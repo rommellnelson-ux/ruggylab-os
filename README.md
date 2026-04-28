@@ -9,6 +9,26 @@ RuggyLab OS is a FastAPI-based laboratory information backend designed for clini
 
 > Laboratory backend for patient intake, sample lifecycle tracking, result validation, reagent control, auditability, and device-oriented workflows.
 
+## Table of contents
+
+- [Why RuggyLab OS](#why-ruggylab-os)
+- [Repository profile](#repository-profile)
+- [Highlights](#highlights)
+- [Main use cases](#main-use-cases)
+- [Technical snapshot](#technical-snapshot)
+- [Project structure](#project-structure)
+- [Architecture overview](#architecture-overview)
+- [Quick start](#quick-start)
+- [API documentation](#api-documentation)
+- [Core API areas](#core-api-areas)
+- [Typical workflow](#typical-workflow)
+- [Database](#database)
+- [Testing](#testing)
+- [Security notes](#security-notes)
+- [Deployment notes](#deployment-notes)
+- [Branding](#branding)
+- [Roadmap ideas](#roadmap-ideas)
+
 ## Why RuggyLab OS
 
 RuggyLab OS provides a backend foundation for laboratory operations where traceability, access control, and operational visibility matter. It combines clinical workflow entities with reporting, inventory-oriented monitoring, and audit events in a single FastAPI codebase.
@@ -56,6 +76,18 @@ RuggyLab OS provides a backend foundation for laboratory operations where tracea
 - `app/services/`: business logic, interfacing, validation, and audit services
 - `alembic/`: database migrations
 - `tests/`: automated test suite
+
+## Architecture overview
+
+RuggyLab OS follows a layered backend structure:
+
+1. `endpoints` receive HTTP requests and enforce access control
+2. `schemas` validate input and shape output payloads
+3. `services` contain workflow-specific business logic
+4. `models` and `db` handle persistence and session management
+5. `reports` and audit services expose operational visibility on top of stored data
+
+In practice, this keeps request handling thin while making domain workflows easier to test and extend.
 
 ## Quick start
 
@@ -112,6 +144,19 @@ Once the server is running:
 - `imaging`: microscope capture reservation flow
 - `ratio-presets` and `equipment-reagent-ratios`: reagent consumption modeling
 
+## Typical workflow
+
+A common RuggyLab OS workflow looks like this:
+
+1. Authenticate and obtain a bearer token
+2. Register a patient
+3. Create and receive a sample
+4. Register or select the equipment involved
+5. Submit results manually or through device-oriented endpoints
+6. Review dashboards, audit events, and stock-related signals
+
+This sequence mirrors the way the current API modules are organized and tested.
+
 ## Database
 
 ### Run migrations
@@ -151,6 +196,10 @@ The repository includes:
 - `docker-compose.yml` for PostgreSQL and pgAdmin
 - Alembic for schema migration management
 - a first API and domain structure suitable for extension
+
+## Branding
+
+If you want to generate a visual banner or cover image for the repository, use the prompt stored in `docs/banner-prompt.md`.
 
 ## Roadmap ideas
 
