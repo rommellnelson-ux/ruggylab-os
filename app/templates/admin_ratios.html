@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RuggyLab OS - Administration des ratios</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --line: #d7e0ea;
+      --text: #16202a;
+      --muted: #607284;
+      --accent: #0b6efd;
+      --danger: #c62828;
+      --success: #0f9d58;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1, h2, h3 { margin: 0 0 10px 0; }
+    p { margin: 0; color: var(--muted); }
+    .toolbar, .layout { display: grid; gap: 16px; }
+    .toolbar { grid-template-columns: 1.5fr 1fr auto auto; align-items: end; margin-bottom: 16px; }
+    .layout { grid-template-columns: 1.1fr 0.9fr; }
+    .stack { display: grid; gap: 16px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font: inherit;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+    button.secondary { background: #334155; }
+    button.danger { background: var(--danger); }
+    button.ghost {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--line);
+    }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #e8f0fe;
+      color: #174ea6;
+    }
+    .log {
+      margin-top: 12px;
+      background: #0f172a;
+      color: #dbeafe;
+      padding: 12px;
+      border-radius: 8px;
+      min-height: 120px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    .small { font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Administration des ratios</h1>
+    <p>Configurer les consommations machine, appliquer des presets, consulter l'historique des versions.</p>
+
+    <div class="toolbar">
+      <div>
+        <label for="token">Bearer token administrateur</label>
+        <input id="token" placeholder="Colle le token ici" />
+      </div>
+      <div>
+        <label for="equipmentFilter">Filtre équipement</label>
+        <input id="equipmentFilter" placeholder="equipment_id facultatif" />
+      </div>
+      <button class="secondary" onclick="refreshAll()">Rafraîchir</button>
+      <button class="ghost" onclick="clearLog()">Vider log</button>
+    </div>
+
+    <div class="layout">
+      <div class="stack">
+        <section class="panel">
+          <h2>Ratios actifs</h2>
+          <p class="small">Sélectionne un ratio pour voir l'historique et le modifier.</p>
+          <table id="ratioTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Équipement</th>
+                <th>Réactif</th>
+                <th>Conso/run</th>
+                <th>Facteur</th>
+                <th>Actif</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <h2>Presets</h2>
+          <table id="presetTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nom</th>
+                <th>Machine</th>
+                <th>Actif</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="panel">
+          <h2>Créer ou modifier un ratio</h2>
+          <div class="row2">
+            <div>
+              <label for="ratioId">Ratio ID</label>
+              <input id="ratioId" placeholder="laisser vide pour créer" />
+            </div>
+            <div>
+              <label for="ratioActive">Actif</label>
+              <select id="ratioActive">
+                <option value="true">Oui</option>
+                <option value="false">Non</option>
+              </select>
+            </div>
+          </div>
+          <div class="row2">
+            <div>
+              <label for="equipmentId">Equipment ID</label>
+              <input id="equipmentId" />
+            </div>
+            <div>
+              <label for="reagentId">Reagent ID</label>
+              <input id="reagentId" />
+            </div>
+          </div>
+          <div class="row2">
+            <div>
+              <label for="consumptionPerRun">Consommation par run</label>
+              <input id="consumptionPerRun" />
+            </div>
+            <div>
+              <label for="adjustmentFactor">Facteur d'ajustement</label>
+              <input id="adjustmentFactor" value="1.0" />
+            </div>
+          </div>
+          <label for="ratioNotes">Notes</label>
+          <textarea id="ratioNotes"></textarea>
+          <div class="actions" style="margin-top:12px;">
+            <button onclick="saveRatio()">Enregistrer</button>
+            <button class="danger" onclick="deleteRatio()">Supprimer</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Créer un preset</h2>
+          <label for="presetName">Nom</label>
+          <input id="presetName" />
+          <label for="presetEquipment">Nom machine</label>
+          <input id="presetEquipment" />
+          <label for="presetDescription">Description</label>
+          <textarea id="presetDescription"></textarea>
+          <div class="actions" style="margin-top:12px;">
+            <button onclick="createPreset()">Créer preset</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Ajouter un item à un preset</h2>
+          <div class="row2">
+            <div>
+              <label for="presetId">Preset ID</label>
+              <input id="presetId" />
+            </div>
+            <div>
+              <label for="presetApplyEquipmentId">Appliquer sur equipment ID</label>
+              <input id="presetApplyEquipmentId" />
+            </div>
+          </div>
+          <label for="presetReagentName">Nom réactif</label>
+          <input id="presetReagentName" />
+          <div class="row2">
+            <div>
+              <label for="presetConsumption">Consommation par run</label>
+              <input id="presetConsumption" />
+            </div>
+            <div>
+              <label for="presetFactor">Facteur d'ajustement</label>
+              <input id="presetFactor" value="1.0" />
+            </div>
+          </div>
+          <label for="presetItemNotes">Notes</label>
+          <textarea id="presetItemNotes"></textarea>
+          <div class="actions" style="margin-top:12px;">
+            <button onclick="createPresetItem()">Ajouter item</button>
+            <button class="secondary" onclick="applyPreset()">Appliquer preset</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Historique du ratio sélectionné</h2>
+          <table id="historyTable">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Conso/run</th>
+                <th>Facteur</th>
+                <th>Motif</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </section>
+
+        <section class="panel">
+          <h2>Journal</h2>
+          <div class="log" id="output">Prêt.</div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let selectedRatioId = null;
+
+    function tokenHeaders() {
+      const token = $("token").value.trim();
+      return {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      };
+    }
+
+    function log(message) {
+      $("output").textContent = typeof message === "string" ? message : JSON.stringify(message, null, 2);
+    }
+
+    function clearLog() {
+      $("output").textContent = "Prêt.";
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      let payload = text;
+      try { payload = JSON.parse(text); } catch {}
+      if (!response.ok) {
+        log(payload);
+        throw new Error(response.statusText);
+      }
+      return payload;
+    }
+
+    async function refreshRatios() {
+      const equipmentFilter = $("equipmentFilter").value.trim();
+      const qs = equipmentFilter ? `?equipment_id=${encodeURIComponent(equipmentFilter)}` : "";
+      const data = await fetchJson(`/api/v1/equipment-reagent-ratios${qs}`, { headers: tokenHeaders() });
+      const tbody = $("ratioTable").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.items) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.id}</td>
+          <td>${row.equipment_id}</td>
+          <td>${row.reagent_id}</td>
+          <td>${row.consumption_per_run}</td>
+          <td>${row.adjustment_factor}</td>
+          <td><span class="pill">${row.is_active ? "Oui" : "Non"}</span></td>
+          <td><button class="ghost" data-ratio="${row.id}">Ouvrir</button></td>
+        `;
+        tr.querySelector("button").addEventListener("click", () => loadRatio(row));
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function refreshPresets() {
+      const data = await fetchJson(`/api/v1/ratio-presets`, { headers: tokenHeaders() });
+      const tbody = $("presetTable").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data.items) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.id}</td>
+          <td>${row.name}</td>
+          <td>${row.equipment_name}</td>
+          <td><span class="pill">${row.is_active ? "Oui" : "Non"}</span></td>
+          <td><button class="ghost" data-preset="${row.id}">Voir items</button></td>
+        `;
+        tr.querySelector("button").addEventListener("click", () => inspectPreset(row.id));
+        tbody.appendChild(tr);
+      }
+    }
+
+    function loadRatio(row) {
+      selectedRatioId = row.id;
+      $("ratioId").value = row.id;
+      $("equipmentId").value = row.equipment_id;
+      $("reagentId").value = row.reagent_id;
+      $("consumptionPerRun").value = row.consumption_per_run;
+      $("adjustmentFactor").value = row.adjustment_factor;
+      $("ratioNotes").value = row.notes || "";
+      $("ratioActive").value = String(row.is_active);
+      loadHistory(row.id);
+    }
+
+    async function loadHistory(ratioId) {
+      const data = await fetchJson(`/api/v1/equipment-reagent-ratios/${ratioId}/versions`, { headers: tokenHeaders() });
+      const tbody = $("historyTable").querySelector("tbody");
+      tbody.innerHTML = "";
+      for (const row of data) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.version_number}</td>
+          <td>${row.consumption_per_run}</td>
+          <td>${row.adjustment_factor}</td>
+          <td>${row.change_reason || ""}</td>
+          <td>${row.created_at}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function saveRatio() {
+      const id = $("ratioId").value.trim();
+      const body = {
+        equipment_id: Number($("equipmentId").value),
+        reagent_id: Number($("reagentId").value),
+        consumption_per_run: Number($("consumptionPerRun").value),
+        adjustment_factor: Number($("adjustmentFactor").value),
+        notes: $("ratioNotes").value,
+        is_active: $("ratioActive").value === "true"
+      };
+      const method = id ? "PUT" : "POST";
+      const url = id ? `/api/v1/equipment-reagent-ratios/${id}` : `/api/v1/equipment-reagent-ratios`;
+      const payload = id ? {
+        consumption_per_run: body.consumption_per_run,
+        adjustment_factor: body.adjustment_factor,
+        notes: body.notes,
+        is_active: body.is_active
+      } : body;
+      const data = await fetchJson(url, { method, headers: tokenHeaders(), body: JSON.stringify(payload) });
+      log(data);
+      await refreshRatios();
+      if (data.id) loadHistory(data.id);
+    }
+
+    async function deleteRatio() {
+      const id = $("ratioId").value.trim();
+      if (!id) return;
+      const data = await fetchJson(`/api/v1/equipment-reagent-ratios/${id}`, { method: "DELETE", headers: tokenHeaders() });
+      log(data);
+      selectedRatioId = null;
+      $("historyTable").querySelector("tbody").innerHTML = "";
+      await refreshRatios();
+    }
+
+    async function createPreset() {
+      const body = {
+        name: $("presetName").value,
+        equipment_name: $("presetEquipment").value,
+        description: $("presetDescription").value,
+        is_active: true
+      };
+      const data = await fetchJson(`/api/v1/ratio-presets`, { method: "POST", headers: tokenHeaders(), body: JSON.stringify(body) });
+      log(data);
+      await refreshPresets();
+    }
+
+    async function createPresetItem() {
+      const body = {
+        preset_id: Number($("presetId").value),
+        reagent_name: $("presetReagentName").value,
+        reagent_category: null,
+        reagent_unit: "unit",
+        consumption_per_run: Number($("presetConsumption").value),
+        adjustment_factor: Number($("presetFactor").value),
+        notes: $("presetItemNotes").value,
+        is_active: true
+      };
+      const data = await fetchJson(`/api/v1/ratio-presets/items`, { method: "POST", headers: tokenHeaders(), body: JSON.stringify(body) });
+      log(data);
+    }
+
+    async function applyPreset() {
+      const presetId = $("presetId").value;
+      const equipmentId = $("presetApplyEquipmentId").value;
+      const data = await fetchJson(`/api/v1/ratio-presets/${presetId}/apply?equipment_id=${equipmentId}`, { method: "POST", headers: tokenHeaders() });
+      log(data);
+      await refreshRatios();
+    }
+
+    async function inspectPreset(presetId) {
+      const data = await fetchJson(`/api/v1/ratio-presets/${presetId}/items`, { headers: tokenHeaders() });
+      log(data);
+      $("presetId").value = presetId;
+    }
+
+    async function refreshAll() {
+      await refreshRatios();
+      await refreshPresets();
+      log("Données rafraîchies.");
+    }
+  </script>
+</body>
+</html>
