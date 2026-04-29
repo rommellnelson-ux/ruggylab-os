@@ -628,6 +628,136 @@ def test_dh36_ingestion_rejects_unknown_barcode(client) -> None:
     assert response.json()["rejection_reason"] == "Code-barres inconnu: BAR-UNKNOWN."
 
 
+def test_result_report_pdf_can_be_signed_and_audited(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-SIGN-001",
+            "first_name": "Officier",
+            "last_name": "Signature",
+            "birth_date": "1988-01-10",
+            "sex": "M",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BAR-SIGN-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    equipment = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={
+            "name": "Signature Analyzer",
+            "serial_number": "SIGN-001",
+            "type": "Automate",
+        },
+    ).json()
+    result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "equipment_id": equipment["id"],
+            "data_points": {"WBC": 6.1, "HGB": 132},
+            "is_critical": False,
+        },
+    ).json()
+
+    pdf_response = client.get(
+        f"/api/v1/reports/results/{result['id']}/pdf",
+        headers=headers,
+    )
+    assert pdf_response.status_code == 200
+    assert pdf_response.headers["content-type"] == "application/pdf"
+    assert pdf_response.content.startswith(b"%PDF-1.4")
+
+    sign_response = client.post(
+        f"/api/v1/reports/results/{result['id']}/sign",
+        headers=headers,
+        json={"signature_meaning": "Validation par l'officier de garde."},
+    )
+    assert sign_response.status_code == 201, sign_response.text
+    signature = sign_response.json()
+    assert signature["result_id"] == result["id"]
+    assert len(signature["report_hash"]) == 64
+    assert len(signature["signature_hash"]) == 64
+
+    signed_pdf_response = client.get(
+        f"/api/v1/reports/results/{result['id']}/pdf",
+        headers=headers,
+    )
+    assert signed_pdf_response.status_code == 200
+    assert signature["signature_hash"].encode("ascii") in signed_pdf_response.content
+
+    duplicate_response = client.post(
+        f"/api/v1/reports/results/{result['id']}/sign",
+        headers=headers,
+        json={"signature_meaning": "Validation par l'officier de garde."},
+    )
+    assert duplicate_response.status_code == 409
+
+    audit_response = client.get("/api/v1/audit-events", headers=headers)
+    assert any(
+        event["event_type"] == "report.sign" and event["entity_id"] == str(result["id"])
+        for event in audit_response.json()["items"]
+    )
+
+
+def test_technician_cannot_sign_result_report(client) -> None:
+    admin_headers = _auth_headers(client)
+    test_password = "change_me_admin_password"  # pragma: allowlist secret
+    create_user_response = client.post(
+        "/api/v1/users",
+        headers=admin_headers,
+        json={
+            "username": "tech-sign",
+            "password": test_password,
+            "full_name": "Technicien Signature",
+            "role": "technician",
+        },
+    )
+    assert create_user_response.status_code == 201, create_user_response.text
+    tech_headers = {
+        "Authorization": f"Bearer {_login(client, 'tech-sign', test_password)}"
+    }
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=admin_headers,
+        json={
+            "ipp_unique_id": "IPP-SIGN-002",
+            "first_name": "Tech",
+            "last_name": "Denied",
+            "birth_date": "1988-01-10",
+            "sex": "F",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=admin_headers,
+        json={"barcode": "BAR-SIGN-002", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    result = client.post(
+        "/api/v1/results",
+        headers=admin_headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"WBC": 6.1},
+            "is_critical": False,
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/v1/reports/results/{result['id']}/sign",
+        headers=tech_headers,
+        json={"signature_meaning": "Tentative technicien."},
+    )
+    assert response.status_code == 403
+
+
 def test_validate_order_is_audited(client) -> None:
     headers = _auth_headers(client)
     reagent_response = client.post(

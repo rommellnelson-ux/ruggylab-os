@@ -1,14 +1,22 @@
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user, require_admin
+from app.api.deps import get_current_active_user, require_admin, require_officer
 from app.db.session import get_db
-from app.models import AuditEvent, EquipmentReagentRatio, Reagent, Result, User
+from app.models import (
+    AuditEvent,
+    EquipmentReagentRatio,
+    Reagent,
+    ReportSignature,
+    Result,
+    User,
+)
 from app.schemas.audit_event import AuditEventRead
 from app.schemas.reagent import ReagentRead
+from app.schemas.report_signature import ReportSignatureCreate, ReportSignatureRead
 from app.schemas.reports import (
     AuditActivityEntry,
     AuditDashboardResponse,
@@ -19,8 +27,19 @@ from app.schemas.reports import (
     MonthlyConsumptionEntry,
     StockDashboardResponse,
 )
+from app.services.report_signing import build_result_report_pdf, create_report_signature
 
 router = APIRouter(prefix="/reports")
+
+
+def _get_result_or_404(db: Session, result_id: int) -> Result:
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resultat introuvable.",
+        )
+    return result
 
 
 @router.get("/stock-dashboard", response_model=StockDashboardResponse)
@@ -44,6 +63,83 @@ def stock_dashboard(
         low_stock_reagents=[ReagentRead.model_validate(item) for item in low_stock],
         total_stock_units=float(total_stock_units),
     )
+
+
+@router.get("/results/{result_id}/pdf")
+def result_report_pdf(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Response:
+    del current_user
+    result = _get_result_or_404(db, result_id)
+    signature = (
+        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
+    )
+    pdf_bytes = build_result_report_pdf(result, signature)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="result-{result_id}.pdf"',
+        },
+    )
+
+
+@router.post(
+    "/results/{result_id}/sign",
+    response_model=ReportSignatureRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def sign_result_report(
+    result_id: int,
+    payload: ReportSignatureCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+) -> ReportSignature:
+    result = _get_result_or_404(db, result_id)
+    if not result.is_validated:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Signature impossible: le resultat n'est pas valide.",
+        )
+
+    existing = (
+        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Rapport deja signe pour ce resultat.",
+        )
+
+    return create_report_signature(
+        db,
+        result=result,
+        user=current_user,
+        signature_meaning=payload.signature_meaning,
+    )
+
+
+@router.get(
+    "/results/{result_id}/signature",
+    response_model=ReportSignatureRead,
+)
+def get_result_report_signature(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ReportSignature:
+    del current_user
+    signature = (
+        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
+    )
+    if not signature:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Signature de rapport introuvable.",
+        )
+    return signature
 
 
 @router.get(

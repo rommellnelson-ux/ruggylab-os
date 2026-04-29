@@ -45,6 +45,9 @@ class User(Base):
     )
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="user")
+    report_signatures: Mapped[list["ReportSignature"]] = relationship(
+        back_populates="signed_by"
+    )
 
 
 class Equipment(Base):
@@ -121,6 +124,9 @@ class Result(Base):
         back_populates="result"
     )
     dh36_messages: Mapped[list["DH36InboundMessage"]] = relationship(
+        back_populates="result"
+    )
+    report_signature: Mapped["ReportSignature | None"] = relationship(
         back_populates="result"
     )
 
@@ -279,3 +285,27 @@ class DH36InboundMessage(Base):
     raw_message: Mapped[str] = mapped_column(Text, nullable=False)
 
     result: Mapped["Result | None"] = relationship(back_populates="dh36_messages")
+
+
+class ReportSignature(Base):
+    __tablename__ = "report_signatures"
+    __table_args__ = (
+        UniqueConstraint("result_id", name="uq_report_signatures_result_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    result_id: Mapped[int] = mapped_column(ForeignKey("results.id"), nullable=False)
+    signed_by_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    report_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    signature_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    signature_meaning: Mapped[str] = mapped_column(String(150), nullable=False)
+    signed_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    revocation_reason: Mapped[str | None] = mapped_column(Text)
+
+    result: Mapped["Result"] = relationship(back_populates="report_signature")
+    signed_by: Mapped["User"] = relationship(back_populates="report_signatures")
