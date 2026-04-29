@@ -47,6 +47,24 @@ def _create_patient_sample_equipment(client) -> None:
     )
 
 
+def _dh36_message(barcode: str, message_id: str, serial: str = "DH36-ING-001") -> str:
+    return "\r".join(
+        [
+            f"MSH|^~\\&|{serial}|LAB|RUGGYLAB|LAB|20260429183000||ORU^R01|{message_id}|P|2.3",
+            "PID|||IPP-DH36-001||Battle^Ready",
+            f"OBR|1||{barcode}||CBC",
+            "OBX|1|NM|WBC||6.1|10^9/L",
+            "OBX|2|NM|RBC||4.7|10^12/L",
+            "OBX|3|NM|HGB||132|g/L",
+            "OBX|4|NM|HCT||40|%",
+            "OBX|5|NM|MCV||86|fL",
+            "OBX|6|NM|MCH||29|pg",
+            "OBX|7|NM|MCHC||330|g/L",
+            "OBX|8|NM|PLT||250|10^9/L",
+        ]
+    )
+
+
 def test_precis_expert_endpoint_creates_result_and_audit_event(client) -> None:
     _create_patient_sample_equipment(client)
     headers = _auth_headers(client)
@@ -499,6 +517,115 @@ def test_insufficient_stock_blocks_result_validation(client) -> None:
 
     results = client.get("/api/v1/results", headers=headers).json()
     assert all(item["sample_id"] != sample["id"] for item in results["items"])
+
+
+def test_dh36_ingestion_creates_validated_result_and_is_idempotent(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-DH36-001",
+            "first_name": "Dymind",
+            "last_name": "Runner",
+            "birth_date": "1990-01-10",
+            "sex": "M",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BAR-DH36-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    equipment = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={
+            "name": "Dymind DH36",
+            "serial_number": "DH36-ING-001",
+            "type": "Automate",
+        },
+    ).json()
+    reagent = client.post(
+        "/api/v1/reagents",
+        headers=headers,
+        json={
+            "name": "DH36 Ingest Diluant",
+            "category": "hematology",
+            "unit": "L",
+            "current_stock": 1.0,
+            "alert_threshold": 0.2,
+        },
+    ).json()
+    client.post(
+        "/api/v1/equipment-reagent-ratios",
+        headers=headers,
+        json={
+            "equipment_id": equipment["id"],
+            "reagent_id": reagent["id"],
+            "consumption_per_run": 0.25,
+            "adjustment_factor": 1.0,
+            "is_active": True,
+        },
+    )
+
+    response = client.post(
+        "/api/v1/dh36/ingest",
+        headers=headers,
+        json={"raw_message": _dh36_message("BAR-DH36-001", "MSG-DH36-001")},
+    )
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "processed"
+    result_id = response.json()["result_id"]
+
+    result_response = client.get(f"/api/v1/results/{result_id}", headers=headers)
+    assert result_response.status_code == 200
+    result_payload = result_response.json()
+    assert result_payload["sample_id"] == sample["id"]
+    assert result_payload["equipment_id"] == equipment["id"]
+    assert result_payload["is_validated"] is True
+    assert result_payload["data_points"]["WBC"]["status"] == "N"
+
+    updated_reagent = client.get(
+        f"/api/v1/reagents/{reagent['id']}", headers=headers
+    ).json()
+    assert updated_reagent["current_stock"] == 0.75
+
+    duplicate_response = client.post(
+        "/api/v1/dh36/ingest",
+        headers=headers,
+        json={"raw_message": _dh36_message("BAR-DH36-001", "MSG-DH36-001")},
+    )
+    assert duplicate_response.status_code == 202
+    assert duplicate_response.json()["status"] == "duplicate"
+    assert duplicate_response.json()["result_id"] == result_id
+
+    results = client.get(
+        f"/api/v1/results?sample_id={sample['id']}", headers=headers
+    ).json()
+    assert results["meta"]["total"] == 1
+
+
+def test_dh36_ingestion_rejects_unknown_barcode(client) -> None:
+    headers = _auth_headers(client)
+    client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={
+            "name": "Dymind DH36",
+            "serial_number": "DH36-ING-001",
+            "type": "Automate",
+        },
+    )
+
+    response = client.post(
+        "/api/v1/dh36/ingest",
+        headers=headers,
+        json={"raw_message": _dh36_message("BAR-UNKNOWN", "MSG-DH36-UNKNOWN")},
+    )
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "rejected"
+    assert response.json()["rejection_reason"] == "Code-barres inconnu: BAR-UNKNOWN."
 
 
 def test_validate_order_is_audited(client) -> None:

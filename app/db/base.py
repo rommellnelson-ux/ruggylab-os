@@ -1,6 +1,7 @@
 from app.db.base_class import Base
 from app.models.ruggylab_os import (
     AuditEvent,
+    DH36InboundMessage,
     Equipment,
     EquipmentReagentRatio,
     EquipmentReagentRatioVersion,
@@ -23,6 +24,7 @@ __all__ = [
     "User",
     "Reagent",
     "AuditEvent",
+    "DH36InboundMessage",
     "EquipmentReagentRatio",
     "EquipmentReagentRatioVersion",
     "RatioPreset",

@@ -3,18 +3,12 @@ import datetime as dt
 import logging
 
 from app.db.session import SessionLocal
-from app.models import Equipment, Patient, Result, Sample
-from app.services.interfacing.dymind_dh36 import DH36Parser
-from app.services.validation.med_logic import validate_nfs_parameters
+from app.services.interfacing.dh36_ingestion import ingest_dh36_message
 
 logger = logging.getLogger(__name__)
 
 MLLP_START_BLOCK = b"\x0b"
 MLLP_END_BLOCK = b"\x1c\x0d"
-
-
-def utcnow_naive() -> dt.datetime:
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
 
 
 class DH36Listener:
@@ -56,60 +50,16 @@ class DH36Listener:
     async def process_hl7_message(self, hl7_string: str) -> None:
         session = SessionLocal()
         try:
-            parser = DH36Parser(hl7_string)
-            info = parser.get_info()
-            if not info["barcode"]:
-                logger.warning("DH36 message without barcode")
-                return
-
-            sample = (
-                session.query(Sample).filter(Sample.barcode == info["barcode"]).first()
-            )
-            if not sample:
+            outcome = ingest_dh36_message(session, raw_message=hl7_string)
+            if outcome.duplicate:
+                logger.info(
+                    "Duplicate DH36 message ignored: %s",
+                    outcome.message.message_control_id or outcome.message.raw_hash,
+                )
+            elif outcome.message.status == "rejected":
                 logger.warning(
-                    "Unknown barcode received from DH36: %s", info["barcode"]
+                    "DH36 message rejected: %s", outcome.message.rejection_reason
                 )
-                return
-
-            patient = (
-                session.query(Patient).filter(Patient.id == sample.patient_id).first()
-            )
-            if not patient:
-                logger.warning("Sample %s is not linked to a patient", sample.barcode)
-                return
-
-            analysis_date = utcnow_naive()
-            age_in_years = (
-                analysis_date.year
-                - patient.birth_date.year
-                - (
-                    (analysis_date.month, analysis_date.day)
-                    < (patient.birth_date.month, patient.birth_date.day)
-                )
-            )
-            results_raw = parser.parse_results()
-            equipment = (
-                session.query(Equipment)
-                .filter(Equipment.name == self.equipment_name)
-                .first()
-            )
-            validated_jsonb, is_panic = validate_nfs_parameters(
-                results_raw,
-                age_in_years,
-                patient.sex,
-                equipment.serial_number if equipment else None,
-            )
-
-            new_result = Result(
-                sample_id=sample.id,
-                equipment_id=equipment.id if equipment else None,
-                analysis_date=analysis_date,
-                data_points=validated_jsonb.model_dump(),
-                is_critical=is_panic,
-            )
-            sample.status = "Termine"
-            session.add(new_result)
-            session.commit()
         except Exception as exc:  # pragma: no cover - runtime I/O path
             logger.exception("Critical DH36 processing error: %s", exc)
             session.rollback()

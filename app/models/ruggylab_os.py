@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -117,6 +118,9 @@ class Result(Base):
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")
     stock_movements: Mapped[list["StockMovement"]] = relationship(
+        back_populates="result"
+    )
+    dh36_messages: Mapped[list["DH36InboundMessage"]] = relationship(
         back_populates="result"
     )
 
@@ -248,3 +252,30 @@ class StockMovement(Base):
 
     reagent: Mapped["Reagent"] = relationship(back_populates="stock_movements")
     result: Mapped["Result | None"] = relationship(back_populates="stock_movements")
+
+
+class DH36InboundMessage(Base):
+    __tablename__ = "dh36_inbound_messages"
+    __table_args__ = (
+        UniqueConstraint("raw_hash", name="uq_dh36_inbound_messages_raw_hash"),
+        UniqueConstraint(
+            "message_control_id",
+            name="uq_dh36_inbound_messages_message_control_id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    raw_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    message_control_id: Mapped[str | None] = mapped_column(String(100), index=True)
+    sample_barcode: Mapped[str | None] = mapped_column(String(100), index=True)
+    equipment_serial: Mapped[str | None] = mapped_column(String(100), index=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="received")
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
+    result_id: Mapped[int | None] = mapped_column(ForeignKey("results.id"))
+    received_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+    processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    raw_message: Mapped[str] = mapped_column(Text, nullable=False)
+
+    result: Mapped["Result | None"] = relationship(back_populates="dh36_messages")

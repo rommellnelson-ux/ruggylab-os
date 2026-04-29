@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
+from app.api.v1.endpoints.dh36 import router as dh36_router
 from app.api.v1.endpoints.equipments import router as equipments_router
 from app.api.v1.endpoints.equipment_reagent_ratios import (
     router as equipment_reagent_ratios_router,
@@ -35,6 +36,7 @@ api_router.include_router(equipments_router, tags=["equipments"])
 api_router.include_router(samples_router, tags=["samples"])
 api_router.include_router(results_router, tags=["results"])
 api_router.include_router(results_poct_router, tags=["poct"])
+api_router.include_router(dh36_router, tags=["dh36"])
 api_router.include_router(imaging_router, tags=["imaging"])
 api_router.include_router(operations_router, tags=["operations"])
 api_router.include_router(reports_router, tags=["reports"])
