@@ -250,3 +250,82 @@ def test_create_result_uses_authenticated_user_for_validation_fields(client) -> 
     payload = response.json()
     assert payload["validator_id"] == 1
     assert payload["is_validated"] is True
+
+
+def test_patient_sample_and_equipment_business_validation(client) -> None:
+    headers = _auth_headers(client)
+
+    future_patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-FUTURE",
+            "first_name": "Future",
+            "last_name": "Patient",
+            "birth_date": "2999-01-01",
+            "sex": "F",
+        },
+    )
+    assert future_patient.status_code == 422
+
+    invalid_sex = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-SEX",
+            "first_name": "Invalid",
+            "last_name": "Sex",
+            "birth_date": "1990-01-01",
+            "sex": "X",
+        },
+    )
+    assert invalid_sex.status_code == 422
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-VALIDATION",
+            "first_name": "Valid",
+            "last_name": "Patient",
+            "birth_date": "1990-01-01",
+            "sex": "m",
+        },
+    )
+    assert patient.status_code == 201
+    assert patient.json()["sex"] == "M"
+
+    invalid_sample_status = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={
+            "barcode": "SAMPLE-INVALID-STATUS",
+            "patient_id": patient.json()["id"],
+            "status": "Lost",
+        },
+    )
+    assert invalid_sample_status.status_code == 422
+
+    invalid_sample_dates = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={
+            "barcode": "SAMPLE-INVALID-DATES",
+            "patient_id": patient.json()["id"],
+            "collection_date": "2026-01-02T10:00:00",
+            "received_date": "2026-01-01T10:00:00",
+            "status": "Recu",
+        },
+    )
+    assert invalid_sample_dates.status_code == 422
+
+    future_calibration = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={
+            "name": "Future Calibration",
+            "serial_number": "FUT-CAL-1",
+            "last_calibration": "2999-01-01",
+        },
+    )
+    assert future_calibration.status_code == 422

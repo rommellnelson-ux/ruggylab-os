@@ -1,16 +1,14 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_SECRET_KEY = "change_me_ruggylab_super_secret_key"
-DEFAULT_FIRST_SUPERUSER_PASSWORD = "change_me_admin_password"
+DEFAULT_SECRET_KEY = "insecure_dev_secret"
+DEFAULT_FIRST_SUPERUSER_PASSWORD = "insecure_admin"
 
 
 class Settings(BaseSettings):
     APP_NAME: str = "RuggyLab OS"
     APP_VERSION: str = "0.1.0"
     API_V1_PREFIX: str = "/api/v1"
-    DATABASE_URL: str = (
-        "postgresql+psycopg://admin:changeme_ruggylab@localhost:5432/ruggylab_os"
-    )
+    DATABASE_URL: str = "sqlite:///./ruggylab_os.db"
     SECRET_KEY: str = DEFAULT_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
