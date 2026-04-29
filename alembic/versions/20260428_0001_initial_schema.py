@@ -4,11 +4,11 @@ Revision ID: 20260428_0001
 Revises:
 Create Date: 2026-04-28 00:00:01
 """
+
 from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
-
 
 revision = "20260428_0001"
 down_revision = None
@@ -60,7 +60,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("ipp_unique_id"),
     )
     op.create_index(op.f("ix_patients_id"), "patients", ["id"], unique=False)
-    op.create_index(op.f("ix_patients_ipp_unique_id"), "patients", ["ipp_unique_id"], unique=True)
+    op.create_index(
+        op.f("ix_patients_ipp_unique_id"), "patients", ["ipp_unique_id"], unique=True
+    )
 
     op.create_table(
         "samples",

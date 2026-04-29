@@ -1,7 +1,19 @@
 import datetime as dt
 import enum
 
-from sqlalchemy import JSON, Boolean, CHAR, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CHAR,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,10 +34,14 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    username: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True
+    )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(150))
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.TECHNICIAN, nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole), default=UserRole.TECHNICIAN, nullable=False
+    )
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="user")
 
@@ -51,7 +67,9 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ipp_unique_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    ipp_unique_id: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False, index=True
+    )
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     birth_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
@@ -65,9 +83,13 @@ class Sample(Base):
     __tablename__ = "samples"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    barcode: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    barcode: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True
+    )
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"))
-    collection_date: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    collection_date: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
     received_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
     status: Mapped[str | None] = mapped_column(String(50))
 
@@ -81,8 +103,12 @@ class Result(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     sample_id: Mapped[int] = mapped_column(ForeignKey("samples.id"), nullable=False)
     equipment_id: Mapped[int | None] = mapped_column(ForeignKey("equipments.id"))
-    analysis_date: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
-    data_points: Mapped[dict] = mapped_column(JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict)
+    analysis_date: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+    data_points: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
+    )
     image_url: Mapped[str | None] = mapped_column(String(255))
     validator_id: Mapped[int | None] = mapped_column(Integer)
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -111,7 +137,9 @@ class EquipmentReagentRatio(Base):
     __tablename__ = "equipment_reagent_ratios"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipments.id"), nullable=False)
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipments.id"), nullable=False
+    )
     reagent_id: Mapped[int] = mapped_column(ForeignKey("reagents.id"), nullable=False)
     consumption_per_run: Mapped[float] = mapped_column(Float, nullable=False)
     adjustment_factor: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
@@ -130,7 +158,9 @@ class EquipmentReagentRatioVersion(Base):
     __tablename__ = "equipment_reagent_ratio_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ratio_id: Mapped[int] = mapped_column(ForeignKey("equipment_reagent_ratios.id"), nullable=False)
+    ratio_id: Mapped[int] = mapped_column(
+        ForeignKey("equipment_reagent_ratios.id"), nullable=False
+    )
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     equipment_id: Mapped[int] = mapped_column(Integer, nullable=False)
     reagent_id: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -140,7 +170,9 @@ class EquipmentReagentRatioVersion(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     changed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     change_reason: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
 
     ratio: Mapped["EquipmentReagentRatio"] = relationship(back_populates="versions")
 
@@ -161,10 +193,14 @@ class RatioPresetItem(Base):
     __tablename__ = "ratio_preset_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    preset_id: Mapped[int] = mapped_column(ForeignKey("ratio_presets.id"), nullable=False)
+    preset_id: Mapped[int] = mapped_column(
+        ForeignKey("ratio_presets.id"), nullable=False
+    )
     reagent_name: Mapped[str] = mapped_column(String(100), nullable=False)
     reagent_category: Mapped[str | None] = mapped_column(String(50))
-    reagent_unit: Mapped[str] = mapped_column(String(20), nullable=False, default="unit")
+    reagent_unit: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unit"
+    )
     consumption_per_run: Mapped[float] = mapped_column(Float, nullable=False)
     adjustment_factor: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     notes: Mapped[str | None] = mapped_column(Text)
@@ -182,6 +218,8 @@ class AuditEvent(Base):
     entity_type: Mapped[str] = mapped_column(String(100), nullable=False)
     entity_id: Mapped[str | None] = mapped_column(String(100))
     payload: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
 
     user: Mapped["User | None"] = relationship(back_populates="audit_events")

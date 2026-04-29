@@ -9,7 +9,6 @@ from app.schemas.pagination import PaginationMeta, ReagentListResponse
 from app.schemas.reagent import ReagentCreate, ReagentRead
 from app.services.audit import log_audit_event
 
-
 router = APIRouter(prefix="/reagents")
 
 
@@ -26,14 +25,18 @@ def list_reagents(
         query = query.filter(Reagent.name.ilike(search))
     total = query.with_entities(func.count(Reagent.id)).scalar() or 0
     items = query.order_by(Reagent.id.desc()).offset(skip).limit(limit).all()
-    return ReagentListResponse(items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit))
+    return ReagentListResponse(
+        items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit)
+    )
 
 
 @router.get("/{reagent_id}", response_model=ReagentRead)
 def get_reagent(reagent_id: int, db: Session = Depends(get_db)) -> Reagent:
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not reagent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable."
+        )
     return reagent
 
 
@@ -75,9 +78,15 @@ def update_reagent(
 ) -> Reagent:
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not reagent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable."
+        )
 
-    existing = db.query(Reagent).filter(Reagent.name == payload.name, Reagent.id != reagent_id).first()
+    existing = (
+        db.query(Reagent)
+        .filter(Reagent.name == payload.name, Reagent.id != reagent_id)
+        .first()
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -108,9 +117,15 @@ def delete_reagent(
 ) -> dict[str, str]:
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not reagent:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable."
+        )
 
-    linked_ratios = db.query(EquipmentReagentRatio).filter(EquipmentReagentRatio.reagent_id == reagent_id).count()
+    linked_ratios = (
+        db.query(EquipmentReagentRatio)
+        .filter(EquipmentReagentRatio.reagent_id == reagent_id)
+        .count()
+    )
     if linked_ratios > 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

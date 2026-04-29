@@ -8,7 +8,6 @@ from app.models import User
 from app.schemas.user import UserCreate, UserRead
 from app.services.audit import log_audit_event
 
-
 router = APIRouter(prefix="/users")
 
 
@@ -22,7 +21,12 @@ def list_users(db: Session = Depends(get_db)) -> list[User]:
     return db.query(User).order_by(User.id.desc()).all()
 
 
-@router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
+@router.post(
+    "",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin)],
+)
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),

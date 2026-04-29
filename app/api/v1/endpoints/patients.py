@@ -8,7 +8,6 @@ from app.models import Patient, User
 from app.schemas.pagination import PaginationMeta, PatientListResponse
 from app.schemas.patient import PatientCreate, PatientRead
 
-
 router = APIRouter(prefix="/patients")
 
 
@@ -35,15 +34,23 @@ def list_patients(
 
     total = query.with_entities(func.count(Patient.id)).scalar() or 0
     items = query.order_by(Patient.id.desc()).offset(skip).limit(limit).all()
-    return PatientListResponse(items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit))
+    return PatientListResponse(
+        items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit)
+    )
 
 
 @router.get("/{patient_id}", response_model=PatientRead)
-def get_patient(patient_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> Patient:
+def get_patient(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Patient:
     del current_user
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Patient introuvable."
+        )
     return patient
 
 
@@ -54,7 +61,9 @@ def create_patient(
     current_user: User = Depends(get_current_active_user),
 ) -> Patient:
     del current_user
-    existing = db.query(Patient).filter(Patient.ipp_unique_id == payload.ipp_unique_id).first()
+    existing = (
+        db.query(Patient).filter(Patient.ipp_unique_id == payload.ipp_unique_id).first()
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

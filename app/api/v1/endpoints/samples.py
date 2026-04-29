@@ -6,12 +6,13 @@ from app.db.session import get_db
 from app.models import Patient, Sample, User
 from app.schemas.sample import SampleCreate, SampleRead
 
-
 router = APIRouter(prefix="/samples")
 
 
 @router.get("", response_model=list[SampleRead])
-def list_samples(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> list[Sample]:
+def list_samples(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+) -> list[Sample]:
     del current_user
     return db.query(Sample).order_by(Sample.id.desc()).all()
 

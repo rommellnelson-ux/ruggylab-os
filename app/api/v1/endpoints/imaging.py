@@ -10,9 +10,10 @@ from app.models import Equipment, Result, Sample
 from app.services.audit import log_audit_event
 from app.services.imaging.capture_service import MicroscopeCaptureService
 
-
 router = APIRouter(prefix="/imaging")
-microscope_service = MicroscopeCaptureService(storage_dir=settings.MICROSCOPY_STORAGE_DIR)
+microscope_service = MicroscopeCaptureService(
+    storage_dir=settings.MICROSCOPY_STORAGE_DIR
+)
 
 
 @router.post("/capture-microscope", status_code=status.HTTP_201_CREATED)

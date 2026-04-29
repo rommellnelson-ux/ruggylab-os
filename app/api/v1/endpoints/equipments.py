@@ -6,12 +6,13 @@ from app.db.session import get_db
 from app.models import Equipment, User
 from app.schemas.equipment import EquipmentCreate, EquipmentRead
 
-
 router = APIRouter(prefix="/equipments")
 
 
 @router.get("", response_model=list[EquipmentRead])
-def list_equipments(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> list[Equipment]:
+def list_equipments(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+) -> list[Equipment]:
     del current_user
     return db.query(Equipment).order_by(Equipment.id.desc()).all()
 
@@ -24,7 +25,11 @@ def create_equipment(
 ) -> Equipment:
     del current_user
     if payload.serial_number:
-        existing = db.query(Equipment).filter(Equipment.serial_number == payload.serial_number).first()
+        existing = (
+            db.query(Equipment)
+            .filter(Equipment.serial_number == payload.serial_number)
+            .first()
+        )
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

@@ -8,7 +8,6 @@ from app.models import Equipment, Result, Sample, User
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import ResultCreate, ResultRead
 
-
 router = APIRouter(prefix="/results")
 
 
@@ -36,15 +35,23 @@ def list_results(
 
     total = query.with_entities(func.count(Result.id)).scalar() or 0
     items = query.order_by(Result.id.desc()).offset(skip).limit(limit).all()
-    return ResultListResponse(items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit))
+    return ResultListResponse(
+        items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit)
+    )
 
 
 @router.get("/{result_id}", response_model=ResultRead)
-def get_result(result_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> Result:
+def get_result(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Result:
     del current_user
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resultat introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Resultat introuvable."
+        )
     return result
 
 
@@ -62,7 +69,9 @@ def create_result(
         )
 
     if payload.equipment_id is not None:
-        equipment = db.query(Equipment).filter(Equipment.id == payload.equipment_id).first()
+        equipment = (
+            db.query(Equipment).filter(Equipment.id == payload.equipment_id).first()
+        )
         if not equipment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

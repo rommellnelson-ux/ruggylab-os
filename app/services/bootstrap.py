@@ -9,7 +9,6 @@ from app.db.base import Base
 from app.db import session as db_session
 from app.models import User, UserRole
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +29,9 @@ def _seed_first_superuser() -> None:
 
     db: Session = db_session.SessionLocal()
     try:
-        existing_user = db.query(User).filter(User.username == settings.FIRST_SUPERUSER).first()
+        existing_user = (
+            db.query(User).filter(User.username == settings.FIRST_SUPERUSER).first()
+        )
         if existing_user:
             return
 

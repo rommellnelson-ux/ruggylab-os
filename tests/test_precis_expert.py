@@ -1,5 +1,8 @@
 from app.schemas.precis_expert import PrecisExpertManualInput
-from app.services.validation.precis_expert import PrecisExpertValidator, calculate_status
+from app.services.validation.precis_expert import (
+    PrecisExpertValidator,
+    calculate_status,
+)
 
 
 def test_glucose_panic_thresholds() -> None:
@@ -18,7 +21,9 @@ def test_glucose_panic_thresholds() -> None:
         ketones_unit="mmol/L",
     )
 
-    validator = PrecisExpertValidator(mock_input, patient_age=35, patient_sex="M", user_id=1)
+    validator = PrecisExpertValidator(
+        mock_input, patient_age=35, patient_sex="M", user_id=1
+    )
     validated_jsonb, is_panic = validator.validate_all()
 
     assert is_panic is True
@@ -48,7 +53,9 @@ def test_lactate_critical_threshold() -> None:
         ketones_raw=0.3,
     )
 
-    validator = PrecisExpertValidator(mock_input, patient_age=29, patient_sex="F", user_id=7)
+    validator = PrecisExpertValidator(
+        mock_input, patient_age=29, patient_sex="F", user_id=7
+    )
     validated_jsonb, is_panic = validator.validate_all()
 
     assert is_panic is True

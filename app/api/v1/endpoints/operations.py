@@ -7,7 +7,6 @@ from app.models import Reagent, User
 from app.schemas.operations import ValidateOrderRequest
 from app.services.audit import log_audit_event
 
-
 router = APIRouter(prefix="/operations")
 
 
@@ -21,7 +20,9 @@ def validate_reagent_order(
     if payload.reagent_id is not None:
         reagent = db.query(Reagent).filter(Reagent.id == payload.reagent_id).first()
         if reagent is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Reactif introuvable."
+            )
         reagent_name = reagent.name
 
     log_audit_event(
@@ -29,7 +30,8 @@ def validate_reagent_order(
         user=current_user,
         event_type="operation.validate_order",
         entity_type="reagent_order",
-        entity_id=payload.order_reference or (str(payload.reagent_id) if payload.reagent_id is not None else None),
+        entity_id=payload.order_reference
+        or (str(payload.reagent_id) if payload.reagent_id is not None else None),
         payload={
             "reagent_id": payload.reagent_id,
             "reagent_name": reagent_name,

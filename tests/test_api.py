@@ -7,7 +7,9 @@ def _login(client, username: str, password: str) -> str:
     return response.json()["access_token"]
 
 
-def _auth_headers(client, username: str = "admin", password: str = "change_me_admin_password") -> dict[str, str]:
+def _auth_headers(
+    client, username: str = "admin", password: str = "change_me_admin_password"
+) -> dict[str, str]:
     return {"Authorization": f"Bearer {_login(client, username, password)}"}
 
 
@@ -53,7 +55,11 @@ def test_patients_pagination_and_search(client) -> None:
     )
     assert create_second.status_code == 201, create_second.text
 
-    response = client.get("/api/v1/patients", headers=headers, params={"skip": 0, "limit": 1, "q": "Aminata"})
+    response = client.get(
+        "/api/v1/patients",
+        headers=headers,
+        params={"skip": 0, "limit": 1, "q": "Aminata"},
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["meta"]["total"] == 1
@@ -123,7 +129,11 @@ def test_results_pagination_and_filters(client) -> None:
     )
     assert second_result.status_code == 201, second_result.text
 
-    response = client.get("/api/v1/results", headers=headers, params={"sample_id": sample_id, "is_critical": "true"})
+    response = client.get(
+        "/api/v1/results",
+        headers=headers,
+        params={"sample_id": sample_id, "is_critical": "true"},
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["meta"]["total"] == 1
@@ -173,11 +183,26 @@ def test_sensitive_crud_endpoints_require_authentication(client) -> None:
     assert patient_response.status_code == 401
 
     assert client.get("/api/v1/patients").status_code == 401
-    assert client.post("/api/v1/samples", json={"barcode": "SAMPLE-SEC-001", "patient_id": 1}).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/samples", json={"barcode": "SAMPLE-SEC-001", "patient_id": 1}
+        ).status_code
+        == 401
+    )
     assert client.get("/api/v1/samples").status_code == 401
-    assert client.post("/api/v1/equipments", json={"name": "DH36", "serial_number": "SEC-001"}).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/equipments", json={"name": "DH36", "serial_number": "SEC-001"}
+        ).status_code
+        == 401
+    )
     assert client.get("/api/v1/equipments").status_code == 401
-    assert client.post("/api/v1/results", json={"sample_id": 1, "data_points": {"WBC": 6.1}}).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/results", json={"sample_id": 1, "data_points": {"WBC": 6.1}}
+        ).status_code
+        == 401
+    )
     assert client.get("/api/v1/results").status_code == 401
 
 

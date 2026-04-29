@@ -7,7 +7,6 @@ from app.models import Equipment, Patient, Result, Sample
 from app.services.interfacing.dymind_dh36 import DH36Parser
 from app.services.validation.med_logic import validate_nfs_parameters
 
-
 logger = logging.getLogger(__name__)
 
 MLLP_START_BLOCK = b"\x0b"
@@ -24,7 +23,9 @@ class DH36Listener:
         self.port = port
         self.equipment_name = "Dymind DH36"
 
-    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         addr = writer.get_extra_info("peername")
         logger.info("DH36 connection received from %s", addr)
         buffer = b""
@@ -61,22 +62,37 @@ class DH36Listener:
                 logger.warning("DH36 message without barcode")
                 return
 
-            sample = session.query(Sample).filter(Sample.barcode == info["barcode"]).first()
+            sample = (
+                session.query(Sample).filter(Sample.barcode == info["barcode"]).first()
+            )
             if not sample:
-                logger.warning("Unknown barcode received from DH36: %s", info["barcode"])
+                logger.warning(
+                    "Unknown barcode received from DH36: %s", info["barcode"]
+                )
                 return
 
-            patient = session.query(Patient).filter(Patient.id == sample.patient_id).first()
+            patient = (
+                session.query(Patient).filter(Patient.id == sample.patient_id).first()
+            )
             if not patient:
                 logger.warning("Sample %s is not linked to a patient", sample.barcode)
                 return
 
             analysis_date = utcnow_naive()
-            age_in_years = analysis_date.year - patient.birth_date.year - (
-                (analysis_date.month, analysis_date.day) < (patient.birth_date.month, patient.birth_date.day)
+            age_in_years = (
+                analysis_date.year
+                - patient.birth_date.year
+                - (
+                    (analysis_date.month, analysis_date.day)
+                    < (patient.birth_date.month, patient.birth_date.day)
+                )
             )
             results_raw = parser.parse_results()
-            equipment = session.query(Equipment).filter(Equipment.name == self.equipment_name).first()
+            equipment = (
+                session.query(Equipment)
+                .filter(Equipment.name == self.equipment_name)
+                .first()
+            )
             validated_jsonb, is_panic = validate_nfs_parameters(
                 results_raw,
                 age_in_years,

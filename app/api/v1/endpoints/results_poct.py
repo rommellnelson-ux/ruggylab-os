@@ -11,7 +11,6 @@ from app.schemas.precis_expert import PrecisExpertManualInput
 from app.services.audit import log_audit_event
 from app.services.validation.precis_expert import PrecisExpertValidator
 
-
 router = APIRouter(prefix="/results/precis-expert")
 
 
@@ -40,17 +39,28 @@ def submit_precis_expert_results(
         )
 
     analysis_date = utcnow_naive()
-    age_in_years = analysis_date.year - patient.birth_date.year - (
-        (analysis_date.month, analysis_date.day) < (patient.birth_date.month, patient.birth_date.day)
+    age_in_years = (
+        analysis_date.year
+        - patient.birth_date.year
+        - (
+            (analysis_date.month, analysis_date.day)
+            < (patient.birth_date.month, patient.birth_date.day)
+        )
     )
 
-    validator = PrecisExpertValidator(payload, age_in_years, patient.sex, current_user.id)
+    validator = PrecisExpertValidator(
+        payload, age_in_years, patient.sex, current_user.id
+    )
     validated_jsonb, is_panic = validator.validate_all()
 
-    equipment = db.query(Equipment).filter(
-        Equipment.serial_number == payload.equipment_serial,
-        Equipment.name == "Precis Expert",
-    ).first()
+    equipment = (
+        db.query(Equipment)
+        .filter(
+            Equipment.serial_number == payload.equipment_serial,
+            Equipment.name == "Precis Expert",
+        )
+        .first()
+    )
     if not equipment:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

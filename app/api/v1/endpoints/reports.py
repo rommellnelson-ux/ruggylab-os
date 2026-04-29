@@ -20,7 +20,6 @@ from app.schemas.reports import (
     StockDashboardResponse,
 )
 
-
 router = APIRouter(prefix="/reports")
 
 
@@ -37,7 +36,9 @@ def stock_dashboard(
         .all()
     )
     total_reagents = db.query(func.count(Reagent.id)).scalar() or 0
-    total_stock_units = db.query(func.coalesce(func.sum(Reagent.current_stock), 0.0)).scalar() or 0.0
+    total_stock_units = (
+        db.query(func.coalesce(func.sum(Reagent.current_stock), 0.0)).scalar() or 0.0
+    )
     return StockDashboardResponse(
         total_reagents=total_reagents,
         low_stock_reagents=[ReagentRead.model_validate(item) for item in low_stock],
@@ -45,11 +46,19 @@ def stock_dashboard(
     )
 
 
-@router.get("/audit-dashboard", response_model=AuditDashboardResponse, dependencies=[Depends(require_admin)])
+@router.get(
+    "/audit-dashboard",
+    response_model=AuditDashboardResponse,
+    dependencies=[Depends(require_admin)],
+)
 def audit_dashboard(db: Session = Depends(get_db)) -> AuditDashboardResponse:
     total_events = db.query(func.count(AuditEvent.id)).scalar() or 0
     recent = db.query(AuditEvent).order_by(AuditEvent.id.desc()).limit(20).all()
-    grouped = db.query(AuditEvent.event_type, func.count(AuditEvent.id)).group_by(AuditEvent.event_type).all()
+    grouped = (
+        db.query(AuditEvent.event_type, func.count(AuditEvent.id))
+        .group_by(AuditEvent.event_type)
+        .all()
+    )
     breakdown = {event_type: count for event_type, count in grouped}
     return AuditDashboardResponse(
         total_events=total_events,
@@ -76,7 +85,11 @@ def monthly_consumption_dashboard(
     )
 
     reagent_usage_map: dict[str, dict[str, object]] = {}
-    ratios = db.query(EquipmentReagentRatio).filter(EquipmentReagentRatio.is_active == True).all()  # noqa: E712
+    ratios = (
+        db.query(EquipmentReagentRatio)
+        .filter(EquipmentReagentRatio.is_active == True)
+        .all()
+    )  # noqa: E712
     for ratio in ratios:
         run_count = int(monthly_result_counts.get(ratio.equipment_id, 0))
         if run_count <= 0:
@@ -90,7 +103,9 @@ def monthly_consumption_dashboard(
             },
         )
         adjusted_ratio = ratio.consumption_per_run * ratio.adjustment_factor
-        usage["estimated_monthly_consumption"] = float(usage["estimated_monthly_consumption"]) + (run_count * adjusted_ratio)
+        usage["estimated_monthly_consumption"] = float(
+            usage["estimated_monthly_consumption"]
+        ) + (run_count * adjusted_ratio)
         usage["actual_run_count"] = int(usage["actual_run_count"]) + run_count
         usage["source_equipment"].add(ratio.equipment.name)
 
@@ -99,7 +114,11 @@ def monthly_consumption_dashboard(
     for reagent in reagents:
         usage = reagent_usage_map.get(
             reagent.name,
-            {"estimated_monthly_consumption": 0.0, "actual_run_count": 0, "source_equipment": set()},
+            {
+                "estimated_monthly_consumption": 0.0,
+                "actual_run_count": 0,
+                "source_equipment": set(),
+            },
         )
         estimated_monthly_consumption = float(usage["estimated_monthly_consumption"])
         days_of_cover = None
@@ -118,7 +137,9 @@ def monthly_consumption_dashboard(
                 days_of_cover=days_of_cover,
             )
         )
-    return MonthlyConsumptionDashboardResponse(month=f"{year:04d}-{month:02d}", items=items)
+    return MonthlyConsumptionDashboardResponse(
+        month=f"{year:04d}-{month:02d}", items=items
+    )
 
 
 @router.get("/critical-thresholds", response_model=CriticalThresholdDashboardResponse)
@@ -146,10 +167,16 @@ def critical_threshold_dashboard(
                 severity=severity,
             )
         )
-    return CriticalThresholdDashboardResponse(total_critical_reagents=len(items), items=items)
+    return CriticalThresholdDashboardResponse(
+        total_critical_reagents=len(items), items=items
+    )
 
 
-@router.get("/audit-activity", response_model=AuditUserActivityDashboardResponse, dependencies=[Depends(require_admin)])
+@router.get(
+    "/audit-activity",
+    response_model=AuditUserActivityDashboardResponse,
+    dependencies=[Depends(require_admin)],
+)
 def audit_activity_dashboard(
     db: Session = Depends(get_db),
     days: int = Query(default=7, ge=1, le=90),
@@ -172,5 +199,11 @@ def audit_activity_dashboard(
     for username, event_date, event_count in grouped:
         if not event_date:
             continue
-        items.append(AuditActivityEntry(username=username or "unknown", event_date=str(event_date), event_count=int(event_count)))
+        items.append(
+            AuditActivityEntry(
+                username=username or "unknown",
+                event_date=str(event_date),
+                event_count=int(event_count),
+            )
+        )
     return AuditUserActivityDashboardResponse(items=items)

@@ -9,7 +9,6 @@ from app.core.middleware import PoweredByMiddleware
 from app.services.bootstrap import init_db
 from app.services.interfacing.listener_dh36 import DH36Listener
 
-
 logger = logging.getLogger(__name__)
 
 

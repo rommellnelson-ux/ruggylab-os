@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "RuggyLab OS"
     APP_VERSION: str = "0.1.0"
     API_V1_PREFIX: str = "/api/v1"
-    DATABASE_URL: str = "postgresql+psycopg://admin:changeme_ruggylab@localhost:5432/ruggylab_os"
+    DATABASE_URL: str = (
+        "postgresql+psycopg://admin:changeme_ruggylab@localhost:5432/ruggylab_os"
+    )
     SECRET_KEY: str = DEFAULT_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
@@ -39,8 +41,13 @@ class Settings(BaseSettings):
 
     @property
     def requires_security_hardening(self) -> bool:
-        weak_secret = len(self.SECRET_KEY) < 32 or "change_me" in self.SECRET_KEY.lower()
-        weak_admin_password = len(self.FIRST_SUPERUSER_PASSWORD) < 16 or "change_me" in self.FIRST_SUPERUSER_PASSWORD.lower()
+        weak_secret = (
+            len(self.SECRET_KEY) < 32 or "change_me" in self.SECRET_KEY.lower()
+        )
+        weak_admin_password = (
+            len(self.FIRST_SUPERUSER_PASSWORD) < 16
+            or "change_me" in self.FIRST_SUPERUSER_PASSWORD.lower()
+        )
         return weak_secret or weak_admin_password
 
 

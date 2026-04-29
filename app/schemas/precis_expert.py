@@ -5,7 +5,9 @@ from app.schemas.dh36_interfacing import RuggylabJSONPoint
 
 class PrecisExpertManualInput(BaseModel):
     sample_barcode: str = Field(..., description="Code-barres de l'echantillon scanne")
-    equipment_serial: str = Field(..., description="Numero de serie de l'appareil Precis Expert")
+    equipment_serial: str = Field(
+        ..., description="Numero de serie de l'appareil Precis Expert"
+    )
     glucose_raw: float
     glucose_unit: str = "g/L"
     cholesterol_raw: float

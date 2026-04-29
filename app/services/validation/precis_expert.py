@@ -17,7 +17,13 @@ def calculate_status(value: float, low: float, high: float) -> str:
 
 
 class PrecisExpertValidator:
-    def __init__(self, input_data: PrecisExpertManualInput, patient_age: float, patient_sex: str | None, user_id: int):
+    def __init__(
+        self,
+        input_data: PrecisExpertManualInput,
+        patient_age: float,
+        patient_sex: str | None,
+        user_id: int,
+    ):
         self.input = input_data
         self.patient_age = patient_age
         self.patient_sex = patient_sex

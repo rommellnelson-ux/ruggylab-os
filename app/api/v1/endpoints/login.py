@@ -10,7 +10,6 @@ from app.db.session import get_db
 from app.models import User
 from app.schemas.auth import Token
 
-
 router = APIRouter(prefix="/login")
 
 
@@ -28,5 +27,7 @@ def login_access_token(
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return Token(
-        access_token=create_access_token(user.username, expires_delta=access_token_expires),
+        access_token=create_access_token(
+            user.username, expires_delta=access_token_expires
+        ),
     )
