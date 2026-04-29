@@ -197,6 +197,19 @@ The repository includes:
 - Alembic for schema migration management
 - a first API and domain structure suitable for extension
 
+### Docker configuration
+
+Before running Docker Compose, create a local `.env` from `.env.example` and set at least:
+
+- `POSTGRES_PASSWORD`
+- `PGADMIN_PASSWORD`
+
+These values are required by `docker-compose.yml`; RuggyLab OS does not provide default database or pgAdmin passwords.
+
+```bash
+docker compose up -d
+```
+
 ## Branding
 
 If you want to generate a visual banner or cover image for the repository, use the prompt stored in `docs/banner-prompt.md`.

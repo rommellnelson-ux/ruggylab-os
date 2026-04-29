@@ -26,12 +26,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff black
+          pip install ruff black pip-audit detect-secrets
 
       - name: Run lint checks
         run: |
           ruff check .
           black --check .
+
+      - name: Audit dependencies
+        run: pip-audit -r requirements.txt
+
+      - name: Scan for secrets
+        run: detect-secrets-hook --baseline .secrets.baseline $(git ls-files)
 
       - name: Run test suite
         run: pytest
