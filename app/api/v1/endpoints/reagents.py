@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import EquipmentReagentRatio, Reagent, User
+from app.models import EquipmentReagentRatio, Reagent, StockMovement, User
 from app.schemas.pagination import PaginationMeta, ReagentListResponse
 from app.schemas.reagent import ReagentCreate, ReagentRead
 from app.services.audit import log_audit_event
@@ -137,6 +137,14 @@ def delete_reagent(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Suppression impossible: ce reactif est encore utilise dans des ratios de consommation.",
+        )
+    linked_movements = (
+        db.query(StockMovement).filter(StockMovement.reagent_id == reagent_id).count()
+    )
+    if linked_movements > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Suppression impossible: ce reactif possede un historique de mouvements de stock.",
         )
 
     log_audit_event(

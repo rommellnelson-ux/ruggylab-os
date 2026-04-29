@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.models import Equipment, Result, Sample, User
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import ResultCreate, ResultRead
+from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 
 router = APIRouter(prefix="/results")
 
@@ -83,6 +84,22 @@ def create_result(
     result_data["is_validated"] = True
     result = Result(**result_data)
     db.add(result)
+    db.flush()
+    try:
+        consume_reagents_for_result(
+            db,
+            result=result,
+            user=current_user,
+            source="result.create",
+        )
+    except InsufficientStockError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Stock reactif insuffisant pour valider ce resultat.",
+                "items": [item.__dict__ for item in exc.items],
+            },
+        ) from exc
     db.commit()
     db.refresh(result)
     return result

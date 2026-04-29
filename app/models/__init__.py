@@ -9,6 +9,7 @@ from app.models.ruggylab_os import (
     Reagent,
     Result,
     Sample,
+    StockMovement,
     User,
     UserRole,
 )
@@ -26,4 +27,5 @@ __all__ = [
     "EquipmentReagentRatioVersion",
     "RatioPreset",
     "RatioPresetItem",
+    "StockMovement",
 ]

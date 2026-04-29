@@ -116,6 +116,9 @@ class Result(Base):
 
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")
+    stock_movements: Mapped[list["StockMovement"]] = relationship(
+        back_populates="result"
+    )
 
 
 class Reagent(Base):
@@ -130,6 +133,9 @@ class Reagent(Base):
     equipment_ratios: Mapped[list["EquipmentReagentRatio"]] = relationship(
         back_populates="reagent",
         cascade="all, delete-orphan",
+    )
+    stock_movements: Mapped[list["StockMovement"]] = relationship(
+        back_populates="reagent"
     )
 
 
@@ -223,3 +229,22 @@ class AuditEvent(Base):
     )
 
     user: Mapped["User | None"] = relationship(back_populates="audit_events")
+
+
+class StockMovement(Base):
+    __tablename__ = "stock_movements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    reagent_id: Mapped[int] = mapped_column(ForeignKey("reagents.id"), nullable=False)
+    result_id: Mapped[int | None] = mapped_column(ForeignKey("results.id"))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    quantity_delta: Mapped[float] = mapped_column(Float, nullable=False)
+    stock_before: Mapped[float] = mapped_column(Float, nullable=False)
+    stock_after: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+
+    reagent: Mapped["Reagent"] = relationship(back_populates="stock_movements")
+    result: Mapped["Result | None"] = relationship(back_populates="stock_movements")

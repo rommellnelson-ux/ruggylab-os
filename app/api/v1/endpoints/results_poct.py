@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models import Equipment, Patient, Result, Sample
 from app.schemas.precis_expert import PrecisExpertManualInput
 from app.services.audit import log_audit_event
+from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.validation.precis_expert import PrecisExpertValidator
 
 router = APIRouter(prefix="/results/precis-expert")
@@ -79,6 +80,21 @@ def submit_precis_expert_results(
     sample.status = "Termine"
     db.add(new_result)
     db.flush()
+    try:
+        consume_reagents_for_result(
+            db,
+            result=new_result,
+            user=current_user,
+            source="result.precis_expert.create",
+        )
+    except InsufficientStockError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Stock reactif insuffisant pour valider ce resultat.",
+                "items": [item.__dict__ for item in exc.items],
+            },
+        ) from exc
     log_audit_event(
         db,
         user=current_user,

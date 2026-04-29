@@ -286,8 +286,219 @@ def test_reagent_crud_and_dashboards(client) -> None:
     assert delete_ratio_response.status_code == 200
 
     delete_response = client.delete(f"/api/v1/reagents/{reagent_id}", headers=headers)
-    assert delete_response.status_code == 200
-    assert delete_response.json()["status"] == "deleted"
+    assert delete_response.status_code == 409
+
+
+def test_validated_result_consumes_reagents_and_audits_movement(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-STOCK-001",
+            "first_name": "Stock",
+            "last_name": "Runner",
+            "birth_date": "1991-01-10",
+            "sex": "M",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={
+            "barcode": "BAR-STOCK-001",
+            "patient_id": patient["id"],
+            "status": "Recu",
+        },
+    ).json()
+    equipment = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={
+            "name": "Stock Analyzer",
+            "serial_number": "STOCK-001",
+            "type": "Automate",
+        },
+    ).json()
+    reagent = client.post(
+        "/api/v1/reagents",
+        headers=headers,
+        json={
+            "name": "Stock Reagent",
+            "category": "hematology",
+            "unit": "L",
+            "current_stock": 1.0,
+            "alert_threshold": 0.2,
+        },
+    ).json()
+    client.post(
+        "/api/v1/equipment-reagent-ratios",
+        headers=headers,
+        json={
+            "equipment_id": equipment["id"],
+            "reagent_id": reagent["id"],
+            "consumption_per_run": 0.2,
+            "adjustment_factor": 1.5,
+            "is_active": True,
+        },
+    )
+
+    response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "equipment_id": equipment["id"],
+            "data_points": {"WBC": 6.1},
+            "is_critical": False,
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    updated_reagent = client.get(
+        f"/api/v1/reagents/{reagent['id']}", headers=headers
+    ).json()
+    assert updated_reagent["current_stock"] == 0.7
+
+    audit_response = client.get("/api/v1/audit-events", headers=headers)
+    assert any(
+        event["event_type"] == "stock.consume"
+        and event["entity_id"] == str(reagent["id"])
+        for event in audit_response.json()["items"]
+    )
+
+
+def test_inactive_ratio_does_not_consume_stock(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-STOCK-002",
+            "first_name": "Inactive",
+            "last_name": "Ratio",
+            "birth_date": "1991-01-10",
+            "sex": "F",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={
+            "barcode": "BAR-STOCK-002",
+            "patient_id": patient["id"],
+            "status": "Recu",
+        },
+    ).json()
+    equipment = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={"name": "Inactive Ratio Analyzer", "serial_number": "STOCK-002"},
+    ).json()
+    reagent = client.post(
+        "/api/v1/reagents",
+        headers=headers,
+        json={
+            "name": "Inactive Ratio Reagent",
+            "unit": "L",
+            "current_stock": 1.0,
+            "alert_threshold": 0.2,
+        },
+    ).json()
+    client.post(
+        "/api/v1/equipment-reagent-ratios",
+        headers=headers,
+        json={
+            "equipment_id": equipment["id"],
+            "reagent_id": reagent["id"],
+            "consumption_per_run": 0.9,
+            "adjustment_factor": 1.0,
+            "is_active": False,
+        },
+    )
+
+    response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "equipment_id": equipment["id"],
+            "data_points": {"WBC": 6.1},
+            "is_critical": False,
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    updated_reagent = client.get(
+        f"/api/v1/reagents/{reagent['id']}", headers=headers
+    ).json()
+    assert updated_reagent["current_stock"] == 1.0
+
+
+def test_insufficient_stock_blocks_result_validation(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-STOCK-003",
+            "first_name": "Low",
+            "last_name": "Stock",
+            "birth_date": "1991-01-10",
+            "sex": "M",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={
+            "barcode": "BAR-STOCK-003",
+            "patient_id": patient["id"],
+            "status": "Recu",
+        },
+    ).json()
+    equipment = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={"name": "Low Stock Analyzer", "serial_number": "STOCK-003"},
+    ).json()
+    reagent = client.post(
+        "/api/v1/reagents",
+        headers=headers,
+        json={
+            "name": "Low Stock Reagent",
+            "unit": "L",
+            "current_stock": 0.1,
+            "alert_threshold": 0.2,
+        },
+    ).json()
+    client.post(
+        "/api/v1/equipment-reagent-ratios",
+        headers=headers,
+        json={
+            "equipment_id": equipment["id"],
+            "reagent_id": reagent["id"],
+            "consumption_per_run": 0.2,
+            "adjustment_factor": 1.0,
+            "is_active": True,
+        },
+    )
+
+    response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "equipment_id": equipment["id"],
+            "data_points": {"WBC": 6.1},
+            "is_critical": False,
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["items"][0]["reagent_name"] == "Low Stock Reagent"
+
+    results = client.get("/api/v1/results", headers=headers).json()
+    assert all(item["sample_id"] != sample["id"] for item in results["items"])
 
 
 def test_validate_order_is_audited(client) -> None:
