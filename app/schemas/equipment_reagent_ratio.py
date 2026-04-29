@@ -1,11 +1,11 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EquipmentReagentRatioBase(BaseModel):
     equipment_id: int
     reagent_id: int
-    consumption_per_run: float
-    adjustment_factor: float = 1.0
+    consumption_per_run: float = Field(ge=0)
+    adjustment_factor: float = Field(default=1.0, gt=0)
     notes: str | None = None
     is_active: bool = True
 
@@ -15,8 +15,8 @@ class EquipmentReagentRatioCreate(EquipmentReagentRatioBase):
 
 
 class EquipmentReagentRatioUpdate(BaseModel):
-    consumption_per_run: float | None = None
-    adjustment_factor: float | None = None
+    consumption_per_run: float | None = Field(default=None, ge=0)
+    adjustment_factor: float | None = Field(default=None, gt=0)
     notes: str | None = None
     is_active: bool | None = None
 

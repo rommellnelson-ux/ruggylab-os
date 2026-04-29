@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RatioPresetBase(BaseModel):
@@ -22,8 +22,8 @@ class RatioPresetItemBase(BaseModel):
     reagent_name: str
     reagent_category: str | None = None
     reagent_unit: str = "unit"
-    consumption_per_run: float
-    adjustment_factor: float = 1.0
+    consumption_per_run: float = Field(ge=0)
+    adjustment_factor: float = Field(default=1.0, gt=0)
     notes: str | None = None
     is_active: bool = True
 

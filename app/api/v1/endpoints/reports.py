@@ -87,9 +87,9 @@ def monthly_consumption_dashboard(
     reagent_usage_map: dict[str, dict[str, object]] = {}
     ratios = (
         db.query(EquipmentReagentRatio)
-        .filter(EquipmentReagentRatio.is_active == True)
+        .filter(EquipmentReagentRatio.is_active.is_(True))
         .all()
-    )  # noqa: E712
+    )
     for ratio in ratios:
         run_count = int(monthly_result_counts.get(ratio.equipment_id, 0))
         if run_count <= 0:

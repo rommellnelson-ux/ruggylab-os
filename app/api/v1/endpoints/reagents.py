@@ -15,10 +15,12 @@ router = APIRouter(prefix="/reagents")
 @router.get("", response_model=ReagentListResponse)
 def list_reagents(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     q: str | None = Query(default=None, min_length=1),
 ) -> ReagentListResponse:
+    del current_user
     query = db.query(Reagent)
     if q:
         search = f"%{q.strip()}%"
@@ -31,7 +33,12 @@ def list_reagents(
 
 
 @router.get("/{reagent_id}", response_model=ReagentRead)
-def get_reagent(reagent_id: int, db: Session = Depends(get_db)) -> Reagent:
+def get_reagent(
+    reagent_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Reagent:
+    del current_user
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not reagent:
         raise HTTPException(

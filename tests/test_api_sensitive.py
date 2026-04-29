@@ -66,6 +66,11 @@ def test_precis_expert_endpoint_creates_result_and_audit_event(client) -> None:
     )
     assert response.status_code == 201, response.text
     assert response.json()["is_critical"] is True
+    result_id = response.json()["result_id"]
+
+    result_response = client.get(f"/api/v1/results/{result_id}", headers=headers)
+    assert result_response.status_code == 200
+    assert result_response.json()["is_validated"] is True
 
     audit_response = client.get("/api/v1/audit-events", headers=headers)
     assert any(
@@ -447,3 +452,108 @@ def test_ratio_presets_and_versioning(client) -> None:
     )
     assert versions.status_code == 200
     assert len(versions.json()) >= 2
+
+
+def test_inactive_ratio_presets_and_items_are_not_applied(client) -> None:
+    headers = _auth_headers(client)
+    equipment = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={
+            "name": "Dymind DX5",
+            "serial_number": "DX5-INACTIVE",
+            "type": "Automate",
+        },
+    ).json()
+    inactive_preset = client.post(
+        "/api/v1/ratio-presets",
+        headers=headers,
+        json={
+            "name": "Inactive preset",
+            "equipment_name": "Dymind DX5",
+            "is_active": False,
+        },
+    ).json()
+
+    inactive_apply = client.post(
+        f"/api/v1/ratio-presets/{inactive_preset['id']}/apply?equipment_id={equipment['id']}",
+        headers=headers,
+    )
+    assert inactive_apply.status_code == 409
+
+    active_preset = client.post(
+        "/api/v1/ratio-presets",
+        headers=headers,
+        json={
+            "name": "Preset with inactive item",
+            "equipment_name": "Dymind DX5",
+            "is_active": True,
+        },
+    ).json()
+    client.post(
+        "/api/v1/ratio-presets/items",
+        headers=headers,
+        json={
+            "preset_id": active_preset["id"],
+            "reagent_name": "Inactive Cleaner",
+            "consumption_per_run": 0.005,
+            "is_active": False,
+        },
+    )
+
+    apply_response = client.post(
+        f"/api/v1/ratio-presets/{active_preset['id']}/apply?equipment_id={equipment['id']}",
+        headers=headers,
+    )
+    assert apply_response.status_code == 200
+    assert apply_response.json()["applied_count"] == 0
+    reagents = client.get("/api/v1/reagents", headers=headers).json()["items"]
+    assert all(item["name"] != "Inactive Cleaner" for item in reagents)
+
+
+def test_negative_stock_and_ratio_values_are_rejected(client) -> None:
+    headers = _auth_headers(client)
+    reagent_response = client.post(
+        "/api/v1/reagents",
+        headers=headers,
+        json={
+            "name": "Invalid Stock",
+            "current_stock": -1.0,
+            "alert_threshold": 0.0,
+        },
+    )
+    assert reagent_response.status_code == 422
+
+    equipment = client.post(
+        "/api/v1/equipments",
+        headers=headers,
+        json={"name": "Ratio Guard", "serial_number": "RG-1"},
+    ).json()
+    reagent = client.post(
+        "/api/v1/reagents",
+        headers=headers,
+        json={"name": "Valid Stock", "current_stock": 1.0, "alert_threshold": 0.0},
+    ).json()
+    ratio_response = client.post(
+        "/api/v1/equipment-reagent-ratios",
+        headers=headers,
+        json={
+            "equipment_id": equipment["id"],
+            "reagent_id": reagent["id"],
+            "consumption_per_run": -0.1,
+            "adjustment_factor": 1.0,
+        },
+    )
+    assert ratio_response.status_code == 422
+
+    preset_item_response = client.post(
+        "/api/v1/ratio-presets/items",
+        headers=headers,
+        json={
+            "preset_id": 1,
+            "reagent_name": "Bad Preset",
+            "consumption_per_run": 0.1,
+            "adjustment_factor": 0,
+        },
+    )
+    assert preset_item_response.status_code == 422

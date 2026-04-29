@@ -197,6 +197,8 @@ def test_sensitive_crud_endpoints_require_authentication(client) -> None:
         == 401
     )
     assert client.get("/api/v1/equipments").status_code == 401
+    assert client.get("/api/v1/reagents").status_code == 401
+    assert client.get("/api/v1/reagents/1").status_code == 401
     assert (
         client.post(
             "/api/v1/results", json={"sample_id": 1, "data_points": {"WBC": 6.1}}

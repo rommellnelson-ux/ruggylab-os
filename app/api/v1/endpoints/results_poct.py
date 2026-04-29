@@ -73,6 +73,7 @@ def submit_precis_expert_results(
         analysis_date=analysis_date,
         data_points=validated_jsonb.model_dump(),
         validator_id=current_user.id,
+        is_validated=True,
         is_critical=is_panic,
     )
     sample.status = "Termine"

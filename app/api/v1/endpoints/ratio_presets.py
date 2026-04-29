@@ -146,9 +146,16 @@ def apply_preset(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Preset ou equipement introuvable.",
         )
+    if not preset.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Preset inactif: application impossible.",
+        )
 
     applied = 0
     for item in preset.items:
+        if not item.is_active:
+            continue
         reagent = db.query(Reagent).filter(Reagent.name == item.reagent_name).first()
         if not reagent:
             reagent = Reagent(
