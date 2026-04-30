@@ -146,6 +146,24 @@
       padding: 12px;
       font-size: 12px;
     }
+    .notice {
+      border: 1px solid rgba(15, 118, 110, 0.26);
+      background: rgba(220, 252, 231, 0.72);
+      border-radius: 8px;
+      padding: 12px;
+      color: #14532d;
+    }
+    .notice strong { display: block; font-size: 18px; margin-top: 4px; }
+    .tube-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.66);
+      min-height: 112px;
+    }
+    .tube-card .tube { font-size: 18px; font-weight: 700; }
+    .tube-card .order { color: var(--amber); font-weight: 700; margin-top: 4px; }
+    .field-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .hidden { display: none !important; }
     .login {
       min-height: 100vh;
@@ -158,6 +176,7 @@
       .shell { grid-template-columns: 1fr; }
       .side { position: static; height: auto; }
       .grid4, .grid3, .grid2 { grid-template-columns: 1fr; }
+      .field-list { grid-template-columns: 1fr; }
       .topbar { position: static; align-items: flex-start; flex-direction: column; }
     }
   </style>
@@ -226,6 +245,12 @@
               <div class="grid2"><div><label>Naissance</label><input id="patientBirth" type="date" /></div><div><label>Sexe</label><select id="patientSex"><option>M</option><option>F</option></select></div></div>
               <div><label>Grade</label><input id="patientRank" /></div>
               <button onclick="createPatient()">Creer patient</button>
+              <div id="patientCreated" class="notice hidden">
+                Patient enregistre
+                <strong id="createdPatientId"></strong>
+                <div id="createdPatientName"></div>
+                <button class="success" style="margin-top:10px;" onclick="useCreatedPatientForSample()">Creer ses echantillons</button>
+              </div>
             </div></div>
             <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th></tr></thead><tbody></tbody></table></div>
           </div>
@@ -234,8 +259,17 @@
         <div id="samples" class="view band hidden">
           <div class="grid2">
             <div class="panel"><h3>Nouvel echantillon</h3><div class="form">
-              <div><label>Code-barres</label><input id="sampleBarcode" /></div>
               <div><label>Patient ID</label><input id="samplePatientId" type="number" /></div>
+              <div><label>Examen demande</label><select id="sampleExam" onchange="updateTubeGuide()">
+                <option value="nfs">NFS - Dymind DH36</option>
+                <option value="poct">Biochimie POCT - Precis Expert</option>
+                <option value="malaria">Paludisme - Microscopie/IA</option>
+                <option value="urine">Urines - Bandelette</option>
+                <option value="coag">Coagulation</option>
+              </select></div>
+              <div><label>Code-barres unique</label><input id="sampleBarcode" /></div>
+              <div class="actions"><button class="secondary" onclick="generateBarcode()">Generer code-barres</button></div>
+              <div id="tubeGuide" class="tube-card"></div>
               <div><label>Statut</label><select id="sampleStatus"><option>Recu</option><option>En cours</option><option>Termine</option></select></div>
               <button onclick="createSample()">Creer echantillon</button>
             </div></div>
@@ -247,7 +281,13 @@
           <div class="grid2">
             <div class="panel"><h3>Nouveau resultat manuel</h3><div class="form">
               <div class="grid2"><div><label>Sample ID</label><input id="resultSampleId" type="number" /></div><div><label>Equipment ID</label><input id="resultEquipmentId" type="number" /></div></div>
-              <div><label>JSON resultats</label><textarea id="resultJson">{ "WBC": 6.1, "HGB": 132 }</textarea></div>
+              <div><label>Canevas machine</label><select id="resultTemplate" onchange="renderResultTemplate()">
+                <option value="dh36">Dymind DH36 - NFS</option>
+                <option value="precis">Precis Expert - POCT</option>
+                <option value="urine">Bandelette urinaire</option>
+                <option value="manual">Autre resultat numerique</option>
+              </select></div>
+              <div id="resultFields" class="field-list"></div>
               <button onclick="createResult()">Creer resultat valide</button>
             </div></div>
             <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
@@ -313,6 +353,29 @@
     const $ = (id) => document.getElementById(id);
     let token = localStorage.getItem("ruggylab_token") || "";
     let currentView = "dashboard";
+    let lastCreatedPatient = null;
+    const tubeGuides = {
+      nfs: { code: "NFS", tube: "Tube EDTA violet", order: "Ordre 3", note: "Inversions douces 8 a 10 fois. Automate Dymind DH36." },
+      poct: { code: "POCT", tube: "Tube heparine vert ou sang capillaire", order: "Ordre 4", note: "Acheminer rapidement pour Precis Expert." },
+      malaria: { code: "PALU", tube: "Tube EDTA violet ou lame goutte epaisse", order: "Ordre 3", note: "Preparer lame, frottis mince et goutte epaisse; compatible IA offline." },
+      urine: { code: "URIN", tube: "Flacon urine sterile", order: "Prelevement separe", note: "Identifier le flacon et tester rapidement." },
+      coag: { code: "COAG", tube: "Tube citrate bleu", order: "Ordre 1", note: "Remplissage exact jusqu'au trait; inversions douces." }
+    };
+    const resultTemplates = {
+      dh36: [
+        ["WBC", "GB", "6.1"], ["RBC", "GR", "4.7"], ["HGB", "Hb g/L", "132"], ["HCT", "Ht %", "40"],
+        ["MCV", "VGM fL", "86"], ["MCH", "TCMH pg", "29"], ["MCHC", "CCMH g/L", "330"], ["PLT", "Plaquettes", "250"]
+      ],
+      precis: [
+        ["GLU", "Glucose", "0.45"], ["CHOL", "Cholesterol", "1.8"], ["UA", "Acide urique", "50"],
+        ["LAC", "Lactate", "1.2"], ["KET", "Cetones", "0.2"]
+      ],
+      urine: [
+        ["LEU", "Leucocytes", ""], ["NIT", "Nitrites", ""], ["PRO", "Proteines", ""],
+        ["GLU", "Glucose", ""], ["KET", "Cetones", ""], ["BLD", "Sang", ""], ["PH", "pH", "6"]
+      ],
+      manual: [["VALUE", "Valeur", ""]]
+    };
 
     function headers(json = true) {
       const h = { Authorization: `Bearer ${token}` };
@@ -330,6 +393,29 @@
     }
     function row(html) { const tr = document.createElement("tr"); tr.innerHTML = html; return tr; }
     function setRows(tableId, rows) { const body = $(tableId).querySelector("tbody"); body.innerHTML = ""; rows.forEach((r) => body.appendChild(r)); }
+    function stamp() {
+      const d = new Date();
+      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
+    }
+    function updateTubeGuide() {
+      const guide = tubeGuides[$("sampleExam").value];
+      $("tubeGuide").innerHTML = `<div class="tube">${guide.tube}</div><div class="order">${guide.order}</div><div>${guide.note}</div>`;
+    }
+    function generateBarcode() {
+      const patientId = $("samplePatientId").value || "0";
+      const guide = tubeGuides[$("sampleExam").value];
+      $("sampleBarcode").value = `${guide.code}-P${patientId}-${stamp()}`;
+      updateTubeGuide();
+    }
+    function renderResultTemplate() {
+      const fields = resultTemplates[$("resultTemplate").value] || resultTemplates.manual;
+      $("resultFields").innerHTML = fields.map(([key, label, value]) => `
+        <div>
+          <label>${label}</label>
+          <input data-result-key="${key}" value="${value}" />
+        </div>
+      `).join("");
+    }
 
     async function login() {
       $("loginError").textContent = "";
@@ -351,6 +437,8 @@
         $("userStatus").textContent = `${me.full_name || me.username} - ${me.role}`;
         $("loginView").classList.add("hidden");
         $("appView").classList.remove("hidden");
+        updateTubeGuide();
+        renderResultTemplate();
         await loadDashboard();
       } catch { logout(); }
     }
@@ -388,16 +476,32 @@
     }
     async function createPatient() {
       const body = { ipp_unique_id: $("patientIpp").value, first_name: $("patientFirst").value, last_name: $("patientLast").value, birth_date: $("patientBirth").value, sex: $("patientSex").value, rank: $("patientRank").value || null };
-      log(await api("/api/v1/patients", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+      const created = await api("/api/v1/patients", { method: "POST", headers: headers(), body: JSON.stringify(body) });
+      lastCreatedPatient = created;
+      $("createdPatientId").textContent = `ID patient: ${created.id}`;
+      $("createdPatientName").textContent = `${created.ipp_unique_id} - ${created.first_name} ${created.last_name}`;
+      $("patientCreated").classList.remove("hidden");
+      log(created);
       await loadPatients();
+    }
+    function useCreatedPatientForSample() {
+      if (!lastCreatedPatient) return;
+      $("samplePatientId").value = lastCreatedPatient.id;
+      showView("samples");
+      generateBarcode();
     }
     async function loadSamples() {
       const data = await api("/api/v1/samples", { headers: headers(false) });
       setRows("samplesTable", data.items.map((s) => row(`<td>${s.id}</td><td>${s.barcode}</td><td>${s.patient_id}</td><td>${s.status || ""}</td>`)));
     }
     async function createSample() {
+      if (!$("sampleBarcode").value) generateBarcode();
       const body = { barcode: $("sampleBarcode").value, patient_id: Number($("samplePatientId").value), status: $("sampleStatus").value };
-      log(await api("/api/v1/samples", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+      const created = await api("/api/v1/samples", { method: "POST", headers: headers(), body: JSON.stringify(body) });
+      $("resultSampleId").value = created.id;
+      $("imageBarcode").value = created.barcode;
+      $("poctBarcode").value = created.barcode;
+      log({ ...created, examen: $("sampleExam").value, tube: tubeGuides[$("sampleExam").value] });
       await loadSamples();
     }
     async function loadResults() {
@@ -405,8 +509,18 @@
       setRows("resultsTable", data.items.map((r) => row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`)));
     }
     function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }
+    function templateDataPoints() {
+      const values = {};
+      document.querySelectorAll("#resultFields input[data-result-key]").forEach((input) => {
+        const raw = input.value.trim();
+        if (raw === "") return;
+        const numeric = Number(raw);
+        values[input.dataset.resultKey] = Number.isNaN(numeric) ? raw : numeric;
+      });
+      return values;
+    }
     async function createResult() {
-      const body = { sample_id: Number($("resultSampleId").value), equipment_id: $("resultEquipmentId").value ? Number($("resultEquipmentId").value) : null, data_points: JSON.parse($("resultJson").value), is_critical: false };
+      const body = { sample_id: Number($("resultSampleId").value), equipment_id: $("resultEquipmentId").value ? Number($("resultEquipmentId").value) : null, data_points: templateDataPoints(), is_critical: false };
       log(await api("/api/v1/results", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
       await loadResults();
     }
