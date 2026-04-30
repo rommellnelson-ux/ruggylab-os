@@ -29,6 +29,26 @@ class AuditActivityEntry(BaseModel):
     event_count: int
 
 
+class EpidemiologyMarkerEntry(BaseModel):
+    marker: str
+    total: int
+    low: int = 0
+    normal: int = 0
+    high: int = 0
+    critical: int = 0
+
+
+class EpidemiologySummaryResponse(BaseModel):
+    period_start: str
+    period_end: str
+    total_results: int
+    critical_results: int
+    malaria_positive: int
+    malaria_negative: int
+    sex_breakdown: dict[str, int]
+    marker_breakdown: list[EpidemiologyMarkerEntry]
+
+
 class StockDashboardResponse(BaseModel):
     total_reagents: int
     low_stock_reagents: list[ReagentRead]

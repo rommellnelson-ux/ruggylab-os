@@ -856,6 +856,78 @@ def test_malaria_analysis_requires_microscope_image(client) -> None:
     assert response.status_code == 409
 
 
+def test_epidemiology_summary_and_csv_export(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-EPI-001",
+            "first_name": "Surveillance",
+            "last_name": "Epi",
+            "birth_date": "1991-01-10",
+            "sex": "F",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BAR-EPI-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    result_response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {
+                "WBC": {
+                    "value": 25.0,
+                    "unit": "10*9/L",
+                    "status": "H",
+                    "is_critical": True,
+                },
+                "HGB": {
+                    "value": 90.0,
+                    "unit": "g/L",
+                    "status": "L",
+                    "is_critical": False,
+                },
+                "malaria_ai": {
+                    "label": "positive",
+                    "confidence": 0.91,
+                    "model": "malaria-mobilenetv2-offline",
+                },
+            },
+            "is_critical": True,
+        },
+    )
+    assert result_response.status_code == 201, result_response.text
+
+    summary_response = client.get(
+        "/api/v1/reports/epidemiology-summary?days=30",
+        headers=headers,
+    )
+    assert summary_response.status_code == 200
+    summary = summary_response.json()
+    assert summary["total_results"] == 1
+    assert summary["critical_results"] == 1
+    assert summary["malaria_positive"] == 1
+    assert summary["sex_breakdown"]["F"] == 1
+    marker_breakdown = {item["marker"]: item for item in summary["marker_breakdown"]}
+    assert marker_breakdown["WBC"]["high"] == 1
+    assert marker_breakdown["WBC"]["critical"] == 1
+    assert marker_breakdown["HGB"]["low"] == 1
+
+    csv_response = client.get(
+        "/api/v1/reports/epidemiology-export.csv?days=30",
+        headers=headers,
+    )
+    assert csv_response.status_code == 200
+    assert csv_response.headers["content-type"].startswith("text/csv")
+    assert "BAR-EPI-001" in csv_response.text
+    assert "positive" in csv_response.text
+
+
 def test_validate_order_is_audited(client) -> None:
     headers = _auth_headers(client)
     reagent_response = client.post(
