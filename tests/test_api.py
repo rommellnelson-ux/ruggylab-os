@@ -13,6 +13,13 @@ def _auth_headers(
     return {"Authorization": f"Bearer {_login(client, username, password)}"}
 
 
+def test_cockpit_ui_is_served(client) -> None:
+    response = client.get("/app")
+    assert response.status_code == 200
+    assert "RuggyLab OS" in response.text
+    assert "/api/v1/login/access-token" in response.text
+
+
 def test_login_with_seeded_admin(client) -> None:
     response = client.post(
         "/api/v1/login/access-token",

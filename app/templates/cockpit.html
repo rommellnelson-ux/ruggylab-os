@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RuggyLab OS</title>
+  <style>
+    :root {
+      --ink: #13202b;
+      --muted: #647486;
+      --line: rgba(36, 52, 66, 0.16);
+      --panel: rgba(255, 255, 255, 0.82);
+      --band: rgba(248, 251, 253, 0.92);
+      --nav: #122233;
+      --blue: #2563eb;
+      --teal: #0f766e;
+      --rose: #be123c;
+      --amber: #b45309;
+      --ok: #15803d;
+      --shadow: 0 12px 36px rgba(18, 34, 51, 0.10);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        linear-gradient(135deg, rgba(226, 241, 248, 0.9), rgba(246, 249, 244, 0.9)),
+        #eef4f7;
+    }
+    button, input, select, textarea { font: inherit; }
+    button {
+      border: 0;
+      border-radius: 7px;
+      padding: 9px 12px;
+      color: #fff;
+      background: var(--blue);
+      cursor: pointer;
+      min-height: 38px;
+    }
+    button.secondary { background: var(--nav); }
+    button.success { background: var(--teal); }
+    button.warn { background: var(--amber); }
+    button.danger { background: var(--rose); }
+    button.ghost {
+      color: var(--nav);
+      background: rgba(255,255,255,0.58);
+      border: 1px solid var(--line);
+    }
+    button:disabled { opacity: 0.58; cursor: not-allowed; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 9px 10px;
+      color: var(--ink);
+      background: rgba(255,255,255,0.78);
+      min-height: 38px;
+    }
+    textarea { min-height: 98px; resize: vertical; }
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 7px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 246px 1fr; }
+    .side {
+      background: var(--nav);
+      color: #e8f0f7;
+      padding: 18px 14px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .brand { padding: 6px 8px 18px; border-bottom: 1px solid rgba(255,255,255,0.14); }
+    .brand h1 { margin: 0; font-size: 19px; letter-spacing: 0; }
+    .brand p { margin: 6px 0 0; color: #a8b7c7; font-size: 12px; }
+    .nav { display: grid; gap: 6px; padding-top: 16px; }
+    .nav button {
+      width: 100%;
+      text-align: left;
+      color: #dbe7f0;
+      background: transparent;
+      border: 1px solid transparent;
+    }
+    .nav button.active, .nav button:hover {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(255,255,255,0.16);
+    }
+    .main { min-width: 0; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 22px;
+      background: rgba(255,255,255,0.74);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .topbar h2 { margin: 0; font-size: 20px; }
+    .topbar .status { color: var(--muted); font-size: 13px; }
+    .content { padding: 22px; display: grid; gap: 18px; }
+    .band {
+      background: var(--band);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .band h3, .panel h3 { margin: 0 0 10px; font-size: 16px; }
+    .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      min-width: 0;
+    }
+    .metric { min-height: 92px; display: grid; align-content: center; gap: 6px; }
+    .metric .value { font-size: 28px; font-weight: 700; }
+    .metric .label { color: var(--muted); font-size: 12px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .form { display: grid; gap: 11px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { display: inline-block; padding: 3px 7px; border-radius: 999px; background: #e7effa; color: #1d4ed8; font-size: 12px; }
+    .pill.bad { background: #ffe4e6; color: #be123c; }
+    .pill.ok { background: #dcfce7; color: #166534; }
+    .log {
+      white-space: pre-wrap;
+      overflow: auto;
+      max-height: 260px;
+      color: #dce8f3;
+      background: #101c2a;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+    }
+    .hidden { display: none !important; }
+    .login {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .login .panel { width: min(420px, 100%); box-shadow: var(--shadow); }
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; }
+      .side { position: static; height: auto; }
+      .grid4, .grid3, .grid2 { grid-template-columns: 1fr; }
+      .topbar { position: static; align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loginView" class="login">
+    <section class="panel">
+      <h3>RuggyLab OS</h3>
+      <p class="status">Connexion au cockpit local du laboratoire.</p>
+      <div class="form" style="margin-top:14px;">
+        <div><label for="username">Utilisateur</label><input id="username" value="admin" autocomplete="username" /></div>
+        <div><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password" /></div>
+        <button onclick="login()">Connexion</button>
+        <div id="loginError" class="status"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="appView" class="shell hidden">
+    <aside class="side">
+      <div class="brand">
+        <h1>RuggyLab OS</h1>
+        <p>Centre de Santé de la Garde Républicaine</p>
+      </div>
+      <nav class="nav">
+        <button class="active" data-view="dashboard" onclick="showView('dashboard')">Tableau de bord</button>
+        <button data-view="patients" onclick="showView('patients')">Patients</button>
+        <button data-view="samples" onclick="showView('samples')">Echantillons</button>
+        <button data-view="results" onclick="showView('results')">Resultats</button>
+        <button data-view="machines" onclick="showView('machines')">DH36 et POCT</button>
+        <button data-view="imaging" onclick="showView('imaging')">Imagerie et IA</button>
+        <button data-view="stocks" onclick="showView('stocks')">Stocks</button>
+        <button data-view="reports" onclick="showView('reports')">Rapports</button>
+      </nav>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 id="viewTitle">Tableau de bord</h2>
+          <div id="userStatus" class="status">Session active</div>
+        </div>
+        <div class="actions">
+          <button class="ghost" onclick="refreshCurrent()">Rafraichir</button>
+          <button class="secondary" onclick="logout()">Deconnexion</button>
+        </div>
+      </header>
+      <section class="content">
+        <div id="dashboard" class="view band">
+          <div class="grid4">
+            <div class="panel metric"><div id="mResults" class="value">0</div><div class="label">Resultats 30 jours</div></div>
+            <div class="panel metric"><div id="mCritical" class="value">0</div><div class="label">Critiques</div></div>
+            <div class="panel metric"><div id="mMalaria" class="value">0</div><div class="label">Paludisme positif</div></div>
+            <div class="panel metric"><div id="mLowStock" class="value">0</div><div class="label">Stocks bas</div></div>
+          </div>
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Stocks bas</h3><table id="lowStockTable"><thead><tr><th>Reactif</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+
+        <div id="patients" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Nouveau patient</h3><div class="form">
+              <div><label>IPP</label><input id="patientIpp" placeholder="IPP-..." /></div>
+              <div class="grid2"><div><label>Prenom</label><input id="patientFirst" /></div><div><label>Nom</label><input id="patientLast" /></div></div>
+              <div class="grid2"><div><label>Naissance</label><input id="patientBirth" type="date" /></div><div><label>Sexe</label><select id="patientSex"><option>M</option><option>F</option></select></div></div>
+              <div><label>Grade</label><input id="patientRank" /></div>
+              <button onclick="createPatient()">Creer patient</button>
+            </div></div>
+            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+
+        <div id="samples" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Nouvel echantillon</h3><div class="form">
+              <div><label>Code-barres</label><input id="sampleBarcode" /></div>
+              <div><label>Patient ID</label><input id="samplePatientId" type="number" /></div>
+              <div><label>Statut</label><select id="sampleStatus"><option>Recu</option><option>En cours</option><option>Termine</option></select></div>
+              <button onclick="createSample()">Creer echantillon</button>
+            </div></div>
+            <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Barcode</th><th>Patient</th><th>Statut</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+
+        <div id="results" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Nouveau resultat manuel</h3><div class="form">
+              <div class="grid2"><div><label>Sample ID</label><input id="resultSampleId" type="number" /></div><div><label>Equipment ID</label><input id="resultEquipmentId" type="number" /></div></div>
+              <div><label>JSON resultats</label><textarea id="resultJson">{ "WBC": 6.1, "HGB": 132 }</textarea></div>
+              <button onclick="createResult()">Creer resultat valide</button>
+            </div></div>
+            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+
+        <div id="machines" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Ingestion DH36</h3><div class="form">
+              <label>Message HL7 brut</label><textarea id="hl7Message"></textarea>
+              <button onclick="ingestDh36()">Traiter message DH36</button>
+            </div></div>
+            <div class="panel"><h3>Precis Expert</h3><div class="form">
+              <div class="grid2"><div><label>Barcode</label><input id="poctBarcode" /></div><div><label>Serie appareil</label><input id="poctSerial" /></div></div>
+              <div class="grid3"><div><label>Glucose</label><input id="poctGlucose" value="0.45" /></div><div><label>Cholesterol</label><input id="poctChol" value="1.8" /></div><div><label>Acide urique</label><input id="poctUa" value="50" /></div></div>
+              <button onclick="submitPoct()">Valider POCT</button>
+            </div></div>
+          </div>
+        </div>
+
+        <div id="imaging" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Microscope Magnus</h3><div class="form">
+              <div><label>Code-barres echantillon</label><input id="imageBarcode" /></div>
+              <button onclick="reserveImage()">Reserver capture image</button>
+            </div></div>
+            <div class="panel"><h3>IA paludisme</h3><div class="form">
+              <div><label>Result ID image</label><input id="malariaResultId" type="number" /></div>
+              <div class="actions"><button onclick="enqueueMalaria()">Soumettre IA</button><button class="success" onclick="processMalaria()">Traiter job</button></div>
+              <div><label>Job ID</label><input id="malariaJobId" type="number" /></div>
+            </div></div>
+          </div>
+        </div>
+
+        <div id="stocks" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Nouveau reactif</h3><div class="form">
+              <div><label>Nom</label><input id="reagentName" /></div>
+              <div class="grid2"><div><label>Categorie</label><input id="reagentCategory" /></div><div><label>Unite</label><input id="reagentUnit" value="unit" /></div></div>
+              <div class="grid2"><div><label>Stock</label><input id="reagentStock" type="number" step="0.001" /></div><div><label>Seuil</label><input id="reagentThreshold" type="number" step="0.001" /></div></div>
+              <button onclick="createReagent()">Creer reactif</button>
+            </div></div>
+            <div class="panel"><h3>Reactifs</h3><table id="reagentsTable"><thead><tr><th>ID</th><th>Nom</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+
+        <div id="reports" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Rapport resultat</h3><div class="form">
+              <div><label>Result ID</label><input id="reportResultId" type="number" /></div>
+              <div class="actions"><button onclick="openPdf()">Ouvrir PDF</button><button class="success" onclick="signPdf()">Signer</button></div>
+            </div></div>
+            <div class="panel"><h3>Surveillance epidemiologique</h3><div class="actions"><button onclick="loadDashboard()">Actualiser resume</button><button class="secondary" onclick="downloadEpiCsv()">Exporter CSV</button></div></div>
+          </div>
+        </div>
+
+        <div class="band"><h3>Journal</h3><div id="log" class="log">Pret.</div></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let token = localStorage.getItem("ruggylab_token") || "";
+    let currentView = "dashboard";
+
+    function headers(json = true) {
+      const h = { Authorization: `Bearer ${token}` };
+      if (json) h["Content-Type"] = "application/json";
+      return h;
+    }
+    function log(value) { $("log").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2); }
+    async function api(path, options = {}) {
+      const response = await fetch(path, options);
+      const text = await response.text();
+      let payload = text;
+      try { payload = JSON.parse(text); } catch {}
+      if (!response.ok) { log(payload); throw new Error(response.statusText); }
+      return payload;
+    }
+    function row(html) { const tr = document.createElement("tr"); tr.innerHTML = html; return tr; }
+    function setRows(tableId, rows) { const body = $(tableId).querySelector("tbody"); body.innerHTML = ""; rows.forEach((r) => body.appendChild(r)); }
+
+    async function login() {
+      $("loginError").textContent = "";
+      const form = new URLSearchParams();
+      form.set("username", $("username").value);
+      form.set("password", $("password").value);
+      try {
+        const payload = await api("/api/v1/login/access-token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form });
+        token = payload.access_token;
+        localStorage.setItem("ruggylab_token", token);
+        await boot();
+      } catch { $("loginError").textContent = "Connexion impossible."; }
+    }
+    function logout() { localStorage.removeItem("ruggylab_token"); token = ""; $("appView").classList.add("hidden"); $("loginView").classList.remove("hidden"); }
+    async function boot() {
+      if (!token) return;
+      try {
+        const me = await api("/api/v1/users/me", { headers: headers(false) });
+        $("userStatus").textContent = `${me.full_name || me.username} - ${me.role}`;
+        $("loginView").classList.add("hidden");
+        $("appView").classList.remove("hidden");
+        await loadDashboard();
+      } catch { logout(); }
+    }
+    function showView(name) {
+      currentView = name;
+      document.querySelectorAll(".view").forEach((el) => el.classList.add("hidden"));
+      $(name).classList.remove("hidden");
+      document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+      $("viewTitle").textContent = document.querySelector(`.nav button[data-view="${name}"]`).textContent;
+      refreshCurrent();
+    }
+    async function refreshCurrent() {
+      if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
+      if (currentView === "patients") await loadPatients();
+      if (currentView === "samples") await loadSamples();
+      if (currentView === "results") await loadResults();
+      if (currentView === "stocks") await loadReagents();
+    }
+    async function loadDashboard() {
+      const [epi, stock] = await Promise.all([
+        api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
+        api("/api/v1/reports/stock-dashboard", { headers: headers(false) })
+      ]);
+      $("mResults").textContent = epi.total_results;
+      $("mCritical").textContent = epi.critical_results;
+      $("mMalaria").textContent = epi.malaria_positive;
+      $("mLowStock").textContent = stock.low_stock_reagents.length;
+      setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
+      setRows("lowStockTable", stock.low_stock_reagents.map((r) => row(`<td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
+      log("Tableau de bord actualise.");
+    }
+    async function loadPatients() {
+      const data = await api(`/api/v1/patients?q=${encodeURIComponent($("patientQuery").value || "")}`, { headers: headers(false) });
+      setRows("patientsTable", data.items.map((p) => row(`<td>${p.id}</td><td>${p.ipp_unique_id}</td><td>${p.first_name} ${p.last_name}</td><td>${p.sex || ""}</td>`)));
+    }
+    async function createPatient() {
+      const body = { ipp_unique_id: $("patientIpp").value, first_name: $("patientFirst").value, last_name: $("patientLast").value, birth_date: $("patientBirth").value, sex: $("patientSex").value, rank: $("patientRank").value || null };
+      log(await api("/api/v1/patients", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+      await loadPatients();
+    }
+    async function loadSamples() {
+      const data = await api("/api/v1/samples", { headers: headers(false) });
+      setRows("samplesTable", data.items.map((s) => row(`<td>${s.id}</td><td>${s.barcode}</td><td>${s.patient_id}</td><td>${s.status || ""}</td>`)));
+    }
+    async function createSample() {
+      const body = { barcode: $("sampleBarcode").value, patient_id: Number($("samplePatientId").value), status: $("sampleStatus").value };
+      log(await api("/api/v1/samples", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+      await loadSamples();
+    }
+    async function loadResults() {
+      const data = await api("/api/v1/results", { headers: headers(false) });
+      setRows("resultsTable", data.items.map((r) => row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`)));
+    }
+    function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }
+    async function createResult() {
+      const body = { sample_id: Number($("resultSampleId").value), equipment_id: $("resultEquipmentId").value ? Number($("resultEquipmentId").value) : null, data_points: JSON.parse($("resultJson").value), is_critical: false };
+      log(await api("/api/v1/results", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+      await loadResults();
+    }
+    async function ingestDh36() { log(await api("/api/v1/dh36/ingest", { method: "POST", headers: headers(), body: JSON.stringify({ raw_message: $("hl7Message").value }) })); }
+    async function submitPoct() {
+      const body = { sample_barcode: $("poctBarcode").value, equipment_serial: $("poctSerial").value, glucose_raw: Number($("poctGlucose").value), cholesterol_raw: Number($("poctChol").value), uric_acid_raw: Number($("poctUa").value), lactate_raw: 1.2, ketones_raw: 0.2 };
+      log(await api("/api/v1/results/precis-expert", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+    }
+    async function reserveImage() {
+      const data = await api("/api/v1/imaging/capture-microscope", { method: "POST", headers: headers(), body: JSON.stringify({ sample_barcode: $("imageBarcode").value }) });
+      $("malariaResultId").value = data.result_id;
+      log(data);
+    }
+    async function enqueueMalaria() {
+      const data = await api(`/api/v1/imaging/malaria/analyze/${$("malariaResultId").value}`, { method: "POST", headers: headers(false) });
+      $("malariaJobId").value = data.id;
+      log(data);
+    }
+    async function processMalaria() { log(await api(`/api/v1/imaging/malaria/jobs/${$("malariaJobId").value}/process`, { method: "POST", headers: headers(false) })); }
+    async function loadReagents() {
+      const data = await api("/api/v1/reagents", { headers: headers(false) });
+      setRows("reagentsTable", data.items.map((r) => row(`<td>${r.id}</td><td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
+    }
+    async function createReagent() {
+      const body = { name: $("reagentName").value, category: $("reagentCategory").value || null, unit: $("reagentUnit").value, current_stock: Number($("reagentStock").value), alert_threshold: Number($("reagentThreshold").value) };
+      log(await api("/api/v1/reagents", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+      await loadReagents();
+    }
+    async function openPdf() {
+      const response = await fetch(`/api/v1/reports/results/${$("reportResultId").value}/pdf`, { headers: headers(false) });
+      if (!response.ok) { log(await response.text()); return; }
+      const blob = await response.blob();
+      window.open(URL.createObjectURL(blob), "_blank");
+    }
+    async function signPdf() {
+      log(await api(`/api/v1/reports/results/${$("reportResultId").value}/sign`, { method: "POST", headers: headers(), body: JSON.stringify({ signature_meaning: "Validation par l'officier de garde." }) }));
+    }
+    function downloadEpiCsv() { window.open("/api/v1/reports/epidemiology-export.csv?days=30", "_blank"); }
+    boot();
+  </script>
+</body>
+</html>

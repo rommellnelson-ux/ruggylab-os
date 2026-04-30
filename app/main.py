@@ -1,7 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -54,6 +56,11 @@ def create_app() -> FastAPI:
             "app": settings.APP_NAME,
             "status": "ok",
         }
+
+    @app.get("/app", response_class=HTMLResponse, tags=["ui"])
+    async def cockpit() -> str:
+        template_path = Path(__file__).resolve().parent / "templates" / "cockpit.html"
+        return template_path.read_text(encoding="utf-8")
 
     return app
 
