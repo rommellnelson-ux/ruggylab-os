@@ -91,6 +91,46 @@ In practice, this keeps request handling thin while making domain workflows easi
 
 ## Quick start
 
+### Windows one-command setup
+
+On a Windows workstation, open PowerShell in the project folder and run:
+
+```powershell
+.\scripts\install.ps1
+```
+
+Then start RuggyLab OS with:
+
+```powershell
+.\scripts\start.ps1
+```
+
+Open:
+
+- Application cockpit: `http://127.0.0.1:8000/app`
+- Swagger API docs: `http://127.0.0.1:8000/docs`
+
+For a real workstation, edit `.env` before starting and set strong values for:
+
+- `SECRET_KEY`
+- `FIRST_SUPERUSER_PASSWORD`
+
+### Backups
+
+Create a local SQLite backup:
+
+```powershell
+.\scripts\backup.ps1
+```
+
+Restore from a backup:
+
+```powershell
+.\scripts\restore.ps1 -BackupPath .\backups\ruggylab_os-YYYYMMDD-HHMMSS.db
+```
+
+The restore script creates a safety copy of the current database before replacing it.
+
 ### 1. Create and activate a virtual environment
 
 ```bash
@@ -188,6 +228,7 @@ The API tests use a dedicated SQLite database through `TestClient` and do not st
 - Result validation fields are enforced server-side
 - Imaging path generation is sanitized to avoid path traversal issues
 - Local `.env` values are ignored by Git; use `.env.example` as the template
+- `models/`, `backups/`, and `logs/` are ignored by Git for local-first deployments
 
 ## Deployment notes
 
