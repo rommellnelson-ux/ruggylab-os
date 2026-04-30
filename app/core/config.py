@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     DH36_LISTENER_PORT: int = 5001
     BASE_DATA_DIR: str = "data"
     MICROSCOPY_STORAGE_DIR: str = "data/microscopy"
+    MALARIA_MODEL_PATH: str = "models/malaria_mobilenetv2"
+    MALARIA_ANALYSIS_AUTORUN: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

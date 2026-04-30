@@ -758,6 +758,104 @@ def test_technician_cannot_sign_result_report(client) -> None:
     assert response.status_code == 403
 
 
+def test_malaria_analysis_is_queued_processed_and_audited(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-MAL-001",
+            "first_name": "Paludisme",
+            "last_name": "Offline",
+            "birth_date": "1993-01-10",
+            "sex": "F",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BAR-MAL-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {},
+            "image_url": "data/microscopy/malaria-positive-slide.jpg",
+            "is_critical": False,
+        },
+    ).json()
+
+    enqueue_response = client.post(
+        f"/api/v1/imaging/malaria/analyze/{result['id']}",
+        headers=headers,
+    )
+    assert enqueue_response.status_code == 202, enqueue_response.text
+    job = enqueue_response.json()
+    assert job["status"] == "queued"
+    assert job["prediction_label"] is None
+
+    process_response = client.post(
+        f"/api/v1/imaging/malaria/jobs/{job['id']}/process",
+        headers=headers,
+    )
+    assert process_response.status_code == 200, process_response.text
+    processed_job = process_response.json()
+    assert processed_job["status"] == "completed"
+    assert processed_job["prediction_label"] == "positive"
+    assert processed_job["confidence"] >= 0.9
+
+    result_response = client.get(f"/api/v1/results/{result['id']}", headers=headers)
+    assert result_response.status_code == 200
+    result_payload = result_response.json()
+    assert result_payload["data_points"]["malaria_ai"]["label"] == "positive"
+    assert result_payload["is_critical"] is True
+
+    duplicate_enqueue = client.post(
+        f"/api/v1/imaging/malaria/analyze/{result['id']}",
+        headers=headers,
+    )
+    assert duplicate_enqueue.status_code == 202
+    assert duplicate_enqueue.json()["id"] == job["id"]
+
+    audit_response = client.get("/api/v1/audit-events", headers=headers)
+    event_types = [event["event_type"] for event in audit_response.json()["items"]]
+    assert "malaria.analysis.enqueue" in event_types
+    assert "malaria.analysis.complete" in event_types
+
+
+def test_malaria_analysis_requires_microscope_image(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-MAL-002",
+            "first_name": "No",
+            "last_name": "Image",
+            "birth_date": "1993-01-10",
+            "sex": "M",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BAR-MAL-002", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={"sample_id": sample["id"], "data_points": {}, "is_critical": False},
+    ).json()
+
+    response = client.post(
+        f"/api/v1/imaging/malaria/analyze/{result['id']}",
+        headers=headers,
+    )
+    assert response.status_code == 409
+
+
 def test_validate_order_is_audited(client) -> None:
     headers = _auth_headers(client)
     reagent_response = client.post(

@@ -129,6 +129,9 @@ class Result(Base):
     report_signature: Mapped["ReportSignature | None"] = relationship(
         back_populates="result"
     )
+    malaria_analysis_jobs: Mapped[list["MalariaAnalysisJob"]] = relationship(
+        back_populates="result"
+    )
 
 
 class Reagent(Base):
@@ -309,3 +312,25 @@ class ReportSignature(Base):
 
     result: Mapped["Result"] = relationship(back_populates="report_signature")
     signed_by: Mapped["User"] = relationship(back_populates="report_signatures")
+
+
+class MalariaAnalysisJob(Base):
+    __tablename__ = "malaria_analysis_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    result_id: Mapped[int] = mapped_column(ForeignKey("results.id"), nullable=False)
+    requested_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="queued")
+    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    image_url: Mapped[str] = mapped_column(String(255), nullable=False)
+    prediction_label: Mapped[str | None] = mapped_column(String(50))
+    confidence: Mapped[float | None] = mapped_column(Float)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    queued_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+    started_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+
+    result: Mapped["Result"] = relationship(back_populates="malaria_analysis_jobs")
+    requested_by: Mapped["User | None"] = relationship()
