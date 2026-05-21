@@ -208,9 +208,68 @@ def validate_nfs_parameters(
     }
 
     is_panic = any(point.is_critical for point in points.values())
+    overall_flags = _build_overall_flags(points)
     validated = HematologyDataDH36JSONB(
         **points,
         calibration=CalibrationFlag(validated=True, equipment_serial=equipment_serial),
-        overall_flags=[],
+        overall_flags=overall_flags,
     )
     return validated, is_panic
+
+
+def _build_overall_flags(points: dict[str, RuggylabJSONPoint]) -> list[str]:
+    """Derive clinical interpretation flags from individual parameter statuses.
+
+    These flags synthesise cross-parameter patterns that a single parameter
+    status cannot capture (e.g. pancytopenia requires WBC + HGB + PLT all low).
+    Terms are intentionally in French to match the rest of the clinical output.
+    """
+    flags: list[str] = []
+
+    wbc = points.get("WBC")
+    hgb = points.get("HGB")
+    plt = points.get("PLT")
+    mcv = points.get("MCV")
+    rbc = points.get("RBC")
+
+    # Anaemia
+    if hgb and hgb.is_critical:
+        flags.append("ANEMIE_SEVERE")
+    elif hgb and hgb.status == "L":
+        flags.append("ANEMIE")
+
+    # Polycythaemia
+    if rbc and rbc.status == "H":
+        flags.append("POLYGLOBULIE")
+
+    # White cell count anomalies
+    if wbc and wbc.status == "L":
+        flags.append("LEUCOPENIE")
+    elif wbc and wbc.status == "H":
+        flags.append("HYPERLEUCOCYTOSE")
+
+    # Platelet anomalies
+    if plt and plt.is_critical:
+        flags.append("THROMBOPENIE_SEVERE")
+    elif plt and plt.status == "L":
+        flags.append("THROMBOPENIE")
+
+    # MCV-based morphology
+    if mcv and mcv.status == "L":
+        flags.append("MICROCYTOSE")
+    elif mcv and mcv.status == "H":
+        flags.append("MACROCYTOSE")
+
+    # Pancytopenia (all three cell lines low)
+    if (
+        wbc and wbc.status == "L"
+        and hgb and hgb.status == "L"
+        and plt and plt.status == "L"
+    ):
+        # Replace the three individual flags with the synthetic one
+        for flag in ("LEUCOPENIE", "ANEMIE", "THROMBOPENIE"):
+            if flag in flags:
+                flags.remove(flag)
+        flags.insert(0, "PANTOPENIQUE")
+
+    return flags

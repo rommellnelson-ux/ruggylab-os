@@ -334,6 +334,32 @@ class MalariaAnalysisJob(Base):
     requested_by: Mapped["User | None"] = relationship()
 
 
+class RefreshToken(Base):
+    """Stateful refresh token for session management.
+
+    Tokens are stored as SHA-256 hashes so the raw value is never
+    persisted.  Revocation is immediate: set revoked_at and the token
+    becomes invalid regardless of its expiry.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+
+    user: Mapped["User"] = relationship()
+
+    @property
+    def is_valid(self) -> bool:
+        return self.revoked_at is None and self.expires_at > utcnow_naive()
+
+
 class MilitaryFacility(Base):
     __tablename__ = "military_facilities"
 

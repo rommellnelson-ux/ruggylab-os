@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
@@ -30,3 +32,13 @@ def create_access_token(
         str,
         jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM),
     )
+
+
+def create_refresh_token() -> str:
+    """Generate a cryptographically random opaque refresh token (URL-safe)."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_token(raw_token: str) -> str:
+    """Return the SHA-256 hex-digest of a raw token for safe DB storage."""
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()

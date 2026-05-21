@@ -27,6 +27,7 @@ from app.core.user_quota import UserQuotaMiddleware
 from app.db.session import SessionLocal, get_db
 from app.services.bootstrap import init_db
 from app.services.interfacing.listener_dh36 import DH36Listener
+from app.utils.redis_rate_limiter import init_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,9 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         raise RuntimeError(
             "Security settings are too weak for a non-test environment. Update SECRET_KEY and FIRST_SUPERUSER_PASSWORD."
         )
+    # Initialise Redis rate-limiter client when configured
+    if not settings.TESTING and settings.REDIS_URL:
+        init_redis_client(settings.REDIS_URL)
     init_db()
     listener_task = None
     if not settings.TESTING and settings.ENABLE_DH36_LISTENER:
