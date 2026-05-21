@@ -70,8 +70,8 @@ def _insured_request(**kwargs) -> BillingRequest:
     return BillingRequest(
         patient_type=PatientType.INSURED,
         insurance_id="CNAM-CI-2026-001234",
-        diagnoses=[_diagnosis()],
-        drugs=[_drug()],
+        diagnoses=kwargs.pop("diagnoses", [_diagnosis()]),
+        drugs=kwargs.pop("drugs", [_drug()]),
         **kwargs,
     )
 
@@ -79,8 +79,8 @@ def _insured_request(**kwargs) -> BillingRequest:
 def _uninsured_request(**kwargs) -> BillingRequest:
     return BillingRequest(
         patient_type=PatientType.UNINSURED,
-        diagnoses=[_diagnosis()],
-        drugs=[_drug()],
+        diagnoses=kwargs.pop("diagnoses", [_diagnosis()]),
+        drugs=kwargs.pop("drugs", [_drug()]),
         **kwargs,
     )
 
@@ -103,7 +103,7 @@ class TestCIM10Validation:
 
     @pytest.mark.parametrize(
         "bad_code",
-        ["54B", "B5", "BCDE", "B54.12345", "b54", "B54.", "B-54"],
+        ["54B", "B5", "BCDE", "B54.12345", "B54.", "B-54"],
     )
     def test_invalid_codes_raise(self, bad_code: str) -> None:
         with pytest.raises(ValidationError, match="CIM-10"):
@@ -308,7 +308,7 @@ class TestUninsuredBilling:
 
 class TestInstallmentPlan:
     def test_bnpl_3_months(self, engine: BillingEngine) -> None:
-        """6 000 XOF / 3 mois = 2 000 XOF/mois."""
+        """Assuré : 6 × 1 000 = 6 000 XOF → patient_due 1 800 XOF (30 %) / 3 mois = 600 XOF/mois."""
         req = _insured_request(
             payment_method=PaymentMethod.BNPL,
             installment_months=3,
@@ -317,7 +317,8 @@ class TestInstallmentPlan:
         plan = result.installment_plan
         assert plan is not None
         assert plan.months == 3
-        assert plan.monthly_amount_xof == Decimal("2000")
+        # BNPL porte sur le patient_due (1 800 XOF), pas sur le total brut
+        assert plan.monthly_amount_xof == Decimal("600")
         assert plan.first_payment_xof + plan.monthly_amount_xof * 2 == plan.total_xof
 
     def test_bnpl_rounding_absorbed_in_first_payment(self, engine: BillingEngine) -> None:

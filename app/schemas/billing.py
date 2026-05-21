@@ -60,7 +60,7 @@ _DCI_RE = re.compile(r"^[A-Z0-9\-]{3,50}$")
 class CIM10Code(BaseModel):
     """Code de pathologie selon la Classification Internationale des Maladies (10e révision)."""
 
-    code: Annotated[str, Field(min_length=3, max_length=8, examples=["B54", "J06.9"])]
+    code: Annotated[str, Field(examples=["B54", "J06.9"])]
     description: str = ""
 
     @field_validator("code")
@@ -262,10 +262,24 @@ class CMMEntry:
         self.suggested_order_qty = max(0, target - self.current_stock)
 
 
+class CMMEntryRequest(BaseModel):
+    """Entrée individuelle pour un rapport CMM."""
+
+    dci_code: str
+    cmm_units: int = Field(ge=0, description="Consommation mensuelle moyenne (unités)")
+    current_stock: int = Field(ge=0, description="Stock actuel (unités)")
+
+    @field_validator("dci_code")
+    @classmethod
+    def normalise_dci(cls, v: str) -> str:
+        return v.strip().upper()
+
+
 class CMMReportRequest(BaseModel):
     """Requête de rapport CMM (tableau de bord stock)."""
 
-    entries: list[dict[str, int]] = Field(
-        description="Liste de {dci_code, cmm_units, current_stock}",
+    entries: list[CMMEntryRequest] = Field(
+        min_length=1,
+        description="Liste de médicaments à analyser",
         examples=[[{"dci_code": "ARTEMETHER-LUMEFANTRINE", "cmm_units": 120, "current_stock": 80}]],
     )

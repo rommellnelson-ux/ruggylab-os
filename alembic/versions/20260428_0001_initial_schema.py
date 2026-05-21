@@ -22,17 +22,19 @@ userrole = sa.Enum("TECHNICIAN", "OFFICER", "ADMIN", name="userrole", create_typ
 
 
 def upgrade() -> None:
-    # Idempotent: the DO block catches duplicate_object, so re-running the
-    # migration (or running against a DB that already has the type) never fails.
-    op.execute(
-        """
-        DO $$ BEGIN
-            CREATE TYPE userrole AS ENUM ('TECHNICIAN', 'OFFICER', 'ADMIN');
-        EXCEPTION
-            WHEN duplicate_object THEN NULL;
-        END $$;
-        """
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        # Idempotent PG-native block: catches duplicate_object silently.
+        op.execute(
+            """
+            DO $$ BEGIN
+                CREATE TYPE userrole AS ENUM ('TECHNICIAN', 'OFFICER', 'ADMIN');
+            EXCEPTION
+                WHEN duplicate_object THEN NULL;
+            END $$;
+            """
+        )
+    # SQLite uses VARCHAR affinity for Enum columns — no CREATE TYPE needed.
 
     op.create_table(
         "users",

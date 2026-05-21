@@ -317,9 +317,9 @@ class BillingEngine:
         entries: list[CMMEntry] = []
         for raw in request.entries:
             entry = CMMEntry(
-                dci_code=str(raw["dci_code"]).upper(),
-                cmm_units=int(raw["cmm_units"]),
-                current_stock=int(raw["current_stock"]),
+                dci_code=raw.dci_code,  # already uppercased by CMMEntryRequest validator
+                cmm_units=raw.cmm_units,
+                current_stock=raw.current_stock,
             )
             entries.append(entry)
 
