@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -20,13 +21,17 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
     Requires user ID to be set in request.state.user_id by auth middleware.
     """
 
-    def __init__(self, app: Any) -> None:
+    def __init__(self, app: Any) -> None:  # noqa: ANN401
         super().__init__(app)
         # In-memory storage for user request counts (use Redis in production)
         self._user_requests: dict[str, list[datetime]] = defaultdict(list)
         self._blocked_users: dict[str, datetime] = {}
 
-    async def dispatch(self, request: Request, call_next: Any) -> Response:
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         if not settings.USER_QUOTA_ENABLED:
             return await call_next(request)
 

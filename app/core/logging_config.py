@@ -84,9 +84,9 @@ def configure_logging(
     dictConfig(stdlib_config)
 
 
-def get_logger(name: str) -> structlog.BoundLogger:  # type: ignore
+def get_logger(name: str) -> Any:
     """Get a structured logger instance."""
-    return structlog.get_logger(name)  # type: ignore
+    return structlog.get_logger(name)
 
 
 class StructuredLogger:

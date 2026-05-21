@@ -28,10 +28,7 @@ def create_access_token(
     to_encode: dict = {"sub": subject, "exp": expire}
     if scopes:
         to_encode["scopes"] = scopes
-    return cast(
-        str,
-        jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM),
-    )
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 def create_refresh_token() -> str:

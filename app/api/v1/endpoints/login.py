@@ -48,7 +48,7 @@ def login_access_token(
     authenticated = bool(user and verify_password(form_data.password, user.hashed_password))
     record_auth_attempt(authenticated)
 
-    if not authenticated:
+    if not authenticated or user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Nom d'utilisateur ou mot de passe incorrect.",

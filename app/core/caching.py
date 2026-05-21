@@ -73,7 +73,7 @@ class RedisCache(CacheBackend):
         self.redis_url = redis_url or "redis://localhost:6379/0"
         self._client = None
 
-    async def _get_client(self):
+    async def _get_client(self) -> Any:
         """Lazy load Redis client."""
         if self._client is None:
             import aioredis

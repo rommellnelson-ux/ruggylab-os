@@ -2,6 +2,7 @@ import asyncio
 from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -31,7 +32,7 @@ class LoginRateLimitMiddleware(BaseHTTPMiddleware):
     Falls back to an in-process deque when Redis is not configured.
     """
 
-    def __init__(self, app: object) -> None:
+    def __init__(self, app: Any) -> None:
         super().__init__(app)
         self.max_requests = settings.LOGIN_RATE_LIMIT_REQUESTS
         self.window = timedelta(seconds=settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS)
@@ -84,7 +85,7 @@ class LoginRateLimitMiddleware(BaseHTTPMiddleware):
                     _DENY_RESPONSE, status_code=429, headers={"Retry-After": retry_after}
                 )
 
-            allowed, _ = await sliding_window_check(  # type: ignore[arg-type]
+            allowed, _ = await sliding_window_check(
                 redis,  # type: ignore[arg-type]
                 window_key,
                 self.max_requests,

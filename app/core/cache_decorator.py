@@ -34,7 +34,7 @@ def cached(
 
     def decorator(func: F) -> F:
         @wraps(func)
-        async def wrapper(*args: Any, request: Request | None = None, **kwargs: Any):
+        async def wrapper(*args: Any, request: Request | None = None, **kwargs: Any) -> Any:
             if not settings.CACHE_ENABLED or not request:
                 return await func(*args, request=request, **kwargs)
 
