@@ -37,10 +37,7 @@ class CompressionMiddleware(BaseHTTPMiddleware):
 
         # Don't compress certain content types
         content_type = response.headers.get("content-type", "")
-        if any(
-            skip in content_type
-            for skip in ["image/", "video/", "application/octet-stream"]
-        ):
+        if any(skip in content_type for skip in ["image/", "video/", "application/octet-stream"]):
             return response
 
         try:

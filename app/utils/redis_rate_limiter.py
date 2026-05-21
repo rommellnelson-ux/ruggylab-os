@@ -70,10 +70,10 @@ async def sliding_window_check(
     expire_seconds = int(window_seconds) + 10
 
     pipe = client.pipeline()
-    pipe.zremrangebyscore(key, 0, window_start)   # evict old timestamps
-    pipe.zcard(key)                                # count after eviction
-    pipe.zadd(key, {str(now): now})               # record this request
-    pipe.expire(key, expire_seconds)              # auto-expire key
+    pipe.zremrangebyscore(key, 0, window_start)  # evict old timestamps
+    pipe.zcard(key)  # count after eviction
+    pipe.zadd(key, {str(now): now})  # record this request
+    pipe.expire(key, expire_seconds)  # auto-expire key
     results = await pipe.execute()
 
     count_before: int = results[1]

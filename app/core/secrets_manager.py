@@ -58,8 +58,7 @@ class AWSSecretsManager(BaseSecretsManager):
             import boto3
         except ImportError as exc:
             raise ImportError(
-                "boto3 is required for AWS Secrets Manager. "
-                "Install it with: pip install boto3"
+                "boto3 is required for AWS Secrets Manager. Install it with: pip install boto3"
             ) from exc
 
         self.region = region or os.getenv("AWS_REGION", "us-east-1")
@@ -118,7 +117,9 @@ class AzureKeyVault(BaseSecretsManager):
 
         self.vault_url = vault_url or os.getenv("AZURE_KEYVAULT_URL")
         if not self.vault_url:
-            raise ValueError("AZURE_KEYVAULT_URL environment variable or vault_url parameter required")
+            raise ValueError(
+                "AZURE_KEYVAULT_URL environment variable or vault_url parameter required"
+            )
 
         tenant_id = tenant_id or os.getenv("AZURE_TENANT_ID")
         client_id = client_id or os.getenv("AZURE_CLIENT_ID")
@@ -141,7 +142,9 @@ class AzureKeyVault(BaseSecretsManager):
             secret = self.client.get_secret(secret_name)
             return str(secret.value)
         except Exception as exc:
-            logger.error("Failed to retrieve secret '%s' from Azure Key Vault: %s", secret_name, exc)
+            logger.error(
+                "Failed to retrieve secret '%s' from Azure Key Vault: %s", secret_name, exc
+            )
             raise
 
     def get_secrets(self, secret_id: str) -> dict[str, str]:

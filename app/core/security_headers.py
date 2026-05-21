@@ -9,7 +9,9 @@ from app.core.config import settings
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Middleware that adds standard HTTP security headers to every response."""
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Response]) -> Response:  # type: ignore
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Response]
+    ) -> Response:  # type: ignore
         response = await call_next(request)
 
         if not settings.SECURITY_HEADERS_ENABLED:

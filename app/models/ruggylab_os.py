@@ -32,9 +32,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    username: Mapped[str] = mapped_column(
-        String(100), unique=True, nullable=False, index=True
-    )
+    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(150))
     role: Mapped[UserRole] = mapped_column(
@@ -43,9 +41,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="user")
-    report_signatures: Mapped[list["ReportSignature"]] = relationship(
-        back_populates="signed_by"
-    )
+    report_signatures: Mapped[list["ReportSignature"]] = relationship(back_populates="signed_by")
 
 
 class Equipment(Base):
@@ -69,9 +65,7 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ipp_unique_id: Mapped[str] = mapped_column(
-        String(50), unique=True, nullable=False, index=True
-    )
+    ipp_unique_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     birth_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
@@ -85,9 +79,7 @@ class Sample(Base):
     __tablename__ = "samples"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    barcode: Mapped[str] = mapped_column(
-        String(100), unique=True, nullable=False, index=True
-    )
+    barcode: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"))
     collection_date: Mapped[dt.datetime] = mapped_column(
         DateTime, default=utcnow_naive, nullable=False
@@ -118,15 +110,9 @@ class Result(Base):
 
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")
-    stock_movements: Mapped[list["StockMovement"]] = relationship(
-        back_populates="result"
-    )
-    dh36_messages: Mapped[list["DH36InboundMessage"]] = relationship(
-        back_populates="result"
-    )
-    report_signature: Mapped["ReportSignature | None"] = relationship(
-        back_populates="result"
-    )
+    stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="result")
+    dh36_messages: Mapped[list["DH36InboundMessage"]] = relationship(back_populates="result")
+    report_signature: Mapped["ReportSignature | None"] = relationship(back_populates="result")
     malaria_analysis_jobs: Mapped[list["MalariaAnalysisJob"]] = relationship(
         back_populates="result"
     )
@@ -145,18 +131,14 @@ class Reagent(Base):
         back_populates="reagent",
         cascade="all, delete-orphan",
     )
-    stock_movements: Mapped[list["StockMovement"]] = relationship(
-        back_populates="reagent"
-    )
+    stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="reagent")
 
 
 class EquipmentReagentRatio(Base):
     __tablename__ = "equipment_reagent_ratios"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    equipment_id: Mapped[int] = mapped_column(
-        ForeignKey("equipments.id"), nullable=False
-    )
+    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipments.id"), nullable=False)
     reagent_id: Mapped[int] = mapped_column(ForeignKey("reagents.id"), nullable=False)
     consumption_per_run: Mapped[float] = mapped_column(Float, nullable=False)
     adjustment_factor: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
@@ -175,9 +157,7 @@ class EquipmentReagentRatioVersion(Base):
     __tablename__ = "equipment_reagent_ratio_versions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ratio_id: Mapped[int] = mapped_column(
-        ForeignKey("equipment_reagent_ratios.id"), nullable=False
-    )
+    ratio_id: Mapped[int] = mapped_column(ForeignKey("equipment_reagent_ratios.id"), nullable=False)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     equipment_id: Mapped[int] = mapped_column(Integer, nullable=False)
     reagent_id: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -187,9 +167,7 @@ class EquipmentReagentRatioVersion(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     changed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     change_reason: Mapped[str | None] = mapped_column(String(255))
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     ratio: Mapped["EquipmentReagentRatio"] = relationship(back_populates="versions")
 
@@ -210,14 +188,10 @@ class RatioPresetItem(Base):
     __tablename__ = "ratio_preset_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    preset_id: Mapped[int] = mapped_column(
-        ForeignKey("ratio_presets.id"), nullable=False
-    )
+    preset_id: Mapped[int] = mapped_column(ForeignKey("ratio_presets.id"), nullable=False)
     reagent_name: Mapped[str] = mapped_column(String(100), nullable=False)
     reagent_category: Mapped[str | None] = mapped_column(String(50))
-    reagent_unit: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="unit"
-    )
+    reagent_unit: Mapped[str] = mapped_column(String(20), nullable=False, default="unit")
     consumption_per_run: Mapped[float] = mapped_column(Float, nullable=False)
     adjustment_factor: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     notes: Mapped[str | None] = mapped_column(Text)
@@ -235,9 +209,7 @@ class AuditEvent(Base):
     entity_type: Mapped[str] = mapped_column(String(100), nullable=False)
     entity_id: Mapped[str | None] = mapped_column(String(100))
     payload: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     user: Mapped["User | None"] = relationship(back_populates="audit_events")
 
@@ -253,9 +225,7 @@ class StockMovement(Base):
     stock_before: Mapped[float] = mapped_column(Float, nullable=False)
     stock_after: Mapped[float] = mapped_column(Float, nullable=False)
     source: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     reagent: Mapped["Reagent"] = relationship(back_populates="stock_movements")
     result: Mapped["Result | None"] = relationship(back_populates="stock_movements")
@@ -279,9 +249,7 @@ class DH36InboundMessage(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="received")
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     result_id: Mapped[int | None] = mapped_column(ForeignKey("results.id"))
-    received_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    received_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
     processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     raw_message: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -290,21 +258,15 @@ class DH36InboundMessage(Base):
 
 class ReportSignature(Base):
     __tablename__ = "report_signatures"
-    __table_args__ = (
-        UniqueConstraint("result_id", name="uq_report_signatures_result_id"),
-    )
+    __table_args__ = (UniqueConstraint("result_id", name="uq_report_signatures_result_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     result_id: Mapped[int] = mapped_column(ForeignKey("results.id"), nullable=False)
-    signed_by_user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"), nullable=False
-    )
+    signed_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     report_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     signature_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     signature_meaning: Mapped[str] = mapped_column(String(150), nullable=False)
-    signed_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    signed_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
     revoked_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     revocation_reason: Mapped[str | None] = mapped_column(Text)
 
@@ -324,9 +286,7 @@ class MalariaAnalysisJob(Base):
     prediction_label: Mapped[str | None] = mapped_column(String(50))
     confidence: Mapped[float | None] = mapped_column(Float)
     error_message: Mapped[str | None] = mapped_column(Text)
-    queued_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    queued_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
     started_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
 
@@ -348,9 +308,7 @@ class RefreshToken(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     expires_at: Mapped[dt.datetime] = mapped_column(DateTime, nullable=False)
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
     revoked_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
 
     user: Mapped["User"] = relationship()

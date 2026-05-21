@@ -81,66 +81,126 @@ def _get_ranges(age: float, sex: str | None) -> _NFSRanges:
     if age < 1:
         # Nourrisson (valeurs moyennes 2–12 mois)
         return _NFSRanges(
-            wbc_low=6.0, wbc_high=17.5, wbc_critical_low=2.0, wbc_critical_high=30.0,
-            rbc_low=3.7, rbc_high=5.3,
-            hgb_low=100.0, hgb_high=140.0, hgb_critical_low=70.0,
-            hct_low=33.0, hct_high=42.0,
-            mcv_low=70.0, mcv_high=84.0,
-            mch_low=23.0, mch_high=31.0,
-            mchc_low=300.0, mchc_high=360.0,
-            plt_low=200.0, plt_high=550.0, plt_critical_low=30.0,
+            wbc_low=6.0,
+            wbc_high=17.5,
+            wbc_critical_low=2.0,
+            wbc_critical_high=30.0,
+            rbc_low=3.7,
+            rbc_high=5.3,
+            hgb_low=100.0,
+            hgb_high=140.0,
+            hgb_critical_low=70.0,
+            hct_low=33.0,
+            hct_high=42.0,
+            mcv_low=70.0,
+            mcv_high=84.0,
+            mch_low=23.0,
+            mch_high=31.0,
+            mchc_low=300.0,
+            mchc_high=360.0,
+            plt_low=200.0,
+            plt_high=550.0,
+            plt_critical_low=30.0,
         )
     if age < 6:
         # Enfant 1–5 ans
         return _NFSRanges(
-            wbc_low=5.0, wbc_high=15.0, wbc_critical_low=2.0, wbc_critical_high=25.0,
-            rbc_low=3.9, rbc_high=5.0,
-            hgb_low=110.0, hgb_high=140.0, hgb_critical_low=70.0,
-            hct_low=34.0, hct_high=40.0,
-            mcv_low=75.0, mcv_high=87.0,
-            mch_low=24.0, mch_high=30.0,
-            mchc_low=310.0, mchc_high=360.0,
-            plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+            wbc_low=5.0,
+            wbc_high=15.0,
+            wbc_critical_low=2.0,
+            wbc_critical_high=25.0,
+            rbc_low=3.9,
+            rbc_high=5.0,
+            hgb_low=110.0,
+            hgb_high=140.0,
+            hgb_critical_low=70.0,
+            hct_low=34.0,
+            hct_high=40.0,
+            mcv_low=75.0,
+            mcv_high=87.0,
+            mch_low=24.0,
+            mch_high=30.0,
+            mchc_low=310.0,
+            mchc_high=360.0,
+            plt_low=150.0,
+            plt_high=450.0,
+            plt_critical_low=30.0,
         )
     if age < 12:
         # Enfant 6–11 ans
         return _NFSRanges(
-            wbc_low=4.5, wbc_high=13.5, wbc_critical_low=2.0, wbc_critical_high=25.0,
-            rbc_low=4.0, rbc_high=5.2,
-            hgb_low=115.0, hgb_high=145.0, hgb_critical_low=70.0,
-            hct_low=35.0, hct_high=44.0,
-            mcv_low=77.0, mcv_high=91.0,
-            mch_low=25.0, mch_high=31.0,
-            mchc_low=310.0, mchc_high=360.0,
-            plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+            wbc_low=4.5,
+            wbc_high=13.5,
+            wbc_critical_low=2.0,
+            wbc_critical_high=25.0,
+            rbc_low=4.0,
+            rbc_high=5.2,
+            hgb_low=115.0,
+            hgb_high=145.0,
+            hgb_critical_low=70.0,
+            hct_low=35.0,
+            hct_high=44.0,
+            mcv_low=77.0,
+            mcv_high=91.0,
+            mch_low=25.0,
+            mch_high=31.0,
+            mchc_low=310.0,
+            mchc_high=360.0,
+            plt_low=150.0,
+            plt_high=450.0,
+            plt_critical_low=30.0,
         )
     if age < 18:
         # Adolescent 12–17 ans
         hgb_low = 130.0 if is_male else 120.0
         hgb_high = 160.0 if is_male else 150.0
         return _NFSRanges(
-            wbc_low=4.5, wbc_high=13.0, wbc_critical_low=2.0, wbc_critical_high=20.0,
-            rbc_low=4.2 if is_male else 3.9, rbc_high=5.6 if is_male else 5.2,
-            hgb_low=hgb_low, hgb_high=hgb_high, hgb_critical_low=70.0,
-            hct_low=37.0 if is_male else 35.0, hct_high=50.0 if is_male else 45.0,
-            mcv_low=80.0, mcv_high=96.0,
-            mch_low=26.0, mch_high=34.0,
-            mchc_low=310.0, mchc_high=360.0,
-            plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+            wbc_low=4.5,
+            wbc_high=13.0,
+            wbc_critical_low=2.0,
+            wbc_critical_high=20.0,
+            rbc_low=4.2 if is_male else 3.9,
+            rbc_high=5.6 if is_male else 5.2,
+            hgb_low=hgb_low,
+            hgb_high=hgb_high,
+            hgb_critical_low=70.0,
+            hct_low=37.0 if is_male else 35.0,
+            hct_high=50.0 if is_male else 45.0,
+            mcv_low=80.0,
+            mcv_high=96.0,
+            mch_low=26.0,
+            mch_high=34.0,
+            mchc_low=310.0,
+            mchc_high=360.0,
+            plt_low=150.0,
+            plt_high=450.0,
+            plt_critical_low=30.0,
         )
 
     # Adulte ≥ 18 ans
     hgb_low = 130.0 if is_male else 120.0
     hgb_high = 170.0 if is_male else 150.0
     return _NFSRanges(
-        wbc_low=4.0, wbc_high=10.0, wbc_critical_low=2.0, wbc_critical_high=20.0,
-        rbc_low=4.5 if is_male else 3.8, rbc_high=5.9 if is_male else 5.2,
-        hgb_low=hgb_low, hgb_high=hgb_high, hgb_critical_low=70.0,
-        hct_low=40.0 if is_male else 36.0, hct_high=54.0 if is_male else 48.0,
-        mcv_low=82.0, mcv_high=98.0,
-        mch_low=27.0, mch_high=34.0,
-        mchc_low=310.0, mchc_high=360.0,
-        plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+        wbc_low=4.0,
+        wbc_high=10.0,
+        wbc_critical_low=2.0,
+        wbc_critical_high=20.0,
+        rbc_low=4.5 if is_male else 3.8,
+        rbc_high=5.9 if is_male else 5.2,
+        hgb_low=hgb_low,
+        hgb_high=hgb_high,
+        hgb_critical_low=70.0,
+        hct_low=40.0 if is_male else 36.0,
+        hct_high=54.0 if is_male else 48.0,
+        mcv_low=82.0,
+        mcv_high=98.0,
+        mch_low=27.0,
+        mch_high=34.0,
+        mchc_low=310.0,
+        mchc_high=360.0,
+        plt_low=150.0,
+        plt_high=450.0,
+        plt_critical_low=30.0,
     )
 
 
@@ -261,11 +321,7 @@ def _build_overall_flags(points: dict[str, RuggylabJSONPoint]) -> list[str]:
         flags.append("MACROCYTOSE")
 
     # Pancytopenia (all three cell lines low)
-    if (
-        wbc and wbc.status == "L"
-        and hgb and hgb.status == "L"
-        and plt and plt.status == "L"
-    ):
+    if wbc and wbc.status == "L" and hgb and hgb.status == "L" and plt and plt.status == "L":
         # Replace the three individual flags with the synthetic one
         for flag in ("LEUCOPENIE", "ANEMIE", "THROMBOPENIE"):
             if flag in flags:

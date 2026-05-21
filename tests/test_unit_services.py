@@ -140,8 +140,8 @@ class TestValidateNFSParameters:
         raw = {**_NORMAL_ADULT_RAW, "WBC": 12.0}
         validated_adult, _ = validate_nfs_parameters(raw, 35, "M")
         validated_child, _ = validate_nfs_parameters(raw, 8, "M")
-        assert validated_adult.WBC.status == "H"   # out of adult range
-        assert validated_child.WBC.status == "N"   # within child range
+        assert validated_adult.WBC.status == "H"  # out of adult range
+        assert validated_child.WBC.status == "N"  # within child range
 
     def test_overall_flags_populated(self):
         raw = {**_NORMAL_ADULT_RAW, "HGB": 110.0}  # low HGB → ANEMIE

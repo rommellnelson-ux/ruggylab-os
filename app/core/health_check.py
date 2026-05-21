@@ -34,6 +34,7 @@ class HealthCheckService:
         try:
             # Simple query to test connectivity
             from sqlalchemy import text
+
             db.execute(text("SELECT 1"))
             return True, {
                 "status": "healthy",
