@@ -16,12 +16,14 @@ branch_labels = None
 depends_on = None
 
 
-userrole = sa.Enum("TECHNICIAN", "OFFICER", "ADMIN", name="userrole")
+# create_type=False: we manage the PG type explicitly via raw SQL so that
+# SQLAlchemy does NOT emit a second CREATE TYPE when building the users table.
+userrole = sa.Enum("TECHNICIAN", "OFFICER", "ADMIN", name="userrole", create_type=False)
 
 
 def upgrade() -> None:
-    # checkfirst=True is unreliable with psycopg3; use a PG-native DO block
-    # that silently swallows duplicate_object errors instead.
+    # Idempotent: the DO block catches duplicate_object, so re-running the
+    # migration (or running against a DB that already has the type) never fails.
     op.execute(
         """
         DO $$ BEGIN
@@ -119,4 +121,4 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index(op.f("ix_users_id"), table_name="users")
     op.drop_table("users")
-    userrole.drop(op.get_bind(), checkfirst=True)
+    op.execute("DROP TYPE IF EXISTS userrole")
