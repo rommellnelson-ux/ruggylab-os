@@ -19,7 +19,7 @@ class EquipmentBase(BaseModel):
 
 
 class EquipmentCreate(EquipmentBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class EquipmentRead(EquipmentBase):

@@ -24,9 +24,7 @@ def _canonical_result_payload(result: Result) -> dict:
         "sample_id": result.sample_id,
         "sample_barcode": sample.barcode if sample else None,
         "patient_ipp": patient.ipp_unique_id if patient else None,
-        "patient_name": (
-            f"{patient.first_name} {patient.last_name}" if patient else None
-        ),
+        "patient_name": (f"{patient.first_name} {patient.last_name}" if patient else None),
         "patient_birth_date": (
             patient.birth_date.isoformat() if patient and patient.birth_date else None
         ),

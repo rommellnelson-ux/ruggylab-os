@@ -36,11 +36,10 @@ def list_ratios(
     if reagent_id is not None:
         query = query.filter(EquipmentReagentRatio.reagent_id == reagent_id)
     total = query.with_entities(func.count(EquipmentReagentRatio.id)).scalar() or 0
-    items = (
-        query.order_by(EquipmentReagentRatio.id.desc()).offset(skip).limit(limit).all()
-    )
+    items = query.order_by(EquipmentReagentRatio.id.desc()).offset(skip).limit(limit).all()
     return EquipmentReagentRatioListResponse(
-        items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit)
+        items=[EquipmentReagentRatioRead.model_validate(r) for r in items],
+        meta=PaginationMeta.from_counts(total=total, skip=skip, limit=limit),
     )
 
 
@@ -52,15 +51,9 @@ def list_ratios(
 def list_ratio_versions(
     ratio_id: int, db: Session = Depends(get_db)
 ) -> list[EquipmentReagentRatioVersionRead]:
-    ratio = (
-        db.query(EquipmentReagentRatio)
-        .filter(EquipmentReagentRatio.id == ratio_id)
-        .first()
-    )
+    ratio = db.query(EquipmentReagentRatio).filter(EquipmentReagentRatio.id == ratio_id).first()
     if not ratio:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Ratio introuvable."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ratio introuvable.")
     return [
         EquipmentReagentRatioVersionRead(
             id=version.id,
@@ -141,15 +134,9 @@ def update_ratio(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> EquipmentReagentRatio:
-    ratio = (
-        db.query(EquipmentReagentRatio)
-        .filter(EquipmentReagentRatio.id == ratio_id)
-        .first()
-    )
+    ratio = db.query(EquipmentReagentRatio).filter(EquipmentReagentRatio.id == ratio_id).first()
     if not ratio:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Ratio introuvable."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ratio introuvable.")
     for key, value in payload.model_dump(exclude_none=True).items():
         setattr(ratio, key, value)
     create_ratio_version(
@@ -168,23 +155,15 @@ def update_ratio(
     return ratio
 
 
-@router.delete(
-    "/{ratio_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_admin)]
-)
+@router.delete("/{ratio_id}", status_code=status.HTTP_200_OK, dependencies=[Depends(require_admin)])
 def delete_ratio(
     ratio_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> dict[str, str]:
-    ratio = (
-        db.query(EquipmentReagentRatio)
-        .filter(EquipmentReagentRatio.id == ratio_id)
-        .first()
-    )
+    ratio = db.query(EquipmentReagentRatio).filter(EquipmentReagentRatio.id == ratio_id).first()
     if not ratio:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Ratio introuvable."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ratio introuvable.")
     log_audit_event(
         db,
         user=current_user,

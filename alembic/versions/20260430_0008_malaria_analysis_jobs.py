@@ -35,9 +35,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["result_id"], ["results.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_malaria_analysis_jobs_id"), "malaria_analysis_jobs", ["id"]
-    )
+    op.create_index(op.f("ix_malaria_analysis_jobs_id"), "malaria_analysis_jobs", ["id"])
     op.create_index(
         op.f("ix_malaria_analysis_jobs_result_id"),
         "malaria_analysis_jobs",
@@ -51,14 +49,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        op.f("ix_malaria_analysis_jobs_status"), table_name="malaria_analysis_jobs"
-    )
+    op.drop_index(op.f("ix_malaria_analysis_jobs_status"), table_name="malaria_analysis_jobs")
     op.drop_index(
         op.f("ix_malaria_analysis_jobs_result_id"),
         table_name="malaria_analysis_jobs",
     )
-    op.drop_index(
-        op.f("ix_malaria_analysis_jobs_id"), table_name="malaria_analysis_jobs"
-    )
+    op.drop_index(op.f("ix_malaria_analysis_jobs_id"), table_name="malaria_analysis_jobs")
     op.drop_table("malaria_analysis_jobs")

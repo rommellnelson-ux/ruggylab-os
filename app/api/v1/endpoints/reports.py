@@ -1,6 +1,7 @@
 import csv
 from datetime import UTC, datetime, timedelta
 from io import StringIO
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func
@@ -38,6 +39,12 @@ from app.services.report_signing import build_result_report_pdf, create_report_s
 router = APIRouter(prefix="/reports")
 
 EPIDEMIOLOGY_MARKERS = ("WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT")
+
+
+class _ReagentUsageBucket(TypedDict):
+    estimated_monthly_consumption: float
+    actual_run_count: int
+    source_equipment: set[str]
 
 
 def _get_result_or_404(db: Session, result_id: int) -> Result:
@@ -92,8 +99,8 @@ def _marker_status(value: object) -> tuple[str | None, bool]:
     if not isinstance(value, dict):
         return None, False
     status_value = value.get("status")
-    status = str(status_value).upper() if status_value else None
-    return status, bool(value.get("is_critical", False))
+    report_status = str(status_value).upper() if status_value else None
+    return report_status, bool(value.get("is_critical", False))
 
 
 def _build_epidemiology_summary(
@@ -168,9 +175,7 @@ def epidemiology_summary(
     end_date = datetime.now(UTC).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
     results = _epidemiology_results(db, start_date=start_date, end_date=end_date)
-    return _build_epidemiology_summary(
-        results, start_date=start_date, end_date=end_date
-    )
+    return _build_epidemiology_summary(results, start_date=start_date, end_date=end_date)
 
 
 @router.get("/epidemiology-export.csv")
@@ -239,9 +244,7 @@ def epidemiology_export_csv(
     return Response(
         content=output.getvalue(),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": 'attachment; filename="epidemiology-export.csv"'
-        },
+        headers={"Content-Disposition": 'attachment; filename="epidemiology-export.csv"'},
     )
 
 
@@ -253,9 +256,7 @@ def result_report_pdf(
 ) -> Response:
     del current_user
     result = _get_result_or_404(db, result_id)
-    signature = (
-        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
-    )
+    signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
     pdf_bytes = build_result_report_pdf(result, signature)
     return Response(
         content=pdf_bytes,
@@ -284,9 +285,7 @@ def sign_result_report(
             detail="Signature impossible: le resultat n'est pas valide.",
         )
 
-    existing = (
-        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
-    )
+    existing = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -311,9 +310,7 @@ def get_result_report_signature(
     current_user: User = Depends(get_current_active_user),
 ) -> ReportSignature:
     del current_user
-    signature = (
-        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
-    )
+    signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
     if not signature:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -335,7 +332,7 @@ def audit_dashboard(db: Session = Depends(get_db)) -> AuditDashboardResponse:
         .group_by(AuditEvent.event_type)
         .all()
     )
-    breakdown = {event_type: count for event_type, count in grouped}
+    breakdown: dict[str, int] = {str(et): int(cnt) for et, cnt in grouped}
     return AuditDashboardResponse(
         total_events=total_events,
         recent_events=[AuditEventRead.model_validate(item) for item in recent],
@@ -351,7 +348,7 @@ def monthly_consumption_dashboard(
     month: int = Query(default_factory=lambda: datetime.now(UTC).month, ge=1, le=12),
 ) -> MonthlyConsumptionDashboardResponse:
     del current_user
-    monthly_result_counts = dict(
+    equip_rows = (
         db.query(Result.equipment_id, func.count(Result.id))
         .filter(func.extract("year", Result.analysis_date) == year)
         .filter(func.extract("month", Result.analysis_date) == month)
@@ -359,29 +356,28 @@ def monthly_consumption_dashboard(
         .group_by(Result.equipment_id)
         .all()
     )
+    monthly_result_counts: dict[int, int] = {
+        int(eid): int(cnt) for eid, cnt in equip_rows if eid is not None
+    }
 
-    reagent_usage_map: dict[str, dict[str, object]] = {}
-    ratios = (
-        db.query(EquipmentReagentRatio)
-        .filter(EquipmentReagentRatio.is_active.is_(True))
-        .all()
-    )
+    reagent_usage_map: dict[str, _ReagentUsageBucket] = {}
+    ratios = db.query(EquipmentReagentRatio).filter(EquipmentReagentRatio.is_active.is_(True)).all()
     for ratio in ratios:
         run_count = int(monthly_result_counts.get(ratio.equipment_id, 0))
         if run_count <= 0:
             continue
         usage = reagent_usage_map.setdefault(
             ratio.reagent.name,
-            {
-                "estimated_monthly_consumption": 0.0,
-                "actual_run_count": 0,
-                "source_equipment": set(),
-            },
+            _ReagentUsageBucket(
+                estimated_monthly_consumption=0.0,
+                actual_run_count=0,
+                source_equipment=set(),
+            ),
         )
         adjusted_ratio = ratio.consumption_per_run * ratio.adjustment_factor
-        usage["estimated_monthly_consumption"] = float(
-            usage["estimated_monthly_consumption"]
-        ) + (run_count * adjusted_ratio)
+        usage["estimated_monthly_consumption"] = float(usage["estimated_monthly_consumption"]) + (
+            run_count * adjusted_ratio
+        )
         usage["actual_run_count"] = int(usage["actual_run_count"]) + run_count
         usage["source_equipment"].add(ratio.equipment.name)
 
@@ -390,11 +386,11 @@ def monthly_consumption_dashboard(
     for reagent in reagents:
         usage = reagent_usage_map.get(
             reagent.name,
-            {
-                "estimated_monthly_consumption": 0.0,
-                "actual_run_count": 0,
-                "source_equipment": set(),
-            },
+            _ReagentUsageBucket(
+                estimated_monthly_consumption=0.0,
+                actual_run_count=0,
+                source_equipment=set(),
+            ),
         )
         estimated_monthly_consumption = float(usage["estimated_monthly_consumption"])
         days_of_cover = None
@@ -409,13 +405,11 @@ def monthly_consumption_dashboard(
                 alert_threshold=reagent.alert_threshold,
                 estimated_monthly_consumption=estimated_monthly_consumption,
                 actual_run_count=int(usage["actual_run_count"]),
-                source_equipment=sorted(list(usage["source_equipment"])),
+                source_equipment=sorted(usage["source_equipment"]),
                 days_of_cover=days_of_cover,
             )
         )
-    return MonthlyConsumptionDashboardResponse(
-        month=f"{year:04d}-{month:02d}", items=items
-    )
+    return MonthlyConsumptionDashboardResponse(month=f"{year:04d}-{month:02d}", items=items)
 
 
 @router.get("/critical-thresholds", response_model=CriticalThresholdDashboardResponse)
@@ -443,9 +437,7 @@ def critical_threshold_dashboard(
                 severity=severity,
             )
         )
-    return CriticalThresholdDashboardResponse(
-        total_critical_reagents=len(items), items=items
-    )
+    return CriticalThresholdDashboardResponse(total_critical_reagents=len(items), items=items)
 
 
 @router.get(

@@ -29,9 +29,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["equipment_id"], ["equipments.id"]),
         sa.ForeignKeyConstraint(["reagent_id"], ["reagents.id"]),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "equipment_id", "reagent_id", name="uq_equipment_reagent_ratio_pair"
-        ),
+        sa.UniqueConstraint("equipment_id", "reagent_id", name="uq_equipment_reagent_ratio_pair"),
     )
     op.create_index(
         op.f("ix_equipment_reagent_ratios_id"),
@@ -42,7 +40,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        op.f("ix_equipment_reagent_ratios_id"), table_name="equipment_reagent_ratios"
-    )
+    op.drop_index(op.f("ix_equipment_reagent_ratios_id"), table_name="equipment_reagent_ratios")
     op.drop_table("equipment_reagent_ratios")

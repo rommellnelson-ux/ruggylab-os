@@ -11,7 +11,7 @@ class EquipmentReagentRatioBase(BaseModel):
 
 
 class EquipmentReagentRatioCreate(EquipmentReagentRatioBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class EquipmentReagentRatioUpdate(BaseModel):

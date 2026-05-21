@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import Equipment, MalariaAnalysisJob, Result, Sample
+from app.models import Equipment, MalariaAnalysisJob, Result, Sample, User
 from app.schemas.malaria import MalariaAnalysisRead
 from app.services.audit import log_audit_event
 from app.services.imaging.capture_service import MicroscopeCaptureService
@@ -17,16 +17,14 @@ from app.services.malaria_ai import (
 )
 
 router = APIRouter(prefix="/imaging")
-microscope_service = MicroscopeCaptureService(
-    storage_dir=settings.MICROSCOPY_STORAGE_DIR
-)
+microscope_service = MicroscopeCaptureService(storage_dir=settings.MICROSCOPY_STORAGE_DIR)
 
 
 @router.post("/capture-microscope", status_code=status.HTTP_201_CREATED)
 def trigger_microscope_capture(
     sample_barcode: str = Body(..., embed=True),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> dict[str, Any]:
     sample = db.query(Sample).filter(Sample.barcode == sample_barcode).first()
     if not sample:
@@ -77,7 +75,7 @@ def submit_malaria_analysis(
     result_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> MalariaAnalysisJob:
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
@@ -91,13 +89,26 @@ def submit_malaria_analysis(
             detail="Analyse paludisme impossible: aucune image microscope liee au resultat.",
         )
 
+    # Check for completed job first (no lock needed)
+    completed_job = (
+        db.query(MalariaAnalysisJob)
+        .filter(
+            MalariaAnalysisJob.result_id == result_id,
+            MalariaAnalysisJob.status == "completed",
+        )
+        .first()
+    )
+    if completed_job:
+        return completed_job
+
+    # Check for active job with lock to prevent race conditions
     active_job = (
         db.query(MalariaAnalysisJob)
         .filter(
             MalariaAnalysisJob.result_id == result_id,
-            MalariaAnalysisJob.status.in_(["queued", "processing", "completed"]),
+            MalariaAnalysisJob.status.in_(["queued", "processing"]),
         )
-        .order_by(MalariaAnalysisJob.id.desc())
+        .with_for_update()
         .first()
     )
     if active_job:
@@ -116,9 +127,7 @@ def submit_malaria_analysis(
 def process_malaria_analysis_job(
     job_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_user),
 ) -> MalariaAnalysisJob:
-    del current_user
     job = process_malaria_job(db, job_id=job_id)
     if not job:
         raise HTTPException(
@@ -135,9 +144,7 @@ def process_malaria_analysis_job(
 def get_malaria_analysis_job(
     job_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_user),
 ) -> MalariaAnalysisJob:
-    del current_user
     job = db.query(MalariaAnalysisJob).filter(MalariaAnalysisJob.id == job_id).first()
     if not job:
         raise HTTPException(

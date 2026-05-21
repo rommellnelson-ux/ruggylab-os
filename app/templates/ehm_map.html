@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartographie des EHM et Gendarmerie</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0B1C2E;
+    --navy-mid: #122540;
+    --navy-light: #1A3356;
+    --gold: #C8993A;
+    --gold-light: #E8B84B;
+    --red: #C0392B;
+    --red-light: #E74C3C;
+    --blue: #2980B9;
+    --blue-light: #3498DB;
+    --green: #1A7A4A;
+    --green-light: #27AE60;
+    --text: #ECF0F1;
+    --text-muted: #8FA8C0;
+    --border: rgba(200,153,58,0.25);
+  }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--navy-mid);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .emblem {
+    width: 42px;
+    height: 42px;
+    border: 1.5px solid var(--gold);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  .header-title h1 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .header-title p {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 2px;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 18px;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+  }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 280px;
+    background: var(--navy-mid);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-section h3 {
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 10px;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    border: 0.5px solid transparent;
+    color: var(--text-muted);
+    padding: 7px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    text-align: left;
+    transition: all 0.15s;
+    width: 100%;
+  }
+
+  .filter-btn:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+  }
+
+  .filter-btn.active {
+    background: rgba(200,153,58,0.1);
+    border-color: var(--border);
+    color: var(--text);
+  }
+
+  .filter-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .filter-count {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .list-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .list-area::-webkit-scrollbar { width: 4px; }
+  .list-area::-webkit-scrollbar-track { background: transparent; }
+  .list-area::-webkit-scrollbar-thumb { background: var(--navy-light); border-radius: 2px; }
+
+  .ehm-item {
+    padding: 8px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.12s;
+    border-left: 2px solid transparent;
+    margin-bottom: 2px;
+  }
+
+  .ehm-item:hover { background: rgba(255,255,255,0.05); }
+  .ehm-item.active { background: rgba(200,153,58,0.1); border-left-color: var(--gold); }
+
+  .ehm-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .ehm-meta {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .type-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-right: 4px;
+  }
+
+  #map {
+    flex: 1;
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--navy-mid);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  .leaflet-popup-tip { background: var(--navy-mid); }
+
+  .popup-content {
+    padding: 4px 2px;
+  }
+
+  .popup-type {
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+
+  .popup-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ECF0F1;
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+
+  .popup-row {
+    font-size: 11px;
+    color: #8FA8C0;
+    margin-bottom: 2px;
+  }
+
+  .popup-row span {
+    color: #BDC3C7;
+  }
+
+  .search-box {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  .search-box input {
+    width: 100%;
+    background: rgba(255,255,255,0.06);
+    border: 0.5px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px 6px 28px;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    outline: none;
+  }
+
+  .search-box input::placeholder { color: var(--text-muted); }
+  .search-box input:focus { border-color: var(--gold); }
+
+  .search-icon {
+    position: absolute;
+    left: 21px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .list-header {
+    padding: 8px 16px 4px;
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .map-credit {
+    position: absolute;
+    bottom: 28px;
+    right: 10px;
+    z-index: 1000;
+    background: rgba(11,28,46,0.9);
+    border: 0.5px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="emblem">EHM</div>
+    <div class="header-title">
+      <h1>Établissements Hospitaliers Militaires</h1>
+      <p>DIVISION SANTÉ — 2026</p>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-num" id="stat-total" style="color:var(--gold)">60</div>
+      <div class="stat-label">Total EHM</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-hma" style="color:var(--red-light)">1</div>
+      <div class="stat-label">HMA</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-cma" style="color:var(--blue-light)">8</div>
+      <div class="stat-label">CMA</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-csa" style="color:var(--green-light)">51</div>
+      <div class="stat-label">CSA</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-armes" style="color:var(--text-muted)">37</div>
+      <div class="stat-label">Armées</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="stat-gendarmerie" style="color:var(--text-muted)">22</div>
+      <div class="stat-label">Gendarmerie</div>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+
+    <div class="sidebar-section">
+      <h3>Filtrer par division</h3>
+      <div class="filter-group">
+        <button class="filter-btn active" onclick="filterMap('ALL', this)">
+          <div class="filter-dot" style="background:var(--gold)"></div>
+          Tous les EHM
+          <span class="filter-count" id="count-all">60</span>
+        </button>
+        <button class="filter-btn" onclick="filterMap('ARMEES', this)">
+          <div class="filter-dot" style="background:#5B84B1"></div>
+          Armées
+          <span class="filter-count" id="count-armes">37</span>
+        </button>
+        <button class="filter-btn" onclick="filterMap('GENDARMERIE NATIONALE', this)">
+          <div class="filter-dot" style="background:#7B6BA0"></div>
+          Gendarmerie Nationale
+          <span class="filter-count" id="count-gendarmerie">22</span>
+        </button>
+        <button class="filter-btn" onclick="filterMap('HMA', this)">
+          <div class="filter-dot" style="background:var(--red-light)"></div>
+          HMA uniquement
+          <span class="filter-count" id="count-hma">1</span>
+        </button>
+        <button class="filter-btn" onclick="filterMap('CMA', this)">
+          <div class="filter-dot" style="background:var(--blue-light)"></div>
+          CMA uniquement
+          <span class="filter-count" id="count-cma">8</span>
+        </button>
+        <button class="filter-btn" onclick="filterMap('CSA', this)">
+          <div class="filter-dot" style="background:var(--green-light)"></div>
+          CSA uniquement
+          <span class="filter-count" id="count-csa">51</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Rechercher un établissement..." oninput="filterList(this.value)">
+    </div>
+
+    <div class="list-header" id="listHeader">60 établissements</div>
+
+    <div class="list-area" id="listArea"></div>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script>
+const API_PATH = "/api/v1/military-facilities";
+const TYPE_COLORS = { HMA: "#E74C3C", CMA: "#3498DB", CSA: "#27AE60" };
+const TYPE_SIZES  = { HMA: 18, CMA: 14, CSA: 9 };
+
+let map, markers = [], DATA = [], currentFilter = "ALL", activeItem = null;
+
+function updateStats() {
+  const totals = {
+    ALL: DATA.length,
+    ARMEES: 0,
+    "GENDARMERIE NATIONALE": 0,
+    HMA: 0,
+    CMA: 0,
+    CSA: 0,
+  };
+  DATA.forEach((e) => {
+    totals[e.division] = (totals[e.division] || 0) + 1;
+    totals[e.type] = (totals[e.type] || 0) + 1;
+  });
+  document.getElementById("stat-total").textContent = totals.ALL;
+  document.getElementById("stat-hma").textContent = totals.HMA;
+  document.getElementById("stat-cma").textContent = totals.CMA;
+  document.getElementById("stat-csa").textContent = totals.CSA;
+  document.getElementById("stat-armes").textContent = totals.ARMEES;
+  document.getElementById("stat-gendarmerie").textContent = totals["GENDARMERIE NATIONALE"];
+  document.getElementById("count-all").textContent = totals.ALL;
+  document.getElementById("count-armes").textContent = totals.ARMEES;
+  document.getElementById("count-gendarmerie").textContent = totals["GENDARMERIE NATIONALE"];
+  document.getElementById("count-hma").textContent = totals.HMA;
+  document.getElementById("count-cma").textContent = totals.CMA;
+  document.getElementById("count-csa").textContent = totals.CSA;
+}
+
+async function loadFacilities() {
+  try {
+    const response = await fetch(API_PATH);
+    if (!response.ok) {
+      throw new Error(`API error ${response.status}`);
+    }
+    DATA = await response.json();
+  } catch (error) {
+    console.error("Impossible de charger les établissements:", error);
+    DATA = [];
+  }
+}
+
+function createIcon(type) {
+  const c = TYPE_COLORS[type]; const s = TYPE_SIZES[type];
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:${s}px;height:${s}px;border-radius:50%;background:${c};border:2px solid rgba(255,255,255,0.7);box-shadow:0 0 0 2px ${c}44,0 2px 6px rgba(0,0,0,0.5)"></div>`,
+    iconAnchor: [s/2, s/2], popupAnchor: [0, -s/2]
+  });
+}
+
+function buildList(filter = "ALL", search = "") {
+  const area = document.getElementById("listArea");
+  const hdr  = document.getElementById("listHeader");
+  area.innerHTML = "";
+  const q = search.toLowerCase();
+  let count = 0;
+
+  DATA.forEach((e, i) => {
+    const matchFilter = filter === "ALL" || filter === e.division || filter === e.type;
+    const matchSearch = !q || e.name.toLowerCase().includes(q) || e.region.toLowerCase().includes(q) || e.bureau.toLowerCase().includes(q);
+    if (!matchFilter || !matchSearch) return;
+    count++;
+    const item = document.createElement("div");
+    item.className = "ehm-item";
+    item.dataset.idx = i;
+    item.innerHTML = `
+      <div class="ehm-name"><span class="type-badge" style="background:${TYPE_COLORS[e.type]}22;color:${TYPE_COLORS[e.type]}">${e.type}</span>${e.name}</div>
+      <div class="ehm-meta">${e.region} · ${e.bureau}</div>
+    `;
+    item.onclick = () => focusMarker(i, item);
+    area.appendChild(item);
+  });
+  hdr.textContent = `${count} établissement${count > 1 ? "s" : ""}`;
+}
+
+function focusMarker(idx, itemEl) {
+  if (activeItem) activeItem.classList.remove("active");
+  itemEl.classList.add("active");
+  activeItem = itemEl;
+  const m = markers[idx];
+  if (m) { map.setView(m.getLatLng(), 13, {animate: true}); m.openPopup(); }
+}
+
+function filterMap(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  const q = document.getElementById("searchInput").value;
+  applyVisibility(filter, q);
+  buildList(filter, q);
+}
+
+function filterList(q) {
+  applyVisibility(currentFilter, q);
+  buildList(currentFilter, q);
+}
+
+function applyVisibility(filter, q) {
+  const qlow = q.toLowerCase();
+  markers.forEach((m, i) => {
+    const e = DATA[i];
+    const matchFilter = filter === "ALL" || filter === e.division || filter === e.type;
+    const matchSearch = !qlow || e.name.toLowerCase().includes(qlow) || e.region.toLowerCase().includes(qlow);
+    if (matchFilter && matchSearch) { if (!map.hasLayer(m)) m.addTo(map); }
+    else { if (map.hasLayer(m)) map.removeLayer(m); }
+  });
+}
+
+window.addEventListener("DOMContentLoaded", async () => {
+  map = L.map("map", { zoomControl: true }).setView([7.5, -5.5], 6);
+
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors",
+    maxZoom: 19
+  }).addTo(map);
+
+  await loadFacilities();
+  updateStats();
+
+  DATA.forEach((e, i) => {
+    const typeColor = TYPE_COLORS[e.type];
+    const m = L.marker([e.latitude, e.longitude], {icon: createIcon(e.type)})
+      .bindPopup(`<div class="popup-content">
+        <div class="popup-type" style="color:${typeColor}">${e.type} — ${e.division}</div>
+        <div class="popup-name">${e.name}</div>
+        <div class="popup-row">Région : <span>${e.region}</span></div>
+        <div class="popup-row">Bureau santé : <span>${e.bureau}</span></div>
+      </div>`, { maxWidth: 260 })
+      .addTo(map);
+    markers.push(m);
+  });
+
+  buildList("ALL", "");
+});
+</script>
+</body>
+</html>

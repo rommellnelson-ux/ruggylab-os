@@ -43,9 +43,7 @@ def upgrade() -> None:
         "dh36_inbound_messages",
         ["equipment_serial"],
     )
-    op.create_index(
-        op.f("ix_dh36_inbound_messages_id"), "dh36_inbound_messages", ["id"]
-    )
+    op.create_index(op.f("ix_dh36_inbound_messages_id"), "dh36_inbound_messages", ["id"])
     op.create_index(
         op.f("ix_dh36_inbound_messages_message_control_id"),
         "dh36_inbound_messages",
@@ -76,9 +74,7 @@ def downgrade() -> None:
         op.f("ix_dh36_inbound_messages_message_control_id"),
         table_name="dh36_inbound_messages",
     )
-    op.drop_index(
-        op.f("ix_dh36_inbound_messages_id"), table_name="dh36_inbound_messages"
-    )
+    op.drop_index(op.f("ix_dh36_inbound_messages_id"), table_name="dh36_inbound_messages")
     op.drop_index(
         op.f("ix_dh36_inbound_messages_equipment_serial"),
         table_name="dh36_inbound_messages",

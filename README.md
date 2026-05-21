@@ -227,8 +227,38 @@ The API tests use a dedicated SQLite database through `TestClient` and do not st
 - Administrative actions are restricted by role checks
 - Result validation fields are enforced server-side
 - Imaging path generation is sanitized to avoid path traversal issues
+- Built-in request throttling protects against abusive retries
+- Login endpoints now enforce brute-force protection and rate limits
+- HTTP security headers are added to reduce attack surface
+- CORS is configured to allow cross-origin requests from trusted domains
+- Per-user request quotas prevent abuse by authenticated users
+- Response caching with configurable TTL reduces database load and improves response times
+- Gzip compression for responses improves bandwidth efficiency
+- Pagination support with configurable page sizes improves large dataset handling
 - Local `.env` values are ignored by Git; use `.env.example` as the template
 - `models/`, `backups/`, and `logs/` are ignored by Git for local-first deployments
+
+### Secrets Management
+
+RuggyLab OS supports secure secrets management for production deployments:
+
+- **Development**: Use local `.env` file (included in `.gitignore`)
+- **Production**: Use cloud secret managers (AWS Secrets Manager, Azure Key Vault, Google Cloud Secret Manager)
+
+## CI and deployment
+
+The GitHub Actions pipeline includes:
+
+- linting and formatting checks with Ruff
+- static typing validation with Mypy
+- Python security scanning with Bandit and pip-audit
+- secret discovery with detect-secrets
+- CodeQL analysis for deeper application security scanning
+- Docker image build/publish on `main` via GitHub Container Registry
+
+Production deployment should use GitHub Secrets for any provider credentials or runtime configuration. The repository also relies on the automatically provided `GITHUB_TOKEN` for CI publishing.
+
+**Important**: Never commit secrets to version control. Always use environment variables or cloud secret managers for sensitive values in production.
 
 ## Deployment notes
 

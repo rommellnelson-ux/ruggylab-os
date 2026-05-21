@@ -5,14 +5,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_admin
 from app.db.session import get_db
 from app.models import AuditEvent
+from app.schemas.audit_event import AuditEventRead
 from app.schemas.pagination import AuditEventListResponse, PaginationMeta
 
 router = APIRouter(prefix="/audit-events")
 
 
-@router.get(
-    "", response_model=AuditEventListResponse, dependencies=[Depends(require_admin)]
-)
+@router.get("", response_model=AuditEventListResponse, dependencies=[Depends(require_admin)])
 def list_audit_events(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
@@ -22,5 +21,6 @@ def list_audit_events(
     total = query.with_entities(func.count(AuditEvent.id)).scalar() or 0
     items = query.order_by(AuditEvent.id.desc()).offset(skip).limit(limit).all()
     return AuditEventListResponse(
-        items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit)
+        items=[AuditEventRead.model_validate(e) for e in items],
+        meta=PaginationMeta.from_counts(total=total, skip=skip, limit=limit),
     )

@@ -249,12 +249,11 @@ def test_create_result_uses_authenticated_user_for_validation_fields(client) -> 
             "sample_id": sample_id,
             "equipment_id": equipment_id,
             "data_points": {"WBC": 7.4},
-            "validator_id": 999,
-            "is_validated": False,
         },
     )
     assert response.status_code == 201, response.text
     payload = response.json()
+    # Server sets validator_id from authenticated user, not from client input
     assert payload["validator_id"] == 1
     assert payload["is_validated"] is True
 

@@ -1,7 +1,43 @@
+import logging
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_SECRET_KEY = "insecure_dev_secret"
-DEFAULT_FIRST_SUPERUSER_PASSWORD = "insecure_admin"
+logger = logging.getLogger(__name__)
+
+
+def _load_secret_from_manager(secret_name: str, default: str) -> str:
+    """
+    Load a secret from the configured secrets manager.
+
+    First tries to load from environment variables, then from cloud provider
+    if SECRET_MANAGER_TYPE is configured.
+    """
+    # Try environment variable first
+    env_value = os.getenv(secret_name)
+    if env_value:
+        return env_value
+
+    # Try cloud secrets manager if configured
+    manager_type = os.getenv("SECRET_MANAGER_TYPE")
+    if manager_type and manager_type != "local":
+        try:
+            from app.core.secrets_manager import SecretsManager
+
+            SecretsManager.initialize(manager_type)
+            return SecretsManager.get_secret(secret_name)
+        except Exception as exc:
+            logger.warning(
+                "Failed to load secret '%s' from cloud manager: %s. Using default.",
+                secret_name,
+                exc,
+            )
+
+    return default
+
+
+DEFAULT_SECRET_KEY = _load_secret_from_manager("SECRET_KEY", "")
+DEFAULT_FIRST_SUPERUSER_PASSWORD = _load_secret_from_manager("FIRST_SUPERUSER_PASSWORD", "")
 
 
 class Settings(BaseSettings):
@@ -11,18 +47,66 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./ruggylab_os.db"
     SECRET_KEY: str = DEFAULT_SECRET_KEY
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     FIRST_SUPERUSER: str = "admin"
     FIRST_SUPERUSER_PASSWORD: str = DEFAULT_FIRST_SUPERUSER_PASSWORD
     FIRST_SUPERUSER_FULL_NAME: str = "RuggyLab Administrator"
     ENABLE_DH36_LISTENER: bool = True
     TESTING: bool = False
-    DH36_LISTENER_HOST: str = "0.0.0.0"
+    DH36_LISTENER_HOST: str = "127.0.0.1"  # Changed from 0.0.0.0 for security
     DH36_LISTENER_PORT: int = 5001
     BASE_DATA_DIR: str = "data"
     MICROSCOPY_STORAGE_DIR: str = "data/microscopy"
     MALARIA_MODEL_PATH: str = "models/malaria_mobilenetv2"
     MALARIA_ANALYSIS_AUTORUN: bool = True
+
+    # Rate limiting and abuse protection
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_REQUESTS: int = 100
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+    RATE_LIMIT_BLOCK_SECONDS: int = 60
+    LOGIN_RATE_LIMIT_ENABLED: bool = True
+    LOGIN_RATE_LIMIT_REQUESTS: int = 10
+    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 300
+    LOGIN_RATE_LIMIT_BLOCK_SECONDS: int = 300
+    REDIS_URL: str | None = None
+    METRICS_SERVER_ENABLED: bool = True
+
+    # HTTP security header settings
+    SECURITY_HEADERS_ENABLED: bool = True
+    HSTS_ENABLED: bool = True
+    HSTS_MAX_AGE_SECONDS: int = 63_072_000
+    HSTS_INCLUDE_SUBDOMAINS: bool = True
+    HSTS_PRELOAD: bool = True
+    REFERRER_POLICY: str = "no-referrer"
+    FRAME_OPTIONS: str = "DENY"
+    PERMISSIONS_POLICY: str = "geolocation=(), microphone=(), camera=()"
+
+    # CORS settings
+    CORS_ENABLED: bool = True
+    CORS_ALLOW_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ALLOW_CREDENTIALS: bool = True
+    CORS_ALLOW_METHODS: list[str] = ["*"]
+    CORS_ALLOW_HEADERS: list[str] = ["*"]
+
+    # User quota settings
+    USER_QUOTA_ENABLED: bool = True
+    USER_QUOTA_REQUESTS: int = 1000
+    USER_QUOTA_WINDOW_SECONDS: int = 3600  # 1 hour
+    USER_QUOTA_BLOCK_SECONDS: int = 3600
+
+    # Caching settings
+    CACHE_ENABLED: bool = True
+    CACHE_DEFAULT_TTL_SECONDS: int = 300  # 5 minutes
+    CACHE_BACKEND: str = "memory"  # "memory" or "redis"
+
+    # Compression settings
+    COMPRESSION_ENABLED: bool = True
+    COMPRESSION_MIN_SIZE_BYTES: int = 500
+
+    # Pagination settings
+    DEFAULT_PAGE_SIZE: int = 20
+    MAX_PAGE_SIZE: int = 100
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,9 +125,7 @@ class Settings(BaseSettings):
 
     @property
     def requires_security_hardening(self) -> bool:
-        weak_secret = (
-            len(self.SECRET_KEY) < 32 or "change_me" in self.SECRET_KEY.lower()
-        )
+        weak_secret = len(self.SECRET_KEY) < 32 or "change_me" in self.SECRET_KEY.lower()
         weak_admin_password = (
             len(self.FIRST_SUPERUSER_PASSWORD) < 16
             or "change_me" in self.FIRST_SUPERUSER_PASSWORD.lower()

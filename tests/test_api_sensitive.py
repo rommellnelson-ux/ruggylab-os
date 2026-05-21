@@ -1,6 +1,4 @@
-def _login(
-    client, username: str = "admin", password: str = "change_me_admin_password"
-) -> str:
+def _login(client, username: str = "admin", password: str = "change_me_admin_password") -> str:
     response = client.post(
         "/api/v1/login/access-token",
         data={"username": username, "password": password},
@@ -27,9 +25,7 @@ def _create_patient_sample_equipment(client) -> None:
             "rank": "Sergent",
         },
     )
-    patient_id = client.get("/api/v1/patients", headers=headers).json()["items"][0][
-        "id"
-    ]
+    patient_id = client.get("/api/v1/patients", headers=headers).json()["items"][0]["id"]
     client.post(
         "/api/v1/samples",
         headers=headers,
@@ -111,8 +107,7 @@ def test_imaging_endpoint_creates_reservation_and_audit_event(client) -> None:
 
     audit_response = client.get("/api/v1/audit-events", headers=headers)
     assert any(
-        event["event_type"] == "imaging.capture.reserve"
-        for event in audit_response.json()["items"]
+        event["event_type"] == "imaging.capture.reserve" for event in audit_response.json()["items"]
     )
 
 
@@ -137,10 +132,7 @@ def test_reagent_endpoint_and_audit_listing(client) -> None:
     assert list_response.json()["meta"]["total"] == 1
 
     audit_response = client.get("/api/v1/audit-events", headers=headers)
-    assert any(
-        event["event_type"] == "reagent.create"
-        for event in audit_response.json()["items"]
-    )
+    assert any(event["event_type"] == "reagent.create" for event in audit_response.json()["items"])
 
 
 def test_reagent_crud_and_dashboards(client) -> None:
@@ -157,9 +149,7 @@ def test_reagent_crud_and_dashboards(client) -> None:
             "rank": "Caporal",
         },
     )
-    patient_id = client.get("/api/v1/patients", headers=headers).json()["items"][0][
-        "id"
-    ]
+    patient_id = client.get("/api/v1/patients", headers=headers).json()["items"][0]["id"]
     sample_response = client.post(
         "/api/v1/samples",
         headers=headers,
@@ -266,14 +256,10 @@ def test_reagent_crud_and_dashboards(client) -> None:
     assert stock_dashboard.status_code == 200
     assert stock_dashboard.json()["total_reagents"] >= 1
 
-    monthly_dashboard = client.get(
-        "/api/v1/reports/monthly-consumption", headers=headers
-    )
+    monthly_dashboard = client.get("/api/v1/reports/monthly-consumption", headers=headers)
     assert monthly_dashboard.status_code == 200
     assert len(monthly_dashboard.json()["items"]) >= 1
-    monthly_items = {
-        item["reagent_name"]: item for item in monthly_dashboard.json()["items"]
-    }
+    monthly_items = {item["reagent_name"]: item for item in monthly_dashboard.json()["items"]}
     assert monthly_items["Lyse DH36"]["estimated_monthly_consumption"] > 0
     assert monthly_items["Lyse DH36"]["actual_run_count"] == 2
     assert "Dymind DH36" in monthly_items["Lyse DH36"]["source_equipment"]
@@ -281,9 +267,7 @@ def test_reagent_crud_and_dashboards(client) -> None:
     assert ratio_list.status_code == 200
     assert ratio_list.json()["meta"]["total"] >= 2
 
-    critical_dashboard = client.get(
-        "/api/v1/reports/critical-thresholds", headers=headers
-    )
+    critical_dashboard = client.get("/api/v1/reports/critical-thresholds", headers=headers)
     assert critical_dashboard.status_code == 200
     assert "total_critical_reagents" in critical_dashboard.json()
 
@@ -294,9 +278,7 @@ def test_reagent_crud_and_dashboards(client) -> None:
     delete_response = client.delete(f"/api/v1/reagents/{reagent_id}", headers=headers)
     assert delete_response.status_code == 409
 
-    ratio_list = client.get("/api/v1/equipment-reagent-ratios", headers=headers).json()[
-        "items"
-    ]
+    ratio_list = client.get("/api/v1/equipment-reagent-ratios", headers=headers).json()["items"]
     lyse_ratio = next(item for item in ratio_list if item["reagent_id"] == reagent_id)
     delete_ratio_response = client.delete(
         f"/api/v1/equipment-reagent-ratios/{lyse_ratio['id']}", headers=headers
@@ -373,15 +355,12 @@ def test_validated_result_consumes_reagents_and_audits_movement(client) -> None:
     )
     assert response.status_code == 201, response.text
 
-    updated_reagent = client.get(
-        f"/api/v1/reagents/{reagent['id']}", headers=headers
-    ).json()
+    updated_reagent = client.get(f"/api/v1/reagents/{reagent['id']}", headers=headers).json()
     assert updated_reagent["current_stock"] == 0.7
 
     audit_response = client.get("/api/v1/audit-events", headers=headers)
     assert any(
-        event["event_type"] == "stock.consume"
-        and event["entity_id"] == str(reagent["id"])
+        event["event_type"] == "stock.consume" and event["entity_id"] == str(reagent["id"])
         for event in audit_response.json()["items"]
     )
 
@@ -447,9 +426,7 @@ def test_inactive_ratio_does_not_consume_stock(client) -> None:
     )
     assert response.status_code == 201, response.text
 
-    updated_reagent = client.get(
-        f"/api/v1/reagents/{reagent['id']}", headers=headers
-    ).json()
+    updated_reagent = client.get(f"/api/v1/reagents/{reagent['id']}", headers=headers).json()
     assert updated_reagent["current_stock"] == 1.0
 
 
@@ -586,9 +563,7 @@ def test_dh36_ingestion_creates_validated_result_and_is_idempotent(client) -> No
     assert result_payload["is_validated"] is True
     assert result_payload["data_points"]["WBC"]["status"] == "N"
 
-    updated_reagent = client.get(
-        f"/api/v1/reagents/{reagent['id']}", headers=headers
-    ).json()
+    updated_reagent = client.get(f"/api/v1/reagents/{reagent['id']}", headers=headers).json()
     assert updated_reagent["current_stock"] == 0.75
 
     duplicate_response = client.post(
@@ -600,9 +575,7 @@ def test_dh36_ingestion_creates_validated_result_and_is_idempotent(client) -> No
     assert duplicate_response.json()["status"] == "duplicate"
     assert duplicate_response.json()["result_id"] == result_id
 
-    results = client.get(
-        f"/api/v1/results?sample_id={sample['id']}", headers=headers
-    ).json()
+    results = client.get(f"/api/v1/results?sample_id={sample['id']}", headers=headers).json()
     assert results["meta"]["total"] == 1
 
 
@@ -720,9 +693,7 @@ def test_technician_cannot_sign_result_report(client) -> None:
         },
     )
     assert create_user_response.status_code == 201, create_user_response.text
-    tech_headers = {
-        "Authorization": f"Bearer {_login(client, 'tech-sign', test_password)}"
-    }
+    tech_headers = {"Authorization": f"Bearer {_login(client, 'tech-sign', test_password)}"}
 
     patient = client.post(
         "/api/v1/patients",
@@ -1074,9 +1045,7 @@ def test_ratio_presets_and_versioning(client) -> None:
         headers=headers,
     )
     assert ratios.status_code == 200
-    ratio = next(
-        item for item in ratios.json()["items"] if item["reagent_id"] == cleaner["id"]
-    )
+    ratio = next(item for item in ratios.json()["items"] if item["reagent_id"] == cleaner["id"])
 
     update_response = client.put(
         f"/api/v1/equipment-reagent-ratios/{ratio['id']}",

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import Equipment, Patient, Result, Sample
+from app.models import Equipment, Patient, Result, Sample, User
 from app.schemas.precis_expert import PrecisExpertManualInput
 from app.services.audit import log_audit_event
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
@@ -23,7 +23,7 @@ def utcnow_naive() -> dt.datetime:
 def submit_precis_expert_results(
     payload: PrecisExpertManualInput,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user),
 ) -> dict[str, Any]:
     sample = db.query(Sample).filter(Sample.barcode == payload.sample_barcode).first()
     if not sample:
@@ -49,9 +49,7 @@ def submit_precis_expert_results(
         )
     )
 
-    validator = PrecisExpertValidator(
-        payload, age_in_years, patient.sex, current_user.id
-    )
+    validator = PrecisExpertValidator(payload, age_in_years, patient.sex, current_user.id)
     validated_jsonb, is_panic = validator.validate_all()
 
     equipment = (

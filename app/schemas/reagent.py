@@ -10,7 +10,7 @@ class ReagentBase(BaseModel):
 
 
 class ReagentCreate(ReagentBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class ReagentRead(ReagentBase):

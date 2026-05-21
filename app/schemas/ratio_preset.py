@@ -9,7 +9,7 @@ class RatioPresetBase(BaseModel):
 
 
 class RatioPresetCreate(RatioPresetBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class RatioPresetRead(RatioPresetBase):
@@ -30,6 +30,8 @@ class RatioPresetItemBase(BaseModel):
 
 class RatioPresetItemCreate(RatioPresetItemBase):
     preset_id: int
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class RatioPresetItemRead(RatioPresetItemBase):

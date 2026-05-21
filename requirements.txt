@@ -11,3 +11,15 @@ python-multipart==0.0.27
 alembic==1.16.4
 pytest==9.0.3
 httpx==0.28.1
+
+# Observability
+structlog==24.1.0
+prometheus-client==0.19.0
+psutil==5.9.6
+
+# Optional dependencies for cloud secret management
+# Install specific provider based on your deployment:
+# For AWS Secrets Manager: pip install boto3
+# For Azure Key Vault: pip install azure-identity azure-keyvault-secrets
+# For Google Cloud Secret Manager: pip install google-cloud-secret-manager
+# For development with all providers: pip install boto3 azure-identity azure-keyvault-secrets google-cloud-secret-manager

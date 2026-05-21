@@ -334,3 +334,16 @@ class MalariaAnalysisJob(Base):
 
     result: Mapped["Result"] = relationship(back_populates="malaria_analysis_jobs")
     requested_by: Mapped["User | None"] = relationship()
+
+
+class MilitaryFacility(Base):
+    __tablename__ = "military_facilities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    type: Mapped[str] = mapped_column(String(10), nullable=False)
+    division: Mapped[str] = mapped_column(String(50), nullable=False)
+    region: Mapped[str] = mapped_column(String(50), nullable=False)
+    bureau: Mapped[str] = mapped_column(String(100), nullable=False)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)

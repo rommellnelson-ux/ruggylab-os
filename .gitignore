@@ -2,7 +2,17 @@
 .venv/
 __pycache__/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 *.db
 backups/
 models/
 logs/
+bandit_report.txt
+pip_audit_report.txt
+*.egg-info/
+dist/
+build/
+.coverage
+coverage.xml
+htmlcov/

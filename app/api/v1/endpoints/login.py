@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.metrics import record_auth_attempt
 from app.core.security import create_access_token, verify_password
 from app.db.session import get_db
 from app.models import User
@@ -19,7 +20,10 @@ def login_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Token:
     user = db.query(User).filter(User.username == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    authenticated = bool(user and verify_password(form_data.password, user.hashed_password))
+    record_auth_attempt(authenticated)
+
+    if not authenticated:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Nom d'utilisateur ou mot de passe incorrect.",
@@ -28,6 +32,6 @@ def login_access_token(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return Token(
         access_token=create_access_token(
-            user.username, expires_delta=access_token_expires
+            user.username, expires_delta=access_token_expires, scopes=form_data.scopes
         ),
     )

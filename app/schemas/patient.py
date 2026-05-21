@@ -30,7 +30,7 @@ class PatientBase(BaseModel):
 
 
 class PatientCreate(PatientBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class PatientRead(PatientBase):

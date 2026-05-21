@@ -15,6 +15,7 @@ from app.models.ruggylab_os import (
     StockMovement,
     User,
     UserRole,
+    MilitaryFacility,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "RatioPresetItem",
     "ReportSignature",
     "StockMovement",
+    "MilitaryFacility",
 ]

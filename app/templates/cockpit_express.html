@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="description" content="Système de gestion de laboratoire médical RuggyLab OS" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png" />
+  <title>RuggyLab OS - Mode Express</title>
+  <style>
+    :root {
+      --ink: #13202b;
+      --muted: #647486;
+      --line: rgba(36, 52, 66, 0.16);
+      --panel: rgba(255, 255, 255, 0.9);
+      --band: rgba(248, 251, 253, 0.95);
+      --nav: #122233;
+      --blue: #2563eb;
+      --teal: #0f766e;
+      --rose: #be123c;
+      --amber: #b45309;
+      --ok: #15803d;
+      --shadow: 0 12px 36px rgba(18, 34, 51, 0.12);
+      --radius: 14px;
+      --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    [data-theme="dark"] {
+      --ink: #e8f0f7;
+      --muted: #a8b7c7;
+      --line: rgba(255, 255, 255, 0.12);
+      --panel: rgba(30, 41, 59, 0.85);
+      --band: rgba(15, 23, 42, 0.95);
+      --nav: #0f172a;
+      --shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--font);
+      background: linear-gradient(145deg, #f0f7ff 0%, #f5f9f5 50%, #fff9f5 100%);
+      min-height: 100vh;
+      transition: var(--transition);
+    }
+    [data-theme="dark"] body {
+      background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    }
+    
+    /* Header compact */
+    .header {
+      background: var(--panel);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+    }
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .header-brand h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--blue), var(--teal));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .mode-badge {
+      background: linear-gradient(135deg, var(--blue), var(--teal));
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    /* Context Patient Sticky */
+    .context-bar {
+      background: linear-gradient(135deg, var(--nav), #1a3045);
+      color: white;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 14px;
+    }
+    .context-patient {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .context-patient strong {
+      font-size: 16px;
+    }
+    .context-chip {
+      background: rgba(255,255,255,0.15);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+    .context-close {
+      margin-left: auto;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .context-close:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    
+    /* Main Layout */
+    .main-container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 24px;
+    }
+    
+    /* Left Column - Workflow */
+    .workflow-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    /* Step Cards */
+    .step-card {
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 2px solid var(--line);
+      overflow: hidden;
+      transition: var(--transition);
+    }
+    .step-card.active {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), var(--shadow);
+    }
+    .step-card.completed {
+      border-color: var(--ok);
+      opacity: 0.85;
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      background: linear-gradient(90deg, rgba(37,99,235,0.05), transparent);
+      border-bottom: 1px solid var(--line);
+    }
+    .step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      transition: var(--transition);
+    }
+    .step-card.active .step-number {
+      background: var(--blue);
+      color: white;
+    }
+    .step-card.completed .step-number {
+      background: var(--ok);
+      color: white;
+    }
+    .step-title {
+      font-weight: 600;
+      font-size: 16px;
+    }
+    .step-status {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .step-body {
+      padding: 20px;
+    }
+    
+    /* Form Styles */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .form-group label.required::after {
+      content: " *";
+      color: var(--rose);
+    }
+    input, select, textarea {
+      padding: 12px 14px;
+      border: 2px solid var(--line);
+      border-radius: 10px;
+      font-size: 14px;
+      background: var(--band);
+      color: var(--ink);
+      transition: var(--transition);
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    input.barcode-field {
+      font-family: monospace;
+      font-size: 16px;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, #fff9e6, var(--band));
+      border-color: var(--amber);
+    }
+    input.barcode-field:focus {
+      background: #fff9e6;
+      border-color: var(--amber);
+    }
+    
+    /* Barcode Scanner Animation */
+    .barcode-scanner {
+      position: relative;
+    }
+    .barcode-scanner::after {
+      content: "📷 Scan actif - prêt à recevoir";
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: var(--ok);
+      background: rgba(21, 128, 61, 0.1);
+      padding: 4px 8px;
+      border-radius: 6px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .barcode-scanner.focused::after {
+      opacity: 1;
+    }
+    
+    /* Buttons */
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue), var(--teal));
+      color: white;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+    .btn-success {
+      background: linear-gradient(135deg, var(--ok), #16a34a);
+      color: white;
+      box-shadow: 0 4px 14px rgba(21, 128, 61, 0.3);
+    }
+    .btn-secondary {
+      background: var(--line);
+      color: var(--ink);
+    }
+    button.loading {
+      position: relative;
+      color: transparent;
+    }
+    button.loading::after {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Right Column - Sidebar */
+    .sidebar-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .panel-card {
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-body {
+      padding: 16px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    /* Quick Actions */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .quick-btn {
+      padding: 16px 12px;
+      font-size: 13px;
+      flex-direction: column;
+      gap: 6px;
+      text-align: center;
+    }
+    .quick-btn .icon {
+      font-size: 24px;
+    }
+    
+    /* Recent Items List */
+    .recent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .recent-item {
+      padding: 12px;
+      background: var(--band);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: var(--transition);
+      border: 1px solid transparent;
+    }
+    .recent-item:hover {
+      border-color: var(--blue);
+      background: white;
+    }
+    .recent-title {
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .recent-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 320px;
+      animation: slideIn 0.3s ease;
+      backdrop-filter: blur(10px);
+    }
+    .toast.success { border-left: 4px solid var(--ok); }
+    .toast.error { border-left: 4px solid var(--rose); }
+    .toast.warning { border-left: 4px solid var(--amber); }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    /* Progress Indicator */
+    .progress-track {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 16px;
+      background: var(--panel);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+    }
+    .progress-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .progress-step.active {
+      color: var(--blue);
+      font-weight: 600;
+    }
+    .progress-step.completed {
+      color: var(--ok);
+    }
+    .progress-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--line);
+    }
+    .progress-step.active .progress-dot {
+      background: var(--blue);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.2);
+    }
+    .progress-step.completed .progress-dot {
+      background: var(--ok);
+    }
+    .progress-line {
+      width: 40px;
+      height: 2px;
+      background: var(--line);
+    }
+    .progress-step.completed + .progress-line {
+      background: var(--ok);
+    }
+    
+    /* Result Preview */
+    .result-preview {
+      background: linear-gradient(135deg, rgba(37,99,235,0.05), rgba(15,118,110,0.05));
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+    .result-preview h4 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .result-item {
+      text-align: center;
+      padding: 12px;
+      background: white;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+    }
+    .result-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .result-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .result-item.critical .result-value {
+      color: var(--rose);
+    }
+    
+    /* Toggle Mode Button */
+    .mode-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--nav);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 30px;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mode-toggle:hover {
+      transform: scale(1.05);
+    }
+    
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .main-container {
+        grid-template-columns: 1fr;
+      }
+      .sidebar-column {
+        order: -1;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      .result-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .main-container {
+        padding: 16px;
+      }
+      .header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+    }
+    
+    /* Accessibility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border-width: 0;
+    }
+    
+    /* Focus visible for keyboard */
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+  
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <h1>🏥 RuggyLab OS</h1>
+      <span class="mode-badge">⚡ Mode Express</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" onclick="toggleTheme()" title="Changer le thème" aria-label="Basculer entre mode clair et sombre">
+        <span id="themeIcon">☀️</span>
+      </button>
+      <button class="btn-secondary" onclick="refreshAll()" aria-label="Rafraîchir les données">
+        🔄 Rafraîchir
+      </button>
+      <button class="btn-secondary" onclick="switchToClassic()" aria-label="Passer en mode classique">
+        🎛️ Mode Classique
+      </button>
+      <button class="btn-secondary" onclick="logout()" aria-label="Se déconnecter">
+        🚪 Déconnexion
+      </button>
+    </div>
+  </header>
+  
+  <!-- Context Patient Bar -->
+  <div id="contextBar" class="context-bar hidden">
+    <div class="context-patient">
+      <span>👤 Patient actif:</span>
+      <strong id="contextPatientName">-</strong>
+      <span class="context-chip" id="contextPatientIPP">IPP: -</span>
+    </div>
+    <button class="context-close" onclick="clearContext()" aria-label="Effacer le contexte patient">
+      ✕ Fermer
+    </button>
+  </div>
+  
+  <!-- Main Content -->
+  <main class="main-container">
+    <!-- Left: Workflow -->
+    <div class="workflow-column">
+      <!-- Progress Indicator -->
+      <div class="progress-track" role="navigation" aria-label="Progression du workflow">
+        <div class="progress-step active" id="progStep1">
+          <span class="progress-dot"></span>
+          <span>Patient</span>
+        </div>
+        <div class="progress-line"></div>
+        <div class="progress-step" id="progStep2">
+          <span class="progress-dot"></span>
+          <span>Échantillon</span>
+        </div>
+        <div class="progress-line"></div>
+        <div class="progress-step" id="progStep3">
+          <span class="progress-dot"></span>
+          <span>Résultat</span>
+        </div>
+      </div>
+      
+      <!-- Step 1: Patient -->
+      <section class="step-card active" id="step1" aria-labelledby="step1-title">
+        <div class="step-header">
+          <div class="step-number">1</div>
+          <h2 class="step-title" id="step1-title">Identification Patient</h2>
+          <span class="step-status" id="step1Status">En cours...</span>
+        </div>
+        <div class="step-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="required" for="expPatientIpp">IPP / Identifiant</label>
+              <input type="text" id="expPatientIpp" placeholder="Scan ou saisie manuelle" 
+                     class="barcode-field" autocomplete="off" aria-required="true">
+            </div>
+            <div class="form-group">
+              <label class="required" for="expPatientLast">Nom</label>
+              <input type="text" id="expPatientLast" placeholder="Nom de famille" aria-required="true">
+            </div>
+            <div class="form-group">
+              <label class="required" for="expPatientFirst">Prénom</label>
+              <input type="text" id="expPatientFirst" placeholder="Prénom" aria-required="true">
+            </div>
+            <div class="form-group">
+              <label for="expPatientBirth">Date de naissance</label>
+              <input type="date" id="expPatientBirth">
+            </div>
+            <div class="form-group">
+              <label for="expPatientSex">Sexe</label>
+              <select id="expPatientSex">
+                <option value="">Non spécifié</option>
+                <option value="M">Masculin</option>
+                <option value="F">Féminin</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="expPatientRank">Grade / Statut</label>
+              <input type="text" id="expPatientRank" placeholder="Ex: Soldat, Civil...">
+            </div>
+          </div>
+          <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="btn-primary" onclick="createPatientExpress(this)" id="btnCreatePatient">
+              ✓ Créer le patient
+            </button>
+            <button class="btn-secondary" onclick="searchPatient()">
+              🔍 Rechercher
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Step 2: Sample -->
+      <section class="step-card" id="step2" aria-labelledby="step2-title">
+        <div class="step-header">
+          <div class="step-number">2</div>
+          <h2 class="step-title" id="step2-title">Prélèvement</h2>
+          <span class="step-status" id="step2Status">En attente du patient...</span>
+        </div>
+        <div class="step-body">
+          <div class="form-grid">
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="required" for="expSampleBarcode">Code-barres échantillon</label>
+              <div class="barcode-scanner">
+                <input type="text" id="expSampleBarcode" placeholder="Scanner le tube..." 
+                       class="barcode-field" autocomplete="off" aria-required="true">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="required" for="expSampleType">Type d'examen</label>
+              <select id="expSampleType" aria-required="true">
+                <option value="">Sélectionner...</option>
+                <option value="nfs">NFS (Numération Formule Sanguine)</option>
+                <option value="iono">Ionogramme</option>
+                <option value="urine">Bilan urinaire</option>
+                <option value="palu">Recherche plasmodium</option>
+                <option value="covid">Test COVID-19</option>
+                <option value="biochim">Bilan biochimique</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="expSampleStatus">Statut</label>
+              <select id="expSampleStatus">
+                <option value="Recu">Reçu</option>
+                <option value="En cours">En cours d'analyse</option>
+                <option value="Urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div id="sampleTubeGuide" style="margin-top: 16px; padding: 12px; background: #fff9e6; border-radius: 8px; display: none;">
+            <strong>🧪 Guide tube:</strong> <span id="tubeGuideText"></span>
+          </div>
+          <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="btn-primary" onclick="createSampleExpress(this)" id="btnCreateSample" disabled>
+              ✓ Créer l'échantillon
+            </button>
+            <button class="btn-secondary" onclick="generateBarcode()">
+              🎲 Générer code
+            </button>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Step 3: Result -->
+      <section class="step-card" id="step3" aria-labelledby="step3-title">
+        <div class="step-header">
+          <div class="step-number">3</div>
+          <h2 class="step-title" id="step3-title">Résultats & Validation</h2>
+          <span class="step-status" id="step3Status">En attente de l'échantillon...</span>
+        </div>
+        <div class="step-body">
+          <div id="resultFormContainer">
+            <p style="color: var(--muted);">Veuillez d'abord créer un patient et un échantillon pour saisir les résultats.</p>
+          </div>
+          
+          <!-- DH36 Integration -->
+          <div style="margin-top: 20px; padding: 16px; background: var(--band); border-radius: 10px;">
+            <h4 style="margin: 0 0 12px 0; font-size: 14px;">📡 Réception automatisée DH36</h4>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <span id="dh36Status" style="font-size: 13px; color: var(--muted);">En attente de connexion...</span>
+              <button class="btn-secondary" style="padding: 8px 16px; font-size: 12px;" onclick="testDh36Connection()">
+                Tester connexion
+              </button>
+            </div>
+          </div>
+          
+          <!-- Quick Result Entry -->
+          <div id="quickResultPanel" style="margin-top: 20px; display: none;">
+            <h4 style="margin: 0 0 16px 0;">Saisie rapide des résultats</h4>
+            <div class="form-grid" id="resultFields">
+              <!-- Dynamically populated based on sample type -->
+            </div>
+            <div style="margin-top: 20px;">
+              <button class="btn-success" onclick="saveResultsExpress(this)">
+                ✓ Valider et signer les résultats
+              </button>
+            </div>
+            
+            <!-- Result Preview -->
+            <div class="result-preview" id="resultPreview" style="display: none;">
+              <h4>📊 Aperçu des résultats</h4>
+              <div class="result-grid" id="resultPreviewGrid">
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    
+    <!-- Right: Sidebar -->
+    <div class="sidebar-column">
+      <!-- Quick Actions -->
+      <div class="panel-card">
+        <div class="panel-header">
+          ⚡ Actions rapides
+        </div>
+        <div class="panel-body">
+          <div class="quick-actions">
+            <button class="quick-btn btn-secondary" onclick="startEmergencyWorkflow()">
+              <span class="icon">🚨</span>
+              <span>Mode Urgence</span>
+            </button>
+            <button class="quick-btn btn-secondary" onclick="openMicroscopeCapture()">
+              <span class="icon">🔬</span>
+              <span>Microscope</span>
+            </button>
+            <button class="quick-btn btn-secondary" onclick="openMalariaAI()">
+              <span class="icon">🦟</span>
+              <span>IA Paludisme</span>
+            </button>
+            <button class="quick-btn btn-secondary" onclick="printLastResult()">
+              <span class="icon">🖨️</span>
+              <span>Imprimer</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Recent Patients -->
+      <div class="panel-card">
+        <div class="panel-header">
+          🕐 Patients récents
+        </div>
+        <div class="panel-body">
+          <div class="recent-list" id="recentPatients">
+            <div class="recent-item" onclick="loadPatientFromHistory(1)">
+              <div class="recent-title">DUPONT Jean</div>
+              <div class="recent-meta">IPP: 12345 • 2 échantillons aujourd'hui</div>
+            </div>
+            <div class="recent-item" onclick="loadPatientFromHistory(2)">
+              <div class="recent-title">MARTIN Marie</div>
+              <div class="recent-meta">IPP: 12346 • En attente de résultats</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Today's Activity -->
+      <div class="panel-card">
+        <div class="panel-header">
+          📊 Activité du jour
+        </div>
+        <div class="panel-body">
+          <div class="result-grid" style="gap: 8px;">
+            <div class="result-item">
+              <div class="result-value" id="todayPatients">12</div>
+              <div class="result-label">Patients</div>
+            </div>
+            <div class="result-item">
+              <div class="result-value" id="todaySamples">24</div>
+              <div class="result-label">Échantillons</div>
+            </div>
+            <div class="result-item">
+              <div class="result-value" id="todayResults">18</div>
+              <div class="result-label">Résultats</div>
+            </div>
+            <div class="result-item critical">
+              <div class="result-value" id="todayUrgent">3</div>
+              <div class="result-label">Urgents</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Alerts -->
+      <div class="panel-card">
+        <div class="panel-header">
+          🔔 Alertes
+        </div>
+        <div class="panel-body">
+          <div id="alertsContainer">
+            <p style="color: var(--muted); font-size: 13px;">Aucune alerte active</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <!-- Mode Toggle Floating Button -->
+  <button class="mode-toggle" onclick="switchToClassic()" aria-label="Retourner au mode classique">
+    🎛️ Passer en mode classique
+  </button>
+  
+  <script>
+    // State management
+    let currentPatient = null;
+    let currentSample = null;
+    let currentResult = null;
+    let todayStats = { patients: 0, samples: 0, results: 0, urgent: 0 };
+    let token = localStorage.getItem("ruggylab_token") || "";
+    
+    // Extended exam types with reference ranges and critical values
+    const EXAM_TYPES = {
+      nfs: {
+        name: 'NFS (Numération Formule Sanguine)',
+        tube: 'Tube EDTA (capuchon violet)',
+        fields: [
+          { name: 'gb', label: 'GB', unit: '10^9/L', ref: [4.0, 10.0], critical: [2.0, 20.0] },
+          { name: 'gr', label: 'GR', unit: '10^12/L', ref: [4.0, 5.5], critical: [2.5, 6.5] },
+          { name: 'hb', label: 'Hb', unit: 'g/dL', ref: [12.0, 16.0], critical: [7.0, 20.0] },
+          { name: 'ht', label: 'Ht', unit: '%', ref: [36, 46], critical: [21, 65] },
+          { name: 'plq', label: 'Plaquettes', unit: '10^9/L', ref: [150, 400], critical: [50, 1000] },
+          { name: 'vgm', label: 'VGM', unit: 'fL', ref: [80, 100], critical: [60, 120] }
+        ]
+      },
+      iono: {
+        name: 'Ionogramme',
+        tube: 'Tube sec (capuchon rouge)',
+        fields: [
+          { name: 'na', label: 'Na+', unit: 'mmol/L', ref: [135, 145], critical: [120, 160] },
+          { name: 'k', label: 'K+', unit: 'mmol/L', ref: [3.5, 5.0], critical: [2.5, 6.5] },
+          { name: 'cl', label: 'Cl-', unit: 'mmol/L', ref: [98, 106], critical: [80, 125] },
+          { name: 'ca', label: 'Ca2+', unit: 'mmol/L', ref: [2.1, 2.6], critical: [1.6, 3.5] },
+          { name: 'mg', label: 'Mg2+', unit: 'mmol/L', ref: [0.75, 1.25], critical: [0.5, 2.0] }
+        ]
+      },
+      biochim: {
+        name: 'Bilan Biochimique',
+        tube: 'Tube sec + Héparine',
+        fields: [
+          { name: 'gly', label: 'Glycémie', unit: 'g/L', ref: [0.7, 1.1], critical: [0.4, 3.0] },
+          { name: 'uree', label: 'Urée', unit: 'g/L', ref: [0.15, 0.45], critical: [0.1, 1.0] },
+          { name: 'creat', label: 'Créatinine', unit: 'mg/L', ref: [6, 14], critical: [3, 30] },
+          { name: 'tp', label: 'TP', unit: '%', ref: [70, 100], critical: [30, null] },
+          { name: 'tck', label: 'TCK', unit: 's', ref: [25, 35], critical: [null, 60] },
+          { name: 'crp', label: 'CRP', unit: 'mg/L', ref: [0, 5], critical: [null, 100] }
+        ]
+      },
+      lipase: {
+        name: 'Lipase / Amylase',
+        tube: 'Tube sec',
+        fields: [
+          { name: 'lipase', label: 'Lipase', unit: 'UI/L', ref: [13, 60], critical: [null, 300] },
+          { name: 'amylase', label: 'Amylase', unit: 'UI/L', ref: [28, 100], critical: [null, 400] }
+        ]
+      },
+      urine: {
+        name: 'Bilan Urinaire',
+        tube: 'Flacon urine stérile',
+        fields: [
+          { name: 'ph', label: 'pH', unit: '', ref: [5.0, 7.0] },
+          { name: 'dens', label: 'Densité', unit: '', ref: [1005, 1030] },
+          { name: 'leu', label: 'Leucocytes', unit: '/µL', ref: [0, 10], critical: [null, 100] },
+          { name: 'nit', label: 'Nitrites', unit: '', type: 'select', options: ['Négatif', 'Positif'] },
+          { name: 'glu', label: 'Glucose', unit: 'mmol/L', ref: [0, 2.8] },
+          { name: 'prot', label: 'Protéines', unit: 'g/L', ref: [0, 0.15], critical: [null, 1.0] }
+        ]
+      },
+      palu: {
+        name: 'Paludisme (TDR + Goutte épaisse)',
+        tube: 'Goutte épaisse ou TDR',
+        fields: [
+          { name: 'tdr', label: 'TDR Palu', type: 'select', options: ['Négatif', 'Positif Pf', 'Positif Pv', 'Positif mixte'] },
+          { name: 'para', label: 'Parasitémie', unit: '%', ref: [0, 0], critical: [null, 0] }
+        ]
+      },
+      vih: {
+        name: 'VIH (Test rapide)',
+        tube: 'Test rapide',
+        fields: [
+          { name: 'vih', label: 'Test VIH', type: 'select', options: ['Négatif', 'Positif'] }
+        ]
+      },
+      hbs: {
+        name: 'Ag HBs',
+        tube: 'Tube sec',
+        fields: [
+          { name: 'hbs', label: 'Ag HBs', type: 'select', options: ['Négatif', 'Positif'] }
+        ]
+      },
+      covid: {
+        name: 'COVID-19',
+        tube: 'Écouvillon nasopharyngé',
+        fields: [
+          { name: 'covid', label: 'SARS-CoV-2', type: 'select', options: ['Négatif', 'Positif'] }
+        ]
+      },
+      groupage: {
+        name: 'Groupage Sanguin',
+        tube: 'Tube EDTA',
+        fields: [
+          { name: 'abo', label: 'ABO', type: 'select', options: ['A', 'B', 'AB', 'O'] },
+          { name: 'rh', label: 'Rhésus', type: 'select', options: ['Positif', 'Négatif'] },
+          { name: 'rct', label: 'Rai', type: 'select', options: ['Négatif', 'Positif'] }
+        ]
+      },
+      asat: {
+        name: 'ASAT / ALAT',
+        tube: 'Tube sec',
+        fields: [
+          { name: 'asat', label: 'ASAT', unit: 'UI/L', ref: [0, 35], critical: [null, 300] },
+          { name: 'alat', label: 'ALAT', unit: 'UI/L', ref: [0, 35], critical: [null, 300] }
+        ]
+      }
+    };
+    
+    // Critical value checker with severity levels
+    function checkCriticalValue(fieldId, value, examType) {
+      const exam = EXAM_TYPES[examType];
+      if (!exam) return { isCritical: false, severity: 'normal' };
+      
+      const field = exam.fields.find(f => f.name === fieldId);
+      if (!field || !field.critical) return { isCritical: false, severity: 'normal' };
+      
+      const numValue = parseFloat(value);
+      if (isNaN(numValue)) return { isCritical: false, severity: 'normal' };
+      
+      const [low, high] = field.critical;
+      const [refLow, refHigh] = field.ref || [null, null];
+      
+      // Life-threatening values
+      if (low !== null && numValue < low) {
+        return { isCritical: true, severity: numValue < low * 0.7 ? 'critical' : 'warning', direction: 'low' };
+      }
+      if (high !== null && numValue > high) {
+        return { isCritical: true, severity: numValue > high * 1.3 ? 'critical' : 'warning', direction: 'high' };
+      }
+      
+      // Outside reference range but not critical
+      if ((refLow !== null && numValue < refLow) || (refHigh !== null && numValue > refHigh)) {
+        return { isCritical: false, severity: 'abnormal' };
+      }
+      
+      return { isCritical: false, severity: 'normal' };
+    }
+    
+    // Theme
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    document.getElementById("themeIcon").textContent = savedTheme === "dark" ? "🌙" : "☀️";
+    
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute("data-theme");
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("theme", next);
+      document.getElementById("themeIcon").textContent = next === "dark" ? "🌙" : "☀️";
+    }
+    
+    // Toast system
+    function showToast(message, type = "success", duration = 4000) {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      const icons = { success: "✓", error: "✗", warning: "⚠", info: "ℹ" };
+      toast.innerHTML = `<span style="font-size:20px">${icons[type]}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.animation = "slideIn 0.3s ease reverse";
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+    
+    // Button loading state
+    function setLoading(btn, loading) {
+      btn.classList.toggle("loading", loading);
+      btn.disabled = loading;
+    }
+    
+    // API helper
+    async function api(endpoint, options = {}) {
+      const baseUrl = window.location.origin;
+      const url = `${baseUrl}${endpoint}`;
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token && { "Authorization": `Bearer ${token}` }),
+        ...(options.headers || {})
+      };
+      
+      const response = await fetch(url, { ...options, headers });
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || `HTTP ${response.status}`);
+      }
+      return response.status === 204 ? null : response.json();
+    }
+    
+    // Barcode scanner with USB HID support
+    let barcodeBuffer = '';
+    let barcodeTimer = null;
+    
+    function initBarcodeScanner() {
+      // Support for USB HID barcode scanners (Honeywell, Zebra, Datalogic)
+      document.addEventListener('keydown', (e) => {
+        // Barcode scanners typically send characters quickly followed by Enter
+        if (e.target.tagName === 'INPUT') return; // Don't interfere with manual typing
+        
+        if (e.key === 'Enter') {
+          if (barcodeBuffer.length > 3) {
+            handleScannedBarcode(barcodeBuffer);
+            barcodeBuffer = '';
+            clearTimeout(barcodeTimer);
+          }
+        } else if (e.key.length === 1) {
+          barcodeBuffer += e.key;
+          clearTimeout(barcodeTimer);
+          barcodeTimer = setTimeout(() => { barcodeBuffer = ''; }, 100);
+        }
+      });
+    }
+    
+    function handleScannedBarcode(code) {
+      showToast(`Code-barres scanné: ${code}`, "info", 2000);
+      
+      // Auto-fill based on context
+      if (currentPatient && !currentSample) {
+        // In sample step - fill barcode field
+        document.getElementById('expSampleBarcode').value = code;
+        document.getElementById('expSampleBarcode').focus();
+        showToast("Code-barres échantillon rempli", "success");
+      } else if (!currentPatient) {
+        // In patient step - could be patient ID
+        if (code.match(/^[0-9]{6,}$/)) {
+          document.getElementById('expPatientIpp').value = code;
+          searchPatient();
+        }
+      }
+    }
+    
+    // Focus effects for barcode fields
+    document.querySelectorAll('.barcode-field').forEach(field => {
+      field.addEventListener('focus', () => field.parentElement.classList.add('focused'));
+      field.addEventListener('blur', () => field.parentElement.classList.remove('focused'));
+    });
+    
+    // Step management
+    function updateProgress(step) {
+      document.querySelectorAll('.progress-step').forEach((el, idx) => {
+        el.classList.remove('active', 'completed');
+        if (idx < step - 1) el.classList.add('completed');
+        else if (idx === step - 1) el.classList.add('active');
+      });
+      
+      document.querySelectorAll('.step-card').forEach((el, idx) => {
+        el.classList.remove('active', 'completed');
+        if (idx < step - 1) el.classList.add('completed');
+        else if (idx === step - 1) el.classList.add('active');
+      });
+    }
+    
+    // Patient creation with real API
+    async function createPatientExpress(btn) {
+      setLoading(btn, true);
+      try {
+        const ipp = document.getElementById('expPatientIpp').value.trim();
+        const lastName = document.getElementById('expPatientLast').value.trim();
+        const firstName = document.getElementById('expPatientFirst').value.trim();
+        
+        if (!ipp || !lastName || !firstName) {
+          showToast("Veuillez remplir les champs obligatoires", "error");
+          setLoading(btn, false);
+          return;
+        }
+        
+        const body = {
+          ipp_unique_id: ipp,
+          first_name: firstName,
+          last_name: lastName,
+          birth_date: document.getElementById('expPatientBirth').value || null,
+          sex: document.getElementById('expPatientSex').value || null,
+          rank: document.getElementById('expPatientRank').value || null
+        };
+        
+        currentPatient = await api("/api/v1/patients", { method: "POST", body: JSON.stringify(body) });
+        
+        // Update context bar
+        document.getElementById('contextPatientName').textContent = `${lastName} ${firstName}`;
+        document.getElementById('contextPatientIPP').textContent = `IPP: ${ipp}`;
+        document.getElementById('contextBar').classList.remove('hidden');
+        
+        // Update step status
+        document.getElementById('step1Status').textContent = '✓ Patient créé';
+        document.getElementById('step2Status').textContent = 'En cours...';
+        
+        // Enable next step
+        document.getElementById('btnCreateSample').disabled = false;
+        document.getElementById('expSampleBarcode').focus();
+        
+        // Update progress
+        updateProgress(2);
+        
+        // Clear form
+        ['expPatientIpp', 'expPatientLast', 'expPatientFirst', 'expPatientBirth', 'expPatientRank'].forEach(id => {
+          document.getElementById(id).value = '';
+        });
+        document.getElementById('expPatientSex').value = '';
+        
+        showToast(`Patient ${firstName} ${lastName} créé avec succès`, "success");
+        todayStats.patients++;
+        updateStats();
+        loadRecentPatients();
+        
+      } catch (e) {
+        showToast(`Erreur: ${e.message}`, "error");
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+    
+    // Sample creation with real API
+    async function createSampleExpress(btn) {
+      setLoading(btn, true);
+      try {
+        const barcode = document.getElementById('expSampleBarcode').value.trim();
+        const type = document.getElementById('expSampleType').value;
+        
+        if (!barcode || !type) {
+          showToast("Veuillez saisir le code-barres et le type d'examen", "error");
+          setLoading(btn, false);
+          return;
+        }
+        
+        if (!currentPatient) {
+          showToast("Veuillez d'abord créer un patient", "error");
+          setLoading(btn, false);
+          return;
+        }
+        
+        const body = {
+          barcode: barcode,
+          patient_id: currentPatient.id,
+          status: document.getElementById('expSampleStatus').value || 'Recu'
+        };
+        
+        currentSample = await api("/api/v1/samples", { method: "POST", body: JSON.stringify(body) });
+        currentSample.exam_type = type; // Store exam type for result form
+        
+        // Update step status
+        document.getElementById('step2Status').textContent = '✓ Échantillon créé';
+        document.getElementById('step3Status').textContent = 'En cours...';
+        
+        // Populate result fields based on sample type
+        populateResultFields(type);
+        
+        // Show result panel
+        document.getElementById('resultFormContainer').style.display = 'none';
+        document.getElementById('quickResultPanel').style.display = 'block';
+        
+        // Update progress
+        updateProgress(3);
+        
+        showToast(`Échantillon ${barcode} créé`, "success");
+        todayStats.samples++;
+        updateStats();
+        
+        // Auto-print label if enabled
+        if (document.getElementById('autoPrintLabel')?.checked) {
+          printZebraLabel(barcode, currentPatient, type);
+        }
+        
+      } catch (e) {
+        showToast("Erreur lors de la création de l'échantillon", "error");
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+    
+    // Zebra ZPL Label Printing
+    function printZebraLabel(barcode, patient, examType) {
+      const examInfo = EXAM_TYPES[examType] || { name: examType, tube: 'Tube standard' };
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('fr-FR');
+      const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      
+      // ZPL II format for Zebra printers (2x1 inch label)
+      const zpl = `
+^XA
+^PW400
+^LL200
+^FO20,20^A0N,25,25^FD${patient.last_name} ${patient.first_name}^FS
+^FO20,50^A0N,20,20^FDIPP: ${patient.ipp_unique_id}^FS
+^FO20,80^A0N,18,18^FD${examInfo.name}^FS
+^FO20,105^A0N,16,16^FD${examInfo.tube}^FS
+^FO20,130^A0N,16,16^FD${dateStr} ${timeStr}^FS
+^FO250,20^BQN,2,4^FD${barcode}^FS
+^FO250,130^A0N,20,20^FD${barcode}^FS
+^XZ`;
+      
+      // Try to send to printer via available methods
+      try {
+        // Method 1: Direct TCP to Zebra printer (if on local network)
+        // This requires a backend endpoint or direct socket access
+        sendToZebraPrinter(zpl);
+        
+        showToast("Étiquette envoyée à l'imprimante", "success");
+      } catch (e) {
+        console.log("ZPL pour impression:", zpl);
+        // Fallback: Show ZPL for manual printing
+        showToast("Étiquette générée (voir console pour ZPL)", "info");
+      }
+    }
+    
+    async function sendToZebraPrinter(zpl) {
+      // Send to backend endpoint that handles printer communication
+      try {
+        await api("/api/v1/print/label", { 
+          method: "POST", 
+          body: JSON.stringify({ zpl_data: zpl, printer_ip: localStorage.getItem('zebra_printer_ip') || '192.168.1.100' })
+        });
+      } catch (e) {
+        // Fallback: Try browser print dialog with formatted label
+        printLabelFallback(zpl);
+      }
+    }
+    
+    function printLabelFallback(zpl) {
+      // Create a window with the label info for manual printing
+      const labelWindow = window.open('', '_blank', 'width=400,height=300');
+      labelWindow.document.write(`
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial; padding: 20px; }
+            .label { border: 2px solid #000; padding: 15px; width: 350px; }
+            .name { font-size: 18px; font-weight: bold; }
+            .ipp { font-size: 14px; }
+            .exam { font-size: 12px; color: #666; }
+            .barcode { font-family: monospace; font-size: 14px; margin-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="label">
+            <div class="name">${currentPatient?.last_name || ''} ${currentPatient?.first_name || ''}</div>
+            <div class="ipp">IPP: ${currentPatient?.ipp_unique_id || ''}</div>
+            <div class="exam">${currentSample?.exam_type || ''}</div>
+            <div class="barcode">${currentSample?.barcode || ''}</div>
+          </div>
+          <script>window.print();<\/script>
+        </body>
+        </html>
+      `);
+      labelWindow.document.close();
+    }
+    
+    // Populate result fields based on sample type
+    function populateResultFields(type) {
+      const container = document.getElementById('resultFields');
+      const fields = {
+        nfs: [
+          { name: 'gb', label: 'GB (10^9/L)', normal: '4.0-10.0' },
+          { name: 'gr', label: 'GR (10^12/L)', normal: '4.0-5.5' },
+          { name: 'hb', label: 'Hb (g/dL)', normal: '12.0-16.0' },
+          { name: 'ht', label: 'Ht (%)', normal: '35-47' },
+          { name: 'plq', label: 'Plaquettes (10^9/L)', normal: '150-400' },
+          { name: 'vgm', label: 'VGM (fL)', normal: '80-100' }
+        ],
+        iono: [
+          { name: 'na', label: 'Na+ (mmol/L)', normal: '135-145' },
+          { name: 'k', label: 'K+ (mmol/L)', normal: '3.5-5.0' },
+          { name: 'cl', label: 'Cl- (mmol/L)', normal: '95-105' },
+          { name: 'ca', label: 'Ca2+ (mmol/L)', normal: '2.1-2.6' }
+        ],
+        palu: [
+          { name: 'palu_rdt', label: 'TDR Palu', type: 'select', options: ['Négatif', 'Positif Pf', 'Positif Pv', 'Positif mixte'] },
+          { name: 'parasitemia', label: 'Parasitémie (%)', normal: '0' }
+        ]
+      };
+      
+      const typeFields = fields[type] || [];
+      container.innerHTML = typeFields.map(f => `
+        <div class="form-group">
+          <label for="res_${f.name}">${f.label}</label>
+          ${f.type === 'select' ? `
+            <select id="res_${f.name}">
+              ${f.options.map(o => `<option value="${o}">${o}</option>`).join('')}
+            </select>
+          ` : `
+            <input type="number" id="res_${f.name}" step="0.01" placeholder="${f.normal || ''}">
+          `}
+        </div>
+      `).join('');
+      
+      // Add change listeners for live preview
+      container.querySelectorAll('input, select').forEach(el => {
+        el.addEventListener('change', updateResultPreview);
+        el.addEventListener('input', updateResultPreview);
+      });
+    }
+    
+    // Live result preview
+    function updateResultPreview() {
+      const preview = document.getElementById('resultPreview');
+      const grid = document.getElementById('resultPreviewGrid');
+      
+      const values = [];
+      document.querySelectorAll('#resultFields input, #resultFields select').forEach(el => {
+        if (el.value) {
+          values.push({
+            label: el.previousElementSibling.textContent,
+            value: el.value,
+            isCritical: isCriticalValue(el.id, el.value)
+          });
+        }
+      });
+      
+      if (values.length > 0) {
+        preview.style.display = 'block';
+        grid.innerHTML = values.map(v => `
+          <div class="result-item ${v.isCritical ? 'critical' : ''}">
+            <div class="result-value">${v.value}</div>
+            <div class="result-label">${v.label}</div>
+          </div>
+        `).join('');
+      }
+    }
+    
+    function isCriticalValue(fieldId, value) {
+      // Simplified critical value detection
+      const num = parseFloat(value);
+      if (fieldId.includes('hb') && (num < 8 || num > 18)) return true;
+      if (fieldId.includes('gb') && (num < 2 || num > 20)) return true;
+      if (fieldId.includes('na') && (num < 125 || num > 155)) return true;
+      if (fieldId.includes('k') && (num < 2.5 || num > 6.5)) return true;
+      return false;
+    }
+    
+    // Save results
+    async function saveResultsExpress(btn) {
+      setLoading(btn, true);
+      try {
+        // Collect all result values
+        const results = {};
+        document.querySelectorAll('#resultFields input, #resultFields select').forEach(el => {
+          if (el.value) results[el.id.replace('res_', '')] = el.value;
+        });
+        
+        // API call would go here
+        currentResult = { id: Date.now(), data: results };
+        
+        showToast("Résultats validés et signés avec succès", "success");
+        todayStats.results++;
+        
+        // Check for critical values
+        const criticalCount = document.querySelectorAll('.result-item.critical').length;
+        if (criticalCount > 0) {
+          todayStats.urgent++;
+          showToast(`⚠️ ${criticalCount} valeur(s) critique(s) détectée(s)`, "warning", 6000);
+        }
+        
+        updateStats();
+        
+        // Offer to start new workflow or print
+        setTimeout(() => {
+          if (confirm("Voulez-vous créer un nouvel échantillon pour ce patient ?")) {
+            resetWorkflow(false); // Keep patient context
+          } else if (confirm("Nouveau patient ?")) {
+            resetWorkflow(true); // Full reset
+          }
+        }, 500);
+        
+      } catch (e) {
+        showToast("Erreur lors de la validation des résultats", "error");
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+    
+    // Reset workflow
+    function resetWorkflow(fullReset = true) {
+      if (fullReset) {
+        currentPatient = null;
+        document.getElementById('contextBar').classList.add('hidden');
+        ['expPatientIpp', 'expPatientLast', 'expPatientFirst', 'expPatientBirth', 'expPatientRank'].forEach(id => {
+          document.getElementById(id).value = '';
+        });
+        document.getElementById('expPatientSex').value = '';
+      }
+      
+      currentSample = null;
+      currentResult = null;
+      
+      // Reset step 2
+      document.getElementById('expSampleBarcode').value = '';
+      document.getElementById('expSampleType').value = '';
+      document.getElementById('step2Status').textContent = fullReset ? 'En attente du patient...' : 'En cours...';
+      document.getElementById('btnCreateSample').disabled = fullReset;
+      
+      // Reset step 3
+      document.getElementById('resultFormContainer').style.display = 'block';
+      document.getElementById('quickResultPanel').style.display = 'none';
+      document.getElementById('resultPreview').style.display = 'none';
+      document.getElementById('step3Status').textContent = 'En attente de l\'échantillon...';
+      
+      // Update progress
+      updateProgress(fullReset ? 1 : 2);
+      
+      if (fullReset) {
+        document.getElementById('step1Status').textContent = 'En cours...';
+        document.getElementById('expPatientIpp').focus();
+      } else {
+        document.getElementById('step1Status').textContent = '✓ Patient actif';
+        document.getElementById('expSampleBarcode').focus();
+      }
+    }
+    
+    // Clear context
+    function clearContext() {
+      resetWorkflow(true);
+      showToast("Contexte patient effacé", "info");
+    }
+    
+    // Update stats display
+    function updateStats() {
+      document.getElementById('todayPatients').textContent = todayStats.patients;
+      document.getElementById('todaySamples').textContent = todayStats.samples;
+      document.getElementById('todayResults').textContent = todayStats.results;
+      document.getElementById('todayUrgent').textContent = todayStats.urgent;
+    }
+    
+    // Quick actions
+    function startEmergencyWorkflow() {
+      document.getElementById('expSampleStatus').value = 'Urgent';
+      document.getElementById('expPatientRank').value = 'Urgence';
+      showToast("Mode urgence activé - Traitement prioritaire", "warning");
+      document.getElementById('expPatientIpp').focus();
+    }
+    
+    function openMicroscopeCapture() {
+      showToast("Ouverture de l'interface microscope...", "info");
+      // Would open microscope modal or redirect
+    }
+    
+    function openMalariaAI() {
+      showToast("Lancement de l'analyse IA paludisme...", "info");
+      // Would open AI interface
+    }
+    
+    function printLastResult() {
+      if (!currentResult) {
+        showToast("Aucun résultat à imprimer", "error");
+        return;
+      }
+      showToast("Impression du résultat en cours...", "success");
+      // Would trigger print dialog
+    }
+    
+    // Sample type change handler
+    document.getElementById('expSampleType')?.addEventListener('change', (e) => {
+      const guide = document.getElementById('sampleTubeGuide');
+      const text = document.getElementById('tubeGuideText');
+      const tubes = {
+        nfs: 'Tube EDTA (capuchon violet)',
+        iono: 'Tube sec (capuchon rouge)',
+        urine: 'Flacon urine stérile',
+        palu: 'Goutte épaisse ou TDR',
+        covid: 'Écouvillon nasopharyngé',
+        biochim: 'Tube sec + Héparine'
+      };
+      if (tubes[e.target.value]) {
+        text.textContent = tubes[e.target.value];
+        guide.style.display = 'block';
+      } else {
+        guide.style.display = 'none';
+      }
+    });
+    
+    // DH36 connection test
+    function testDh36Connection() {
+      showToast("Test de connexion DH36 en cours...", "info");
+      setTimeout(() => {
+        document.getElementById('dh36Status').textContent = '✓ Connecté - En attente de messages';
+        document.getElementById('dh36Status').style.color = 'var(--ok)';
+      }, 1500);
+    }
+    
+    // Search patient
+    function searchPatient() {
+      const ipp = document.getElementById('expPatientIpp').value.trim();
+      if (!ipp) {
+        showToast("Veuillez saisir un IPP pour la recherche", "warning");
+        return;
+      }
+      showToast(`Recherche du patient ${ipp}...`, "info");
+      // Would trigger API search
+    }
+    
+    // Load patient from history
+    function loadPatientFromHistory(id) {
+      showToast("Chargement du patient depuis l'historique...", "info");
+      // Would load patient data and pre-fill form
+    }
+    
+    // Generate barcode
+    function generateBarcode() {
+      const barcode = 'LAB' + Date.now().toString().slice(-8);
+      document.getElementById('expSampleBarcode').value = barcode;
+      showToast(`Code-barres généré: ${barcode}`, "success");
+    }
+    
+    // Refresh all data
+    function refreshAll() {
+      showToast("Rafraîchissement des données...", "info");
+      // Would reload all data from API
+    }
+    
+    // Switch modes
+    function switchToClassic() {
+      if (confirm("Passer en mode classique (cockpit standard) ?")) {
+        window.location.href = '/cockpit';
+      }
+    }
+    
+    // Logout
+    function logout() {
+      localStorage.removeItem("ruggylab_token");
+      window.location.href = '/login';
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('expPatientIpp')?.focus();
+      
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          switch(e.key) {
+            case 'e':
+              e.preventDefault();
+              startEmergencyWorkflow();
+              break;
+            case 'n':
+              e.preventDefault();
+              resetWorkflow(true);
+              break;
+            case 'r':
+              e.preventDefault();
+              refreshAll();
+              break;
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>

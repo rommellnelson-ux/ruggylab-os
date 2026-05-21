@@ -20,6 +20,8 @@ class ResultCreate(BaseModel):
     image_url: str | None = None
     is_critical: bool = False
 
+    model_config = ConfigDict(extra="forbid")
+
 
 class ResultRead(ResultBase):
     id: int

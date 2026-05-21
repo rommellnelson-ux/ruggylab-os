@@ -26,9 +26,7 @@ def create_equipment(
     del current_user
     if payload.serial_number:
         existing = (
-            db.query(Equipment)
-            .filter(Equipment.serial_number == payload.serial_number)
-            .first()
+            db.query(Equipment).filter(Equipment.serial_number == payload.serial_number).first()
         )
         if existing:
             raise HTTPException(

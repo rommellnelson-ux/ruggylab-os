@@ -29,9 +29,7 @@ from app.services.ratio_management import create_ratio_version
 router = APIRouter(prefix="/ratio-presets")
 
 
-@router.get(
-    "", response_model=RatioPresetListResponse, dependencies=[Depends(require_admin)]
-)
+@router.get("", response_model=RatioPresetListResponse, dependencies=[Depends(require_admin)])
 def list_presets(
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
@@ -41,7 +39,8 @@ def list_presets(
     total = query.with_entities(func.count(RatioPreset.id)).scalar() or 0
     items = query.order_by(RatioPreset.id.desc()).offset(skip).limit(limit).all()
     return RatioPresetListResponse(
-        items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit)
+        items=[RatioPresetRead.model_validate(p) for p in items],
+        meta=PaginationMeta.from_counts(total=total, skip=skip, limit=limit),
     )
 
 
@@ -58,9 +57,7 @@ def create_preset(
 ) -> RatioPreset:
     existing = db.query(RatioPreset).filter(RatioPreset.name == payload.name).first()
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Preset deja existant."
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Preset deja existant.")
     preset = RatioPreset(**payload.model_dump())
     db.add(preset)
     db.flush()
@@ -92,7 +89,8 @@ def list_preset_items(
     total = query.with_entities(func.count(RatioPresetItem.id)).scalar() or 0
     items = query.order_by(RatioPresetItem.id.asc()).offset(skip).limit(limit).all()
     return RatioPresetItemListResponse(
-        items=items, meta=PaginationMeta(total=total, skip=skip, limit=limit)
+        items=[RatioPresetItemRead.model_validate(i) for i in items],
+        meta=PaginationMeta.from_counts(total=total, skip=skip, limit=limit),
     )
 
 
@@ -109,9 +107,7 @@ def create_preset_item(
 ) -> RatioPresetItem:
     preset = db.query(RatioPreset).filter(RatioPreset.id == payload.preset_id).first()
     if not preset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Preset introuvable."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preset introuvable.")
     item = RatioPresetItem(**payload.model_dump())
     db.add(item)
     db.flush()

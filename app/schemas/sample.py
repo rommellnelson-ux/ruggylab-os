@@ -45,7 +45,7 @@ def _as_aware_utc(value: dt.datetime | None) -> dt.datetime | None:
 
 
 class SampleCreate(SampleBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class SampleRead(SampleBase):

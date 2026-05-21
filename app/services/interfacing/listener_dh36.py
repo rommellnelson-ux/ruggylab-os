@@ -12,7 +12,7 @@ MLLP_END_BLOCK = b"\x1c\x0d"
 
 
 class DH36Listener:
-    def __init__(self, host: str = "0.0.0.0", port: int = 5001):
+    def __init__(self, host: str = "127.0.0.1", port: int = 5001):
         self.host = host
         self.port = port
         self.equipment_name = "Dymind DH36"
@@ -23,6 +23,17 @@ class DH36Listener:
         addr = writer.get_extra_info("peername")
         logger.info("DH36 connection received from %s", addr)
         buffer = b""
+
+        async def send_ack(is_error: bool = False) -> None:
+            ack_code = "AR" if is_error else "AA"
+            ack = (
+                f"MSH|^~\\&|RUGGYLAB|LAB|{self.equipment_name}|DYMIND|"
+                f"{dt.datetime.now(dt.UTC).strftime('%Y%m%d%H%M%S')}||ACK|||2.3\r"
+                f"MSA|{ack_code}|1\r"
+            ).encode()
+            writer.write(MLLP_START_BLOCK + ack + MLLP_END_BLOCK)
+            await writer.drain()
+
         while True:
             data = await reader.read(4096)
             if not data:
@@ -35,14 +46,13 @@ class DH36Listener:
                     continue
                 _, hl7_payload = full_message_raw.split(MLLP_START_BLOCK, 1)
                 hl7_string = hl7_payload.decode("utf-8", errors="ignore")
-                asyncio.create_task(self.process_hl7_message(hl7_string))
 
-                ack = (
-                    f"MSH|^~\\&|RUGGYLAB|LAB|{self.equipment_name}|DYMIND|"
-                    f"{dt.datetime.now().strftime('%Y%m%d%H%M%S')}||ACK|||2.3\rMSA|AA|1\r"
-                ).encode("utf-8")
-                writer.write(MLLP_START_BLOCK + ack + MLLP_END_BLOCK)
-                await writer.drain()
+                try:
+                    await self.process_hl7_message(hl7_string)
+                    await send_ack(is_error=False)
+                except Exception:
+                    logger.exception("DH36 processing error, sending negative ACK")
+                    await send_ack(is_error=True)
 
         writer.close()
         await writer.wait_closed()
@@ -57,12 +67,11 @@ class DH36Listener:
                     outcome.message.message_control_id or outcome.message.raw_hash,
                 )
             elif outcome.message.status == "rejected":
-                logger.warning(
-                    "DH36 message rejected: %s", outcome.message.rejection_reason
-                )
-        except Exception as exc:  # pragma: no cover - runtime I/O path
-            logger.exception("Critical DH36 processing error: %s", exc)
+                logger.warning("DH36 message rejected: %s", outcome.message.rejection_reason)
+                raise RuntimeError(outcome.message.rejection_reason)
+        except Exception:
             session.rollback()
+            raise
         finally:
             session.close()
 

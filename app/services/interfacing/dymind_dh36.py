@@ -1,17 +1,19 @@
+import logging
 from typing import Any
 
 import hl7
+
+logger = logging.getLogger(__name__)
 
 
 class DH36Parser:
     def __init__(self, raw_message: str):
         self.message_str = raw_message.strip()
-        self.lines = [
-            line for line in self.message_str.replace("\n", "\r").split("\r") if line
-        ]
+        self.lines = [line for line in self.message_str.replace("\n", "\r").split("\r") if line]
         try:
             self.h_message = hl7.parse(self.message_str)
         except Exception as exc:  # pragma: no cover - defensive parser boundary
+            logger.error("Erreur de parsing HL7 brute: %s", exc, exc_info=True)
             raise ValueError(f"Erreur de parsing HL7 brute: {exc}") from exc
 
     def _segment_fields(self, segment_name: str) -> list[str] | None:
@@ -77,7 +79,10 @@ class DH36Parser:
 
             try:
                 results_map[mapped_name] = float(fields[5])
-            except Exception:
+            except (ValueError, IndexError):
+                logger.warning(
+                    "Failed to parse %s value '%s'", mapped_name, fields[5], exc_info=True
+                )
                 continue
 
         return results_map

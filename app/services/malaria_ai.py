@@ -37,12 +37,8 @@ class OfflineMalariaClassifier:
         digest = hashlib.sha256(image_url.encode("utf-8")).hexdigest()
         score = int(digest[:8], 16) / 0xFFFFFFFF
         if score >= 0.5:
-            return MalariaPrediction(
-                label="positive", confidence=round(0.70 + score * 0.2, 4)
-            )
-        return MalariaPrediction(
-            label="negative", confidence=round(0.70 + (1 - score) * 0.2, 4)
-        )
+            return MalariaPrediction(label="positive", confidence=round(0.70 + score * 0.2, 4))
+        return MalariaPrediction(label="negative", confidence=round(0.70 + (1 - score) * 0.2, 4))
 
 
 classifier = OfflineMalariaClassifier(settings.MALARIA_MODEL_PATH)

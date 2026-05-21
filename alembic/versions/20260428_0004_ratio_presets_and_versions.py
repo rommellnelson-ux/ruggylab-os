@@ -68,9 +68,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["preset_id"], ["ratio_presets.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_ratio_preset_items_id"), "ratio_preset_items", ["id"], unique=False
-    )
+    op.create_index(op.f("ix_ratio_preset_items_id"), "ratio_preset_items", ["id"], unique=False)
 
 
 def downgrade() -> None:

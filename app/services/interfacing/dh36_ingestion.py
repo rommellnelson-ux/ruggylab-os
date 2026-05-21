@@ -126,10 +126,7 @@ def ingest_dh36_message(
         )
 
     sample = (
-        db.query(Sample)
-        .filter(Sample.barcode == message.sample_barcode)
-        .with_for_update()
-        .first()
+        db.query(Sample).filter(Sample.barcode == message.sample_barcode).with_for_update().first()
     )
     if not sample:
         return _reject(
@@ -207,8 +204,7 @@ def ingest_dh36_message(
             db,
             message,
             reason=(
-                "Stock reactif insuffisant: "
-                + ", ".join(item.reagent_name for item in exc.items)
+                "Stock reactif insuffisant: " + ", ".join(item.reagent_name for item in exc.items)
             ),
             user=user,
         )

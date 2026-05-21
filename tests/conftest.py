@@ -23,6 +23,10 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
     Base.metadata.drop_all(bind=db_session.engine)
     Base.metadata.create_all(bind=db_session.engine)
 
+    # Seed the database
+    from app.services.bootstrap import init_db
+    init_db()
+
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client

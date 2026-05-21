@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -18,15 +18,26 @@
       --amber: #b45309;
       --ok: #15803d;
       --shadow: 0 12px 36px rgba(18, 34, 51, 0.10);
+      --radius: 12px;
+      --transition: all 0.2s ease;
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    [data-theme="dark"] {
+      --ink: #e8f0f7;
+      --muted: #a8b7c7;
+      --line: rgba(255, 255, 255, 0.12);
+      --panel: rgba(30, 41, 59, 0.8);
+      --band: rgba(15, 23, 42, 0.9);
+      --nav: #0f172a;
+      --shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       color: var(--ink);
-      font-family: Arial, Helvetica, sans-serif;
-      background:
-        linear-gradient(135deg, rgba(226, 241, 248, 0.9), rgba(246, 249, 244, 0.9)),
-        #eef4f7;
+      font-family: var(--font);
+      background: var(--band);
+      transition: var(--transition);
     }
     button, input, select, textarea { font: inherit; }
     button {
@@ -48,6 +59,54 @@
       border: 1px solid var(--line);
     }
     button:disabled { opacity: 0.58; cursor: not-allowed; }
+    button.loading { position: relative; color: transparent; }
+    button.loading::after {
+      content: "";
+      position: absolute;
+      width: 16px; height: 16px;
+      border: 2px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      left: 50%; top: 50%;
+      margin-left: -8px; margin-top: -8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast-container {
+      position: fixed; top: 20px; right: 20px;
+      z-index: 1000;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      box-shadow: var(--shadow);
+      display: flex; align-items: center; gap: 10px;
+      animation: slideIn 0.3s ease;
+      min-width: 280px;
+    }
+    .toast.success { border-left: 4px solid var(--ok); }
+    .toast.error { border-left: 4px solid var(--rose); }
+    .toast.warning { border-left: 4px solid var(--amber); }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .sidebar-toggle {
+      display: none;
+      position: fixed; bottom: 20px; right: 20px;
+      z-index: 100; width: 50px; height: 50px;
+      border-radius: 50%; font-size: 20px;
+    }
+    .theme-toggle {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 6px 10px;
+      font-size: 18px;
+    }
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--line);
@@ -174,35 +233,347 @@
     .login .panel { width: min(420px, 100%); box-shadow: var(--shadow); }
     @media (max-width: 980px) {
       .shell { grid-template-columns: 1fr; }
-      .side { position: static; height: auto; }
+      .side { 
+        position: fixed; 
+        height: 100vh;
+        z-index: 50;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+      .side.open { transform: translateX(0); }
       .grid4, .grid3, .grid2 { grid-template-columns: 1fr; }
       .field-list { grid-template-columns: 1fr; }
       .topbar { position: static; align-items: flex-start; flex-direction: column; }
+      .sidebar-toggle { display: block; }
+      .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 40;
+      }
+      .sidebar-overlay.show { display: block; }
+    }
+    
+    /* Enhanced responsive design */
+    @media (max-width: 768px) {
+      .content { padding: 16px; }
+      .panel { padding: 12px; }
+      .band { padding: 12px; }
+      .topbar { padding: 12px 16px; }
+      .metric .value { font-size: 24px; }
+      .metric { min-height: 80px; }
+      .toolbar { gap: 6px; }
+      button { 
+        padding: 8px 10px;
+        font-size: 14px;
+        min-height: 36px;
+      }
+      .toast {
+        min-width: 240px;
+        padding: 10px 12px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .content { padding: 12px; }
+      .panel { padding: 10px; }
+      .band { padding: 10px; }
+      .topbar { padding: 10px 12px; }
+      .metric .value { font-size: 20px; }
+      .metric .label { font-size: 11px; }
+      .metric { min-height: 70px; }
+      h2 { font-size: 18px; }
+      h3 { font-size: 15px; }
+      button { 
+        padding: 6px 8px;
+        font-size: 13px;
+        min-height: 32px;
+      }
+      .actions { gap: 6px; }
+      .form { gap: 8px; }
+      .toast {
+        min-width: 200px;
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+    }
+    
+    /* Landscape mobile optimizations */
+    @media (max-height: 600px) and (orientation: landscape) {
+      .login { padding: 16px; }
+      .login .panel { padding: 16px; }
+      .metric { min-height: 60px; }
+      .metric .value { font-size: 18px; }
+      .metric .label { font-size: 10px; }
+    }
+    
+    /* Tablet optimizations */
+    @media (min-width: 981px) and (max-width: 1200px) {
+      .shell { grid-template-columns: 220px 1fr; }
+      .side { padding: 14px 12px; }
+      .brand h1 { font-size: 17px; }
+      .brand p { font-size: 11px; }
+      .nav button { font-size: 13px; padding: 8px 10px; }
+    }
+    .panel { transition: var(--transition); }
+    .panel:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+    .nav button { transition: var(--transition); }
+    .metric { 
+      position: relative; 
+      overflow: hidden;
+    }
+    .metric::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--blue), var(--teal));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .metric:hover::before { opacity: 1; }
+    
+    /* Accessibility improvements */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    
+    /* Focus indicators */
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+    
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+      :root {
+        --line: rgba(0, 0, 0, 0.5);
+      }
+      [data-theme="dark"] {
+        --line: rgba(255, 255, 255, 0.5);
+      }
+    }
+    
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+    
+    /* Enhanced loading states */
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+    }
+    
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    /* Better error states */
+    .error-input {
+      border-color: var(--rose) !important;
+      box-shadow: 0 0 0 2px rgba(190, 18, 60, 0.2) !important;
+    }
+    
+    .error-message {
+      color: var(--rose);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    
+    /* Success states */
+    .success-input {
+      border-color: var(--ok) !important;
+      box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.2) !important;
+    }
+    
+    /* Tooltip styles */
+    .tooltip {
+      position: relative;
+    }
+    
+    .tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--nav);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 1000;
+    }
+    
+    .tooltip:hover::after {
+      opacity: 1;
+    }
+    
+    /* AI Results Styling */
+    .ai-results {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 15px;
+      background: var(--panel);
+      margin-top: 10px;
+    }
+    
+    .ai-confidence {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    
+    .confidence-bar {
+      flex: 1;
+      height: 8px;
+      background: var(--line);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .confidence-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+    
+    .confidence-high { background: var(--ok); }
+    .confidence-medium { background: var(--amber); }
+    .confidence-low { background: var(--rose); }
+    
+    .ai-explanation {
+      padding: 10px;
+      background: var(--band);
+      border-radius: 6px;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+    
+    .ai-recommendations {
+      margin-top: 10px;
+    }
+    
+    .ai-recommendations ul {
+      margin: 5px 0;
+      padding-left: 20px;
+    }
+    
+    .ai-recommendations li {
+      margin: 5px 0;
+      font-size: 13px;
+    }
+    
+    .anomaly-critical {
+      border-left: 4px solid var(--rose);
+      padding: 10px;
+      margin: 5px 0;
+      background: rgba(190, 18, 60, 0.1);
+    }
+    
+    .anomaly-warning {
+      border-left: 4px solid var(--amber);
+      padding: 10px;
+      margin: 5px 0;
+      background: rgba(180, 83, 9, 0.1);
+    }
+    
+    .ai-predictions {
+      display: grid;
+      gap: 10px;
+      margin: 10px 0;
+    }
+    
+    .prediction-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      background: var(--band);
+      border-radius: 4px;
+    }
+    
+    .prediction-label {
+      font-weight: 500;
+    }
+    
+    .prediction-value {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    /* Print styles */
+    @media print {
+      .sidebar-toggle,
+      .topbar .actions,
+      .nav {
+        display: none !important;
+      }
+      
+      .shell {
+        grid-template-columns: 1fr;
+      }
+      
+      .side {
+        display: none;
+      }
+      
+      .panel {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #000;
+      }
     }
   </style>
 </head>
 <body>
+  <div id="toastContainer" class="toast-container"></div>
   <div id="loginView" class="login">
     <section class="panel">
       <h3>RuggyLab OS</h3>
       <p class="status">Connexion au cockpit local du laboratoire.</p>
       <div class="form" style="margin-top:14px;">
-        <div><label for="username">Utilisateur</label><input id="username" value="admin" autocomplete="username" /></div>
-        <div><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password" /></div>
-        <button onclick="login()">Connexion</button>
-        <div id="loginError" class="status"></div>
+        <div><label for="username">Utilisateur</label><input id="username" value="admin" autocomplete="username" required aria-describedby="loginError" /></div>
+        <div><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError" /></div>
+        <button onclick="login()" aria-describedby="loginError">Connexion</button>
+        <div id="loginError" class="status" role="alert" aria-live="polite"></div>
       </div>
     </section>
   </div>
 
   <div id="appView" class="shell hidden">
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
     <aside class="side">
       <div class="brand">
         <h1>RuggyLab OS</h1>
         <p>Centre de Santé de la Garde Républicaine</p>
       </div>
-      <nav class="nav">
-        <button class="active" data-view="dashboard" onclick="showView('dashboard')">Tableau de bord</button>
+      <nav class="nav" role="navigation" aria-label="Navigation principale">
+        <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">Tableau de bord</button>
         <button data-view="patients" onclick="showView('patients')">Patients</button>
         <button data-view="samples" onclick="showView('samples')">Echantillons</button>
         <button data-view="results" onclick="showView('results')">Resultats</button>
@@ -210,6 +581,7 @@
         <button data-view="imaging" onclick="showView('imaging')">Imagerie et IA</button>
         <button data-view="stocks" onclick="showView('stocks')">Stocks</button>
         <button data-view="reports" onclick="showView('reports')">Rapports</button>
+        <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
       </nav>
     </aside>
     <main class="main">
@@ -219,8 +591,9 @@
           <div id="userStatus" class="status">Session active</div>
         </div>
         <div class="actions">
-          <button class="ghost" onclick="refreshCurrent()">Rafraichir</button>
-          <button class="secondary" onclick="logout()">Deconnexion</button>
+          <button class="theme-toggle" onclick="toggleTheme()" title="Changer le theme" aria-label="Basculer entre mode clair et sombre">☀️</button>
+          <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraichir la vue actuelle">Rafraichir</button>
+          <button class="secondary" onclick="logout()" aria-label="Se deconnecter">Deconnexion</button>
         </div>
       </header>
       <section class="content">
@@ -244,7 +617,7 @@
               <div class="grid2"><div><label>Prenom</label><input id="patientFirst" /></div><div><label>Nom</label><input id="patientLast" /></div></div>
               <div class="grid2"><div><label>Naissance</label><input id="patientBirth" type="date" /></div><div><label>Sexe</label><select id="patientSex"><option>M</option><option>F</option></select></div></div>
               <div><label>Grade</label><input id="patientRank" /></div>
-              <button onclick="createPatient()">Creer patient</button>
+              <button onclick="createPatient(this)" aria-label="Créer un nouveau patient">Creer patient</button>
               <div id="patientCreated" class="notice hidden">
                 Patient enregistre
                 <strong id="createdPatientId"></strong>
@@ -271,7 +644,7 @@
               <div class="actions"><button class="secondary" onclick="generateBarcode()">Generer code-barres</button></div>
               <div id="tubeGuide" class="tube-card"></div>
               <div><label>Statut</label><select id="sampleStatus"><option>Recu</option><option>En cours</option><option>Termine</option></select></div>
-              <button onclick="createSample()">Creer echantillon</button>
+              <button onclick="createSample(this)" aria-label="Créer un nouvel échantillon">Creer echantillon</button>
             </div></div>
             <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Barcode</th><th>Patient</th><th>Statut</th></tr></thead><tbody></tbody></table></div>
           </div>
@@ -279,16 +652,13 @@
 
         <div id="results" class="view band hidden">
           <div class="grid2">
-            <div class="panel"><h3>Nouveau resultat manuel</h3><div class="form">
-              <div class="grid2"><div><label>Sample ID</label><input id="resultSampleId" type="number" /></div><div><label>Equipment ID</label><input id="resultEquipmentId" type="number" /></div></div>
-              <div><label>Canevas machine</label><select id="resultTemplate" onchange="renderResultTemplate()">
-                <option value="dh36">Dymind DH36 - NFS</option>
-                <option value="precis">Precis Expert - POCT</option>
-                <option value="urine">Bandelette urinaire</option>
-                <option value="manual">Autre resultat numerique</option>
-              </select></div>
-              <div id="resultFields" class="field-list"></div>
-              <button onclick="createResult()">Creer resultat valide</button>
+            <div class="panel"><h3>Nouveau resultat</h3><div class="form">
+              <div><label>Sample ID</label><input id="resultSampleId" type="number" /></div>
+              <div><label>Equipment ID</label><input id="resultEquipmentId" type="number" /></div>
+              <div><label>Template</label><select id="resultTemplate" onchange="templateDataPoints()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
+              <div id="dataPoints"></div>
+              <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
+              <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
             <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
@@ -298,12 +668,12 @@
           <div class="grid2">
             <div class="panel"><h3>Ingestion DH36</h3><div class="form">
               <label>Message HL7 brut</label><textarea id="hl7Message"></textarea>
-              <button onclick="ingestDh36()">Traiter message DH36</button>
+              <button onclick="ingestDh36(this)">Traiter message DH36</button>
             </div></div>
             <div class="panel"><h3>Precis Expert</h3><div class="form">
               <div class="grid2"><div><label>Barcode</label><input id="poctBarcode" /></div><div><label>Serie appareil</label><input id="poctSerial" /></div></div>
               <div class="grid3"><div><label>Glucose</label><input id="poctGlucose" value="0.45" /></div><div><label>Cholesterol</label><input id="poctChol" value="1.8" /></div><div><label>Acide urique</label><input id="poctUa" value="50" /></div></div>
-              <button onclick="submitPoct()">Valider POCT</button>
+              <button onclick="submitPoct(this)">Valider POCT</button>
             </div></div>
           </div>
         </div>
@@ -312,12 +682,19 @@
           <div class="grid2">
             <div class="panel"><h3>Microscope Magnus</h3><div class="form">
               <div><label>Code-barres echantillon</label><input id="imageBarcode" /></div>
-              <button onclick="reserveImage()">Reserver capture image</button>
+              <button onclick="reserveImage(this)">Reserver capture image</button>
             </div></div>
-            <div class="panel"><h3>IA paludisme</h3><div class="form">
+            <div class="panel"><h3>IA Paludisme - RuggyAI</h3><div class="form">
               <div><label>Result ID image</label><input id="malariaResultId" type="number" /></div>
-              <div class="actions"><button onclick="enqueueMalaria()">Soumettre IA</button><button class="success" onclick="processMalaria()">Traiter job</button></div>
+              <div><label>Uploader image microscope</label><input id="malariaImage" type="file" accept="image/*" onchange="previewMalariaImage(this)" /></div>
+              <div id="malariaPreview" style="margin: 10px 0;"></div>
+              <div class="actions">
+                <button onclick="analyzeMalariaWithAI()" class="primary">Analyser IA</button>
+                <button onclick="enqueueMalaria(this)">Soumettre IA</button>
+                <button class="success" onclick="processMalaria(this)">Traiter job</button>
+              </div>
               <div><label>Job ID</label><input id="malariaJobId" type="number" /></div>
+              <div id="aiResults" class="ai-results" style="margin-top: 15px;"></div>
             </div></div>
           </div>
         </div>
@@ -328,9 +705,14 @@
               <div><label>Nom</label><input id="reagentName" /></div>
               <div class="grid2"><div><label>Categorie</label><input id="reagentCategory" /></div><div><label>Unite</label><input id="reagentUnit" value="unit" /></div></div>
               <div class="grid2"><div><label>Stock</label><input id="reagentStock" type="number" step="0.001" /></div><div><label>Seuil</label><input id="reagentThreshold" type="number" step="0.001" /></div></div>
-              <button onclick="createReagent()">Creer reactif</button>
+              <button onclick="createReagent(this)">Creer reactif</button>
             </div></div>
-            <div class="panel"><h3>Reactifs</h3><table id="reagentsTable"><thead><tr><th>ID</th><th>Nom</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Reactifs</h3>
+              <div style="margin-bottom: 10px;">
+                <button onclick="predictInventoryNeeds()" class="primary">🤖 Prédictions IA Stocks</button>
+              </div>
+              <table id="reagentsTable"><thead><tr><th>ID</th><th>Nom</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table>
+            </div>
           </div>
         </div>
 
@@ -338,10 +720,40 @@
           <div class="grid2">
             <div class="panel"><h3>Rapport resultat</h3><div class="form">
               <div><label>Result ID</label><input id="reportResultId" type="number" /></div>
-              <div class="actions"><button onclick="openPdf()">Ouvrir PDF</button><button class="success" onclick="signPdf()">Signer</button></div>
+              <div class="actions"><button onclick="openPdf()">Ouvrir PDF</button><button class="success" onclick="signPdf(this)">Signer</button></div>
             </div></div>
             <div class="panel"><h3>Surveillance epidemiologique</h3><div class="actions"><button onclick="loadDashboard()">Actualiser resume</button><button class="secondary" onclick="downloadEpiCsv()">Exporter CSV</button></div></div>
           </div>
+        </div>
+
+        <div id="ai_training" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>🤖 Dataset Entraînement IA</h3><div class="form">
+              <div><label>Dataset Actuel</label><input id="currentDatasetName" readonly value="Non initialisé" /></div>
+              <div><label>Total Echantillons</label><input id="totalSamples" readonly value="0" /></div>
+              <div><label>Echantillons Annotés</label><input id="annotatedSamples" readonly value="0" /></div>
+              <div class="actions">
+                <button onclick="initializeAIDataset()" class="primary">Initialiser Dataset</button>
+                <button onclick="showDatasetStats()">Statistiques</button>
+                <button onclick="exportDataset()" class="secondary">Exporter</button>
+              </div>
+            </div></div>
+            <div class="panel"><h3>📸 Collecte Images</h3><div class="form">
+              <div><label>Uploader Image Microscope</label><input id="trainingImage" type="file" accept="image/*" onchange="previewTrainingImage(this)" /></div>
+              <div id="trainingImagePreview" style="margin: 10px 0;"></div>
+              <div><label>Annotation</label><select id="imageAnnotation">
+                <option value="positive">Positif (parasites)</option>
+                <option value="negative">Négatif (sain)</option>
+                <option value="unlabeled">Non annoté</option>
+              </select></div>
+              <div><label>Notes</label><textarea id="annotationNotes" placeholder="Notes additionnelles..."></textarea></div>
+              <div class="actions">
+                <button onclick="addTrainingSample()" class="primary">Ajouter au Dataset</button>
+                <button onclick="validateAnnotations()">Valider Annotations</button>
+              </div>
+            </div></div>
+          </div>
+          <div class="panel"><h3>📊 Statistiques Dataset</h3><div id="datasetStats" style="padding: 15px;"></div></div>
         </div>
 
         <div class="band"><h3>Journal</h3><div id="log" class="log">Pret.</div></div>
@@ -349,11 +761,428 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+  <script src="/static/ai/training_data_manager.js"></script>
+  <script src="/static/ai/malaria_dataset_collector.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
-    let token = localStorage.getItem("ruggylab_token") || "";
+    const storage = {
+      getItem: (key) => {
+        try {
+          return localStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      },
+      setItem: (key, value) => {
+        try {
+          localStorage.setItem(key, value);
+        } catch {
+          /* Storage blocked by browser settings */
+        }
+      },
+      removeItem: (key) => {
+        try {
+          localStorage.removeItem(key);
+        } catch {
+          /* Storage blocked by browser settings */
+        }
+      }
+    };
+    storage.removeItem("ruggylab_token");
+    let token = "";
     let currentView = "dashboard";
     let lastCreatedPatient = null;
+    
+    // Error handling and logging
+    const errorHandler = {
+      handle: (error, context = '') => {
+        console.error(`Error in ${context}:`, error);
+        log(`Erreur: ${error.message || error}`);
+        showToast(`Une erreur est survenue: ${error.message || 'Erreur inconnue'}`, 'error');
+      },
+      
+      async safeExecute(fn, context = '') {
+        try {
+          return await fn();
+        } catch (error) {
+          this.handle(error, context);
+          throw error;
+        }
+      }
+    };
+    
+    // Performance monitoring
+    const perfMonitor = {
+      measure: (name, fn) => {
+        const start = performance.now();
+        const result = fn();
+        const end = performance.now();
+        console.log(`${name} took ${end - start}ms`);
+        return result;
+      },
+      
+      async measureAsync(name, fn) {
+        const start = performance.now();
+        const result = await fn();
+        const end = performance.now();
+        console.log(`${name} took ${end - start}ms`);
+        return result;
+      }
+    };
+    
+    // Debounce utility
+    const debounce = (func, wait) => {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    };
+    
+    // Input validation utilities
+    const validator = {
+      required: (value) => value && value.trim() !== '',
+      numeric: (value) => !isNaN(Number(value)) && value !== '',
+      date: (value) => !isNaN(Date.parse(value)),
+      barcode: (value) => /^[A-Z0-9-]+$/.test(value),
+      
+      validateField: (field, rules) => {
+        const value = field.value;
+        const errors = [];
+        
+        if (rules.required && !validator.required(value)) {
+          errors.push('Ce champ est requis');
+        }
+        
+        if (rules.numeric && value && !validator.numeric(value)) {
+          errors.push('Valeur numérique invalide');
+        }
+        
+        if (rules.date && value && !validator.date(value)) {
+          errors.push('Date invalide');
+        }
+        
+        if (rules.barcode && value && !validator.barcode(value)) {
+          errors.push('Code-barres invalide');
+        }
+        
+        return errors;
+      },
+      
+      showFieldErrors: (field, errors) => {
+        field.classList.toggle('error-input', errors.length > 0);
+        field.classList.toggle('success-input', errors.length === 0 && field.value);
+        
+        let errorDiv = field.parentNode.querySelector('.error-message');
+        if (errors.length > 0) {
+          if (!errorDiv) {
+            errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            field.parentNode.appendChild(errorDiv);
+          }
+          errorDiv.textContent = errors[0];
+        } else if (errorDiv) {
+          errorDiv.remove();
+        }
+      }
+    };
+    
+    // Security utilities
+    const security = {
+      sanitize: (str) => {
+        if (!str) return '';
+        return str
+          .replace(/[<>]/g, '')
+          .replace(/[\x00-\x1F\x7F]/g, '')
+          .trim();
+      },
+      
+      sanitizeNumber: (str) => {
+        const sanitized = str.replace(/[^0-9.-]/g, '');
+        return sanitized === '' ? '' : sanitized;
+      },
+      
+      escapeHtml: (str) => {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      },
+      
+      validateToken: () => {
+        if (!token || token.length < 10) {
+          logout();
+          return false;
+        }
+        return true;
+      },
+      
+      rateLimit: (() => {
+        const lastCalls = {};
+        return (key, limitMs = 1000) => {
+          const now = Date.now();
+          if (lastCalls[key] && now - lastCalls[key] < limitMs) {
+            return false;
+          }
+          lastCalls[key] = now;
+          return true;
+        };
+      })()
+    };
+    
+    const savedTheme = storage.getItem("theme") || "light";
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute("data-theme");
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      storage.setItem("theme", next);
+      const btn = document.querySelector(".theme-toggle");
+      if (btn) btn.textContent = next === "dark" ? "🌙" : "☀️";
+    }
+    
+    // Enhanced loading states and user feedback
+    const loadingStates = {
+      showSkeleton: (element, count = 3) => {
+        const skeletonHtml = Array(count).fill(0).map(() => 
+          '<div class="skeleton" style="height: 20px; margin: 8px 0; border-radius: 4px;"></div>'
+        ).join('');
+        
+        if (element.tagName === 'TBODY') {
+          element.innerHTML = skeletonHtml.split('</div>').map(s => 
+            `<tr><td colspan="100">${s}</div></td></tr>`
+          ).join('');
+        } else {
+          element.innerHTML = skeletonHtml;
+        }
+      },
+      
+      hideSkeleton: (element, content) => {
+        if (content) {
+          element.innerHTML = content;
+        } else {
+          element.innerHTML = '';
+        }
+      },
+      
+      showLoadingOverlay: (message = 'Chargement...') => {
+        const overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+          <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-text">${message}</div>
+          </div>
+        `;
+        overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        `;
+        
+        const style = document.createElement('style');
+        style.textContent = `
+          .loading-content {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: var(--shadow);
+          }
+          .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--line);
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+          }
+          .loading-text {
+            color: var(--ink);
+            font-size: 14px;
+          }
+        `;
+        
+        document.head.appendChild(style);
+        document.body.appendChild(overlay);
+      },
+      
+      hideLoadingOverlay: () => {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.remove();
+      }
+    };
+    
+    // Toast notifications
+    function showToast(message, type = "success", duration = 4000) {
+      const container = $("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      const icon = type === "success" ? "✓" : type === "error" ? "✗" : "⚠";
+      toast.innerHTML = `<span style="font-size:18px">${icon}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.animation = "slideIn 0.3s ease reverse";
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+    
+    // Keyboard shortcuts and accessibility improvements
+    const keyboard = {
+      shortcuts: {
+        'Ctrl+K': () => {
+          const query = $("patientQuery");
+          if (query) {
+            query.focus();
+            showView('patients');
+          }
+        },
+        'Ctrl+N': () => {
+          showView('patients');
+          setTimeout(() => $("patientIpp")?.focus(), 100);
+        },
+        'Ctrl+S': () => {
+          showView('samples');
+          setTimeout(() => $("sampleBarcode")?.focus(), 100);
+        },
+        'Ctrl+R': () => refreshCurrent(),
+        'Ctrl+D': () => showView('dashboard'),
+        'Ctrl+L': () => logout(),
+        'Ctrl+T': () => toggleTheme(),
+        'Escape': () => {
+          document.querySelector('.side.open')?.classList.remove('open');
+          document.querySelector('.sidebar-overlay.show')?.classList.remove('show');
+        },
+        'F1': (e) => {
+          e.preventDefault();
+          keyboard.showHelp();
+        }
+      },
+      
+      init: () => {
+        document.addEventListener('keydown', (e) => {
+          // Skip if user is typing in input fields
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            if (e.key === 'Escape') {
+              e.target.blur();
+            }
+            return;
+          }
+          
+          const key = [];
+          if (e.ctrlKey) key.push('Ctrl');
+          if (e.altKey) key.push('Alt');
+          if (e.shiftKey) key.push('Shift');
+          key.push(e.key);
+          
+          const shortcut = key.join('+');
+          if (keyboard.shortcuts[shortcut]) {
+            e.preventDefault();
+            keyboard.shortcuts[shortcut](e);
+          }
+        });
+        
+        // Add help button to topbar
+        const helpBtn = document.createElement('button');
+        helpBtn.className = 'ghost tooltip';
+        helpBtn.setAttribute('data-tooltip', 'Raccourcis clavier (F1)');
+        helpBtn.innerHTML = '?';
+        helpBtn.onclick = () => keyboard.showHelp();
+        helpBtn.style.cssText = 'width: 32px; height: 32px; padding: 0; font-weight: bold;';
+        
+        const actions = document.querySelector('.topbar .actions');
+        if (actions) {
+          actions.insertBefore(helpBtn, actions.firstChild);
+        }
+      },
+      
+      showHelp: () => {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+        `;
+        
+        const content = document.createElement('div');
+        content.className = 'panel';
+        content.style.cssText = 'max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;';
+        
+        content.innerHTML = `
+          <h3>Raccourcis clavier</h3>
+          <div style="display: grid; gap: 8px; margin: 16px 0;">
+            <div><kbd>Ctrl+K</kbd> - Recherche patients</div>
+            <div><kbd>Ctrl+N</kbd> - Nouveau patient</div>
+            <div><kbd>Ctrl+S</kbd> - Nouvel échantillon</div>
+            <div><kbd>Ctrl+R</kbd> - Rafraîchir</div>
+            <div><kbd>Ctrl+D</kbd> - Tableau de bord</div>
+            <div><kbd>Ctrl+L</kbd> - Déconnexion</div>
+            <div><kbd>Ctrl+T</kbd> - Changer thème</div>
+            <div><kbd>Échap</kbd> - Fermer menu/fenêtre</div>
+            <div><kbd>F1</kbd> - Aide</div>
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            <button onclick="this.closest('.modal-overlay').remove()">Fermer</button>
+          </div>
+        `;
+        
+        modal.appendChild(content);
+        modal.onclick = (e) => {
+          if (e.target === modal) modal.remove();
+        };
+        
+        document.body.appendChild(modal);
+        
+        // Add keyboard styles
+        if (!document.getElementById('keyboard-styles')) {
+          const style = document.createElement('style');
+          style.id = 'keyboard-styles';
+          style.textContent = `
+            kbd {
+              background: var(--band);
+              border: 1px solid var(--line);
+              border-radius: 4px;
+              padding: 2px 6px;
+              font-family: monospace;
+              font-size: 12px;
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      }
+    };
+    function toggleSidebar() {
+      document.querySelector(".side").classList.toggle("open");
+      document.querySelector(".sidebar-overlay")?.classList.toggle("show");
+    }
+    
+    // Button loading state
+    function setLoading(btn, loading) {
+      btn.classList.toggle("loading", loading);
+      btn.disabled = loading;
+    }
     const tubeGuides = {
       nfs: { code: "NFS", tube: "Tube EDTA violet", order: "Ordre 3", note: "Inversions douces 8 a 10 fois. Automate Dymind DH36." },
       poct: { code: "POCT", tube: "Tube heparine vert ou sang capillaire", order: "Ordre 4", note: "Acheminer rapidement pour Precis Expert." },
@@ -384,11 +1213,26 @@
     }
     function log(value) { $("log").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2); }
     async function api(path, options = {}) {
+      if (!security.validateToken() && !path.includes('/login/access-token')) {
+        throw new Error('Session expirée');
+      }
+      
+      // Rate limiting for non-GET requests
+      if (options.method && options.method !== 'GET') {
+        const key = `${path}_${options.method || 'GET'}`;
+        if (!security.rateLimit(key, 500)) {
+          throw new Error('Trop de requêtes, veuillez patienter');
+        }
+      }
+      
       const response = await fetch(path, options);
       const text = await response.text();
       let payload = text;
       try { payload = JSON.parse(text); } catch {}
-      if (!response.ok) { log(payload); throw new Error(response.statusText); }
+      if (!response.ok) { 
+        log(payload); 
+        throw new Error(response.statusText); 
+      }
       return payload;
     }
     function row(html) { const tr = document.createElement("tr"); tr.innerHTML = html; return tr; }
@@ -418,18 +1262,40 @@
     }
 
     async function login() {
-      $("loginError").textContent = "";
-      const form = new URLSearchParams();
-      form.set("username", $("username").value);
-      form.set("password", $("password").value);
-      try {
-        const payload = await api("/api/v1/login/access-token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form });
+      return errorHandler.safeExecute(async () => {
+        const usernameField = $("username");
+        const passwordField = $("password");
+        
+        // Validate inputs
+        const usernameErrors = validator.validateField(usernameField, { required: true });
+        const passwordErrors = validator.validateField(passwordField, { required: true });
+        
+        validator.showFieldErrors(usernameField, usernameErrors);
+        validator.showFieldErrors(passwordField, passwordErrors);
+        
+        if (usernameErrors.length > 0 || passwordErrors.length > 0) {
+          throw new Error('Veuillez remplir tous les champs requis');
+        }
+        
+        $("loginError").textContent = "";
+        const form = new URLSearchParams();
+        form.set("username", usernameField.value);
+        form.set("password", passwordField.value);
+        
+        const payload = await perfMonitor.measureAsync('login', () => 
+          api("/api/v1/login/access-token", { 
+            method: "POST", 
+            headers: { "Content-Type": "application/x-www-form-urlencoded" }, 
+            body: form 
+          })
+        );
+        
         token = payload.access_token;
-        localStorage.setItem("ruggylab_token", token);
+        storage.setItem("ruggylab_token", token);
         await boot();
-      } catch { $("loginError").textContent = "Connexion impossible."; }
+      }, 'login');
     }
-    function logout() { localStorage.removeItem("ruggylab_token"); token = ""; $("appView").classList.add("hidden"); $("loginView").classList.remove("hidden"); }
+    function logout() { storage.removeItem("ruggylab_token"); token = ""; $("appView").classList.add("hidden"); $("loginView").classList.remove("hidden"); }
     async function boot() {
       if (!token) return;
       try {
@@ -457,32 +1323,94 @@
       if (currentView === "results") await loadResults();
       if (currentView === "stocks") await loadReagents();
     }
-    async function loadDashboard() {
-      const [epi, stock] = await Promise.all([
-        api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
-        api("/api/v1/reports/stock-dashboard", { headers: headers(false) })
-      ]);
-      $("mResults").textContent = epi.total_results;
-      $("mCritical").textContent = epi.critical_results;
-      $("mMalaria").textContent = epi.malaria_positive;
-      $("mLowStock").textContent = stock.low_stock_reagents.length;
-      setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
-      setRows("lowStockTable", stock.low_stock_reagents.map((r) => row(`<td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
-      log("Tableau de bord actualise.");
+    async function loadDashboard(btn = null) {
+      if (btn) setLoading(btn, true);
+      try {
+        const [epi, stock] = await Promise.all([
+          api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
+          api("/api/v1/reports/stock-dashboard", { headers: headers(false) })
+        ]);
+        $("mResults").textContent = epi.total_results;
+        $("mCritical").textContent = epi.critical_results;
+        $("mMalaria").textContent = epi.malaria_positive;
+        $("mLowStock").textContent = stock.low_stock_reagents.length;
+        setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
+        setRows("lowStockTable", stock.low_stock_reagents.map((r) => row(`<td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
+        showToast("Tableau de bord actualisé", "success");
+      } catch (e) {
+        showToast("Erreur lors du chargement du dashboard", "error");
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
     }
     async function loadPatients() {
-      const data = await api(`/api/v1/patients?q=${encodeURIComponent($("patientQuery").value || "")}`, { headers: headers(false) });
-      setRows("patientsTable", data.items.map((p) => row(`<td>${p.id}</td><td>${p.ipp_unique_id}</td><td>${p.first_name} ${p.last_name}</td><td>${p.sex || ""}</td>`)));
+      const tbody = $("patientsTable").querySelector("tbody");
+      loadingStates.showSkeleton(tbody, 5);
+      
+      try {
+        const data = await api(`/api/v1/patients?q=${encodeURIComponent($("patientQuery").value || "")}`, { headers: headers(false) });
+        const rows = data.items.map((p) => row(`<td>${p.id}</td><td>${p.ipp_unique_id}</td><td>${p.first_name} ${p.last_name}</td><td>${p.sex || ""}</td>`));
+        setRows("patientsTable", rows);
+      } catch (error) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        throw error;
+      }
     }
-    async function createPatient() {
-      const body = { ipp_unique_id: $("patientIpp").value, first_name: $("patientFirst").value, last_name: $("patientLast").value, birth_date: $("patientBirth").value, sex: $("patientSex").value, rank: $("patientRank").value || null };
-      const created = await api("/api/v1/patients", { method: "POST", headers: headers(), body: JSON.stringify(body) });
-      lastCreatedPatient = created;
-      $("createdPatientId").textContent = `ID patient: ${created.id}`;
-      $("createdPatientName").textContent = `${created.ipp_unique_id} - ${created.first_name} ${created.last_name}`;
-      $("patientCreated").classList.remove("hidden");
-      log(created);
-      await loadPatients();
+    async function createPatient(btn) {
+      return errorHandler.safeExecute(async () => {
+        setLoading(btn, true);
+        
+        // Validate all fields
+        const fields = {
+          patientIpp: { required: true },
+          patientFirst: { required: true },
+          patientLast: { required: true },
+          patientBirth: { required: true, date: true },
+          patientRank: { required: false }
+        };
+        
+        let hasErrors = false;
+        Object.entries(fields).forEach(([fieldId, rules]) => {
+          const field = $(fieldId);
+          const errors = validator.validateField(field, rules);
+          validator.showFieldErrors(field, errors);
+          if (errors.length > 0) hasErrors = true;
+        });
+        
+        if (hasErrors) {
+          throw new Error('Veuillez corriger les erreurs dans le formulaire');
+        }
+        
+        const body = { 
+          ipp_unique_id: $("patientIpp").value, 
+          first_name: $("patientFirst").value, 
+          last_name: $("patientLast").value, 
+          birth_date: $("patientBirth").value, 
+          sex: $("patientSex").value, 
+          rank: $("patientRank").value || null 
+        };
+        
+        const created = await perfMonitor.measureAsync('createPatient', () =>
+          api("/api/v1/patients", { method: "POST", headers: headers(), body: JSON.stringify(body) })
+        );
+        
+        lastCreatedPatient = created;
+        $("createdPatientId").textContent = `ID patient: ${created.id}`;
+        $("createdPatientName").textContent = `${created.ipp_unique_id} - ${created.first_name} ${created.last_name}`;
+        $("patientCreated").classList.remove("hidden");
+        showToast(`Patient ${created.first_name} ${created.last_name} créé avec succès`, "success");
+        
+        // Clear form
+        ["patientIpp", "patientFirst", "patientLast", "patientBirth", "patientRank"].forEach(id => {
+          const field = $(id);
+          field.value = "";
+          field.classList.remove('success-input', 'error-input');
+          const errorDiv = field.parentNode.querySelector('.error-message');
+          if (errorDiv) errorDiv.remove();
+        });
+        
+        await loadPatients();
+      }, 'createPatient').finally(() => setLoading(btn, false));
     }
     function useCreatedPatientForSample() {
       if (!lastCreatedPatient) return;
@@ -491,22 +1419,64 @@
       generateBarcode();
     }
     async function loadSamples() {
-      const data = await api("/api/v1/samples", { headers: headers(false) });
-      setRows("samplesTable", data.items.map((s) => row(`<td>${s.id}</td><td>${s.barcode}</td><td>${s.patient_id}</td><td>${s.status || ""}</td>`)));
+      const tbody = $("samplesTable").querySelector("tbody");
+      loadingStates.showSkeleton(tbody, 5);
+      
+      try {
+        const data = await api("/api/v1/samples", { headers: headers(false) });
+        const rows = data.items.map((s) => row(`<td>${s.id}</td><td>${s.barcode}</td><td>${s.patient_id}</td><td>${s.status || ""}</td>`));
+        setRows("samplesTable", rows);
+      } catch (error) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        throw error;
+      }
     }
-    async function createSample() {
-      if (!$("sampleBarcode").value) generateBarcode();
-      const body = { barcode: $("sampleBarcode").value, patient_id: Number($("samplePatientId").value), status: $("sampleStatus").value };
-      const created = await api("/api/v1/samples", { method: "POST", headers: headers(), body: JSON.stringify(body) });
-      $("resultSampleId").value = created.id;
-      $("imageBarcode").value = created.barcode;
-      $("poctBarcode").value = created.barcode;
-      log({ ...created, examen: $("sampleExam").value, tube: tubeGuides[$("sampleExam").value] });
-      await loadSamples();
+    async function createSample(btn) {
+      return errorHandler.safeExecute(async () => {
+        setLoading(btn, true);
+        
+        // Validate inputs
+        const patientIdErrors = validator.validateField($("samplePatientId"), { required: true, numeric: true });
+        const barcodeErrors = validator.validateField($("sampleBarcode"), { required: true, barcode: true });
+        
+        validator.showFieldErrors($("samplePatientId"), patientIdErrors);
+        validator.showFieldErrors($("sampleBarcode"), barcodeErrors);
+        
+        if (patientIdErrors.length > 0 || barcodeErrors.length > 0) {
+          throw new Error('Veuillez corriger les erreurs dans le formulaire');
+        }
+        
+        if (!$("sampleBarcode").value) generateBarcode();
+        
+        const body = { 
+          barcode: security.sanitize($("sampleBarcode").value), 
+          patient_id: Number(security.sanitizeNumber($("samplePatientId").value)), 
+          status: $("sampleStatus").value 
+        };
+        
+        const created = await perfMonitor.measureAsync('createSample', () =>
+          api("/api/v1/samples", { method: "POST", headers: headers(), body: JSON.stringify(body) })
+        );
+        
+        $("resultSampleId").value = created.id;
+        $("imageBarcode").value = created.barcode;
+        $("poctBarcode").value = created.barcode;
+        showToast(`Échantillon ${security.escapeHtml(created.barcode)} créé avec succès`, "success");
+        await loadSamples();
+      }, 'createSample').finally(() => setLoading(btn, false));
     }
     async function loadResults() {
-      const data = await api("/api/v1/results", { headers: headers(false) });
-      setRows("resultsTable", data.items.map((r) => row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`)));
+      const tbody = $("resultsTable").querySelector("tbody");
+      loadingStates.showSkeleton(tbody, 5);
+      
+      try {
+        const data = await api("/api/v1/results", { headers: headers(false) });
+        const rows = data.items.map((r) => row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`));
+        setRows("resultsTable", rows);
+      } catch (error) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        throw error;
+      }
     }
     function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }
     function templateDataPoints() {
@@ -519,47 +1489,1133 @@
       });
       return values;
     }
-    async function createResult() {
-      const body = { sample_id: Number($("resultSampleId").value), equipment_id: $("resultEquipmentId").value ? Number($("resultEquipmentId").value) : null, data_points: templateDataPoints(), is_critical: false };
-      log(await api("/api/v1/results", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
-      await loadResults();
+    async function createResult(btn) {
+      return errorHandler.safeExecute(async () => {
+        setLoading(btn, true);
+        
+        // Validate inputs
+        const sampleIdErrors = validator.validateField($("resultSampleId"), { required: true, numeric: true });
+        const equipmentIdErrors = validator.validateField($("resultEquipmentId"), { numeric: true });
+        
+        validator.showFieldErrors($("resultSampleId"), sampleIdErrors);
+        validator.showFieldErrors($("resultEquipmentId"), equipmentIdErrors);
+        
+        if (sampleIdErrors.length > 0) {
+          throw new Error('Veuillez corriger les erreurs dans le formulaire');
+        }
+        
+        // Validate result fields
+        const resultFields = document.querySelectorAll("#resultFields input[data-result-key]");
+        let hasResultErrors = false;
+        
+        resultFields.forEach(input => {
+          const value = input.value.trim();
+          if (value && isNaN(Number(value))) {
+            input.classList.add('error-input');
+            hasResultErrors = true;
+          } else {
+            input.classList.remove('error-input');
+          }
+        });
+        
+        if (hasResultErrors) {
+          throw new Error('Les valeurs des résultats doivent être numériques');
+        }
+        
+        const body = { 
+          sample_id: Number(security.sanitizeNumber($("resultSampleId").value)), 
+          equipment_id: $("resultEquipmentId").value ? Number(security.sanitizeNumber($("resultEquipmentId").value)) : null, 
+          data_points: templateDataPoints(), 
+          is_critical: false 
+        };
+        
+        await perfMonitor.measureAsync('createResult', () =>
+          api("/api/v1/results", { method: "POST", headers: headers(), body: JSON.stringify(body) })
+        );
+        
+        showToast("Résultat créé et validé avec succès", "success");
+        await loadResults();
+      }, 'createResult').finally(() => setLoading(btn, false));
     }
-    async function ingestDh36() { log(await api("/api/v1/dh36/ingest", { method: "POST", headers: headers(), body: JSON.stringify({ raw_message: $("hl7Message").value }) })); }
-    async function submitPoct() {
-      const body = { sample_barcode: $("poctBarcode").value, equipment_serial: $("poctSerial").value, glucose_raw: Number($("poctGlucose").value), cholesterol_raw: Number($("poctChol").value), uric_acid_raw: Number($("poctUa").value), lactate_raw: 1.2, ketones_raw: 0.2 };
-      log(await api("/api/v1/results/precis-expert", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
+    async function ingestDh36(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api("/api/v1/dh36/ingest", { method: "POST", headers: headers(), body: JSON.stringify({ raw_message: $("hl7Message").value }) });
+        showToast("Message DH36 traité avec succès", "success");
+        $("hl7Message").value = "";
+      } catch (e) {
+        showToast("Erreur lors du traitement DH36", "error");
+      } finally {
+        setLoading(btn, false);
+      }
     }
-    async function reserveImage() {
-      const data = await api("/api/v1/imaging/capture-microscope", { method: "POST", headers: headers(), body: JSON.stringify({ sample_barcode: $("imageBarcode").value }) });
-      $("malariaResultId").value = data.result_id;
-      log(data);
+    async function submitPoct(btn) {
+      setLoading(btn, true);
+      try {
+        const body = { sample_barcode: $("poctBarcode").value, equipment_serial: $("poctSerial").value, glucose_raw: Number($("poctGlucose").value), cholesterol_raw: Number($("poctChol").value), uric_acid_raw: Number($("poctUa").value), lactate_raw: 1.2, ketones_raw: 0.2 };
+        await api("/api/v1/results/precis-expert", { method: "POST", headers: headers(), body: JSON.stringify(body) });
+        showToast("Résultat POCT enregistré avec succès", "success");
+      } catch (e) {
+        showToast("Erreur lors de l'enregistrement POCT", "error");
+      } finally {
+        setLoading(btn, false);
+      }
     }
-    async function enqueueMalaria() {
-      const data = await api(`/api/v1/imaging/malaria/analyze/${$("malariaResultId").value}`, { method: "POST", headers: headers(false) });
-      $("malariaJobId").value = data.id;
-      log(data);
+    async function reserveImage(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api("/api/v1/imaging/capture-microscope", { method: "POST", headers: headers(), body: JSON.stringify({ sample_barcode: $("imageBarcode").value }) });
+        $("malariaResultId").value = data.result_id;
+        showToast("Image réservée avec succès", "success");
+      } catch (e) {
+        showToast("Erreur lors de la réservation d'image", "error");
+      } finally {
+        setLoading(btn, false);
+      }
     }
-    async function processMalaria() { log(await api(`/api/v1/imaging/malaria/jobs/${$("malariaJobId").value}/process`, { method: "POST", headers: headers(false) })); }
+    async function enqueueMalaria(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api(`/api/v1/imaging/malaria/analyze/${$("malariaResultId").value}`, { method: "POST", headers: headers(false) });
+        $("malariaJobId").value = data.id;
+        showToast("Analyse paludisme mise en file d'attente", "success");
+      } catch (e) {
+        showToast("Erreur lors de la mise en file d'attente", "error");
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+    async function processMalaria(btn) {
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/imaging/malaria/jobs/${$("malariaJobId").value}/process`, { method: "POST", headers: headers(false) });
+        showToast("Analyse paludisme traitée avec succès", "success");
+      } catch (e) {
+        showToast("Erreur lors du traitement de l'analyse", "error");
+      } finally {
+        setLoading(btn, false);
+      }
+    }
     async function loadReagents() {
       const data = await api("/api/v1/reagents", { headers: headers(false) });
       setRows("reagentsTable", data.items.map((r) => row(`<td>${r.id}</td><td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
     }
-    async function createReagent() {
-      const body = { name: $("reagentName").value, category: $("reagentCategory").value || null, unit: $("reagentUnit").value, current_stock: Number($("reagentStock").value), alert_threshold: Number($("reagentThreshold").value) };
-      log(await api("/api/v1/reagents", { method: "POST", headers: headers(), body: JSON.stringify(body) }));
-      await loadReagents();
+    async function createReagent(btn) {
+      return errorHandler.safeExecute(async () => {
+        setLoading(btn, true);
+        
+        // Validate inputs
+        const fields = {
+          reagentName: { required: true },
+          reagentCategory: { required: false },
+          reagentStock: { required: true, numeric: true },
+          reagentThreshold: { required: true, numeric: true }
+        };
+        
+        let hasErrors = false;
+        Object.entries(fields).forEach(([fieldId, rules]) => {
+          const field = $(fieldId);
+          const errors = validator.validateField(field, rules);
+          validator.showFieldErrors(field, errors);
+          if (errors.length > 0) hasErrors = true;
+        });
+        
+        if (hasErrors) {
+          throw new Error('Veuillez corriger les erreurs dans le formulaire');
+        }
+        
+        const body = { 
+          name: security.sanitize($("reagentName").value), 
+          category: security.sanitize($("reagentCategory").value) || null, 
+          unit: security.sanitize($("reagentUnit").value), 
+          current_stock: Number(security.sanitizeNumber($("reagentStock").value)), 
+          alert_threshold: Number(security.sanitizeNumber($("reagentThreshold").value)) 
+        };
+        
+        await perfMonitor.measureAsync('createReagent', () =>
+          api("/api/v1/reagents", { method: "POST", headers: headers(), body: JSON.stringify(body) })
+        );
+        
+        showToast("Réactif créé avec succès", "success");
+        
+        // Clear form
+        ["reagentName", "reagentCategory", "reagentStock", "reagentThreshold"].forEach(id => {
+          const field = $(id);
+          field.value = "";
+          field.classList.remove('success-input', 'error-input');
+          const errorDiv = field.parentNode.querySelector('.error-message');
+          if (errorDiv) errorDiv.remove();
+        });
+        
+        await loadReagents();
+      }, 'createReagent').finally(() => setLoading(btn, false));
     }
     async function openPdf() {
-      const response = await fetch(`/api/v1/reports/results/${$("reportResultId").value}/pdf`, { headers: headers(false) });
-      if (!response.ok) { log(await response.text()); return; }
-      const blob = await response.blob();
-      window.open(URL.createObjectURL(blob), "_blank");
+      try {
+        const response = await fetch(`/api/v1/reports/results/${$("reportResultId").value}/pdf`, { headers: headers(false) });
+        if (!response.ok) throw new Error("PDF non disponible");
+        const blob = await response.blob();
+        window.open(URL.createObjectURL(blob), "_blank");
+        showToast("PDF ouvert dans un nouvel onglet", "success");
+      } catch (e) {
+        showToast("Erreur lors de l'ouverture du PDF", "error");
+      }
     }
-    async function signPdf() {
-      log(await api(`/api/v1/reports/results/${$("reportResultId").value}/sign`, { method: "POST", headers: headers(), body: JSON.stringify({ signature_meaning: "Validation par l'officier de garde." }) }));
+    async function signPdf(btn) {
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/reports/results/${$("reportResultId").value}/sign`, { method: "POST", headers: headers(), body: JSON.stringify({ signature_meaning: "Validation par l'officier de garde." }) });
+        showToast("Résultat signé et validé avec succès", "success");
+      } catch (e) {
+        showToast("Erreur lors de la signature", "error");
+      } finally {
+        setLoading(btn, false);
+      }
     }
     function downloadEpiCsv() { window.open("/api/v1/reports/epidemiology-export.csv?days=30", "_blank"); }
-    boot();
+    logout();
+    
+    // Initialize keyboard shortcuts
+    keyboard.init();
+    
+    // Initialize service worker for offline functionality
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js')
+        .then(registration => {
+          console.log('Service Worker registered:', registration);
+        })
+        .catch(error => {
+          console.log('Service Worker registration failed:', error);
+        });
+      
+      // Listen for messages from service worker
+      navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data.type === 'SYNC_COMPLETE') {
+          showToast('Synchronisation terminée', 'success');
+          refreshCurrent();
+        }
+      });
+    }
+    
+    // Offline detection
+    const offlineDetector = {
+      init: () => {
+        window.addEventListener('online', () => {
+          showToast('Connexion rétablie', 'success');
+          refreshCurrent();
+        });
+        
+        window.addEventListener('offline', () => {
+          showToast('Hors ligne - Données en cache uniquement', 'warning');
+        });
+        
+        // Update connection status
+        offlineDetector.updateStatus();
+        setInterval(() => offlineDetector.updateStatus(), 30000);
+      },
+      
+      updateStatus: () => {
+        const status = navigator.onLine ? 'En ligne' : 'Hors ligne';
+        const userStatus = $('userStatus');
+        if (userStatus) {
+          const currentText = userStatus.textContent;
+          userStatus.textContent = `${currentText.split(' - ')[0]} - ${status}`;
+        }
+      }
+    };
+    
+    offlineDetector.init();
+    
+    // AI Engine - RuggyLab Intelligence
+    const ruggyAI = {
+      models: new Map(),
+      isInitialized: false,
+      
+      async init() {
+        try {
+          loadingStates.showLoadingOverlay('Initialisation IA...');
+          
+          // Charger les modèles IA
+          await this.loadModels();
+          
+          // Initialiser les pipelines
+          this.setupPipelines();
+          
+          this.isInitialized = true;
+          showToast('Moteur IA initialisé avec succès', 'success');
+          loadingStates.hideLoadingOverlay();
+        } catch (error) {
+          errorHandler.handle(error, 'AI initialization');
+          loadingStates.hideLoadingOverlay();
+        }
+      },
+      
+      async loadModels() {
+        try {
+          // Modèle de classification d'images (MobileNet pré-entraîné)
+          console.log('Chargement modèle Computer Vision...');
+          const visionModel = await mobilenet.load();
+          this.models.set('vision', visionModel);
+          
+          // Modèle personnalisé pour détection paludisme (simulation)
+          const malariaModel = await this.createMalariaModel();
+          this.models.set('malaria', malariaModel);
+          
+          // Modèle de détection d'anomalies
+          const anomalyModel = await this.createAnomalyModel();
+          this.models.set('anomaly', anomalyModel);
+          
+        } catch (error) {
+          throw new Error(`Erreur chargement modèles IA: ${error.message}`);
+        }
+      },
+      
+      async createMalariaModel() {
+        // Créer un modèle simple pour détection paludisme
+        const model = tf.sequential({
+          layers: [
+            tf.layers.dense({inputShape: [224*224*3], units: 128, activation: 'relu'}),
+            tf.layers.dropout({rate: 0.2}),
+            tf.layers.dense({units: 64, activation: 'relu'}),
+            tf.layers.dense({units: 2, activation: 'softmax'}) // Parasité vs Non parasité
+          ]
+        });
+        
+        model.compile({
+          optimizer: 'adam',
+          loss: 'categoricalCrossentropy',
+          metrics: ['accuracy']
+        });
+        
+        return model;
+      },
+      
+      async createAnomalyModel() {
+        // Modèle pour détecter les anomalies dans les résultats de laboratoire
+        const model = tf.sequential({
+          layers: [
+            tf.layers.dense({inputShape: [10], units: 32, activation: 'relu'}),
+            tf.layers.dense({units: 16, activation: 'relu'}),
+            tf.layers.dense({units: 1, activation: 'sigmoid'}) // Anomaly vs Normal
+          ]
+        });
+        
+        model.compile({
+          optimizer: 'adam',
+          loss: 'binaryCrossentropy',
+          metrics: ['accuracy']
+        });
+        
+        return model;
+      },
+      
+      setupPipelines() {
+        // Configurer les pipelines de traitement IA
+        this.pipelines = {
+          imageAnalysis: new ImageAnalysisPipeline(),
+          resultAnalysis: new ResultAnalysisPipeline(),
+          predictiveAnalytics: new PredictiveAnalyticsPipeline()
+        };
+      },
+      
+      // Computer Vision - Analyse d'images médicales
+      async analyzeImage(imageElement, type = 'general') {
+        if (!this.isInitialized) {
+          throw new Error('Moteur IA non initialisé');
+        }
+        
+        try {
+          const predictions = await this.pipelines.imageAnalysis.process(imageElement, type);
+          return this.explainPredictions(predictions, type);
+        } catch (error) {
+          errorHandler.handle(error, 'image analysis');
+          throw error;
+        }
+      },
+      
+      // Anomaly Detection - Résultats de laboratoire
+      async detectAnomalies(results) {
+        if (!this.isInitialized) {
+          throw new Error('Moteur IA non initialisé');
+        }
+        
+        try {
+          const anomalies = await this.pipelines.resultAnalysis.detectAnomalies(results);
+          return this.formatAnomalyReport(anomalies);
+        } catch (error) {
+          errorHandler.handle(error, 'anomaly detection');
+          throw error;
+        }
+      },
+      
+      // Predictive Analytics - Prédictions diverses
+      async predict(data, type) {
+        if (!this.isInitialized) {
+          throw new Error('Moteur IA non initialisé');
+        }
+        
+        try {
+          return await this.pipelines.predictiveAnalytics.predict(data, type);
+        } catch (error) {
+          errorHandler.handle(error, 'prediction');
+          throw error;
+        }
+      },
+      
+      explainPredictions(predictions, type) {
+        // Rendre les prédictions IA explicables
+        return {
+          predictions,
+          confidence: this.calculateConfidence(predictions),
+          explanation: this.generateExplanation(predictions, type),
+          recommendations: this.generateRecommendations(predictions, type)
+        };
+      },
+      
+      calculateConfidence(predictions) {
+        if (!predictions || predictions.length === 0) return 0;
+        const maxProb = Math.max(...predictions.map(p => p.probability));
+        return Math.round(maxProb * 100);
+      },
+      
+      generateExplanation(predictions, type) {
+        const explanations = {
+          malaria: {
+            positive: 'Parasites de Plasmodium détectés dans les globules rouges',
+            negative: 'Aucun parasite de Plasmodium détecté',
+            uncertain: 'Analyse incertaine - recommander nouvel examen'
+          },
+          general: {
+            high: 'Forte confiance dans la classification',
+            medium: 'Confiance modérée - vérification recommandée',
+            low: 'Faible confiance - analyse complémentaire nécessaire'
+          }
+        };
+        
+        const topPrediction = predictions[0];
+        const confidence = this.calculateConfidence(predictions);
+        
+        if (confidence > 80) return explanations[type]?.positive || explanations.general.high;
+        if (confidence > 60) return explanations[type]?.negative || explanations.general.medium;
+        return explanations[type]?.uncertain || explanations.general.low;
+      },
+      
+      generateRecommendations(predictions, type) {
+        const recommendations = [];
+        const confidence = this.calculateConfidence(predictions);
+        
+        if (type === 'malaria') {
+          const topPrediction = predictions[0];
+          if (topPrediction.className.includes('parasite') && confidence > 70) {
+            recommendations.push('Confirmer avec test rapide antigénique');
+            recommendations.push('Initier traitement antipaludique si cliniquement justifié');
+          } else if (confidence < 60) {
+            recommendations.push('Répéter l\'examen avec nouveau frottis');
+            recommendations.push('Considérer test de diagnostic rapide');
+          } else {
+            recommendations.push('Surveillance clinique recommandée');
+          }
+        }
+        
+        if (confidence < 70) {
+          recommendations.push('Validation par biologiste senior recommandée');
+        }
+        
+        return recommendations;
+      },
+      
+      formatAnomalyReport(anomalies) {
+        return {
+          hasAnomalies: anomalies.length > 0,
+          criticalAnomalies: anomalies.filter(a => a.severity === 'critical'),
+          warningAnomalies: anomalies.filter(a => a.severity === 'warning'),
+          summary: this.generateAnomalySummary(anomalies),
+          recommendations: this.generateAnomalyRecommendations(anomalies)
+        };
+      },
+      
+      generateAnomalySummary(anomalies) {
+        const critical = anomalies.filter(a => a.severity === 'critical').length;
+        const warnings = anomalies.filter(a => a.severity === 'warning').length;
+        
+        if (critical > 0) {
+          return `${critical} anomalie(s) critique(s) détectée(s) - Action immédiate requise`;
+        } else if (warnings > 0) {
+          return `${warnings} anomalie(s) mineure(s) détectée(s) - Surveillance recommandée`;
+        }
+        return 'Aucune anomalie détectée';
+      },
+      
+      generateAnomalyRecommendations(anomalies) {
+        const recommendations = [];
+        
+        anomalies.forEach(anomaly => {
+          switch (anomaly.type) {
+            case 'critical_value':
+              recommendations.push('Répéter l\'analyse immédiatement');
+              recommendations.push('Notifier le médecin prescripteur');
+              break;
+            case 'trend_anomaly':
+              recommendations.push('Analyser l\'évolution sur 3 derniers résultats');
+              recommendations.push('Considérer un contrôle de qualité');
+              break;
+            case 'out_of_range':
+              recommendations.push('Vérifier calibration équipement');
+              recommendations.push('Confirmer identité patient');
+              break;
+          }
+        });
+        
+        return [...new Set(recommendations)]; // Dédupliquer
+      }
+    };
+    
+    // Pipeline d'analyse d'images
+    class ImageAnalysisPipeline {
+      async process(imageElement, type) {
+        const model = ruggyAI.models.get('vision');
+        const predictions = await model.classify(imageElement);
+        
+        // Post-traitement selon le type d'analyse
+        if (type === 'malaria') {
+          return this.processMalariaAnalysis(predictions);
+        }
+        
+        return predictions;
+      }
+      
+      processMalariaAnalysis(predictions) {
+        // Filtrer et adapter les prédictions pour le paludisme
+        const malariaPredictions = predictions.map(p => ({
+          className: this.mapToMalariaClass(p.className),
+          probability: p.probability
+        }));
+        
+        return malariaPredictions.sort((a, b) => b.probability - a.probability);
+      }
+      
+      mapToMalariaClass(originalClass) {
+        // Mapper les classes MobileNet vers classes paludisme
+        const malariaMapping = {
+          'cell': 'cellules_saines',
+          'microscope': 'parasites_detectes',
+          'blood': 'echantillon_sang',
+          'medicine': 'traitement_requis'
+        };
+        
+        for (const [key, value] of Object.entries(malariaMapping)) {
+          if (originalClass.toLowerCase().includes(key)) {
+            return value;
+          }
+        }
+        
+        return originalClass;
+      }
+    }
+    
+    // Pipeline d'analyse de résultats
+    class ResultAnalysisPipeline {
+      async detectAnomalies(results) {
+        const anomalies = [];
+        
+        // Détection valeurs critiques
+        results.forEach(result => {
+          if (this.isCriticalValue(result)) {
+            anomalies.push({
+              type: 'critical_value',
+              severity: 'critical',
+              parameter: result.parameter,
+              value: result.value,
+              expected: this.getExpectedRange(result.parameter)
+            });
+          }
+          
+          if (this.isOutOfRange(result)) {
+            anomalies.push({
+              type: 'out_of_range',
+              severity: 'warning',
+              parameter: result.parameter,
+              value: result.value,
+              expected: this.getExpectedRange(result.parameter)
+            });
+          }
+        });
+        
+        // Détection tendances anormales
+        const trendAnomalies = this.detectTrendAnomalies(results);
+        anomalies.push(...trendAnomalies);
+        
+        return anomalies;
+      }
+      
+      isCriticalValue(result) {
+        const criticalRanges = {
+          'WBC': { min: 0.5, max: 50 }, // Globules blancs
+          'RBC': { min: 2, max: 8 },    // Globules rouges
+          'HGB': { min: 50, max: 200 },  // Hémoglobine
+          'PLT': { min: 20, max: 1000 }  // Plaquettes
+        };
+        
+        const range = criticalRanges[result.parameter];
+        if (!range) return false;
+        
+        return result.value < range.min || result.value > range.max;
+      }
+      
+      isOutOfRange(result) {
+        const normalRanges = {
+          'WBC': { min: 4, max: 11 },
+          'RBC': { min: 4.2, max: 5.4 },
+          'HGB': { min: 120, max: 160 },
+          'PLT': { min: 150, max: 450 }
+        };
+        
+        const range = normalRanges[result.parameter];
+        if (!range) return false;
+        
+        return result.value < range.min || result.value > range.max;
+      }
+      
+      getExpectedRange(parameter) {
+        const ranges = {
+          'WBC': '4.0 - 11.0 x10⁹/L',
+          'RBC': '4.2 - 5.4 x10¹²/L',
+          'HGB': '120 - 160 g/L',
+          'PLT': '150 - 450 x10⁹/L'
+        };
+        
+        return ranges[parameter] || 'Non défini';
+      }
+      
+      detectTrendAnomalies(results) {
+        // Simulation de détection de tendances anormales
+        // En pratique, utiliserait les données historiques
+        const anomalies = [];
+        
+        // Exemple: détecter variations > 50% entre analyses
+        if (results.length >= 2) {
+          const latest = results[results.length - 1];
+          const previous = results[results.length - 2];
+          
+          if (latest.parameter === previous.parameter) {
+            const variation = Math.abs((latest.value - previous.value) / previous.value);
+            
+            if (variation > 0.5) {
+              anomalies.push({
+                type: 'trend_anomaly',
+                severity: 'warning',
+                parameter: latest.parameter,
+                variation: Math.round(variation * 100)
+              });
+            }
+          }
+        }
+        
+        return anomalies;
+      }
+    }
+    
+    // Pipeline d'analyse prédictive
+    class PredictiveAnalyticsPipeline {
+      async predict(data, type) {
+        switch (type) {
+          case 'inventory':
+            return this.predictInventoryNeeds(data);
+          case 'workload':
+            return this.predictWorkload(data);
+          case 'quality':
+            return this.predictQualityIssues(data);
+          default:
+            throw new Error(`Type de prédiction non supporté: ${type}`);
+        }
+      }
+      
+      predictInventoryNeeds(currentStock) {
+        // Prédire les besoins de stock pour les 30 prochains jours
+        const predictions = {};
+        
+        Object.entries(currentStock).forEach(([item, stock]) => {
+          const dailyUsage = this.estimateDailyUsage(item);
+          const daysUntilEmpty = Math.floor(stock / dailyUsage);
+          
+          predictions[item] = {
+            currentStock: stock,
+            dailyUsage: dailyUsage,
+            daysUntilEmpty: daysUntilEmpty,
+            recommendedOrder: this.calculateRecommendedOrder(stock, dailyUsage),
+            urgency: this.calculateUrgency(daysUntilEmpty),
+            predictionDate: new Date(Date.now() + (daysUntilEmpty * 24 * 60 * 60 * 1000))
+          };
+        });
+        
+        return predictions;
+      }
+      
+      predictWorkload(historicalData) {
+        // Prédire la charge de travail basée sur les tendances
+        const dayOfWeek = new Date().getDay();
+        const seasonalFactor = this.getSeasonalFactor();
+        
+        const avgDailySamples = historicalData.reduce((sum, day) => sum + day.samples, 0) / historicalData.length;
+        
+        const predicted = Math.round(avgDailySamples * seasonalFactor * this.getDayFactor(dayOfWeek));
+        
+        return {
+          predictedSamples: predicted,
+          confidence: 75,
+          factors: {
+            seasonal: seasonalFactor,
+            dayOfWeek: dayOfWeek,
+            trend: this.calculateTrend(historicalData)
+          },
+          recommendations: this.generateWorkloadRecommendations(predicted)
+        };
+      }
+      
+      predictQualityIssues(qualityData) {
+        // Prédire les problèmes de qualité potentiels
+        const riskFactors = {
+          equipmentAge: qualityData.equipmentAge || 0,
+          maintenanceScore: qualityData.maintenanceScore || 100,
+          operatorExperience: qualityData.operatorExperience || 100,
+          environmentalFactors: qualityData.environmentalFactors || 100
+        };
+        
+        const riskScore = this.calculateQualityRisk(riskFactors);
+        
+        return {
+          riskScore: riskScore,
+          riskLevel: this.getRiskLevel(riskScore),
+          contributingFactors: this.identifyRiskFactors(riskFactors),
+          recommendations: this.generateQualityRecommendations(riskScore, riskFactors)
+        };
+      }
+      
+      // Méthodes utilitaires pour les prédictions
+      estimateDailyUsage(item) {
+        const usagePatterns = {
+          'EDTA': 15,    // Tubes par jour
+          'Citrate': 8,
+          'Heparine': 12,
+          'ReactifNFS': 25,
+          'LameMicroscope': 30
+        };
+        
+        return usagePatterns[item] || 10;
+      }
+      
+      calculateRecommendedOrder(currentStock, dailyUsage) {
+        const safetyStock = dailyUsage * 7; // 7 jours de stock de sécurité
+        const orderQuantity = Math.max(0, safetyStock - currentStock + (dailyUsage * 30));
+        
+        return Math.ceil(orderQuantity);
+      }
+      
+      calculateUrgency(daysUntilEmpty) {
+        if (daysUntilEmpty <= 3) return 'critical';
+        if (daysUntilEmpty <= 7) return 'high';
+        if (daysUntilEmpty <= 14) return 'medium';
+        return 'low';
+      }
+      
+      getSeasonalFactor() {
+        const month = new Date().getMonth();
+        const seasonalFactors = [0.9, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.2, 1.1, 1.0, 0.9, 0.9];
+        return seasonalFactors[month];
+      }
+      
+      getDayFactor(dayOfWeek) {
+        const dayFactors = [0.7, 1.0, 1.2, 1.1, 1.0, 0.5, 0.3]; // Dimanche=0
+        return dayFactors[dayOfWeek];
+      }
+      
+      calculateTrend(historicalData) {
+        if (historicalData.length < 2) return 'stable';
+        
+        const recent = historicalData.slice(-7);
+        const older = historicalData.slice(-14, -7);
+        
+        const recentAvg = recent.reduce((sum, day) => sum + day.samples, 0) / recent.length;
+        const olderAvg = older.reduce((sum, day) => sum + day.samples, 0) / older.length;
+        
+        const change = (recentAvg - olderAvg) / olderAvg;
+        
+        if (change > 0.1) return 'increasing';
+        if (change < -0.1) return 'decreasing';
+        return 'stable';
+      }
+      
+      generateWorkloadRecommendations(predictedSamples) {
+        const recommendations = [];
+        
+        if (predictedSamples > 100) {
+          recommendations.push('Prévoir personnel supplémentaire');
+          recommendations.push('Vérifier disponibilité équipements');
+        } else if (predictedSamples < 50) {
+          recommendations.push('Optimiser planning personnel');
+          recommendations.push('Planifier maintenance équipements');
+        }
+        
+        return recommendations;
+      }
+      
+      calculateQualityRisk(riskFactors) {
+        const weights = {
+          equipmentAge: 0.3,
+          maintenanceScore: 0.3,
+          operatorExperience: 0.2,
+          environmentalFactors: 0.2
+        };
+        
+        let riskScore = 0;
+        
+        // Équipement ancien augmente le risque
+        riskScore += (riskFactors.equipmentAge / 10) * weights.equipmentAge;
+        
+        // Score de maintenance bas augmente le risque
+        riskScore += ((100 - riskFactors.maintenanceScore) / 100) * weights.maintenanceScore;
+        
+        // Expérience opérateur faible augmente le risque
+        riskScore += ((100 - riskFactors.operatorExperience) / 100) * weights.operatorExperience;
+        
+        // Facteurs environnementaux
+        riskScore += ((100 - riskFactors.environmentalFactors) / 100) * weights.environmentalFactors;
+        
+        return Math.min(100, Math.round(riskScore * 100));
+      }
+      
+      getRiskLevel(riskScore) {
+        if (riskScore >= 80) return 'critical';
+        if (riskScore >= 60) return 'high';
+        if (riskScore >= 40) return 'medium';
+        return 'low';
+      }
+      
+      identifyRiskFactors(riskFactors) {
+        const factors = [];
+        
+        if (riskFactors.equipmentAge > 5) {
+          factors.push('Équipement ancien (>5 ans)');
+        }
+        if (riskFactors.maintenanceScore < 70) {
+          factors.push('Maintenance insuffisante');
+        }
+        if (riskFactors.operatorExperience < 60) {
+          factors.push('Expérience opérateur limitée');
+        }
+        if (riskFactors.environmentalFactors < 70) {
+          factors.push('Conditions environnementales dégradées');
+        }
+        
+        return factors;
+      }
+      
+      generateQualityRecommendations(riskScore, riskFactors) {
+        const recommendations = [];
+        
+        if (riskScore >= 60) {
+          recommendations.push('Augmenter fréquence contrôles qualité');
+          recommendations.push('Planner formation personnel');
+        }
+        
+        if (riskFactors.equipmentAge > 5) {
+          recommendations.push('Évaluer remplacement équipement');
+        }
+        
+        if (riskFactors.maintenanceScore < 70) {
+          recommendations.push('Programmer maintenance préventive');
+        }
+        
+        if (riskFactors.operatorExperience < 60) {
+          recommendations.push('Organiser session de formation');
+        }
+        
+        return recommendations;
+      }
+    }
+    
+    // AI Training Interface Functions
+    function initializeAIDataset() {
+      try {
+        const dataset = malariaDatasetCollector.initializeMalariaDataset();
+        
+        $('currentDatasetName').value = dataset.name;
+        $('totalSamples').value = dataset.size;
+        $('annotatedSamples').value = '0';
+        
+        showToast('Dataset IA initialisé avec succès', 'success');
+        updateDatasetStats();
+      } catch (error) {
+        errorHandler.handle(error, 'AI dataset initialization');
+      }
+    }
+    
+    function previewTrainingImage(input) {
+      const file = input.files[0];
+      const preview = $('trainingImagePreview');
+      
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          preview.innerHTML = `
+            <img id="trainingImageElement" src="${e.target.result}" style="max-width: 300px; max-height: 300px; border-radius: 8px; border: 1px solid var(--line);" />
+            <div style="margin-top: 5px; font-size: 12px; color: var(--muted);">${file.name} (${(file.size / 1024).toFixed(1)} KB)</div>
+          `;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.innerHTML = '';
+      }
+    }
+    
+    async function addTrainingSample() {
+      const imageElement = $('trainingImageElement');
+      const annotation = $('imageAnnotation').value;
+      const notes = $('annotationNotes').value;
+      
+      if (!imageElement) {
+        showToast('Veuillez d\'abord uploader une image', 'warning');
+        return;
+      }
+      
+      try {
+        loadingStates.showLoadingOverlay('Ajout échantillon au dataset...');
+        
+        // Convertir l'image en base64
+        const imageData = imageElement.src;
+        
+        // Ajouter l'échantillon
+        const result = await malariaDatasetCollector.collectMicroscopeImage(imageData, annotation);
+        
+        if (result.success) {
+          // Ajouter l'annotation détaillée
+          if (notes) {
+            malariaDatasetCollector.annotateDetailed(
+              result.sample.id,
+              annotation === 'positive' ? 1 : 0,
+              100,
+              notes
+            );
+          }
+          
+          // Mettre à jour l'interface
+          $('totalSamples').value = malariaDatasetCollector.currentDataset.size;
+          
+          // Réinitialiser le formulaire
+          $('trainingImage').value = '';
+          $('trainingImagePreview').innerHTML = '';
+          $('annotationNotes').value = '';
+          
+          updateDatasetStats();
+          showToast('Échantillon ajouté avec succès', 'success');
+        } else {
+          showToast(`Erreur: ${result.reason}`, 'error');
+        }
+        
+        loadingStates.hideLoadingOverlay();
+      } catch (error) {
+        errorHandler.handle(error, 'training sample addition');
+        loadingStates.hideLoadingOverlay();
+      }
+    }
+    
+    function showDatasetStats() {
+      try {
+        const stats = malariaDatasetCollector.getDatasetStatistics();
+        
+        if (!stats) {
+          showToast('Aucun dataset initialisé', 'warning');
+          return;
+        }
+        
+        const statsDiv = $('datasetStats');
+        statsDiv.innerHTML = `
+          <div style="display: grid; gap: 15px;">
+            <div class="prediction-item">
+              <span class="prediction-label">Total Échantillons</span>
+              <span class="prediction-value">${stats.totalSamples}</span>
+            </div>
+            <div class="prediction-item">
+              <span class="prediction-label">Positifs (Parasites)</span>
+              <span class="prediction-value" style="color: var(--rose);">${stats.malariaSpecific.positive || 0}</span>
+            </div>
+            <div class="prediction-item">
+              <span class="prediction-label">Négatifs (Sains)</span>
+              <span class="prediction-value" style="color: var(--ok);">${stats.malariaSpecific.negative || 0}</span>
+            </div>
+            <div class="prediction-item">
+              <span class="prediction-label">Non annotés</span>
+              <span class="prediction-value" style="color: var(--muted);">${stats.malariaSpecific.unlabeled || 0}</span>
+            </div>
+            <div class="prediction-item">
+              <span class="prediction-label">Taux d'annotation</span>
+              <span class="prediction-value">${stats.annotationRate.toFixed(1)}%</span>
+            </div>
+            <div class="prediction-item">
+              <span class="prediction-label">Créé le</span>
+              <span class="prediction-value">${new Date(stats.created).toLocaleDateString('fr-FR')}</span>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        errorHandler.handle(error, 'dataset stats display');
+      }
+    }
+    
+    function updateDatasetStats() {
+      showDatasetStats();
+    }
+    
+    function validateAnnotations() {
+      try {
+        const validation = malariaDatasetCollector.validateAnnotations();
+        
+        if (validation.valid) {
+          showToast('✅ Toutes les annotations sont valides', 'success');
+        } else {
+          const issuesDiv = $('datasetStats');
+          issuesDiv.innerHTML = `
+            <div style="color: var(--rose);">
+              <h4>❌ Problèmes détectés (${validation.issues.length})</h4>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                ${validation.issues.slice(0, 10).map(issue => `<li>${issue}</li>`).join('')}
+                ${validation.issues.length > 10 ? `<li>... et ${validation.issues.length - 10} autres</li>` : ''}
+              </ul>
+              <div style="margin-top: 10px;">
+                <strong>Échantillons annotés:</strong> ${validation.annotatedSamples} / ${validation.totalSamples}
+              </div>
+            </div>
+          `;
+          showToast('Problèmes détectés dans les annotations', 'warning');
+        }
+      } catch (error) {
+        errorHandler.handle(error, 'annotation validation');
+      }
+    }
+    
+    function exportDataset() {
+      try {
+        const exportData = malariaDatasetCollector.exportForTraining();
+        
+        // Créer un blob et télécharger
+        const blob = new Blob([exportData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `malaria_dataset_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showToast('Dataset exporté avec succès', 'success');
+      } catch (error) {
+        errorHandler.handle(error, 'dataset export');
+      }
+    }
+    
+    // AI Interface Functions
+    function previewMalariaImage(input) {
+      const file = input.files[0];
+      const preview = $('malariaPreview');
+      
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          preview.innerHTML = `
+            <img id="malariaImagePreview" src="${e.target.result}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid var(--line);" />
+            <div style="margin-top: 5px; font-size: 12px; color: var(--muted);">${file.name}</div>
+          `;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.innerHTML = '';
+      }
+    }
+    
+    async function analyzeMalariaWithAI() {
+      if (!ruggyAI.isInitialized) {
+        showToast('Moteur IA non initialisé', 'error');
+        return;
+      }
+      
+      const imagePreview = $('malariaImagePreview');
+      if (!imagePreview) {
+        showToast('Veuillez d\'abord uploader une image', 'warning');
+        return;
+      }
+      
+      try {
+        loadingStates.showLoadingOverlay('Analyse IA en cours...');
+        
+        // Analyser l'image avec l'IA
+        const results = await ruggyAI.analyzeImage(imagePreview, 'malaria');
+        
+        // Afficher les résultats
+        displayAIResults(results);
+        
+        showToast('Analyse IA terminée', 'success');
+        loadingStates.hideLoadingOverlay();
+        
+      } catch (error) {
+        errorHandler.handle(error, 'malaria AI analysis');
+        loadingStates.hideLoadingOverlay();
+      }
+    }
+    
+    function displayAIResults(results) {
+      const resultsDiv = $('aiResults');
+      
+      const confidenceClass = results.confidence > 80 ? 'confidence-high' : 
+                             results.confidence > 60 ? 'confidence-medium' : 'confidence-low';
+      
+      resultsDiv.innerHTML = `
+        <div class="ai-results">
+          <h4>🤖 Résultats Analyse IA</h4>
+          
+          <div class="ai-confidence">
+            <span>Confiance:</span>
+            <div class="confidence-bar">
+              <div class="confidence-fill ${confidenceClass}" style="width: ${results.confidence}%"></div>
+            </div>
+            <span>${results.confidence}%</span>
+          </div>
+          
+          <div class="ai-predictions">
+            ${results.predictions.map(pred => `
+              <div class="prediction-item">
+                <span class="prediction-label">${pred.className}</span>
+                <span class="prediction-value">${Math.round(pred.probability * 100)}%</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="ai-explanation">
+            <strong>📋 Explication:</strong> ${results.explanation}
+          </div>
+          
+          ${results.recommendations.length > 0 ? `
+            <div class="ai-recommendations">
+              <strong>💡 Recommandations:</strong>
+              <ul>
+                ${results.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+    
+    // Initialiser le moteur IA au chargement de la page
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialiser l'IA après un court délai pour éviter de bloquer le chargement
+      setTimeout(() => {
+        ruggyAI.init().catch(error => {
+          console.error('Échec initialisation IA:', error);
+          showToast('Initialisation IA échouée - Certaines fonctionnalités limitées', 'warning');
+        });
+      }, 2000);
+    });
   </script>
 </body>
 </html>

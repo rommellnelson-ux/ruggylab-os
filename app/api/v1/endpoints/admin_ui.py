@@ -10,7 +10,5 @@ router = APIRouter(prefix="/admin")
 
 @router.get("/ratios", response_class=HTMLResponse)
 def ratios_admin_ui(_: None = Depends(require_admin)) -> str:
-    template_path = (
-        Path(__file__).resolve().parents[3] / "templates" / "admin_ratios.html"
-    )
+    template_path = Path(__file__).resolve().parents[3] / "templates" / "admin_ratios.html"
     return template_path.read_text(encoding="utf-8")

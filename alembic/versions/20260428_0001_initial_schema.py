@@ -60,9 +60,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("ipp_unique_id"),
     )
     op.create_index(op.f("ix_patients_id"), "patients", ["id"], unique=False)
-    op.create_index(
-        op.f("ix_patients_ipp_unique_id"), "patients", ["ipp_unique_id"], unique=True
-    )
+    op.create_index(op.f("ix_patients_ipp_unique_id"), "patients", ["ipp_unique_id"], unique=True)
 
     op.create_table(
         "samples",
