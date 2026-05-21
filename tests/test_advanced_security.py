@@ -30,7 +30,6 @@ def test_user_quota_blocks_after_limit():
         pytest.skip("User quota not enabled")
 
     from fastapi import FastAPI
-    from fastapi.testclient import TestClient
     from starlette.middleware.base import BaseHTTPMiddleware
 
     from app.core.user_quota import UserQuotaMiddleware

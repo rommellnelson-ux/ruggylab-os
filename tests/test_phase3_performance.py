@@ -92,10 +92,11 @@ def test_pagination_params_validation():
     params = PaginationParams(skip=0, limit=settings.MAX_PAGE_SIZE)
     assert params.limit == settings.MAX_PAGE_SIZE
 
-    # Limit exceeding max should raise validation error
+    # Limit exceeding max should raise a Pydantic ValidationError
     import pytest
+    from pydantic import ValidationError
 
-    with pytest.raises(Exception):  # Pydantic validation error
+    with pytest.raises(ValidationError):
         PaginationParams(skip=0, limit=999)
 
 

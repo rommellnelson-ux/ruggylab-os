@@ -1,7 +1,7 @@
 import asyncio
 from collections import deque
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -105,7 +105,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         call_next: Callable[[Request], Awaitable[Response]],
         client_key: str,
     ) -> Response:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._lock:
             blocked_until = self._blocked_until.get(client_key)
             if blocked_until and now < blocked_until:

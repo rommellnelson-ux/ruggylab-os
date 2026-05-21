@@ -4,10 +4,8 @@ Structured logging configuration with JSON format for production.
 Supports multiple outputs: console, file, and structured JSON logging.
 """
 
-import logging
-from logging.config import dictConfig
-import logging.handlers
 import sys
+from logging.config import dictConfig
 from typing import Any
 
 import structlog

@@ -1,13 +1,14 @@
-import sqlite3
-from passlib.context import CryptContext
 import os
+import sqlite3
+
+from passlib.context import CryptContext
 
 # Load .env manually
 env_path = '.env'
 password = None
 username = 'admin'
 if os.path.exists(env_path):
-    with open(env_path, 'r', encoding='utf-8') as f:
+    with open(env_path, encoding='utf-8') as f:
         for line in f:
             if line.strip().startswith('FIRST_SUPERUSER_PASSWORD='):
                 password = line.strip().split('=', 1)[1]

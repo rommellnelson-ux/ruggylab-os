@@ -26,7 +26,7 @@ if TYPE_CHECKING:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 # Module-level client, initialised once by init_redis_client()
-_redis_client: "aioredis.Redis | None" = None
+_redis_client: aioredis.Redis | None = None
 
 
 def init_redis_client(redis_url: str) -> None:
@@ -47,13 +47,13 @@ def init_redis_client(redis_url: str) -> None:
         logger.warning("Failed to init Redis rate-limiter client: %s", exc)
 
 
-def get_redis_client() -> "aioredis.Redis | None":
+def get_redis_client() -> aioredis.Redis | None:
     """Return the shared Redis client, or None if not initialised."""
     return _redis_client
 
 
 async def sliding_window_check(
-    client: "aioredis.Redis",
+    client: aioredis.Redis,
     key: str,
     max_requests: int,
     window_seconds: float,
@@ -81,13 +81,13 @@ async def sliding_window_check(
     return allowed, count_before
 
 
-async def is_blocked(client: "aioredis.Redis", block_key: str) -> bool:
+async def is_blocked(client: aioredis.Redis, block_key: str) -> bool:
     """Return True when a block key exists in Redis (TTL still active)."""
     return bool(await client.exists(block_key))
 
 
 async def set_block(
-    client: "aioredis.Redis",
+    client: aioredis.Redis,
     block_key: str,
     block_seconds: int,
 ) -> None:

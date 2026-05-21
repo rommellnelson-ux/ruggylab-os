@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Request, Response
@@ -35,7 +35,7 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         user_id = request.state.user_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Check if user is currently blocked
         if user_id in self._blocked_users:

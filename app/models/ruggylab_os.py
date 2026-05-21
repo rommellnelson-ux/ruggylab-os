@@ -2,9 +2,9 @@ import datetime as dt
 import enum
 
 from sqlalchemy import (
+    CHAR,
     JSON,
     Boolean,
-    CHAR,
     Date,
     DateTime,
     Enum,
@@ -22,7 +22,7 @@ from app.db.base_class import Base
 from app.utils.datetime_utils import utcnow_naive
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     TECHNICIAN = "technician"
     OFFICER = "officer"
     ADMIN = "admin"

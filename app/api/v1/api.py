@@ -10,6 +10,7 @@ from app.api.v1.endpoints.equipments import router as equipments_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.imaging import router as imaging_router
 from app.api.v1.endpoints.login import router as login_router
+from app.api.v1.endpoints.military_facilities import router as military_facilities_router
 from app.api.v1.endpoints.operations import router as operations_router
 from app.api.v1.endpoints.patients import router as patients_router
 from app.api.v1.endpoints.ratio_presets import router as ratio_presets_router
@@ -17,7 +18,6 @@ from app.api.v1.endpoints.reagents import router as reagents_router
 from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.results import router as results_router
 from app.api.v1.endpoints.results_poct import router as results_poct_router
-from app.api.v1.endpoints.military_facilities import router as military_facilities_router
 from app.api.v1.endpoints.samples import router as samples_router
 from app.api.v1.endpoints.users import router as users_router
 

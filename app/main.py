@@ -1,7 +1,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +24,7 @@ from app.core.observability_middleware import ObservabilityMiddleware, RequestID
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.user_quota import UserQuotaMiddleware
-from app.db.session import SessionLocal, get_db
+from app.db.session import get_db
 from app.services.bootstrap import init_db
 from app.services.interfacing.listener_dh36 import DH36Listener
 from app.utils.redis_rate_limiter import init_redis_client
@@ -47,7 +47,7 @@ if not settings.TESTING and settings.METRICS_SERVER_ENABLED:
         logger.warning("Failed to start metrics server: %s", exc)
 
 # Initialize health check service
-_app_start_time = datetime.now(timezone.utc)
+_app_start_time = datetime.now(UTC)
 health_check_service = HealthCheckService(_app_start_time)
 
 # Initialize cache

@@ -71,3 +71,4 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S", "SIM"]
 "alembic/versions/*" = ["ALL"]
+"scripts/*" = ["S", "T", "I"]

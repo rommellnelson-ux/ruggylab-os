@@ -1,4 +1,5 @@
 import sqlite3
+
 from passlib.context import CryptContext
 
 pwd = 'SuperAdmin2026!SecurePass'
