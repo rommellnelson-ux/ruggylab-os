@@ -38,9 +38,10 @@ def upgrade() -> None:
     )
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
+        # json has no default GIN operator class; cast to jsonb in the expression.
         op.execute(
             "CREATE INDEX IF NOT EXISTS ix_results_data_points_gin "
-            "ON results USING gin (data_points)"
+            "ON results USING gin ((data_points::jsonb))"
         )
 
 
