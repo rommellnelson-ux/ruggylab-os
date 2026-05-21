@@ -39,12 +39,12 @@ import sys
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build malaria MobileNetV2 ONNX model")
-    parser.add_argument("--data-dir",    required=True,  help="Root directory with train/val sub-dirs")
-    parser.add_argument("--output-path", required=True,  help="Output .onnx file path")
-    parser.add_argument("--epochs",      type=int, default=10)
-    parser.add_argument("--batch-size",  type=int, default=32)
-    parser.add_argument("--lr",          type=float, default=1e-4)
-    parser.add_argument("--workers",     type=int, default=4)
+    parser.add_argument("--data-dir", required=True, help="Root directory with train/val sub-dirs")
+    parser.add_argument("--output-path", required=True, help="Output .onnx file path")
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
 
     # ------------------------------------------------------------------ imports
@@ -57,8 +57,7 @@ def main() -> None:
         from tqdm import tqdm
     except ImportError as exc:
         sys.exit(
-            f"Missing dependency: {exc}\n"
-            "Install with: pip install torch torchvision pillow tqdm"
+            f"Missing dependency: {exc}\nInstall with: pip install torch torchvision pillow tqdm"
         )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -66,24 +65,28 @@ def main() -> None:
 
     # ------------------------------------------------------------------ data
     _mean = [0.485, 0.456, 0.406]
-    _std  = [0.229, 0.224, 0.225]
+    _std = [0.229, 0.224, 0.225]
 
-    train_tf = transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1),
-        transforms.ToTensor(),
-        transforms.Normalize(_mean, _std),
-    ])
-    val_tf = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(_mean, _std),
-    ])
+    train_tf = transforms.Compose(
+        [
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1),
+            transforms.ToTensor(),
+            transforms.Normalize(_mean, _std),
+        ]
+    )
+    val_tf = transforms.Compose(
+        [
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(_mean, _std),
+        ]
+    )
 
     train_ds = datasets.ImageFolder(os.path.join(args.data_dir, "train"), transform=train_tf)
-    val_ds   = datasets.ImageFolder(os.path.join(args.data_dir, "val"),   transform=val_tf)
+    val_ds = datasets.ImageFolder(os.path.join(args.data_dir, "val"), transform=val_tf)
 
     # The ImageFolder sorts classes alphabetically:
     # Parasitized → index 0  (but we want "positive" = index 1)
@@ -92,8 +95,10 @@ def main() -> None:
     # If your folder names differ, adjust class_to_idx accordingly.
     print("Class mapping:", train_ds.class_to_idx)
 
-    train_dl = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  num_workers=args.workers)
-    val_dl   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
+    train_dl = DataLoader(
+        train_ds, batch_size=args.batch_size, shuffle=True, num_workers=args.workers
+    )
+    val_dl = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
     # ------------------------------------------------------------------ model
     model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.IMAGENET1K_V1)
@@ -108,7 +113,7 @@ def main() -> None:
 
     # ------------------------------------------------------------------ train
     best_val_acc = 0.0
-    best_state   = None
+    best_state = None
 
     for epoch in range(1, args.epochs + 1):
         # -- train --
@@ -122,7 +127,7 @@ def main() -> None:
             loss = criterion(out, labels)
             loss.backward()
             optimizer.step()
-            train_loss    += loss.item() * imgs.size(0)
+            train_loss += loss.item() * imgs.size(0)
             train_correct += (out.argmax(1) == labels).sum().item()
         scheduler.step()
 
@@ -136,15 +141,15 @@ def main() -> None:
                 val_correct += (out.argmax(1) == labels).sum().item()
 
         train_acc = train_correct / len(train_ds)
-        val_acc   = val_correct   / len(val_ds)
+        val_acc = val_correct / len(val_ds)
         print(
-            f"  loss={train_loss/len(train_ds):.4f}  "
+            f"  loss={train_loss / len(train_ds):.4f}  "
             f"train_acc={train_acc:.4f}  val_acc={val_acc:.4f}"
         )
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            best_state   = {k: v.clone() for k, v in model.state_dict().items()}
+            best_state = {k: v.clone() for k, v in model.state_dict().items()}
 
     # ------------------------------------------------------------------ export
     model.load_state_dict(best_state)

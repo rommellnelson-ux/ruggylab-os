@@ -12,7 +12,6 @@ Tests cover:
 - Preprocessing pipeline (resize, normalise, shape)
 """
 
-
 import numpy as np
 import pytest
 
@@ -43,7 +42,7 @@ def onnx_model_path(tmp_path):
     # We build the simplest valid ONNX graph that matches the inference code's
     # expectations: input name = "input", output shape = (N, 2).
 
-    X = h.make_tensor_value_info("input",  tp.FLOAT, [1, 3, 224, 224])
+    X = h.make_tensor_value_info("input", tp.FLOAT, [1, 3, 224, 224])
     Y = h.make_tensor_value_info("output", tp.FLOAT, [1, 2])
 
     # Global average pool: (1,3,224,224) → (1,3,1,1)
@@ -54,15 +53,13 @@ def onnx_model_path(tmp_path):
 
     # Initialiser: weight matrix (2,3) and bias (2,)
     W_data = np.zeros((2, 3), dtype=np.float32)
-    W_data[1, :] = 0.1   # slight bias toward "positive" class
+    W_data[1, :] = 0.1  # slight bias toward "positive" class
     b_data = np.array([0.0, 0.1], dtype=np.float32)
 
     W_init = h.make_tensor("W", tp.FLOAT, [2, 3], W_data.flatten().tolist())
     b_init = h.make_tensor("b", tp.FLOAT, [2], b_data.tolist())
 
-    gemm_node = h.make_node(
-        "Gemm", inputs=["flat", "W", "b"], outputs=["output"], transB=1
-    )
+    gemm_node = h.make_node("Gemm", inputs=["flat", "W", "b"], outputs=["output"], transB=1)
 
     graph = h.make_graph(
         [gap_node, flatten_node, gemm_node],

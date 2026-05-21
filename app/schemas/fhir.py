@@ -102,9 +102,7 @@ class FHIRDiagnosticReport(BaseModel):
     id: str
     meta: FHIRMeta = Field(default_factory=FHIRMeta)
     text: FHIRNarrative = Field(default_factory=FHIRNarrative)
-    contained: list[FHIRContainedPatient | FHIRObservation | dict] = Field(
-        default_factory=list
-    )
+    contained: list[FHIRContainedPatient | FHIRObservation | dict] = Field(default_factory=list)
     identifier: list[FHIRIdentifier] = Field(default_factory=list)
     status: str = "final"
     category: list[FHIRCodeableConcept] = Field(default_factory=list)

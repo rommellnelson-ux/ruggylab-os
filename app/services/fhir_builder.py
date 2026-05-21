@@ -42,41 +42,41 @@ from app.schemas.fhir import (
 
 _NFS_CATALOGUE: dict[str, tuple[str, str, str, str]] = {
     # CBC core
-    "WBC":  ("6690-2",  "WBC [#/volume] in Blood by Automated count",   "10*3/uL", "×10³/µL"),
-    "RBC":  ("789-8",   "RBC [#/volume] in Blood by Automated count",   "10*6/uL", "×10⁶/µL"),
-    "HGB":  ("718-7",   "Hemoglobin [Mass/volume] in Blood",             "g/dL",    "g/dL"),
-    "HCT":  ("4544-3",  "Hematocrit [Volume Fraction] of Blood",         "%",       "%"),
-    "MCV":  ("787-2",   "MCV [Entitic volume] by Automated count",       "fL",      "fL"),
-    "MCH":  ("785-6",   "MCH [Entitic mass] by Automated count",         "pg",      "pg"),
-    "MCHC": ("786-4",   "MCHC [Mass/volume] by Automated count",         "g/dL",    "g/dL"),
-    "PLT":  ("777-3",   "Platelets [#/volume] in Blood by Automated count","10*3/uL","×10³/µL"),
+    "WBC": ("6690-2", "WBC [#/volume] in Blood by Automated count", "10*3/uL", "×10³/µL"),
+    "RBC": ("789-8", "RBC [#/volume] in Blood by Automated count", "10*6/uL", "×10⁶/µL"),
+    "HGB": ("718-7", "Hemoglobin [Mass/volume] in Blood", "g/dL", "g/dL"),
+    "HCT": ("4544-3", "Hematocrit [Volume Fraction] of Blood", "%", "%"),
+    "MCV": ("787-2", "MCV [Entitic volume] by Automated count", "fL", "fL"),
+    "MCH": ("785-6", "MCH [Entitic mass] by Automated count", "pg", "pg"),
+    "MCHC": ("786-4", "MCHC [Mass/volume] by Automated count", "g/dL", "g/dL"),
+    "PLT": ("777-3", "Platelets [#/volume] in Blood by Automated count", "10*3/uL", "×10³/µL"),
     # Differential — absolute counts
-    "NEUT": ("26499-4", "Neutrophils [#/volume] in Blood",               "10*3/uL", "×10³/µL"),
-    "LYMPH":("26474-7", "Lymphocytes [#/volume] in Blood",               "10*3/uL", "×10³/µL"),
-    "MONO": ("26484-6", "Monocytes [#/volume] in Blood",                 "10*3/uL", "×10³/µL"),
-    "EOS":  ("26449-9", "Eosinophils [#/volume] in Blood",               "10*3/uL", "×10³/µL"),
-    "BASO": ("26444-0", "Basophils [#/volume] in Blood",                 "10*3/uL", "×10³/µL"),
+    "NEUT": ("26499-4", "Neutrophils [#/volume] in Blood", "10*3/uL", "×10³/µL"),
+    "LYMPH": ("26474-7", "Lymphocytes [#/volume] in Blood", "10*3/uL", "×10³/µL"),
+    "MONO": ("26484-6", "Monocytes [#/volume] in Blood", "10*3/uL", "×10³/µL"),
+    "EOS": ("26449-9", "Eosinophils [#/volume] in Blood", "10*3/uL", "×10³/µL"),
+    "BASO": ("26444-0", "Basophils [#/volume] in Blood", "10*3/uL", "×10³/µL"),
     # Differential — percentages
-    "NEUT_pct": ("770-8",   "Neutrophils/100 leukocytes in Blood by Automated count", "%", "%"),
-    "LYMPH_pct":("736-9",   "Lymphocytes/100 leukocytes in Blood by Automated count","%", "%"),
-    "MONO_pct": ("5905-5",  "Monocytes/100 leukocytes in Blood by Automated count",  "%", "%"),
-    "EOS_pct":  ("713-8",   "Eosinophils/100 leukocytes in Blood by Automated count","%", "%"),
-    "BASO_pct": ("706-2",   "Basophils/100 leukocytes in Blood by Automated count",  "%", "%"),
+    "NEUT_pct": ("770-8", "Neutrophils/100 leukocytes in Blood by Automated count", "%", "%"),
+    "LYMPH_pct": ("736-9", "Lymphocytes/100 leukocytes in Blood by Automated count", "%", "%"),
+    "MONO_pct": ("5905-5", "Monocytes/100 leukocytes in Blood by Automated count", "%", "%"),
+    "EOS_pct": ("713-8", "Eosinophils/100 leukocytes in Blood by Automated count", "%", "%"),
+    "BASO_pct": ("706-2", "Basophils/100 leukocytes in Blood by Automated count", "%", "%"),
 }
 
 # RuggyLab status → FHIR interpretation code
 _RUGGYLAB_STATUS_TO_FHIR: dict[str, tuple[str, str]] = {
-    "NORMAL":        ("N",  "Normal"),
-    "LOW":           ("L",  "Low"),
-    "HIGH":          ("H",  "High"),
-    "CRITICAL_LOW":  ("LL", "Critical low"),
+    "NORMAL": ("N", "Normal"),
+    "LOW": ("L", "Low"),
+    "HIGH": ("H", "High"),
+    "CRITICAL_LOW": ("LL", "Critical low"),
     "CRITICAL_HIGH": ("HH", "Critical high"),
 }
 
 _INTERP_SYSTEM = "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation"
-_LOINC_SYSTEM  = "http://loinc.org"
+_LOINC_SYSTEM = "http://loinc.org"
 _CATEGORY_SYSTEM = "http://terminology.hl7.org/CodeSystem/v2-0074"
-_UCUM_SYSTEM   = "http://unitsofmeasure.org"
+_UCUM_SYSTEM = "http://unitsofmeasure.org"
 
 _OBS_CATEGORY = FHIRCodeableConcept(
     coding=[
@@ -243,9 +243,7 @@ def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
             ),
         ),
         contained=contained,
-        identifier=[
-            FHIRIdentifier(system="urn:ruggylab:result-id", value=str(result.id))
-        ],
+        identifier=[FHIRIdentifier(system="urn:ruggylab:result-id", value=str(result.id))],
         status=dr_status,
         category=[
             FHIRCodeableConcept(

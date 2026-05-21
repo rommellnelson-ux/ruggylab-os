@@ -45,9 +45,7 @@ def _run_alembic(command: str, db_url: str) -> None:
         cwd=str(Path(__file__).parent.parent),  # repo root
     )
     if result.returncode != 0:
-        raise AssertionError(
-            f"alembic {command} failed:\n{result.stdout}\n{result.stderr}"
-        )
+        raise AssertionError(f"alembic {command} failed:\n{result.stdout}\n{result.stderr}")
 
 
 @pytest.mark.parametrize("dummy", [None])  # run once, named for clarity

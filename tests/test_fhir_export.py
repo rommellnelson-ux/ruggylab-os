@@ -71,20 +71,20 @@ def _create_result(client, headers, sample_id: int, data_points: dict) -> int:
 
 # NFS data_points fixture — mirrors real DH36 validated output
 NFS_DATA_POINTS = {
-    "WBC":  {"value": 7.2,  "unit": "10^9/L", "status": "NORMAL"},
-    "RBC":  {"value": 4.8,  "unit": "10^12/L", "status": "NORMAL"},
-    "HGB":  {"value": 14.5, "unit": "g/dL",   "status": "NORMAL"},
-    "HCT":  {"value": 43.1, "unit": "%",       "status": "NORMAL"},
-    "MCV":  {"value": 89.8, "unit": "fL",      "status": "NORMAL"},
-    "MCH":  {"value": 30.2, "unit": "pg",      "status": "NORMAL"},
-    "MCHC": {"value": 33.6, "unit": "g/dL",    "status": "NORMAL"},
-    "PLT":  {"value": 210,  "unit": "10^9/L",  "status": "NORMAL"},
+    "WBC": {"value": 7.2, "unit": "10^9/L", "status": "NORMAL"},
+    "RBC": {"value": 4.8, "unit": "10^12/L", "status": "NORMAL"},
+    "HGB": {"value": 14.5, "unit": "g/dL", "status": "NORMAL"},
+    "HCT": {"value": 43.1, "unit": "%", "status": "NORMAL"},
+    "MCV": {"value": 89.8, "unit": "fL", "status": "NORMAL"},
+    "MCH": {"value": 30.2, "unit": "pg", "status": "NORMAL"},
+    "MCHC": {"value": 33.6, "unit": "g/dL", "status": "NORMAL"},
+    "PLT": {"value": 210, "unit": "10^9/L", "status": "NORMAL"},
 }
 
 NFS_WITH_ANOMALIES = {
-    "WBC":  {"value": 2.1,  "unit": "10^9/L", "status": "CRITICAL_LOW"},
-    "HGB":  {"value": 6.8,  "unit": "g/dL",   "status": "LOW"},
-    "PLT":  {"value": 42,   "unit": "10^9/L",  "status": "CRITICAL_LOW"},
+    "WBC": {"value": 2.1, "unit": "10^9/L", "status": "CRITICAL_LOW"},
+    "HGB": {"value": 6.8, "unit": "g/dL", "status": "LOW"},
+    "PLT": {"value": 42, "unit": "10^9/L", "status": "CRITICAL_LOW"},
     "overall_flags": ["ANEMIE_SEVERE", "LEUCOPENIE", "THROMBOPENIE_SEVERE", "PANTOPENIQUE"],
 }
 
@@ -179,9 +179,9 @@ def test_fhir_export_result_refs(client):
     doc = client.get(f"/api/v1/results/{rid}/fhir", headers=headers).json()
     refs = {r["reference"] for r in doc["result"]}
 
-    assert "#obs-wbc"  in refs
-    assert "#obs-hgb"  in refs
-    assert "#obs-plt"  in refs
+    assert "#obs-wbc" in refs
+    assert "#obs-hgb" in refs
+    assert "#obs-plt" in refs
 
 
 def test_fhir_export_normal_interpretation_code(client):
@@ -209,11 +209,7 @@ def test_fhir_export_anomaly_interpretation_codes(client):
     rid = _create_result(client, headers, sid, NFS_WITH_ANOMALIES)
 
     doc = client.get(f"/api/v1/results/{rid}/fhir", headers=headers).json()
-    obs_map = {
-        o["id"]: o
-        for o in doc["contained"]
-        if o.get("resourceType") == "Observation"
-    }
+    obs_map = {o["id"]: o for o in doc["contained"] if o.get("resourceType") == "Observation"}
 
     # WBC is CRITICAL_LOW → LL
     assert obs_map["obs-wbc"]["interpretation"][0]["coding"][0]["code"] == "LL"
