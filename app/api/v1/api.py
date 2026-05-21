@@ -21,6 +21,7 @@ from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.results import router as results_router
 from app.api.v1.endpoints.results_poct import router as results_poct_router
 from app.api.v1.endpoints.samples import router as samples_router
+from app.api.v1.endpoints.stock_predictor import router as stock_predictor_router
 from app.api.v1.endpoints.users import router as users_router
 
 api_router = APIRouter()
@@ -44,3 +45,4 @@ api_router.include_router(operations_router, tags=["operations"])
 api_router.include_router(reports_router, tags=["reports"])
 api_router.include_router(maintenance_router, tags=["maintenance"])
 api_router.include_router(billing_router, tags=["Billing CMU"])
+api_router.include_router(stock_predictor_router, tags=["Stock Predictor CMU"])
