@@ -3,7 +3,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import HTTPException, Request, Response
+from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
@@ -45,9 +46,9 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
                     user_id,
                     block_until.isoformat(),
                 )
-                raise HTTPException(
+                return JSONResponse(
+                    {"detail": "User quota exceeded. Try again later."},
                     status_code=429,
-                    detail="User quota exceeded. Try again later.",
                 )
             else:
                 # Block expired, remove from blocked list
@@ -71,9 +72,9 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
                 settings.USER_QUOTA_WINDOW_SECONDS,
                 block_until.isoformat(),
             )
-            raise HTTPException(
+            return JSONResponse(
+                {"detail": "User quota exceeded. Try again later."},
                 status_code=429,
-                detail="User quota exceeded. Try again later.",
             )
 
         # Record request
