@@ -20,7 +20,17 @@ userrole = sa.Enum("TECHNICIAN", "OFFICER", "ADMIN", name="userrole")
 
 
 def upgrade() -> None:
-    userrole.create(op.get_bind(), checkfirst=True)
+    # checkfirst=True is unreliable with psycopg3; use a PG-native DO block
+    # that silently swallows duplicate_object errors instead.
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE userrole AS ENUM ('TECHNICIAN', 'OFFICER', 'ADMIN');
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END $$;
+        """
+    )
 
     op.create_table(
         "users",
