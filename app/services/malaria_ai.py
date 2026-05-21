@@ -46,6 +46,7 @@ import hashlib
 import logging
 import os
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from sqlalchemy.orm import Session
@@ -76,8 +77,9 @@ class MalariaPrediction:
 
 
 def _softmax(x: np.ndarray) -> np.ndarray:
-    e = np.exp(x - x.max())
-    return e / e.sum()
+    e: np.ndarray = np.exp(x - x.max())
+    result: np.ndarray = e / e.sum()
+    return result
 
 
 def _preprocess_image(image_path: str) -> np.ndarray:
@@ -115,7 +117,7 @@ class MobileNetV2Classifier:
     def __init__(self, model_path: str) -> None:
         self.model_path = model_path
         self.model_name = MODEL_NAME
-        self._session = None
+        self._session: Any = None  # ort.InferenceSession when loaded, else None
         self._input_name: str = "input"
         self._load_model()
 
@@ -193,7 +195,7 @@ class MobileNetV2Classifier:
     def _onnx_predict(self, image_path: str) -> MalariaPrediction:
         """Run real MobileNetV2 inference via ONNX Runtime."""
         arr = _preprocess_image(image_path)
-        outputs = self._session.run(None, {self._input_name: arr})  # type: ignore[union-attr]
+        outputs = self._session.run(None, {self._input_name: arr})
         logits: np.ndarray = outputs[0][0]  # shape (2,)
         probs = _softmax(logits)
         idx = int(np.argmax(probs))
