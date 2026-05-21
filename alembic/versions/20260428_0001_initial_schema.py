@@ -16,26 +16,14 @@ branch_labels = None
 depends_on = None
 
 
-# create_type=False: we manage the PG type explicitly via raw SQL so that
-# SQLAlchemy does NOT emit a second CREATE TYPE when building the users table.
-userrole = sa.Enum("TECHNICIAN", "OFFICER", "ADMIN", name="userrole", create_type=False)
+# Values must match UserRole StrEnum (lowercase).  create_type=True (default)
+# lets SQLAlchemy emit "CREATE TYPE userrole AS ENUM ('admin', 'officer',
+# 'technician')" automatically before CREATE TABLE on PostgreSQL; on SQLite it
+# is a no-op (VARCHAR affinity is used instead).
+userrole = sa.Enum("technician", "officer", "admin", name="userrole")
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        # Idempotent PG-native block: catches duplicate_object silently.
-        op.execute(
-            """
-            DO $$ BEGIN
-                CREATE TYPE userrole AS ENUM ('TECHNICIAN', 'OFFICER', 'ADMIN');
-            EXCEPTION
-                WHEN duplicate_object THEN NULL;
-            END $$;
-            """
-        )
-    # SQLite uses VARCHAR affinity for Enum columns — no CREATE TYPE needed.
-
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -123,4 +111,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index(op.f("ix_users_id"), table_name="users")
     op.drop_table("users")
-    op.execute("DROP TYPE IF EXISTS userrole")
+    # PostgreSQL requires explicit type drop; SQLite has no named types.
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute(sa.text("DROP TYPE IF EXISTS userrole"))
