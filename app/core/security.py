@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from jose import jwt
+import jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -25,6 +25,8 @@ def create_access_token(
     )
     to_encode: dict = {"sub": subject, "exp": expire}
     if scopes:
-        # Include scopes as a list in the token payload
         to_encode["scopes"] = scopes
-    return cast(str, jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM))
+    return cast(
+        str,
+        jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM),
+    )

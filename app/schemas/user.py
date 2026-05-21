@@ -12,10 +12,21 @@ class UserCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class UserUpdate(BaseModel):
+    """Payload for partial user updates (admin only)."""
+
+    full_name: str | None = Field(default=None, max_length=150)
+    role: UserRole | None = None
+    is_active: bool | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class UserRead(BaseModel):
     id: int
     username: str
     full_name: str | None = None
     role: UserRole
+    is_active: bool = True
 
     model_config = ConfigDict(from_attributes=True)

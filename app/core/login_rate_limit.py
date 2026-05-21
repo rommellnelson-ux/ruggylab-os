@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.core.metrics import record_rate_limit_denied
+from app.utils.net_utils import get_client_ip
 
 logger = get_logger(__name__)
 
@@ -38,9 +39,7 @@ class LoginRateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path != self.login_path:
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else None
-        forwarded_for = request.headers.get("x-forwarded-for")
-        client_key = forwarded_for.split(",")[0].strip() if forwarded_for else client_ip or "unknown"
+        client_key = get_client_ip(request)
 
         now = datetime.now(timezone.utc)
         async with self.lock:

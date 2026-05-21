@@ -108,6 +108,12 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # Trusted reverse-proxy IPs.
+    # X-Forwarded-For is only trusted when the direct client IP is in this list.
+    # Example: ["127.0.0.1", "10.0.0.1"]
+    # Leave empty (default) to never trust X-Forwarded-For (safest for direct exposure).
+    TRUSTED_PROXY_IPS: list[str] = []
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

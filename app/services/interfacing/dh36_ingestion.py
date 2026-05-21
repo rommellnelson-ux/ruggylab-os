@@ -10,12 +10,9 @@ from app.services.audit import log_audit_event
 from app.services.interfacing.dymind_dh36 import DH36Parser
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.validation.med_logic import validate_nfs_parameters
+from app.utils.datetime_utils import utcnow_naive
 
 DH36_EQUIPMENT_NAME = "Dymind DH36"
-
-
-def utcnow_naive() -> dt.datetime:
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
 
 
 @dataclass(frozen=True)

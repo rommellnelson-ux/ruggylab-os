@@ -6,7 +6,8 @@ __pycache__/
 .mypy_cache/
 *.db
 backups/
-models/
+# ML model weights stored at repo root — never commit large binary model files
+/models/
 logs/
 bandit_report.txt
 pip_audit_report.txt

@@ -1,6 +1,7 @@
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
-from jose import JWTError, jwt
+from jwt.exceptions import InvalidTokenError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -39,7 +40,7 @@ def get_current_user(
         token_scopes = payload.get("scopes", [])
         if not username:
             raise credentials_exception
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise credentials_exception from exc
 
     user = db.query(User).filter(User.username == username).first()
@@ -59,6 +60,11 @@ def get_current_user(
 
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte utilisateur desactive.",
+        )
     return current_user
 
 

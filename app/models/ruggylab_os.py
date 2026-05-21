@@ -19,10 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
-
-
-def utcnow_naive() -> dt.datetime:
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
+from app.utils.datetime_utils import utcnow_naive
 
 
 class UserRole(str, enum.Enum):
@@ -43,6 +40,7 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole), default=UserRole.TECHNICIAN, nullable=False
     )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="user")
     report_signatures: Mapped[list["ReportSignature"]] = relationship(
@@ -114,7 +112,7 @@ class Result(Base):
         JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
     )
     image_url: Mapped[str | None] = mapped_column(String(255))
-    validator_id: Mapped[int | None] = mapped_column(Integer)
+    validator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_critical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

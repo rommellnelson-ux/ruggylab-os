@@ -84,6 +84,17 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
             listener_task.cancel()
 
 
+def _load_template(name: str) -> str:
+    """Load an HTML template from disk once at module import time."""
+    return (Path(__file__).resolve().parent / "templates" / name).read_text(encoding="utf-8")
+
+
+# Templates chargés une seule fois au démarrage (pas de relecture disque par requête)
+_TPL_COCKPIT = _load_template("cockpit.html")
+_TPL_COCKPIT_EXPRESS = _load_template("cockpit_express.html")
+_TPL_EHM_MAP = _load_template("ehm_map.html")
+
+
 def create_app() -> FastAPI:
     fastapi_app = FastAPI(
         title=settings.APP_NAME,
@@ -132,18 +143,15 @@ def create_app() -> FastAPI:
 
     @fastapi_app.get("/app", response_class=HTMLResponse, tags=["ui"])
     async def cockpit() -> str:
-        template_path = Path(__file__).resolve().parent / "templates" / "cockpit.html"
-        return template_path.read_text(encoding="utf-8")
+        return _TPL_COCKPIT
 
     @fastapi_app.get("/app/express", response_class=HTMLResponse, tags=["ui"])
     async def cockpit_express() -> str:
-        template_path = Path(__file__).resolve().parent / "templates" / "cockpit_express.html"
-        return template_path.read_text(encoding="utf-8")
+        return _TPL_COCKPIT_EXPRESS
 
     @fastapi_app.get("/app/map", response_class=HTMLResponse, tags=["ui"])
     async def ehm_map() -> str:
-        template_path = Path(__file__).resolve().parent / "templates" / "ehm_map.html"
-        return template_path.read_text(encoding="utf-8")
+        return _TPL_EHM_MAP
 
     # Health check endpoints
     @fastapi_app.get("/health/live", tags=["health"])

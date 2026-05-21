@@ -1,4 +1,3 @@
-import datetime as dt
 import hashlib
 from dataclasses import dataclass
 
@@ -8,12 +7,23 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import MalariaAnalysisJob, Result, User
 from app.services.audit import log_audit_event
+from app.utils.datetime_utils import utcnow_naive
 
 MODEL_NAME = "malaria-mobilenetv2-offline"
 
-
-def utcnow_naive() -> dt.datetime:
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
+# ============================================================
+# ⚠️  AVERTISSEMENT CLINIQUE — DEMO UNIQUEMENT ⚠️
+#
+# OfflineMalariaClassifier est un STUB de démonstration.
+# Il ne charge aucun modèle réel et ses prédictions sont
+# déterministes basées sur le nom de fichier (URL) ou
+# pseudo-aléatoires (SHA-256 du chemin).
+#
+# CE CODE NE DOIT PAS ÊTRE UTILISÉ À DES FINS CLINIQUES.
+# Pour un déploiement en production, remplacez la méthode
+# `predict()` par une inférence réelle (TensorFlow Serving,
+# ONNX Runtime, API externe, etc.).
+# ============================================================
 
 
 @dataclass(frozen=True)
@@ -23,11 +33,14 @@ class MalariaPrediction:
 
 
 class OfflineMalariaClassifier:
+    """Stub de démonstration — NON CLINIQUE. Voir avertissement ci-dessus."""
+
     def __init__(self, model_path: str):
         self.model_path = model_path
         self.model_name = MODEL_NAME
 
     def predict(self, image_url: str) -> MalariaPrediction:
+        """Prédiction simulée basée sur le nom de fichier. NON CLINIQUE."""
         lowered = image_url.lower()
         if "positive" in lowered or "palud" in lowered or "malaria" in lowered:
             return MalariaPrediction(label="positive", confidence=0.91)

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from app.schemas.dh36_interfacing import (
     CalibrationFlag,
     HematologyDataDH36JSONB,
@@ -37,68 +39,171 @@ def _build_point(
     )
 
 
+@dataclass(frozen=True)
+class _NFSRanges:
+    """Reference ranges for a single NFS parameter."""
+
+    wbc_low: float
+    wbc_high: float
+    wbc_critical_low: float
+    wbc_critical_high: float
+    rbc_low: float
+    rbc_high: float
+    hgb_low: float
+    hgb_high: float
+    hgb_critical_low: float
+    hct_low: float
+    hct_high: float
+    mcv_low: float
+    mcv_high: float
+    mch_low: float
+    mch_high: float
+    mchc_low: float
+    mchc_high: float
+    plt_low: float
+    plt_high: float
+    plt_critical_low: float
+
+
+def _get_ranges(age: float, sex: str | None) -> _NFSRanges:
+    """Return age- and sex-adapted NFS reference ranges.
+
+    Sources: WHO, Société Française de Biologie Clinique (SFBC) paediatric tables.
+    Age thresholds (years):
+      < 1   → nourrisson
+      1–5   → enfant en bas âge
+      6–11  → enfant scolarisé
+      12–17 → adolescent
+      ≥ 18  → adulte
+    """
+    is_male = sex == "M"
+
+    if age < 1:
+        # Nourrisson (valeurs moyennes 2–12 mois)
+        return _NFSRanges(
+            wbc_low=6.0, wbc_high=17.5, wbc_critical_low=2.0, wbc_critical_high=30.0,
+            rbc_low=3.7, rbc_high=5.3,
+            hgb_low=100.0, hgb_high=140.0, hgb_critical_low=70.0,
+            hct_low=33.0, hct_high=42.0,
+            mcv_low=70.0, mcv_high=84.0,
+            mch_low=23.0, mch_high=31.0,
+            mchc_low=300.0, mchc_high=360.0,
+            plt_low=200.0, plt_high=550.0, plt_critical_low=30.0,
+        )
+    if age < 6:
+        # Enfant 1–5 ans
+        return _NFSRanges(
+            wbc_low=5.0, wbc_high=15.0, wbc_critical_low=2.0, wbc_critical_high=25.0,
+            rbc_low=3.9, rbc_high=5.0,
+            hgb_low=110.0, hgb_high=140.0, hgb_critical_low=70.0,
+            hct_low=34.0, hct_high=40.0,
+            mcv_low=75.0, mcv_high=87.0,
+            mch_low=24.0, mch_high=30.0,
+            mchc_low=310.0, mchc_high=360.0,
+            plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+        )
+    if age < 12:
+        # Enfant 6–11 ans
+        return _NFSRanges(
+            wbc_low=4.5, wbc_high=13.5, wbc_critical_low=2.0, wbc_critical_high=25.0,
+            rbc_low=4.0, rbc_high=5.2,
+            hgb_low=115.0, hgb_high=145.0, hgb_critical_low=70.0,
+            hct_low=35.0, hct_high=44.0,
+            mcv_low=77.0, mcv_high=91.0,
+            mch_low=25.0, mch_high=31.0,
+            mchc_low=310.0, mchc_high=360.0,
+            plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+        )
+    if age < 18:
+        # Adolescent 12–17 ans
+        hgb_low = 130.0 if is_male else 120.0
+        hgb_high = 160.0 if is_male else 150.0
+        return _NFSRanges(
+            wbc_low=4.5, wbc_high=13.0, wbc_critical_low=2.0, wbc_critical_high=20.0,
+            rbc_low=4.2 if is_male else 3.9, rbc_high=5.6 if is_male else 5.2,
+            hgb_low=hgb_low, hgb_high=hgb_high, hgb_critical_low=70.0,
+            hct_low=37.0 if is_male else 35.0, hct_high=50.0 if is_male else 45.0,
+            mcv_low=80.0, mcv_high=96.0,
+            mch_low=26.0, mch_high=34.0,
+            mchc_low=310.0, mchc_high=360.0,
+            plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+        )
+
+    # Adulte ≥ 18 ans
+    hgb_low = 130.0 if is_male else 120.0
+    hgb_high = 170.0 if is_male else 150.0
+    return _NFSRanges(
+        wbc_low=4.0, wbc_high=10.0, wbc_critical_low=2.0, wbc_critical_high=20.0,
+        rbc_low=4.5 if is_male else 3.8, rbc_high=5.9 if is_male else 5.2,
+        hgb_low=hgb_low, hgb_high=hgb_high, hgb_critical_low=70.0,
+        hct_low=40.0 if is_male else 36.0, hct_high=54.0 if is_male else 48.0,
+        mcv_low=82.0, mcv_high=98.0,
+        mch_low=27.0, mch_high=34.0,
+        mchc_low=310.0, mchc_high=360.0,
+        plt_low=150.0, plt_high=450.0, plt_critical_low=30.0,
+    )
+
+
 def validate_nfs_parameters(
     results_raw: dict[str, float],
     patient_age: float,
     patient_sex: str | None,
     equipment_serial: str | None = None,
 ) -> tuple[HematologyDataDH36JSONB, bool]:
-    del patient_age
-
-    hgb_low, hgb_high = (130.0, 170.0) if patient_sex == "M" else (120.0, 150.0)
+    r = _get_ranges(patient_age, patient_sex)
 
     points = {
         "WBC": _build_point(
             value=results_raw.get("WBC", 0.0),
             unit="10*9/L",
-            low=4.0,
-            high=10.0,
-            critical_low=2.0,
-            critical_high=20.0,
+            low=r.wbc_low,
+            high=r.wbc_high,
+            critical_low=r.wbc_critical_low,
+            critical_high=r.wbc_critical_high,
         ),
         "RBC": _build_point(
             value=results_raw.get("RBC", 0.0),
             unit="10*12/L",
-            low=3.5,
-            high=5.5,
+            low=r.rbc_low,
+            high=r.rbc_high,
         ),
         "HGB": _build_point(
             value=results_raw.get("HGB", 0.0),
             unit="g/L",
-            low=hgb_low,
-            high=hgb_high,
-            critical_low=70.0,
+            low=r.hgb_low,
+            high=r.hgb_high,
+            critical_low=r.hgb_critical_low,
         ),
         "HCT": _build_point(
             value=results_raw.get("HCT", 0.0),
             unit="%",
-            low=37.0,
-            high=50.0,
+            low=r.hct_low,
+            high=r.hct_high,
         ),
         "MCV": _build_point(
             value=results_raw.get("MCV", 0.0),
             unit="fL",
-            low=82.0,
-            high=98.0,
+            low=r.mcv_low,
+            high=r.mcv_high,
         ),
         "MCH": _build_point(
             value=results_raw.get("MCH", 0.0),
             unit="pg",
-            low=27.0,
-            high=34.0,
+            low=r.mch_low,
+            high=r.mch_high,
         ),
         "MCHC": _build_point(
             value=results_raw.get("MCHC", 0.0),
             unit="g/L",
-            low=310.0,
-            high=360.0,
+            low=r.mchc_low,
+            high=r.mchc_high,
         ),
         "PLT": _build_point(
             value=results_raw.get("PLT", 0.0),
             unit="10*9/L",
-            low=150.0,
-            high=450.0,
-            critical_low=30.0,
+            low=r.plt_low,
+            high=r.plt_high,
+            critical_low=r.plt_critical_low,
         ),
     }
 

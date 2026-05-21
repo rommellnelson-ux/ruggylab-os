@@ -9,10 +9,7 @@ from app.core.config import settings
 from app.models import ReportSignature, Result, User
 from app.services.audit import log_audit_event
 from app.services.pdf import build_simple_pdf
-
-
-def utcnow_naive() -> dt.datetime:
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
+from app.utils.datetime_utils import utcnow_naive
 
 
 def _canonical_result_payload(result: Result) -> dict:
