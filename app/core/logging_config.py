@@ -53,6 +53,9 @@ def configure_logging(
 
     # Add file handler if specified
     if log_file:
+        import os
+
+        os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
         stdlib_config["handlers"]["file"] = {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "json",
