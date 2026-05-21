@@ -10,6 +10,7 @@ from app.api.v1.endpoints.equipments import router as equipments_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.imaging import router as imaging_router
 from app.api.v1.endpoints.login import router as login_router
+from app.api.v1.endpoints.maintenance import router as maintenance_router
 from app.api.v1.endpoints.military_facilities import router as military_facilities_router
 from app.api.v1.endpoints.operations import router as operations_router
 from app.api.v1.endpoints.patients import router as patients_router
@@ -40,3 +41,4 @@ api_router.include_router(dh36_router, tags=["dh36"])
 api_router.include_router(imaging_router, tags=["imaging"])
 api_router.include_router(operations_router, tags=["operations"])
 api_router.include_router(reports_router, tags=["reports"])
+api_router.include_router(maintenance_router, tags=["maintenance"])

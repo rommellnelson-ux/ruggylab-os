@@ -59,6 +59,77 @@ jobs:
       - name: Run test suite
         run: pytest
 
+  test-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ruggylab
+          POSTGRES_PASSWORD: ruggylab_test
+          POSTGRES_DB: ruggylab_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Alembic migrations (upgrade)
+        env:
+          DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_test
+          SECRET_KEY: ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+        run: alembic upgrade head
+
+      - name: Verify migration idempotency (downgrade → upgrade)
+        env:
+          DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_test
+          SECRET_KEY: ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: Smoke-test app startup against PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_test
+          SECRET_KEY: ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+          TESTING: "true"
+        run: |
+          python - <<'EOF'
+          import os
+          os.environ.setdefault("TESTING", "true")
+          import app.db.session as db_session
+          from app.db.session import engine
+          from app.db.base import Base
+          from app.services.bootstrap import init_db
+          # Verify the ORM can query the migrated schema
+          from sqlalchemy import text
+          with engine.connect() as conn:
+              result = conn.execute(text("SELECT count(*) FROM users"))
+              count = result.scalar()
+          print(f"PostgreSQL smoke-test OK — {count} user(s) in DB")
+          EOF
+
   codeql:
     needs: test
     runs-on: ubuntu-latest

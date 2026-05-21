@@ -27,6 +27,7 @@ from app.core.user_quota import UserQuotaMiddleware
 from app.db.session import get_db
 from app.services.bootstrap import init_db
 from app.services.interfacing.listener_dh36 import DH36Listener
+from app.services.token_cleanup import periodic_token_cleanup
 from app.utils.redis_rate_limiter import init_redis_client
 
 logger = logging.getLogger(__name__)
@@ -69,23 +70,33 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     if not settings.TESTING and settings.REDIS_URL:
         init_redis_client(settings.REDIS_URL)
     init_db()
+    import asyncio
+
     listener_task = None
+    cleanup_task = None
     if not settings.TESTING and settings.ENABLE_DH36_LISTENER:
         listener = DH36Listener(
             host=settings.DH36_LISTENER_HOST,
             port=settings.DH36_LISTENER_PORT,
         )
-        import asyncio
-
         try:
             listener_task = asyncio.create_task(listener.start())
         except RuntimeError as exc:
             logger.warning("DH36 listener not started: %s", exc)
+
+    if not settings.TESTING:
+        cleanup_task = asyncio.create_task(
+            periodic_token_cleanup(interval_seconds=3600, keep_days=7)
+        )
+        logger.info("Periodic refresh-token cleanup task started (every 3600 s).")
+
     try:
         yield
     finally:
         if listener_task:
             listener_task.cancel()
+        if cleanup_task:
+            cleanup_task.cancel()
 
 
 def _load_template(name: str) -> str:
