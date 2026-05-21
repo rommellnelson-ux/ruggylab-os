@@ -4,8 +4,7 @@ Middleware for observability: logging, metrics, and tracing.
 
 import time
 import uuid
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -19,7 +18,11 @@ logger = get_logger(__name__)
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     """Middleware for logging, metrics, and tracing of HTTP requests."""
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:  # type: ignore
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         """Process request and response with observability."""
         # Generate request ID
         request_id = str(uuid.uuid4())
@@ -63,7 +66,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             # Add request ID to response headers
             response.headers["X-Request-ID"] = request_id
 
-            return response  # type: ignore[no-any-return]
+            return response
 
         except Exception as exc:
             duration = time.time() - start_time
@@ -89,12 +92,16 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Middleware to add request ID to all requests."""
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:  # type: ignore
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         """Add request ID if not already present."""
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         request.state.request_id = request_id
 
-        response = await call_next(request)
+        response: Response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
 
-        return response  # type: ignore[no-any-return]
+        return response

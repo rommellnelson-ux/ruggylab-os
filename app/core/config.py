@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = DEFAULT_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     FIRST_SUPERUSER: str = "admin"
     FIRST_SUPERUSER_PASSWORD: str = DEFAULT_FIRST_SUPERUSER_PASSWORD
     FIRST_SUPERUSER_FULL_NAME: str = "RuggyLab Administrator"
@@ -86,8 +87,8 @@ class Settings(BaseSettings):
     CORS_ENABLED: bool = True
     CORS_ALLOW_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     CORS_ALLOW_CREDENTIALS: bool = True
-    CORS_ALLOW_METHODS: list[str] = ["*"]
-    CORS_ALLOW_HEADERS: list[str] = ["*"]
+    CORS_ALLOW_METHODS: list[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    CORS_ALLOW_HEADERS: list[str] = ["Authorization", "Content-Type", "X-Request-ID"]
 
     # User quota settings
     USER_QUOTA_ENABLED: bool = True

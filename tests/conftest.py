@@ -25,6 +25,7 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
 
     # Seed the database
     from app.services.bootstrap import init_db
+
     init_db()
 
     app = create_app()

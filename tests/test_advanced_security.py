@@ -18,51 +18,58 @@ def test_cors_headers_present(client):
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_user_quota_blocks_after_limit(client, monkeypatch):
-    """Test that user quota middleware blocks after exceeding limit."""
+def test_user_quota_blocks_after_limit():
+    """Test that UserQuotaMiddleware returns 429 after the per-user quota is reached.
+
+    Uses a self-contained mini-app so it is independent of the shared conftest
+    client (which sets TESTING=True and skips several middlewares).  A thin
+    SetUserIDMiddleware sits in front of UserQuotaMiddleware and injects a
+    synthetic user_id so the quota logic is exercised.
+    """
     if not settings.USER_QUOTA_ENABLED:
         pytest.skip("User quota not enabled")
 
-    # Temporarily increase rate limit and decrease quota for faster test
-    original_rate_limit = settings.RATE_LIMIT_REQUESTS
-    original_quota = settings.USER_QUOTA_REQUESTS
-    settings.RATE_LIMIT_REQUESTS = 2000
-    settings.USER_QUOTA_REQUESTS = 5
+    from fastapi import FastAPI
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    from app.core.user_quota import UserQuotaMiddleware
+
+    # -- Build minimal app ------------------------------------------------
+    mini_app = FastAPI()
+
+    @mini_app.get("/ping")
+    def ping():
+        return {"ok": True}
+
+    class SetUserIDMiddleware(BaseHTTPMiddleware):
+        """Injects a fixed user_id so UserQuotaMiddleware sees an auth'd user."""
+
+        async def dispatch(self, request, call_next):
+            request.state.user_id = "quota_test_user"
+            return await call_next(request)
+
+    # Starlette applies user-middlewares in LIFO order: add SetUserID *after*
+    # UserQuota so that SetUserID runs *first* (outermost) in the call chain.
+    mini_app.add_middleware(UserQuotaMiddleware)
+    mini_app.add_middleware(SetUserIDMiddleware)
+
+    # -- Configure a tight quota -------------------------------------------
+    old_quota = settings.USER_QUOTA_REQUESTS
+    old_window = settings.USER_QUOTA_WINDOW_SECONDS
+    settings.USER_QUOTA_REQUESTS = 3
+    settings.USER_QUOTA_WINDOW_SECONDS = 60
 
     try:
-        # Login to get auth token
-        response = client.post(
-            "/api/v1/login/access-token",
-            data={"username": "admin", "password": "change_me_admin_password"},
-        )
-        assert response.status_code == 200
-        token = response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
+        with TestClient(mini_app, raise_server_exceptions=False) as tc:
+            # First N requests must succeed
+            for i in range(settings.USER_QUOTA_REQUESTS):
+                resp = tc.get("/ping")
+                assert resp.status_code == 200, f"Request {i + 1} unexpectedly failed"
 
-        # Mock authentication to set user_id
-        def mock_auth_middleware(request, call_next):
-            request.state.user_id = "test_user"
-            return call_next(request)
-
-        # Patch the middleware to simulate auth
-        from app.core.user_quota import UserQuotaMiddleware
-        original_dispatch = UserQuotaMiddleware.dispatch
-
-        async def patched_dispatch(self, request, call_next):
-            request.state.user_id = "test_user"
-            return await original_dispatch(self, request, call_next)
-
-        monkeypatch.setattr(UserQuotaMiddleware, "dispatch", patched_dispatch)
-
-        # Make requests up to the limit
-        for _ in range(settings.USER_QUOTA_REQUESTS):
-            response = client.get("/api/v1/users/me", headers=headers)
-            assert response.status_code == 200  # Now authenticated
-
-        # Next request should be blocked
-        response = client.get("/api/v1/users/me", headers=headers)
-        assert response.status_code == 429
-        assert "quota exceeded" in response.json()["detail"].lower()
+            # One more request must be blocked
+            resp = tc.get("/ping")
+            assert resp.status_code == 429
+            assert "quota exceeded" in resp.json()["detail"].lower()
     finally:
-        settings.RATE_LIMIT_REQUESTS = original_rate_limit
-        settings.USER_QUOTA_REQUESTS = original_quota
+        settings.USER_QUOTA_REQUESTS = old_quota
+        settings.USER_QUOTA_WINDOW_SECONDS = old_window

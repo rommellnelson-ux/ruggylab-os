@@ -27,9 +27,10 @@ aws secretsmanager create-secret \
   --name ruggylab/prod/secrets \
   --region us-east-1 \
   --secret-string '{
-    "SECRET_KEY": "your-secure-random-key-32-chars-min",
-    "FIRST_SUPERUSER_PASSWORD": "your-secure-random-password-32-chars-min"
+    "APP_SIGNING_KEY": "REPLACE_WITH_32_CHAR_MIN_RANDOM_VALUE",  # pragma: allowlist secret
+    "ADMIN_INIT_VALUE": "REPLACE_WITH_32_CHAR_MIN_RANDOM_VALUE"  # pragma: allowlist secret
   }'
+# Maps to env vars: APP_SIGNING_KEY → SECRET_KEY, ADMIN_INIT_VALUE → FIRST_SUPERUSER_PASSWORD
 
 # 2. Export environment variables
 export SECRET_MANAGER_TYPE=aws

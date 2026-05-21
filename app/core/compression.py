@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -16,7 +16,11 @@ class CompressionMiddleware(BaseHTTPMiddleware):
     Only compresses responses larger than the configured minimum size.
     """
 
-    async def dispatch(self, request: Request, call_next: Any) -> Response:
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         if not settings.COMPRESSION_ENABLED:
             return await call_next(request)
 
@@ -37,10 +41,7 @@ class CompressionMiddleware(BaseHTTPMiddleware):
 
         # Don't compress certain content types
         content_type = response.headers.get("content-type", "")
-        if any(
-            skip in content_type
-            for skip in ["image/", "video/", "application/octet-stream"]
-        ):
+        if any(skip in content_type for skip in ["image/", "video/", "application/octet-stream"]):
             return response
 
         try:

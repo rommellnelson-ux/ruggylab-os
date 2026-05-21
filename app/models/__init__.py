@@ -5,17 +5,18 @@ from app.models.ruggylab_os import (
     EquipmentReagentRatio,
     EquipmentReagentRatioVersion,
     MalariaAnalysisJob,
+    MilitaryFacility,
     Patient,
     RatioPreset,
     RatioPresetItem,
     Reagent,
+    RefreshToken,
     ReportSignature,
     Result,
     Sample,
     StockMovement,
     User,
     UserRole,
-    MilitaryFacility,
 )
 
 __all__ = [
@@ -31,9 +32,10 @@ __all__ = [
     "EquipmentReagentRatio",
     "EquipmentReagentRatioVersion",
     "MalariaAnalysisJob",
+    "MilitaryFacility",
     "RatioPreset",
     "RatioPresetItem",
+    "RefreshToken",
     "ReportSignature",
     "StockMovement",
-    "MilitaryFacility",
 ]

@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -9,8 +9,12 @@ from app.core.config import settings
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Middleware that adds standard HTTP security headers to every response."""
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Response]) -> Response:  # type: ignore
-        response = await call_next(request)
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response: Response = await call_next(request)
 
         if not settings.SECURITY_HEADERS_ENABLED:
             return response

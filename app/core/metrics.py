@@ -4,7 +4,6 @@ Prometheus metrics and monitoring for RuggyLab OS.
 Provides metrics for requests, database operations, and custom application metrics.
 """
 
-
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 

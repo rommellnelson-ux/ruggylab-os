@@ -1,9 +1,11 @@
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import HTTPException, Request, Response
+from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
@@ -19,13 +21,17 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
     Requires user ID to be set in request.state.user_id by auth middleware.
     """
 
-    def __init__(self, app: Any) -> None:
+    def __init__(self, app: Any) -> None:  # noqa: ANN401
         super().__init__(app)
         # In-memory storage for user request counts (use Redis in production)
         self._user_requests: dict[str, list[datetime]] = defaultdict(list)
         self._blocked_users: dict[str, datetime] = {}
 
-    async def dispatch(self, request: Request, call_next: Any) -> Response:
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         if not settings.USER_QUOTA_ENABLED:
             return await call_next(request)
 
@@ -34,7 +40,7 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         user_id = request.state.user_id
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Check if user is currently blocked
         if user_id in self._blocked_users:
@@ -45,9 +51,9 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
                     user_id,
                     block_until.isoformat(),
                 )
-                raise HTTPException(
+                return JSONResponse(
+                    {"detail": "User quota exceeded. Try again later."},
                     status_code=429,
-                    detail="User quota exceeded. Try again later.",
                 )
             else:
                 # Block expired, remove from blocked list
@@ -71,9 +77,9 @@ class UserQuotaMiddleware(BaseHTTPMiddleware):
                 settings.USER_QUOTA_WINDOW_SECONDS,
                 block_until.isoformat(),
             )
-            raise HTTPException(
+            return JSONResponse(
+                {"detail": "User quota exceeded. Try again later."},
                 status_code=429,
-                detail="User quota exceeded. Try again later.",
             )
 
         # Record request

@@ -1,7 +1,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,9 +24,10 @@ from app.core.observability_middleware import ObservabilityMiddleware, RequestID
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.user_quota import UserQuotaMiddleware
-from app.db.session import SessionLocal, get_db
+from app.db.session import get_db
 from app.services.bootstrap import init_db
 from app.services.interfacing.listener_dh36 import DH36Listener
+from app.utils.redis_rate_limiter import init_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ if not settings.TESTING and settings.METRICS_SERVER_ENABLED:
         logger.warning("Failed to start metrics server: %s", exc)
 
 # Initialize health check service
-_app_start_time = datetime.now(timezone.utc)
+_app_start_time = datetime.now(UTC)
 health_check_service = HealthCheckService(_app_start_time)
 
 # Initialize cache
@@ -64,6 +65,9 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         raise RuntimeError(
             "Security settings are too weak for a non-test environment. Update SECRET_KEY and FIRST_SUPERUSER_PASSWORD."
         )
+    # Initialise Redis rate-limiter client when configured
+    if not settings.TESTING and settings.REDIS_URL:
+        init_redis_client(settings.REDIS_URL)
     init_db()
     listener_task = None
     if not settings.TESTING and settings.ENABLE_DH36_LISTENER:

@@ -13,7 +13,7 @@ def client():
     return TestClient(app)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_memory_cache_set_and_get():
     """Test in-memory cache set and get operations."""
     cache = MemoryCache()
@@ -30,7 +30,7 @@ async def test_memory_cache_set_and_get():
     assert value is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_memory_cache_ttl_expiry():
     """Test cache expiry after TTL."""
     import time
@@ -52,7 +52,7 @@ async def test_memory_cache_ttl_expiry():
     assert value is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_memory_cache_delete():
     """Test cache delete operation."""
     cache = MemoryCache()
@@ -92,10 +92,11 @@ def test_pagination_params_validation():
     params = PaginationParams(skip=0, limit=settings.MAX_PAGE_SIZE)
     assert params.limit == settings.MAX_PAGE_SIZE
 
-    # Limit exceeding max should raise validation error
+    # Limit exceeding max should raise a Pydantic ValidationError
     import pytest
+    from pydantic import ValidationError
 
-    with pytest.raises(Exception):  # Pydantic validation error
+    with pytest.raises(ValidationError):
         PaginationParams(skip=0, limit=999)
 
 

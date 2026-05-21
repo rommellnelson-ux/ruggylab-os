@@ -4,10 +4,8 @@ Structured logging configuration with JSON format for production.
 Supports multiple outputs: console, file, and structured JSON logging.
 """
 
-import logging
-from logging.config import dictConfig
-import logging.handlers
 import sys
+from logging.config import dictConfig
 from typing import Any
 
 import structlog
@@ -55,6 +53,9 @@ def configure_logging(
 
     # Add file handler if specified
     if log_file:
+        import os
+
+        os.makedirs(os.path.dirname(os.path.abspath(log_file)), exist_ok=True)
         stdlib_config["handlers"]["file"] = {
             "class": "logging.handlers.RotatingFileHandler",
             "formatter": "json",
@@ -86,9 +87,9 @@ def configure_logging(
     dictConfig(stdlib_config)
 
 
-def get_logger(name: str) -> structlog.BoundLogger:  # type: ignore
+def get_logger(name: str) -> Any:
     """Get a structured logger instance."""
-    return structlog.get_logger(name)  # type: ignore
+    return structlog.get_logger(name)
 
 
 class StructuredLogger:

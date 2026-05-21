@@ -4,7 +4,7 @@ Health checks and status endpoints for RuggyLab OS.
 Provides liveness, readiness, and detailed health check endpoints.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -34,6 +34,7 @@ class HealthCheckService:
         try:
             # Simple query to test connectivity
             from sqlalchemy import text
+
             db.execute(text("SELECT 1"))
             return True, {
                 "status": "healthy",
@@ -107,7 +108,7 @@ class HealthCheckService:
 
     def get_health(self, db: Session, app_version: str) -> HealthStatus:
         """Perform comprehensive health check."""
-        uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        uptime = (datetime.now(UTC) - self.start_time).total_seconds()
 
         db_ok, db_check = self.check_database(db)
         cache_ok, cache_check = self.check_cache()
@@ -134,7 +135,7 @@ class HealthCheckService:
 
         return HealthStatus(
             status=overall_status,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             uptime_seconds=uptime,
             version=app_version,
             checks=checks,
@@ -155,12 +156,12 @@ class HealthCheckService:
 
     def get_liveness(self) -> dict[str, Any]:
         """Check if service is alive (simple check)."""
-        uptime = (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        uptime = (datetime.now(UTC) - self.start_time).total_seconds()
 
         return {
             "alive": True,
             "uptime_seconds": uptime,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
         }
 
     def get_metrics_summary(self) -> dict[str, Any]:
@@ -178,5 +179,5 @@ class HealthCheckService:
                 registry.db_queries_total._metrics.values(),
             ),
             "active_users": registry.active_users._value.get(),
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
         }
