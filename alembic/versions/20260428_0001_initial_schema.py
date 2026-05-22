@@ -16,12 +16,14 @@ branch_labels = None
 depends_on = None
 
 
-userrole = sa.Enum("TECHNICIAN", "OFFICER", "ADMIN", name="userrole")
+# Values must match UserRole StrEnum (lowercase).  create_type=True (default)
+# lets SQLAlchemy emit "CREATE TYPE userrole AS ENUM ('admin', 'officer',
+# 'technician')" automatically before CREATE TABLE on PostgreSQL; on SQLite it
+# is a no-op (VARCHAR affinity is used instead).
+userrole = sa.Enum("technician", "officer", "admin", name="userrole")
 
 
 def upgrade() -> None:
-    userrole.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -109,4 +111,6 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index(op.f("ix_users_id"), table_name="users")
     op.drop_table("users")
-    userrole.drop(op.get_bind(), checkfirst=True)
+    # PostgreSQL requires explicit type drop; SQLite has no named types.
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute(sa.text("DROP TYPE IF EXISTS userrole"))

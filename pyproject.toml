@@ -69,6 +69,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "SIM"]
+"tests/*" = ["S", "SIM", "N"]
 "alembic/versions/*" = ["ALL"]
-"scripts/*" = ["S", "T", "I"]
+"scripts/*" = ["S", "T", "I", "N"]
+# FHIR R4 mandates camelCase field names (resourceType, effectiveDateTime…)
+"app/schemas/fhir.py" = ["N815"]

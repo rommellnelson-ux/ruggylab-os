@@ -6,7 +6,7 @@ the pure business logic in the service and utility modules directly.
 
 import pytest
 
-from app.services.malaria_ai import OfflineMalariaClassifier
+from app.services.malaria_ai import MobileNetV2Classifier
 from app.services.report_signing import report_hash
 from app.services.validation.med_logic import (
     _build_overall_flags,
@@ -243,12 +243,12 @@ class TestBuildOverallFlags:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# OfflineMalariaClassifier
+# MobileNetV2Classifier
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-class TestOfflineMalariaClassifier:
-    classifier = OfflineMalariaClassifier("models/fake")
+class TestMobileNetV2Classifier:
+    classifier = MobileNetV2Classifier("models/fake")
 
     def test_positive_keyword_in_url(self):
         pred = self.classifier.predict("data/microscopy/sample_positive.tiff")

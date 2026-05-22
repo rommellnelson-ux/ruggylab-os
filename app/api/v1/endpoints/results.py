@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models import Equipment, Result, Sample, User
+from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import ResultCreate, ResultRead
+from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 
 router = APIRouter(prefix="/results")
@@ -53,6 +56,44 @@ def get_result(
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resultat introuvable.")
     return result
+
+
+@router.get(
+    "/{result_id}/fhir",
+    response_model=FHIRDiagnosticReport,
+    summary="Export NFS result as FHIR R4 DiagnosticReport",
+    responses={
+        200: {
+            "content": {"application/fhir+json": {}},
+            "description": "FHIR R4 DiagnosticReport (self-contained, with Patient and Observations)",
+        },
+        404: {"description": "Result not found"},
+    },
+)
+def get_result_fhir(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> JSONResponse:
+    """Return a FHIR R4 DiagnosticReport for the requested result.
+
+    The response is a self-contained FHIR document: the patient resource and
+    all CBC Observation resources are embedded as ``contained`` entries so the
+    document can be imported into any FHIR server without prior resource
+    registration.
+
+    MIME type is ``application/fhir+json`` as required by the FHIR R4 spec.
+    """
+    del current_user
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resultat introuvable.")
+
+    report = build_diagnostic_report(result)
+    return JSONResponse(
+        content=report.model_dump(exclude_none=True),
+        media_type="application/fhir+json",
+    )
 
 
 @router.post("", response_model=ResultRead, status_code=status.HTTP_201_CREATED)
