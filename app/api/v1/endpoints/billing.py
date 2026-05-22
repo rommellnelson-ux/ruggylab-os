@@ -18,7 +18,7 @@ from app.models.ruggylab_os import User
 from app.schemas.billing import (
     BillingRequest,
     BillingResult,
-    CMMEntry,
+    CMMEntryResponse,
     CMMReportRequest,
 )
 from app.services.billing_engine import BillingEngine, get_billing_engine
@@ -74,7 +74,7 @@ def calculate_bill(
 
 @router.post(
     "/cmm-report",
-    response_model=list[CMMEntry],
+    response_model=list[CMMEntryResponse],
     status_code=status.HTTP_200_OK,
     summary="Rapport CMM — Consommation Mensuelle Moyenne (OMS/MSF)",
     description=(
@@ -87,10 +87,11 @@ def cmm_report(
     payload: CMMReportRequest,
     engine: BillingEngine = Depends(get_billing_engine),
     _current_user: User = Depends(get_current_active_user),
-) -> list[CMMEntry]:
+) -> list[CMMEntryResponse]:
     """Calcule le rapport CMM et retourne les médicaments triés par criticité."""
     try:
-        return engine.compute_cmm_report(payload)
+        entries = engine.compute_cmm_report(payload)
+        return [CMMEntryResponse.from_entry(e) for e in entries]
     except (KeyError, ValueError, TypeError) as exc:
         logger.warning("billing.cmm_report.validation_error", extra={"error": str(exc)})
         raise HTTPException(
