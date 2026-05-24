@@ -8,6 +8,7 @@ from app.api.v1.endpoints.equipment_reagent_ratios import (
     router as equipment_reagent_ratios_router,
 )
 from app.api.v1.endpoints.equipments import router as equipments_router
+from app.api.v1.endpoints.fhir_pharmacy import router as fhir_pharmacy_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.imaging import router as imaging_router
 from app.api.v1.endpoints.login import router as login_router
@@ -48,3 +49,4 @@ api_router.include_router(maintenance_router, tags=["maintenance"])
 api_router.include_router(billing_router, tags=["Billing CMU"])
 api_router.include_router(stock_predictor_router, tags=["Stock Predictor CMU"])
 api_router.include_router(prescription_scanner_router, tags=["Prescription Scanner CMU"])
+api_router.include_router(fhir_pharmacy_router, tags=["FHIR R4 Pharmacy"])
