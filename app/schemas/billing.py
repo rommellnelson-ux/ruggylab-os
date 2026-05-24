@@ -283,3 +283,25 @@ class CMMReportRequest(BaseModel):
         description="Liste de médicaments à analyser",
         examples=[[{"dci_code": "ARTEMETHER-LUMEFANTRINE", "cmm_units": 120, "current_stock": 80}]],
     )
+
+
+class CMMEntryResponse(BaseModel):
+    """Réponse API sérialisable pour une entrée CMM (remplace le dataclass brut)."""
+
+    dci_code: str
+    cmm_units: int
+    current_stock: int
+    months_of_stock: float
+    reorder_needed: bool
+    suggested_order_qty: int
+
+    @classmethod
+    def from_entry(cls, entry: CMMEntry) -> CMMEntryResponse:
+        return cls(
+            dci_code=entry.dci_code,
+            cmm_units=entry.cmm_units,
+            current_stock=entry.current_stock,
+            months_of_stock=entry.months_of_stock,
+            reorder_needed=entry.reorder_needed,
+            suggested_order_qty=entry.suggested_order_qty,
+        )
