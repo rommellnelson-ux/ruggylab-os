@@ -74,9 +74,11 @@ def create_medication_dispense(
     logger.info(
         "fhir.medication_dispense.created",
         extra={
-            "patient_ref": payload.patient_ref,
+            # patient_ref et cnam_billing_ref sont PHI — on ne les logue pas en clair
+            "has_patient_ref": bool(payload.patient_ref),
             "drug_count": len(payload.drug_lines),
-            "cnam_billing_ref": payload.cnam_billing_ref,
+            "has_cnam_billing_ref": bool(payload.cnam_billing_ref),
+            "has_prescription_ref": bool(payload.authorizing_prescription_ref),
         },
     )
 
