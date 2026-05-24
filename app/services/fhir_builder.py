@@ -1,4 +1,17 @@
-"""Build FHIR R4 DiagnosticReport documents from RuggyLab Result objects.
+"""Build FHIR R4 resources for the RuggyLab / CMU pharmacy cycle.
+
+Resources produced:
+  - DiagnosticReport   : CBC/NFS lab results        (from Result ORM objects)
+  - MedicationDispense : drug dispensing to patient  (from MedicationDispenseRequest)
+  - SupplyDelivery     : stock replenishment received (from SupplyDeliveryRequest)
+
+Reference profiles:
+  - DiagnosticReport:   http://hl7.org/fhir/StructureDefinition/DiagnosticReport
+  - MedicationDispense: http://hl7.org/fhir/StructureDefinition/MedicationDispense
+  - SupplyDelivery:     http://hl7.org/fhir/StructureDefinition/SupplyDelivery
+
+DiagnosticReport details — maps each NFS (CBC) parameter stored in Result.data_points
+to an Observation resource with LOINC codes, UCUM units, and interpretation flags.
 
 Maps each NFS (CBC) parameter stored in Result.data_points to an
 Observation resource with:
@@ -19,6 +32,7 @@ Reference profiles used:
 from __future__ import annotations
 
 import datetime
+from typing import Any
 
 from app.models.ruggylab_os import Result
 from app.schemas.fhir import (
@@ -26,13 +40,18 @@ from app.schemas.fhir import (
     FHIRCoding,
     FHIRContainedPatient,
     FHIRDiagnosticReport,
+    FHIRDosageInstruction,
     FHIRHumanName,
     FHIRIdentifier,
+    FHIRMedicationDispense,
     FHIRMeta,
     FHIRNarrative,
     FHIRObservation,
     FHIRQuantity,
     FHIRReference,
+    FHIRSupplyDelivery,
+    MedicationDispenseRequest,
+    SupplyDeliveryRequest,
 )
 
 # ---------------------------------------------------------------------------
@@ -274,3 +293,286 @@ def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
     )
 
     return report
+
+
+# ---------------------------------------------------------------------------
+# Systèmes de terminologie partagés
+# ---------------------------------------------------------------------------
+
+_ATC_SYSTEM = "http://www.whocc.no/atc"
+_SNOMED_SYSTEM = "http://snomed.info/sct"
+_SUPPLY_TYPE_SYSTEM = "http://terminology.hl7.org/CodeSystem/supply-kind"
+
+
+def _now_iso() -> str:
+    return datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _date_iso(value: str | None) -> str:
+    """Return value if provided, otherwise today in ISO-8601."""
+    return value or datetime.date.today().isoformat()
+
+
+# ---------------------------------------------------------------------------
+# MedicationDispense bundle
+# ---------------------------------------------------------------------------
+
+
+def build_medication_dispense_bundle(
+    request: MedicationDispenseRequest,
+) -> dict[str, Any]:
+    """
+    Construit un Bundle FHIR R4 de type ``collection`` contenant un
+    ``MedicationDispense`` par ligne de médicament dispensé.
+
+    Chaque ressource est liée au patient, au prescripteur (si fourni) et
+    à la prescription autorisant la dispensation (si fournie).
+
+    Args:
+        request: données de dispensation validées (Pydantic).
+
+    Returns:
+        dict sérialisable en JSON conforme FHIR R4 Bundle.
+    """
+    dispensed_at = request.dispensed_at or _now_iso()
+    entries: list[dict[str, Any]] = []
+
+    subject_ref = FHIRReference(reference=f"urn:ruggylab:patient:{request.patient_ref}")
+    auth_prescriptions: list[FHIRReference] = []
+    if request.authorizing_prescription_ref:
+        auth_prescriptions = [FHIRReference(reference=request.authorizing_prescription_ref)]
+
+    performer: list[dict] = []
+    if request.practitioner_ref:
+        performer = [
+            {"actor": {"reference": f"urn:ruggylab:practitioner:{request.practitioner_ref}"}}
+        ]
+
+    for idx, line in enumerate(request.drug_lines, start=1):
+        resource_id = f"disp-{idx:04d}"
+
+        # Posologie
+        dosage: list[FHIRDosageInstruction] = []
+        if line.dose_mg is not None or line.route:
+            parts: list[str] = []
+            if line.dose_mg:
+                parts.append(f"{line.dose_mg} mg")
+            if line.frequency_per_day:
+                parts.append(f"{line.frequency_per_day}×/j")
+            if line.duration_days:
+                parts.append(f"pendant {line.duration_days} j")
+            dosage_text = " — ".join(parts) if parts else line.route
+
+            route_concept = FHIRCodeableConcept(
+                coding=[
+                    FHIRCoding(
+                        system=_SNOMED_SYSTEM,
+                        code="26643006" if line.route == "oral" else "47625008",
+                        display="Oral route" if line.route == "oral" else line.route,
+                    )
+                ],
+                text=line.route,
+            )
+            dose_rate: list[dict] = []
+            if line.dose_mg is not None:
+                dose_rate = [
+                    {
+                        "doseQuantity": {
+                            "value": line.dose_mg,
+                            "unit": "mg",
+                            "system": _UCUM_SYSTEM,
+                            "code": "mg",
+                        }
+                    }
+                ]
+            dosage = [
+                FHIRDosageInstruction(
+                    text=dosage_text,
+                    route=route_concept,
+                    doseAndRate=dose_rate,
+                )
+            ]
+
+        # Quantité dispensée
+        quantity = FHIRQuantity(
+            value=float(line.quantity),
+            unit="unité",
+            system=_UCUM_SYSTEM,
+            code="1",
+        )
+
+        # Note CMU
+        notes: list[dict[str, str]] = []
+        if request.cnam_billing_ref:
+            notes.append({"text": f"Dossier CMU CNAM : {request.cnam_billing_ref}"})
+
+        dispense = FHIRMedicationDispense(
+            id=resource_id,
+            meta=FHIRMeta(
+                profile=["http://hl7.org/fhir/StructureDefinition/MedicationDispense"],
+                lastUpdated=dispensed_at,
+            ),
+            status="completed",
+            medicationCodeableConcept=FHIRCodeableConcept(
+                coding=[
+                    FHIRCoding(
+                        system=_ATC_SYSTEM,
+                        code=line.dci_code,
+                        display=line.dci_code,
+                    )
+                ],
+                text=line.dci_code,
+            ),
+            subject=subject_ref,
+            performer=performer,
+            authorizingPrescription=auth_prescriptions,
+            quantity=quantity,
+            whenHandedOver=dispensed_at,
+            dosageInstruction=dosage,
+            note=notes,
+        )
+
+        entries.append(
+            {
+                "fullUrl": f"urn:uuid:{resource_id}",
+                "resource": dispense.model_dump(exclude_none=True),
+            }
+        )
+
+    bundle_meta: dict[str, Any] = {}
+    if request.pharmacy_id:
+        bundle_meta["pharmacy_id"] = request.pharmacy_id
+
+    return {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "timestamp": dispensed_at,
+        "total": len(entries),
+        "entry": entries,
+        # Extension locale CMU (hors namespace FHIR standard)
+        "_cmu_context": bundle_meta or None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# SupplyDelivery bundle
+# ---------------------------------------------------------------------------
+
+# Type de livraison : réassort pharmaceutique
+_SUPPLY_DELIVERY_TYPE = FHIRCodeableConcept(
+    coding=[
+        FHIRCoding(
+            system=_SUPPLY_TYPE_SYSTEM,
+            code="medication",
+            display="Medication",
+        )
+    ],
+    text="Réassort médicament",
+)
+
+
+def build_supply_delivery_bundle(
+    request: SupplyDeliveryRequest,
+) -> dict[str, Any]:
+    """
+    Construit un Bundle FHIR R4 de type ``collection`` contenant un
+    ``SupplyDelivery`` par article livré.
+
+    Chaque ressource trace :
+      - l'article livré (DCI OMS + quantité)
+      - le fournisseur (grossiste ou NPSP)
+      - l'officine destinataire
+      - la date de livraison
+      - la référence MedicationRequest si la commande est tracée
+
+    Args:
+        request: données de livraison validées (Pydantic).
+
+    Returns:
+        dict sérialisable en JSON conforme FHIR R4 Bundle.
+    """
+    delivery_date = _date_iso(request.delivery_date)
+    entries: list[dict[str, Any]] = []
+
+    supplier_ref = FHIRReference(
+        reference=f"urn:ruggylab:organization:{request.supplier_name.replace(' ', '-')}",
+        display=request.supplier_name,
+    )
+    destination_ref = FHIRReference(
+        reference=f"urn:ruggylab:location:{request.destination_pharmacy_id}",
+        display=request.destination_pharmacy_id,
+    )
+    based_on: list[FHIRReference] = []
+    if request.order_reference:
+        based_on = [FHIRReference(reference=request.order_reference)]
+
+    for idx, item in enumerate(request.items, start=1):
+        resource_id = f"supply-del-{idx:04d}"
+
+        # Article livré
+        supplied_item: dict[str, Any] = {
+            "quantity": {
+                "value": float(item.quantity),
+                "unit": "unité",
+                "system": _UCUM_SYSTEM,
+                "code": "1",
+            },
+            "itemCodeableConcept": {
+                "coding": [
+                    {
+                        "system": _ATC_SYSTEM,
+                        "code": item.dci_code,
+                        "display": item.dci_code,
+                    }
+                ],
+                "text": item.dci_code,
+            },
+        }
+
+        # Notes : lot + péremption + valorisation
+        notes: list[dict[str, str]] = []
+        if item.batch_number:
+            notes.append({"text": f"Lot : {item.batch_number}"})
+        if item.expiry_date:
+            notes.append({"text": f"Date péremption : {item.expiry_date}"})
+        if item.unit_cost_xof is not None:
+            total_xof = item.unit_cost_xof * item.quantity
+            notes.append(
+                {
+                    "text": (
+                        f"Valorisation : {item.unit_cost_xof} XOF/unité × "
+                        f"{item.quantity} = {total_xof:.0f} XOF"
+                    )
+                }
+            )
+
+        delivery = FHIRSupplyDelivery(
+            id=resource_id,
+            meta=FHIRMeta(
+                profile=["http://hl7.org/fhir/StructureDefinition/SupplyDelivery"],
+                lastUpdated=delivery_date,
+            ),
+            status="completed",
+            type=_SUPPLY_DELIVERY_TYPE,
+            suppliedItem=supplied_item,
+            occurrenceDateTime=delivery_date,
+            supplier=supplier_ref,
+            destination=destination_ref,
+            basedOn=based_on,
+            note=notes,
+        )
+
+        entries.append(
+            {
+                "fullUrl": f"urn:uuid:{resource_id}",
+                "resource": delivery.model_dump(exclude_none=True),
+            }
+        )
+
+    return {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "timestamp": delivery_date,
+        "total": len(entries),
+        "entry": entries,
+    }
