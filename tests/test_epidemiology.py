@@ -33,8 +33,8 @@ def _auth(client) -> dict:
         "/api/v1/login/access-token",
         data={
             "username": "admin",
-            "password": "change_me_admin_password",
-        },  # pragma: allowlist secret
+            "password": "change_me_admin_password",  # pragma: allowlist secret
+        },
     )
     assert resp.status_code == 200, resp.text
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
