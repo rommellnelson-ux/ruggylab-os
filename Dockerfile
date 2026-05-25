@@ -1,53 +1,67 @@
-# Multi-stage build for optimized production image
-FROM python:3.11-slim AS builder
+# syntax=docker/dockerfile:1
+# ──────────────────────────────────────────────────────────────────────────────
+# Stage 1 – builder : install Python deps in an isolated venv
+# ──────────────────────────────────────────────────────────────────────────────
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
+# Build-time system deps (gcc needed by some C-ext wheels)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
+        gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy only the dependency manifest first (layer-cache friendly)
 COPY requirements.txt .
 
-# Create virtual environment and install dependencies
+# Create venv and populate it
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Production stage
-FROM python:3.11-slim AS production
+# ──────────────────────────────────────────────────────────────────────────────
+# Stage 2 – runtime : minimal image, non-root user, no build tools
+# ──────────────────────────────────────────────────────────────────────────────
+FROM python:3.13-slim AS runtime
+
+# OCI standard labels
+LABEL org.opencontainers.image.title="RuggyLab OS" \
+      org.opencontainers.image.description="Laboratory Information System for hospitals in Côte d'Ivoire" \
+      org.opencontainers.image.source="https://github.com/rommellnelson-ux/ruggylab-os" \
+      org.opencontainers.image.licenses="GPL-2.0" \
+      org.opencontainers.image.vendor="RuggyLab"
 
 WORKDIR /app
 
-# Create non-root user
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+# Non-root user/group
+RUN groupadd -r ruggylab && useradd -r -g ruggylab -s /sbin/nologin ruggylab
 
-# Copy virtual environment from builder
+# Copy the pre-built venv from builder (no compiler needed at runtime)
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application code
-COPY --chown=appuser:appgroup app/ ./app/
-COPY --chown=appuser:appgroup alembic/ ./alembic/
-COPY --chown=appuser:appgroup alembic.ini .
+# Copy application source (owned by the non-root user)
+COPY --chown=ruggylab:ruggylab app/       ./app/
+COPY --chown=ruggylab:ruggylab alembic/   ./alembic/
+COPY --chown=ruggylab:ruggylab alembic.ini .
 
-# Create necessary directories
+# Runtime directories (must exist before USER switch)
 RUN mkdir -p data microscopy models backups && \
-    chown -R appuser:appgroup data microscopy models backups
+    chown -R ruggylab:ruggylab data microscopy models backups
 
-# Switch to non-root user
-USER appuser
+# Drop privileges
+USER ruggylab
 
-# Expose ports (API + DH36 Listener)
-EXPOSE 8000 5001
+# API port
+EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" || exit 1
+# Liveness probe (used by Docker and docker-compose)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c \
+        "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" \
+        || exit 1
 
-# Run migrations then API (default 1 worker; override with UVICORN_WORKERS for PostgreSQL)
-ENV UVICORN_WORKERS=1
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}"]
+# Default: run uvicorn directly (migrations handled by the dedicated `migrate`
+# service in docker-compose, or run manually before deploying).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
