@@ -123,6 +123,11 @@ class Settings(BaseSettings):
     # Leave empty (default) to never trust X-Forwarded-For (safest for direct exposure).
     TRUSTED_PROXY_IPS: list[str] = []
 
+    # ONMCI — Ordre National des Médecins de Côte d'Ivoire
+    ONMCI_SECRET_KEY: str = "change-me-use-a-32-char-secret-key"  # noqa: S105
+    ONMCI_API_URL: str | None = None  # None = vérification locale seulement
+    ONMCI_TIMEOUT_SECONDS: int = 5
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
