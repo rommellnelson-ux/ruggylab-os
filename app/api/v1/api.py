@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.billing import router as billing_router
+from app.api.v1.endpoints.bnpl import router as bnpl_router
 from app.api.v1.endpoints.dh36 import router as dh36_router
 from app.api.v1.endpoints.epidemiology import router as epidemiology_router
 from app.api.v1.endpoints.equipment_reagent_ratios import (
@@ -56,3 +57,4 @@ api_router.include_router(prescription_scanner_router, tags=["Prescription Scann
 api_router.include_router(pdf_prescription_router, tags=["Prescription Scanner CMU"])
 api_router.include_router(fhir_pharmacy_router, tags=["FHIR R4 Pharmacy"])
 api_router.include_router(epidemiology_router, tags=["Epidemiology"])
+api_router.include_router(bnpl_router, tags=["BNPL CMU"])
