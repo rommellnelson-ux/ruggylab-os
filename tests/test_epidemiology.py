@@ -31,7 +31,7 @@ DASHBOARD_URL = "/api/v1/epidemiology/dashboard"
 def _auth(client) -> dict:
     resp = client.post(
         "/api/v1/login/access-token",
-        data={"username": "admin", "password": "change_me_admin_password"},
+        data={"username": "admin", "password": "change_me_admin_password"},  # pragma: allowlist secret
     )
     assert resp.status_code == 200, resp.text
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}

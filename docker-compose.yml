@@ -16,7 +16,7 @@ services:
     image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
@@ -103,7 +103,7 @@ services:
     image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
     command: ["alembic", "upgrade", "head"]
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY:-placeholder-only-needed-at-import-time}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-placeholder}
     depends_on:
