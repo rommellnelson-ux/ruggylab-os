@@ -109,6 +109,14 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # Notifications
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_FROM: str = "alertes@ruggylab.local"
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    NOTIFICATION_WEBHOOK_TIMEOUT_SECONDS: int = 10
+
     # Trusted reverse-proxy IPs.
     # X-Forwarded-For is only trusted when the direct client IP is in this list.
     # Example: ["127.0.0.1", "10.0.0.1"]
