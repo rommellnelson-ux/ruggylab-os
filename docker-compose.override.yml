@@ -1,0 +1,41 @@
+# docker-compose.override.yml – Local development overrides
+# Automatically merged by `docker compose up` (no extra flags needed).
+# Do NOT commit secrets here; use a local .env file.
+
+services:
+
+  app:
+    build:
+      context: .
+      target: runtime
+    # Hot-reload: mount source code and run uvicorn with --reload
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      # Live source mount – changes take effect without rebuilding the image
+      - ./app:/app/app:ro
+      - ./alembic:/app/alembic:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      # In dev, SQLite is fine; override with DATABASE_URL in your .env for PG
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./ruggylab_os.db}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-NOT-for-production-use-32c}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-DevPassword123!}
+      CACHE_BACKEND: ${CACHE_BACKEND:-memory}
+
+  postgres:
+    # Expose PG on localhost so local tools (psql, DBeaver…) can connect
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    # Expose Redis on localhost for local debugging
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  prometheus:
+    # Restrict Prometheus to localhost in dev (not publicly accessible)
+    ports:
+      - "127.0.0.1:9090:9090"

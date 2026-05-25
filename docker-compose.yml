@@ -1,30 +1,128 @@
-version: "3.8"
+# docker-compose.yml – Production configuration
+# Override for local dev: docker-compose.override.yml (auto-loaded by Compose)
+# Run migrations manually: docker compose --profile migrate up migrate
+#
+# Required environment variables (copy .env.example → .env and fill in):
+#   DATABASE_URL, SECRET_KEY, REDIS_URL, FIRST_SUPERUSER_PASSWORD
+#   POSTGRES_PASSWORD
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: ruggylab-db
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: ${POSTGRES_DB:-ruggylab_os}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: ruggylab-pgadmin
-    restart: always
+  # ── Application ─────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      target: runtime
+    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@ruggylab.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?Set PGADMIN_PASSWORD in .env}
-    ports:
-      - "5050:80"
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}
+      SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
+      CACHE_BACKEND: redis
     depends_on:
-      - db
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    volumes:
+      - app_data:/app/data
+      - app_models:/app/models
+    networks:
+      - ruggylab
 
+  # ── PostgreSQL 16 ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ruggylab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ruggylab}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ruggylab} -d ${POSTGRES_DB:-ruggylab}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    networks:
+      - ruggylab
+
+  # ── Redis 7 ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    networks:
+      - ruggylab
+
+  # ── Prometheus ───────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - app
+    networks:
+      - ruggylab
+
+  # ── Migrations (run-once, manual) ────────────────────────────────────────────
+  migrate:
+    build:
+      context: .
+      target: runtime
+    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}
+      SECRET_KEY: ${SECRET_KEY:-placeholder-only-needed-at-import-time}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-placeholder}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - migrate
+    networks:
+      - ruggylab
+
+# ── Named volumes ────────────────────────────────────────────────────────────
 volumes:
-  pgdata:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  app_data:
+  app_models:
+
+# ── Network ──────────────────────────────────────────────────────────────────
+networks:
+  ruggylab:
+    driver: bridge
