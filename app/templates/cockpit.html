@@ -532,20 +532,27 @@
       .nav {
         display: none !important;
       }
-      
+
       .shell {
         grid-template-columns: 1fr;
       }
-      
+
       .side {
         display: none;
       }
-      
+
       .panel {
         break-inside: avoid;
         box-shadow: none;
         border: 1px solid #000;
       }
+    }
+    .nav-section {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(168, 183, 199, 0.55);
+      padding: 14px 8px 3px;
     }
   </style>
 </head>
@@ -573,14 +580,20 @@
         <p>Centre de Santé de la Garde Républicaine</p>
       </div>
       <nav class="nav" role="navigation" aria-label="Navigation principale">
-        <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">Tableau de bord</button>
-        <button data-view="patients" onclick="showView('patients')">Patients</button>
-        <button data-view="samples" onclick="showView('samples')">Echantillons</button>
-        <button data-view="results" onclick="showView('results')">Resultats</button>
-        <button data-view="machines" onclick="showView('machines')">DH36 et POCT</button>
-        <button data-view="imaging" onclick="showView('imaging')">Imagerie et IA</button>
-        <button data-view="stocks" onclick="showView('stocks')">Stocks</button>
-        <button data-view="reports" onclick="showView('reports')">Rapports</button>
+        <div class="nav-section">── CLINIQUE ──</div>
+        <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">🏠 Tableau de bord</button>
+        <button data-view="patients" onclick="showView('patients')">👤 Patients</button>
+        <button data-view="samples" onclick="showView('samples')">🧪 Échantillons</button>
+        <button data-view="results" onclick="showView('results')">📋 Résultats</button>
+        <div class="nav-section">── ANALYTIQUE ──</div>
+        <button data-view="epidemio" onclick="showView('epidemio')">📊 Épidémiologie</button>
+        <button data-view="machines" onclick="showView('machines')">🔬 DH36 &amp; POCT</button>
+        <button data-view="imaging" onclick="showView('imaging')">👁 Imagerie IA</button>
+        <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
+        <div class="nav-section">── LOGISTIQUE ──</div>
+        <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
+        <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
+        <div class="nav-section">── SYSTÈME ──</div>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
       </nav>
     </aside>
@@ -723,6 +736,93 @@
               <div class="actions"><button onclick="openPdf()">Ouvrir PDF</button><button class="success" onclick="signPdf(this)">Signer</button></div>
             </div></div>
             <div class="panel"><h3>Surveillance epidemiologique</h3><div class="actions"><button onclick="loadDashboard()">Actualiser resume</button><button class="secondary" onclick="downloadEpiCsv()">Exporter CSV</button></div></div>
+          </div>
+        </div>
+
+        <div id="epidemio" class="view band hidden">
+          <div class="toolbar" style="margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <div><label style="display:block;font-size:11px;margin-bottom:3px;">Début</label><input type="date" id="epiStart" style="width:140px;" /></div>
+            <div><label style="display:block;font-size:11px;margin-bottom:3px;">Fin</label><input type="date" id="epiEnd" style="width:140px;" /></div>
+            <div style="flex:1;min-width:160px;"><label style="display:block;font-size:11px;margin-bottom:3px;">Paramètres (comma-sep, vide = tous)</label><input id="epiParams" placeholder="WBC,HGB,PLT" /></div>
+            <button onclick="loadEpidemio(this)" style="align-self:flex-end;">Calculer</button>
+            <button class="secondary" onclick="exportEpiCsv()" style="align-self:flex-end;">↓ CSV</button>
+          </div>
+          <div class="grid3" style="margin-bottom:14px;">
+            <div class="panel metric"><div id="epiTotal" class="value">—</div><div class="label">Total résultats</div></div>
+            <div class="panel metric"><div id="epiCritical" class="value">—</div><div class="label">Résultats critiques</div></div>
+            <div class="panel metric"><div id="epiRate" class="value">—</div><div class="label">Taux critique global</div></div>
+          </div>
+          <div class="grid2" style="margin-bottom:14px;">
+            <div class="panel">
+              <h3>Tendance critiques / jour</h3>
+              <svg id="epiChart" width="100%" height="180" style="display:block;overflow:visible;"></svg>
+            </div>
+            <div class="panel">
+              <h3>Stats par paramètre</h3>
+              <table id="epiParamTable">
+                <thead><tr><th>Paramètre</th><th>Total</th><th>Critiques</th><th>Taux</th><th>Moy.</th><th>Min</th><th>Max</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Stats par équipement / établissement</h3>
+            <table id="epiFacilityTable">
+              <thead><tr><th>Équipement</th><th>Total</th><th>Critiques</th><th>Taux</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="pharmacy" class="view band hidden">
+          <div class="toolbar" style="margin-bottom:14px;">
+            <button id="tabDispense" onclick="switchPharmTab('dispense')">💊 Dispensation CMU</button>
+            <button id="tabSupply" onclick="switchPharmTab('supply')" class="secondary">🚚 Livraison réassort</button>
+          </div>
+
+          <!-- Dispensation -->
+          <div id="pharmDispense" class="grid2">
+            <div class="panel">
+              <h3>MedicationDispense FHIR R4</h3>
+              <div class="form">
+                <div><label>Réf. patient (IPP)</label><input id="dspPatientRef" placeholder="IPP-CI-2026-001234" /></div>
+                <div><label>Réf. pharmacien (optionnel)</label><input id="dspPractRef" placeholder="PRCT-..." /></div>
+                <div><label>Réf. ordonnance FHIR</label><input id="dspPrescRef" placeholder="MedReq/..." /></div>
+                <div><label>Réf. dossier CMU CNAM</label><input id="dspCnamRef" placeholder="CNAM-2026-..." /></div>
+                <div><label>Date dispensation</label><input id="dspDate" type="datetime-local" /></div>
+                <h4 style="margin:10px 0 4px;font-size:14px;">Médicaments dispensés</h4>
+                <div id="dspDrugLines"></div>
+                <button class="ghost" onclick="addDrugLine()" style="width:100%;margin-top:4px;">+ Ajouter médicament</button>
+                <button onclick="submitDispense(this)" style="margin-top:8px;">Générer Bundle FHIR</button>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Bundle FHIR — MedicationDispense</h3>
+              <div class="toolbar" style="margin-bottom:8px;"><button class="ghost" onclick="copyFhirJson('dspResult')">Copier JSON</button></div>
+              <pre id="dspResult" class="log" style="max-height:460px;overflow:auto;color:#a8d8a8;font-size:11px;">Aucun bundle généré.</pre>
+            </div>
+          </div>
+
+          <!-- Livraison réassort -->
+          <div id="pharmSupply" class="grid2 hidden">
+            <div class="panel">
+              <h3>SupplyDelivery FHIR R4</h3>
+              <div class="form">
+                <div><label>Fournisseur</label><input id="supSupplier" placeholder="NPSP Côte d'Ivoire" /></div>
+                <div><label>Officine destinataire</label><input id="supDest" placeholder="PHARM-ABJ-001" /></div>
+                <div><label>Date livraison</label><input id="supDate" type="date" /></div>
+                <div><label>Réf. commande MedicationRequest</label><input id="supOrderRef" placeholder="urn:uuid:..." /></div>
+                <h4 style="margin:10px 0 4px;font-size:14px;">Articles livrés</h4>
+                <div id="supItemLines"></div>
+                <button class="ghost" onclick="addSupplyLine()" style="width:100%;margin-top:4px;">+ Ajouter article</button>
+                <button onclick="submitSupply(this)" style="margin-top:8px;">Générer Bundle FHIR</button>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Bundle FHIR — SupplyDelivery</h3>
+              <div class="toolbar" style="margin-bottom:8px;"><button class="ghost" onclick="copyFhirJson('supResult')">Copier JSON</button></div>
+              <pre id="supResult" class="log" style="max-height:460px;overflow:auto;color:#a8d8a8;font-size:11px;">Aucun bundle généré.</pre>
+            </div>
           </div>
         </div>
 
@@ -1253,7 +1353,9 @@
     }
     function renderResultTemplate() {
       const fields = resultTemplates[$("resultTemplate").value] || resultTemplates.manual;
-      $("resultFields").innerHTML = fields.map(([key, label, value]) => `
+      const container = $("dataPoints") || $("resultFields");
+      if (!container) return;
+      container.innerHTML = fields.map(([key, label, value]) => `
         <div>
           <label>${label}</label>
           <input data-result-key="${key}" value="${value}" />
@@ -1322,6 +1424,7 @@
       if (currentView === "samples") await loadSamples();
       if (currentView === "results") await loadResults();
       if (currentView === "stocks") await loadReagents();
+      if (currentView === "epidemio") await loadEpidemio();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -1481,12 +1584,13 @@
     function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }
     function templateDataPoints() {
       const values = {};
-      document.querySelectorAll("#resultFields input[data-result-key]").forEach((input) => {
-        const raw = input.value.trim();
-        if (raw === "") return;
-        const numeric = Number(raw);
-        values[input.dataset.resultKey] = Number.isNaN(numeric) ? raw : numeric;
-      });
+      document.querySelectorAll("#dataPoints input[data-result-key], #resultFields input[data-result-key]")
+        .forEach((input) => {
+          const raw = input.value.trim();
+          if (raw === "") return;
+          const numeric = Number(raw);
+          values[input.dataset.resultKey] = Number.isNaN(numeric) ? raw : numeric;
+        });
       return values;
     }
     async function createResult(btn) {
@@ -2606,6 +2710,257 @@
       `;
     }
     
+    // ── analyzeResultsWithAI (stub appelant le backend) ─────────────────────────
+    async function analyzeResultsWithAI() {
+      showToast('Analyse IA: utilisez la vue Imagerie IA pour l\'analyse paludisme.', 'success');
+      log('Analyse IA dédiée : vue Imagerie IA → Analyser IA avec un Result ID.\nPour l\'analyse NFS, les statuts critiques sont calculés automatiquement à la saisie du résultat.');
+    }
+
+    // ── predictInventoryNeeds (appel stock predictor) ───────────────────────────
+    async function predictInventoryNeeds() {
+      try {
+        const data = await api('/api/v1/stock/predict', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ include_fhir: false })
+        });
+        log(data);
+        const n = data.drug_predictions?.length ?? 0;
+        showToast(`Prédictions IA stocks : ${n} médicament(s) analysé(s)`, 'success');
+      } catch (e) {
+        showToast('Erreur prédiction stock', 'error');
+      }
+    }
+
+    // ── Épidémiologie ───────────────────────────────────────────────────────────
+    async function loadEpidemio(btn) {
+      if (btn) setLoading(btn, true);
+      try {
+        const body = {};
+        if ($('epiStart').value) body.start_date = $('epiStart').value;
+        if ($('epiEnd').value) body.end_date = $('epiEnd').value;
+        const params = $('epiParams').value.trim();
+        if (params) body.parameters = params.split(',').map(s => s.trim()).filter(Boolean);
+
+        const d = await api('/api/v1/epidemiology/dashboard', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(body)
+        });
+
+        $('epiTotal').textContent = d.total_results;
+        $('epiCritical').textContent = d.total_critical;
+        $('epiRate').textContent = (d.overall_critical_rate * 100).toFixed(1) + '%';
+
+        renderEpiChart(d.daily_critical_trend);
+
+        setRows('epiParamTable', (d.parameter_stats || []).map(p => row(
+          `<td><strong>${p.parameter}</strong></td>` +
+          `<td>${p.total_results}</td>` +
+          `<td>${p.critical_count}</td>` +
+          `<td>${(p.critical_rate * 100).toFixed(1)}%</td>` +
+          `<td>${p.mean_value != null ? p.mean_value.toFixed(2) : '—'}</td>` +
+          `<td>${p.min_value != null ? p.min_value : '—'}</td>` +
+          `<td>${p.max_value != null ? p.max_value : '—'}</td>`
+        )));
+
+        setRows('epiFacilityTable', (d.facility_stats || []).map(f => row(
+          `<td>${f.facility_name ?? '—'} <span class="pill">#${f.facility_id ?? '?'}</span></td>` +
+          `<td>${f.total_results}</td>` +
+          `<td>${f.critical_count}</td>` +
+          `<td>${(f.critical_rate * 100).toFixed(1)}%</td>`
+        )));
+
+        showToast('Tableau épidémiologique actualisé', 'success');
+      } catch (e) {
+        showToast('Erreur épidémiologie', 'error');
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
+    }
+
+    function renderEpiChart(trend) {
+      const svg = $('epiChart');
+      if (!svg) return;
+      if (!trend || trend.length === 0) {
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--muted)" font-size="13">Aucune donnée</text>';
+        return;
+      }
+      const H = 180;
+      const pad = { top: 16, right: 16, bottom: 36, left: 36 };
+      const W = svg.getBoundingClientRect().width || 380;
+      const chartW = W - pad.left - pad.right;
+      const chartH = H - pad.top - pad.bottom;
+      const maxC = Math.max(...trend.map(d => d.count), 1);
+      const n = trend.length;
+      const xS = (i) => pad.left + (n > 1 ? (i / (n - 1)) * chartW : chartW / 2);
+      const yS = (v) => pad.top + chartH - (v / maxC) * chartH;
+
+      const pts = trend.map((d, i) => `${xS(i).toFixed(1)},${yS(d.count).toFixed(1)}`).join(' ');
+      const area = `${xS(0).toFixed(1)},${(pad.top + chartH).toFixed(1)} ${pts} ${xS(n - 1).toFixed(1)},${(pad.top + chartH).toFixed(1)}`;
+
+      const labelIdx = n <= 8 ? trend.map((_, i) => i) : [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor(3 * n / 4), n - 1];
+      const xLabels = labelIdx.map(i => {
+        const d = trend[i].date.slice(5); // MM-DD
+        return `<text x="${xS(i).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="10" fill="var(--muted)">${d}</text>`;
+      }).join('');
+
+      const dots = trend.map((d, i) => d.count > 0
+        ? `<circle cx="${xS(i).toFixed(1)}" cy="${yS(d.count).toFixed(1)}" r="3" fill="var(--blue)">
+             <title>${d.date}: ${d.count} critique(s)</title>
+           </circle>`
+        : ''
+      ).join('');
+
+      svg.setAttribute('height', H);
+      svg.innerHTML = `
+        <polygon points="${area}" fill="rgba(37,99,235,0.10)" stroke="none"/>
+        <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dots}
+        ${xLabels}
+        <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + chartH}" stroke="var(--line)" stroke-width="1"/>
+        <line x1="${pad.left}" y1="${pad.top + chartH}" x2="${pad.left + chartW}" y2="${pad.top + chartH}" stroke="var(--line)" stroke-width="1"/>
+        <text x="${pad.left - 4}" y="${pad.top + 4}" text-anchor="end" font-size="10" fill="var(--muted)">${maxC}</text>
+        <text x="${pad.left - 4}" y="${pad.top + chartH}" text-anchor="end" font-size="10" fill="var(--muted)">0</text>
+      `;
+    }
+
+    function exportEpiCsv() {
+      window.open('/api/v1/reports/epidemiology-export.csv?days=30', '_blank');
+    }
+
+    // ── Pharmacie FHIR ──────────────────────────────────────────────────────────
+    function switchPharmTab(tab) {
+      const isDispense = tab === 'dispense';
+      $('pharmDispense').classList.toggle('hidden', !isDispense);
+      $('pharmSupply').classList.toggle('hidden', isDispense);
+      $('tabDispense').classList.toggle('secondary', !isDispense);
+      $('tabDispense').classList.remove('warn');
+      $('tabSupply').classList.toggle('secondary', isDispense);
+      if (!isDispense) $('tabDispense').classList.add('secondary');
+    }
+
+    let _dlCount = 0;
+    function addDrugLine() {
+      _dlCount++;
+      const div = document.createElement('div');
+      div.className = 'panel';
+      div.style.cssText = 'margin-bottom:8px;padding:10px;';
+      div.innerHTML = `
+        <div class="grid3" style="gap:6px;align-items:end;">
+          <div><label>DCI (code OMS)</label><input data-dl-dci placeholder="ARTEMETHER-LUMEFANTRINE" /></div>
+          <div><label>Quantité</label><input data-dl-qty type="number" min="1" value="1" /></div>
+          <div><label>Dose (mg)</label><input data-dl-dose type="number" step="0.1" placeholder="opt." /></div>
+        </div>
+        <div class="grid3" style="gap:6px;margin-top:6px;align-items:end;">
+          <div><label>Fréquence/j</label><input data-dl-freq type="number" min="1" max="24" placeholder="opt." /></div>
+          <div><label>Durée (j)</label><input data-dl-dur type="number" min="1" placeholder="opt." /></div>
+          <div><label>Voie</label><select data-dl-route><option>oral</option><option>IV</option><option>IM</option><option>SC</option><option>topique</option></select></div>
+        </div>
+        <button class="danger" style="margin-top:6px;width:100%;padding:5px;" onclick="this.parentNode.remove()">✕ Supprimer</button>
+      `;
+      $('dspDrugLines').appendChild(div);
+    }
+
+    let _slCount = 0;
+    function addSupplyLine() {
+      _slCount++;
+      const div = document.createElement('div');
+      div.className = 'panel';
+      div.style.cssText = 'margin-bottom:8px;padding:10px;';
+      div.innerHTML = `
+        <div class="grid3" style="gap:6px;align-items:end;">
+          <div><label>DCI (code OMS)</label><input data-sl-dci placeholder="ARTEMETHER-LUMEFANTRINE" /></div>
+          <div><label>Qté livrée</label><input data-sl-qty type="number" min="1" value="1" /></div>
+          <div><label>Coût unit. XOF</label><input data-sl-cost type="number" step="1" placeholder="opt." /></div>
+        </div>
+        <div class="grid2" style="gap:6px;margin-top:6px;align-items:end;">
+          <div><label>N° lot</label><input data-sl-batch placeholder="LOT-2026-001 (opt.)" /></div>
+          <div><label>Date péremption</label><input data-sl-expiry type="date" /></div>
+        </div>
+        <button class="danger" style="margin-top:6px;width:100%;padding:5px;" onclick="this.parentNode.remove()">✕ Supprimer</button>
+      `;
+      $('supItemLines').appendChild(div);
+    }
+
+    async function submitDispense(btn) {
+      setLoading(btn, true);
+      try {
+        const drugLines = [];
+        Array.from($('dspDrugLines').children).forEach(panel => {
+          const dci = panel.querySelector('[data-dl-dci]')?.value?.trim();
+          const qty = panel.querySelector('[data-dl-qty]')?.value;
+          if (!dci || !qty) return;
+          const line = {
+            dci_code: dci,
+            quantity: parseInt(qty),
+            route: panel.querySelector('[data-dl-route]')?.value || 'oral'
+          };
+          const dose = panel.querySelector('[data-dl-dose]')?.value;
+          const freq = panel.querySelector('[data-dl-freq]')?.value;
+          const dur = panel.querySelector('[data-dl-dur]')?.value;
+          if (dose) line.dose_mg = parseFloat(dose);
+          if (freq) line.frequency_per_day = parseInt(freq);
+          if (dur) line.duration_days = parseInt(dur);
+          drugLines.push(line);
+        });
+        if (!drugLines.length) { showToast('Ajoutez au moins un médicament', 'warning'); setLoading(btn, false); return; }
+        const payload = {
+          patient_ref: $('dspPatientRef').value,
+          practitioner_ref: $('dspPractRef').value || null,
+          authorizing_prescription_ref: $('dspPrescRef').value || null,
+          cnam_billing_ref: $('dspCnamRef').value || null,
+          dispensed_at: $('dspDate').value ? new Date($('dspDate').value).toISOString() : null,
+          drug_lines: drugLines
+        };
+        const bundle = await api('/fhir/medication-dispense', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+        $('dspResult').textContent = JSON.stringify(bundle, null, 2);
+        showToast(`Bundle MedicationDispense — ${bundle.entry?.length ?? 0} entrée(s)`, 'success');
+      } catch (e) { showToast('Erreur génération bundle MedicationDispense', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function submitSupply(btn) {
+      setLoading(btn, true);
+      try {
+        const items = [];
+        Array.from($('supItemLines').children).forEach(panel => {
+          const dci = panel.querySelector('[data-sl-dci]')?.value?.trim();
+          const qty = panel.querySelector('[data-sl-qty]')?.value;
+          if (!dci || !qty) return;
+          const item = { dci_code: dci, quantity: parseInt(qty) };
+          const cost = panel.querySelector('[data-sl-cost]')?.value;
+          const batch = panel.querySelector('[data-sl-batch]')?.value;
+          const expiry = panel.querySelector('[data-sl-expiry]')?.value;
+          if (cost) item.unit_cost_xof = parseFloat(cost);
+          if (batch) item.batch_number = batch;
+          if (expiry) item.expiry_date = expiry;
+          items.push(item);
+        });
+        if (!items.length) { showToast('Ajoutez au moins un article', 'warning'); setLoading(btn, false); return; }
+        const payload = {
+          supplier_name: $('supSupplier').value,
+          destination_pharmacy_id: $('supDest').value,
+          delivery_date: $('supDate').value || null,
+          order_reference: $('supOrderRef').value || null,
+          items
+        };
+        const bundle = await api('/fhir/supply-delivery', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+        $('supResult').textContent = JSON.stringify(bundle, null, 2);
+        showToast(`Bundle SupplyDelivery — ${bundle.entry?.length ?? 0} entrée(s)`, 'success');
+      } catch (e) { showToast('Erreur génération bundle SupplyDelivery', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function copyFhirJson(id) {
+      const text = $(id)?.textContent;
+      if (!text || text === 'Aucun bundle généré.') { showToast('Aucun bundle à copier', 'warning'); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('JSON copié dans le presse-papiers', 'success');
+      } catch { showToast('Copie impossible (HTTP non sécurisé)', 'error'); }
+    }
+
     // Initialiser le moteur IA au chargement de la page
     document.addEventListener('DOMContentLoaded', () => {
       // Initialiser l'IA après un court délai pour éviter de bloquer le chargement
