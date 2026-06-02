@@ -22,6 +22,12 @@ Architecture principale:
 Depuis la racine du depot:
 
 ```powershell
+.\scripts\validate.ps1
+```
+
+Ou manuellement:
+
+```powershell
 python -m ruff check app tests
 python -m bandit -q -r app -c pyproject.toml
 python -m pip_audit -r requirements.txt --ignore-vuln PYSEC-2025-183
@@ -33,7 +39,7 @@ La suite complete prend environ 1 a 2 minutes en local et doit finir autour de `
 Pour une passe ciblee apres changement auth/API:
 
 ```powershell
-python -m pytest tests/test_security.py tests/test_login_security.py tests/test_auth_refresh.py tests/test_api.py --tb=short -q
+.\scripts\validate.ps1 -Fast
 ```
 
 ## Demarrage Local
@@ -86,13 +92,11 @@ Verifier au minimum:
 
 ```powershell
 git status --short
-python -m ruff check app tests
-python -m pytest --tb=short -q
+.\scripts\validate.ps1
 ```
 
 Pour un changement de dependance ou de securite, ajouter:
 
 ```powershell
-python -m bandit -q -r app -c pyproject.toml
-python -m pip_audit -r requirements.txt --ignore-vuln PYSEC-2025-183
+.\scripts\validate.ps1
 ```

@@ -221,6 +221,12 @@ pytest
 
 The API tests use a dedicated SQLite database through `TestClient` and do not start the DH36 listener.
 
+On Windows, run the full local validation suite with:
+
+```powershell
+.\scripts\validate.ps1
+```
+
 ## Security notes
 
 - Sensitive CRUD routes require authentication
