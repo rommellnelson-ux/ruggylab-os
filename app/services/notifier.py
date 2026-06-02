@@ -156,7 +156,7 @@ class StockNotifier:
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310  # nosec B310
                 status_code: int = resp.status
                 if 200 <= status_code < 300:
                     logger.info("stock_notifier.webhook.ok url=%s status=%d", url, status_code)
