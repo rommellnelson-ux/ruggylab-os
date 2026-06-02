@@ -1,7 +1,7 @@
 # RuggyLab OS
 
 [![Release](https://img.shields.io/github/v/release/rommellnelson-ux/ruggylab-os?display_name=tag)](https://github.com/rommellnelson-ux/ruggylab-os/releases)
-[![Python](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-GPL--2.0-lightgrey.svg)](https://github.com/rommellnelson-ux/ruggylab-os)
 
