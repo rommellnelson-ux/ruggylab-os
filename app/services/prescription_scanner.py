@@ -32,6 +32,7 @@ from app.schemas.prescription_scanner import (
     ScanResult,
     ScanStatus,
 )
+from app.services.onmci_client import ONMCIClient, get_onmci_client
 
 logger = logging.getLogger(__name__)
 
@@ -473,6 +474,7 @@ class PrescriptionScanner:
         default_factory=lambda: dict(_CONTRAINDICATIONS)
     )
     max_daily_doses: dict[str, float] = field(default_factory=lambda: dict(_MAX_DAILY_DOSE_ADULT))
+    onmci_client: ONMCIClient | None = None  # None → fallback format-only
 
     def scan(self, request: PrescriptionRequest) -> ScanResult:
         """Point d'entrée principal — analyse complète de l'ordonnance."""
@@ -663,18 +665,20 @@ class PrescriptionScanner:
     # 4. Vérification QR-code (stub extensible)
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _verify_qr(token: str | None, prescriber_id: str | None) -> bool:
+    def _verify_qr(self, token: str | None, prescriber_id: str | None) -> bool:
         """
-        Vérification d'authenticité de l'ordonnance.
+        Vérification d'authenticité de l'ordonnance via ONMCI.
 
-        Implémentation actuelle : stub basé sur HMAC-SHA256.
-        Production : appel au registre centralisé ONMCI (Ordre National des
-        Médecins de Côte d'Ivoire) via API sécurisée.
+        Si un client ONMCI est configuré, délègue la vérification à celui-ci
+        (HMAC local ou API distante avec fallback). Sinon, repli sur le
+        contrôle de format hex ≥ 32 chars (comportement historique).
         """
         if not token or not prescriber_id:
             return False
-        # Stub : vérifie que le token ressemble à un hash valide (≥ 32 hex chars)
+        if self.onmci_client is not None:
+            result = self.onmci_client.verify(token, prescriber_id)
+            return result.valid
+        # Fallback si pas de client configuré : vérification format hex ≥ 32 chars
         try:
             cleaned = token.strip().lower()
             int(cleaned, 16)
@@ -753,5 +757,5 @@ def get_prescription_scanner() -> PrescriptionScanner:
     """Factory / singleton FastAPI-injectable."""
     global _scanner
     if _scanner is None:
-        _scanner = PrescriptionScanner()
+        _scanner = PrescriptionScanner(onmci_client=get_onmci_client())
     return _scanner
