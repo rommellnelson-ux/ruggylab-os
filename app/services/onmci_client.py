@@ -133,8 +133,8 @@ class ONMCIClient:
         url = f"{self.api_url.rstrip('/')}/verify?{params}"
 
         try:
-            req = urllib.request.Request(url, method="GET")  # noqa: S310
-            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as resp:  # noqa: S310
+            req = urllib.request.Request(url, method="GET")  # noqa: S310  # nosec B310
+            with urllib.request.urlopen(req, timeout=self.timeout_seconds) as resp:  # noqa: S310  # nosec B310
                 raw = resp.read()
                 data: dict[str, object] = json.loads(raw)
 
