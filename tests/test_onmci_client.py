@@ -33,7 +33,7 @@ from app.services.onmci_client import (
 # Helpers & fixtures
 # ---------------------------------------------------------------------------
 
-_SECRET = "test-secret-key-for-unit-tests-ok"
+_SECRET = "test-secret-key-for-unit-tests-ok"  # pragma: allowlist secret
 _PRESCRIBER = "ONMCI-99001"
 
 
