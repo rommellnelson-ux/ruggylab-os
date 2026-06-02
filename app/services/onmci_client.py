@@ -121,9 +121,7 @@ class ONMCIClient:
                 return True
         return False
 
-    def _verify_remote(
-        self, token: str, prescriber_id: str
-    ) -> ONMCIVerificationResult | None:
+    def _verify_remote(self, token: str, prescriber_id: str) -> ONMCIVerificationResult | None:
         """
         Appel HTTP GET à l'API ONMCI.
 
