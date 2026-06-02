@@ -280,7 +280,9 @@ class TestSendWebhook:
             result = notifier._send_webhook("http://example.com/hook", _make_payload())  # type: ignore[arg-type]
         assert result is False
 
-    def test_timeout_logs_error(self, notifier: StockNotifier, caplog: pytest.LogCaptureFixture) -> None:
+    def test_timeout_logs_error(
+        self, notifier: StockNotifier, caplog: pytest.LogCaptureFixture
+    ) -> None:
 
         with patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")):
             with caplog.at_level("ERROR", logger="app.services.notifier"):
@@ -425,9 +427,7 @@ class TestStockNotificationEndpoint:
             )
         assert resp.status_code == 200, resp.text
 
-    def test_notify_endpoint_returns_notification_result_schema(
-        self, client: TestClient
-    ) -> None:
+    def test_notify_endpoint_returns_notification_result_schema(self, client: TestClient) -> None:
         headers = _auth_headers(client)
         with patch("app.services.notifier.StockNotifier._send_webhook", return_value=True):
             resp = client.post(

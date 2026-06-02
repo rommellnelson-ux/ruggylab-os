@@ -161,9 +161,7 @@ class StockNotifier:
                 if 200 <= status_code < 300:
                     logger.info("stock_notifier.webhook.ok url=%s status=%d", url, status_code)
                     return True
-                logger.warning(
-                    "stock_notifier.webhook.non2xx url=%s status=%d", url, status_code
-                )
+                logger.warning("stock_notifier.webhook.non2xx url=%s status=%d", url, status_code)
                 return False
         except urllib.error.HTTPError as exc:
             logger.error(
