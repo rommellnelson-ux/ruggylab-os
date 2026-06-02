@@ -355,7 +355,9 @@ class TestEndpointPdfPrescription:
             json=payload,
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
 
     def test_report_content_type_pdf(self, client: TestClient) -> None:
         """Le content-type de la réponse doit être application/pdf."""

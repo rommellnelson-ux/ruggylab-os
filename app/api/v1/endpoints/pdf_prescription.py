@@ -64,11 +64,7 @@ def generate_prescription_report(
             detail="Erreur lors de la génération du rapport PDF.",
         ) from exc
 
-    date_str = (
-        str(payload.prescription_date)
-        if payload.prescription_date
-        else str(date.today())
-    )
+    date_str = str(payload.prescription_date) if payload.prescription_date else str(date.today())
     filename = f"ordonnance-{date_str}.pdf"
 
     logger.info(

@@ -36,12 +36,7 @@ _FONT_BOLD = "/Helvetica-Bold"
 
 def _escape(text: str) -> str:
     """Échappe les caractères spéciaux PDF dans une chaîne de contenu."""
-    return (
-        text.replace("\\", "\\\\")
-        .replace("(", "\\(")
-        .replace(")", "\\)")
-        .replace("\n", " ")
-    )
+    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)").replace("\n", " ")
 
 
 def _safe_latin1(text: str) -> str:
@@ -149,25 +144,21 @@ class _PdfBuilder:
         self._font = font
         self._font_size = size
 
-    def _draw_text(self, text: str, x: float, y: float, bold: bool = False, size: int | None = None) -> None:
+    def _draw_text(
+        self, text: str, x: float, y: float, bold: bool = False, size: int | None = None
+    ) -> None:
         font = _FONT_BOLD if bold else _FONT_REGULAR
         sz = size if size is not None else self._font_size
         safe = _safe_latin1(text)
         escaped = _escape(safe)
-        self._current_page_cmds.append(
-            f"BT {font} {sz} Tf {x:.1f} {y:.1f} Td ({escaped}) Tj ET"
-        )
+        self._current_page_cmds.append(f"BT {font} {sz} Tf {x:.1f} {y:.1f} Td ({escaped}) Tj ET")
 
     def _draw_line_h(self, x1: float, x2: float, y: float, width: float = 0.5) -> None:
-        self._current_page_cmds.append(
-            f"{width} w {x1:.1f} {y:.1f} m {x2:.1f} {y:.1f} l S"
-        )
+        self._current_page_cmds.append(f"{width} w {x1:.1f} {y:.1f} m {x2:.1f} {y:.1f} l S")
 
     def _draw_rect_filled(self, x: float, y: float, w: float, h: float, gray: float = 0.85) -> None:
         """Dessine un rectangle rempli (gris)."""
-        self._current_page_cmds.append(
-            f"{gray:.2f} g {x:.1f} {y:.1f} {w:.1f} {h:.1f} re f"
-        )
+        self._current_page_cmds.append(f"{gray:.2f} g {x:.1f} {y:.1f} {w:.1f} {h:.1f} re f")
         # Remet la couleur à noir pour le texte suivant
         self._current_page_cmds.append("0 g")
 
@@ -178,7 +169,9 @@ class _PdfBuilder:
     def _header_block(self, title: str) -> None:
         """Bande de titre principale."""
         # Fond gris foncé
-        self._draw_rect_filled(_MARGIN_LEFT - 5, self._y - 5, _PAGE_WIDTH - 2 * _MARGIN_LEFT + 10, 24, gray=0.2)
+        self._draw_rect_filled(
+            _MARGIN_LEFT - 5, self._y - 5, _PAGE_WIDTH - 2 * _MARGIN_LEFT + 10, 24, gray=0.2
+        )
         # Texte blanc n'est pas possible avec Type1 standard — on met gris très clair
         # (le fond est sombre, police bold)
         self._draw_text(title, _MARGIN_LEFT, self._y + 5, bold=True, size=self._FONT_SIZE_TITLE)
@@ -202,14 +195,18 @@ class _PdfBuilder:
         self._ensure_space(self._LINE_HEIGHT_BODY + 2)
         x = _MARGIN_LEFT + indent
         self._draw_text(key + ": ", x, self._y, bold=True, size=self._FONT_SIZE_BODY)
-        self._draw_text(value, x + len(key) * 5.5 + 8, self._y, bold=False, size=self._FONT_SIZE_BODY)
+        self._draw_text(
+            value, x + len(key) * 5.5 + 8, self._y, bold=False, size=self._FONT_SIZE_BODY
+        )
         self._y -= self._LINE_HEIGHT_BODY
 
     def _table_header(self, cols: list[tuple[str, float]]) -> None:
         """Dessine l'en-tête d'un tableau (liste de (titre, x_pos))."""
         self._ensure_space(self._LINE_HEIGHT_BODY * 3)
         row_h = self._LINE_HEIGHT_BODY + 2
-        self._draw_rect_filled(_MARGIN_LEFT - 2, self._y - 2, _PAGE_WIDTH - 2 * _MARGIN_LEFT + 4, row_h, gray=0.75)
+        self._draw_rect_filled(
+            _MARGIN_LEFT - 2, self._y - 2, _PAGE_WIDTH - 2 * _MARGIN_LEFT + 4, row_h, gray=0.75
+        )
         for col_title, col_x in cols:
             self._draw_text(col_title, col_x, self._y, bold=True, size=self._FONT_SIZE_BODY)
         self._y -= row_h + 2
@@ -219,7 +216,9 @@ class _PdfBuilder:
         self._ensure_space(self._LINE_HEIGHT_BODY + 2)
         row_h = self._LINE_HEIGHT_BODY + 1
         if shade:
-            self._draw_rect_filled(_MARGIN_LEFT - 2, self._y - 2, _PAGE_WIDTH - 2 * _MARGIN_LEFT + 4, row_h, gray=0.93)
+            self._draw_rect_filled(
+                _MARGIN_LEFT - 2, self._y - 2, _PAGE_WIDTH - 2 * _MARGIN_LEFT + 4, row_h, gray=0.93
+            )
         for cell_text, cell_x in cells:
             self._draw_text(cell_text, cell_x, self._y, size=self._FONT_SIZE_BODY)
         self._y -= row_h + 1
@@ -277,9 +276,7 @@ class _PdfBuilder:
         for i, stream in enumerate(self._pages):
             page_id = 3 + i
             content_id = 3 + n + i
-            resources = (
-                f"<< /Font << /F1 {font_f1_id} 0 R /F2 {font_f2_id} 0 R >> >>"
-            )
+            resources = f"<< /Font << /F1 {font_f1_id} 0 R /F2 {font_f2_id} 0 R >> >>"
             add_obj(
                 page_id,
                 (
@@ -291,7 +288,11 @@ class _PdfBuilder:
             )
             add_obj(
                 content_id,
-                b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+                b"<< /Length "
+                + str(len(stream)).encode("ascii")
+                + b" >>\nstream\n"
+                + stream
+                + b"\nendstream",
             )
 
         # Font objects
@@ -386,26 +387,35 @@ def build_prescription_report(
     col_dur = 340.0
     col_voie = 400.0
 
-    builder._table_header([  # noqa: SLF001
-        ("DCI", col_dci),
-        ("Dose (mg)", col_dose),
-        ("Freq/j", col_freq),
-        ("Duree (j)", col_dur),
-        ("Voie", col_voie),
-    ])
+    builder._table_header(
+        [  # noqa: SLF001
+            ("DCI", col_dci),
+            ("Dose (mg)", col_dose),
+            ("Freq/j", col_freq),
+            ("Duree (j)", col_dur),
+            ("Voie", col_voie),
+        ]
+    )
 
     for idx, drug in enumerate(request.drugs):
-        dose_str = str(int(drug.dose_mg)) if drug.dose_mg and drug.dose_mg == int(drug.dose_mg) else (f"{drug.dose_mg:.1f}" if drug.dose_mg else "-")
+        dose_str = (
+            str(int(drug.dose_mg))
+            if drug.dose_mg and drug.dose_mg == int(drug.dose_mg)
+            else (f"{drug.dose_mg:.1f}" if drug.dose_mg else "-")
+        )
         freq_str = str(drug.frequency_per_day) if drug.frequency_per_day else "-"
         dur_str = str(drug.duration_days) if drug.duration_days else "-"
         voie_str = drug.route or "-"
-        builder._table_row([  # noqa: SLF001
-            (drug.dci.code, col_dci),
-            (dose_str, col_dose),
-            (freq_str, col_freq),
-            (dur_str, col_dur),
-            (voie_str, col_voie),
-        ], shade=(idx % 2 == 1))
+        builder._table_row(
+            [  # noqa: SLF001
+                (drug.dci.code, col_dci),
+                (dose_str, col_dose),
+                (freq_str, col_freq),
+                (dur_str, col_dur),
+                (voie_str, col_voie),
+            ],
+            shade=(idx % 2 == 1),
+        )
 
     # --- Alertes ---
     has_alerts = bool(result.interactions or result.contraindications or result.dosage_flags)
@@ -455,7 +465,9 @@ def build_prescription_report(
     if result.blocked_drugs:
         builder._body_line(f"Medicaments BLOQUES: {', '.join(result.blocked_drugs)}", indent=0)  # noqa: SLF001
     if result.warning_drugs:
-        builder._body_line(f"Medicaments sous surveillance: {', '.join(result.warning_drugs)}", indent=0)  # noqa: SLF001
+        builder._body_line(
+            f"Medicaments sous surveillance: {', '.join(result.warning_drugs)}", indent=0
+        )  # noqa: SLF001
 
     # --- Statut final ---
     builder._section_title("STATUT FINAL DE L'ORDONNANCE")  # noqa: SLF001
