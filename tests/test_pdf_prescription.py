@@ -320,7 +320,10 @@ class TestEndpointPdfPrescription:
     def _get_auth_token(self, client: TestClient) -> str:
         response = client.post(
             "/api/v1/login/access-token",
-            data={"username": "admin", "password": "change_me_admin_password"},
+            data={
+                "username": "admin",
+                "password": "change_me_admin_password",  # pragma: allowlist secret
+            },
         )
         assert response.status_code == 200, f"Login failed: {response.text}"
         return response.json()["access_token"]
