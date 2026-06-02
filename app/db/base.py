@@ -1,4 +1,5 @@
 from app.db.base_class import Base
+from app.models.bnpl import BNPLPayment, BNPLSchedule
 from app.models.ruggylab_os import (
     AuditEvent,
     DH36InboundMessage,
@@ -19,6 +20,8 @@ from app.models.ruggylab_os import (
 
 __all__ = [
     "Base",
+    "BNPLPayment",
+    "BNPLSchedule",
     "Equipment",
     "Patient",
     "Sample",
