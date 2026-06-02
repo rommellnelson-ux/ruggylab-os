@@ -72,6 +72,7 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
     Base.metadata.create_all(bind=db_session.engine)
 
     from app.services.bootstrap import init_db
+
     init_db()
 
     app = create_app()
@@ -166,6 +167,7 @@ class TestCreateSchedule:
         result = tracker.create_schedule(db, data)
         # Vérifier via la base
         from app.models.bnpl import BNPLSchedule
+
         schedule = db.get(BNPLSchedule, result.id)
         assert schedule is not None
         assert schedule.prescriber_id == "DR-YAPI"
@@ -184,7 +186,9 @@ class TestRecordPayment:
         assert payment.paid_at is not None
 
     def test_payment_amount_updated(self, tracker: BNPLTracker, db: Session) -> None:
-        schedule = tracker.create_schedule(db, _create_data(total_amount_xof=6000, installment_months=3))
+        schedule = tracker.create_schedule(
+            db, _create_data(total_amount_xof=6000, installment_months=3)
+        )
         payment = tracker.record_payment(db, schedule.id, 1, 1999)
         assert payment.amount_xof == 1999
 
@@ -192,22 +196,27 @@ class TestRecordPayment:
         schedule = tracker.create_schedule(db, _create_data(installment_months=3))
         tracker.record_payment(db, schedule.id, 1, 2000)
         from app.models.bnpl import BNPLSchedule
+
         s = db.get(BNPLSchedule, schedule.id)
         assert s is not None
         assert s.status == "ACTIVE"
 
     def test_plan_completed_when_all_paid(self, tracker: BNPLTracker, db: Session) -> None:
-        schedule = tracker.create_schedule(db, _create_data(total_amount_xof=6000, installment_months=3))
+        schedule = tracker.create_schedule(
+            db, _create_data(total_amount_xof=6000, installment_months=3)
+        )
         tracker.record_payment(db, schedule.id, 1, 2000)
         tracker.record_payment(db, schedule.id, 2, 2000)
         tracker.record_payment(db, schedule.id, 3, 2000)
         from app.models.bnpl import BNPLSchedule
+
         s = db.get(BNPLSchedule, schedule.id)
         assert s is not None
         assert s.status == "COMPLETED"
 
     def test_duplicate_payment_raises_409(self, tracker: BNPLTracker, db: Session) -> None:
         from fastapi import HTTPException
+
         schedule = tracker.create_schedule(db, _create_data(installment_months=2))
         tracker.record_payment(db, schedule.id, 1, 1000)
         with pytest.raises(HTTPException) as exc_info:
@@ -216,12 +225,14 @@ class TestRecordPayment:
 
     def test_unknown_schedule_raises_404(self, tracker: BNPLTracker, db: Session) -> None:
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             tracker.record_payment(db, 9999, 1, 1000)
         assert exc_info.value.status_code == 404
 
     def test_unknown_installment_raises_404(self, tracker: BNPLTracker, db: Session) -> None:
         from fastapi import HTTPException
+
         schedule = tracker.create_schedule(db, _create_data(installment_months=2))
         with pytest.raises(HTTPException) as exc_info:
             tracker.record_payment(db, schedule.id, 99, 1000)
@@ -230,14 +241,18 @@ class TestRecordPayment:
 
 class TestGetSummary:
     def test_initial_summary(self, tracker: BNPLTracker, db: Session) -> None:
-        schedule = tracker.create_schedule(db, _create_data(total_amount_xof=6000, installment_months=3))
+        schedule = tracker.create_schedule(
+            db, _create_data(total_amount_xof=6000, installment_months=3)
+        )
         summary = tracker.get_summary(db, schedule.id)
         assert summary.paid_amount_xof == 0
         assert summary.remaining_xof == 6000
         assert summary.overdue_count == 0
 
     def test_summary_after_payment(self, tracker: BNPLTracker, db: Session) -> None:
-        schedule = tracker.create_schedule(db, _create_data(total_amount_xof=6000, installment_months=3))
+        schedule = tracker.create_schedule(
+            db, _create_data(total_amount_xof=6000, installment_months=3)
+        )
         tracker.record_payment(db, schedule.id, 1, 2000)
         summary = tracker.get_summary(db, schedule.id)
         assert summary.paid_amount_xof == 2000
@@ -254,6 +269,7 @@ class TestGetSummary:
         schedule = tracker.create_schedule(db, _create_data(installment_months=3))
         # Modifier manuellement la due_date d'une échéance pour la mettre dans le passé
         from app.models.bnpl import BNPLPayment
+
         payment = (
             db.query(BNPLPayment)
             .filter(
@@ -271,6 +287,7 @@ class TestGetSummary:
 
     def test_summary_unknown_schedule_raises_404(self, tracker: BNPLTracker, db: Session) -> None:
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             tracker.get_summary(db, 9999)
         assert exc_info.value.status_code == 404
@@ -291,6 +308,7 @@ class TestGetOverdue:
         schedule = tracker.create_schedule(db, _create_data(installment_months=2))
         # Forcer une due_date dans le passé
         from app.models.bnpl import BNPLPayment
+
         payment = (
             db.query(BNPLPayment)
             .filter(
@@ -311,6 +329,7 @@ class TestGetOverdue:
         """Un plan dont l'échéance en retard a été payée ne doit pas apparaître."""
         schedule = tracker.create_schedule(db, _create_data(installment_months=2))
         from app.models.bnpl import BNPLPayment
+
         payment = (
             db.query(BNPLPayment)
             .filter(
@@ -335,6 +354,7 @@ class TestGetOverdue:
         tracker.create_schedule(db, _create_data(patient_ref="P3", installment_months=2))
 
         from app.models.bnpl import BNPLPayment
+
         for sid in (s1.id, s2.id):
             p = (
                 db.query(BNPLPayment)
