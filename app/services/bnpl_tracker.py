@@ -98,15 +98,10 @@ class BNPLTracker:
         payment.amount_xof = amount_xof
 
         # Vérifier si tous les paiements sont PAID ou WAIVED
-        all_payments = (
-            db.query(BNPLPayment)
-            .filter(BNPLPayment.schedule_id == schedule_id)
-            .all()
-        )
+        all_payments = db.query(BNPLPayment).filter(BNPLPayment.schedule_id == schedule_id).all()
         # Mettre à jour status en mémoire pour inclure le paiement courant
         pending_or_late = [
-            p for p in all_payments
-            if p.id != payment.id and p.status in ("PENDING", "LATE")
+            p for p in all_payments if p.id != payment.id and p.status in ("PENDING", "LATE")
         ]
         if not pending_or_late:
             schedule.status = "COMPLETED"
@@ -124,17 +119,11 @@ class BNPLTracker:
                 detail=f"Plan BNPL {schedule_id} introuvable.",
             )
 
-        payments = (
-            db.query(BNPLPayment)
-            .filter(BNPLPayment.schedule_id == schedule_id)
-            .all()
-        )
+        payments = db.query(BNPLPayment).filter(BNPLPayment.schedule_id == schedule_id).all()
 
         today = dt.date.today()
         paid_amount = sum(p.amount_xof for p in payments if p.status in ("PAID", "WAIVED"))
-        overdue_count = sum(
-            1 for p in payments if p.status == "PENDING" and p.due_date < today
-        )
+        overdue_count = sum(1 for p in payments if p.status == "PENDING" and p.due_date < today)
 
         return BNPLSummary(
             schedule_id=schedule.id,

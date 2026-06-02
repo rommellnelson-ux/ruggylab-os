@@ -33,9 +33,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_bnpl_schedules_id"), "bnpl_schedules", ["id"])
-    op.create_index(
-        op.f("ix_bnpl_schedules_patient_ref"), "bnpl_schedules", ["patient_ref"]
-    )
+    op.create_index(op.f("ix_bnpl_schedules_patient_ref"), "bnpl_schedules", ["patient_ref"])
 
     op.create_table(
         "bnpl_payments",
@@ -50,9 +48,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_bnpl_payments_id"), "bnpl_payments", ["id"])
-    op.create_index(
-        op.f("ix_bnpl_payments_schedule_id"), "bnpl_payments", ["schedule_id"]
-    )
+    op.create_index(op.f("ix_bnpl_payments_schedule_id"), "bnpl_payments", ["schedule_id"])
 
 
 def downgrade() -> None:

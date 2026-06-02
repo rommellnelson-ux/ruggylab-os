@@ -11,10 +11,21 @@ from pydantic import BaseModel, Field
 class BNPLScheduleCreate(BaseModel):
     """Données nécessaires pour créer un plan de paiement fractionné."""
 
-    patient_ref: Annotated[str, Field(min_length=1, max_length=200, description="Identifiant externe (insurance_id ou nom du patient)")]
+    patient_ref: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=200,
+            description="Identifiant externe (insurance_id ou nom du patient)",
+        ),
+    ]
     total_amount_xof: Annotated[int, Field(gt=0, description="Montant total en XOF")]
-    installment_months: Annotated[int, Field(ge=2, le=24, description="Nombre de mensualités (minimum 2)")]
-    prescriber_id: Annotated[str | None, Field(default=None, max_length=200, description="Identifiant du prescripteur")] = None
+    installment_months: Annotated[
+        int, Field(ge=2, le=24, description="Nombre de mensualités (minimum 2)")
+    ]
+    prescriber_id: Annotated[
+        str | None, Field(default=None, max_length=200, description="Identifiant du prescripteur")
+    ] = None
 
 
 class BNPLPaymentOut(BaseModel):
