@@ -63,9 +63,9 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
     database_path = tmp_path / "test_bnpl_api.db"
     settings.TESTING = True
     settings.ENABLE_DH36_LISTENER = False
-    settings.SECRET_KEY = "test_secret_key_bnpl_only_123456"
+    settings.SECRET_KEY = "test_secret_key_bnpl_only_123456"  # pragma: allowlist secret
     settings.FIRST_SUPERUSER = "admin"
-    settings.FIRST_SUPERUSER_PASSWORD = "admin_bnpl_pass"
+    settings.FIRST_SUPERUSER_PASSWORD = "admin_bnpl_pass"  # pragma: allowlist secret
     settings.FIRST_SUPERUSER_FULL_NAME = "BNPL Test Admin"
     db_session.configure_database(f"sqlite:///{database_path}")
     Base.metadata.drop_all(bind=db_session.engine)
@@ -85,7 +85,7 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
 def _auth_headers(client: TestClient) -> dict[str, str]:
     resp = client.post(
         "/api/v1/login/access-token",
-        data={"username": "admin", "password": "admin_bnpl_pass"},
+        data={"username": "admin", "password": "admin_bnpl_pass"},  # pragma: allowlist secret
     )
     assert resp.status_code == 200, resp.text
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
