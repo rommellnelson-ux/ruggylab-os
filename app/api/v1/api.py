@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.billing import router as billing_router
+from app.api.v1.endpoints.bnpl import router as bnpl_router
 from app.api.v1.endpoints.dh36 import router as dh36_router
 from app.api.v1.endpoints.epidemiology import router as epidemiology_router
 from app.api.v1.endpoints.equipment_reagent_ratios import (
@@ -17,6 +18,7 @@ from app.api.v1.endpoints.maintenance import router as maintenance_router
 from app.api.v1.endpoints.military_facilities import router as military_facilities_router
 from app.api.v1.endpoints.operations import router as operations_router
 from app.api.v1.endpoints.patients import router as patients_router
+from app.api.v1.endpoints.pdf_prescription import router as pdf_prescription_router
 from app.api.v1.endpoints.prescription_scanner import router as prescription_scanner_router
 from app.api.v1.endpoints.ratio_presets import router as ratio_presets_router
 from app.api.v1.endpoints.reagents import router as reagents_router
@@ -24,6 +26,7 @@ from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.results import router as results_router
 from app.api.v1.endpoints.results_poct import router as results_poct_router
 from app.api.v1.endpoints.samples import router as samples_router
+from app.api.v1.endpoints.stock_notifications import router as stock_notifications_router
 from app.api.v1.endpoints.stock_predictor import router as stock_predictor_router
 from app.api.v1.endpoints.users import router as users_router
 
@@ -49,6 +52,9 @@ api_router.include_router(reports_router, tags=["reports"])
 api_router.include_router(maintenance_router, tags=["maintenance"])
 api_router.include_router(billing_router, tags=["Billing CMU"])
 api_router.include_router(stock_predictor_router, tags=["Stock Predictor CMU"])
+api_router.include_router(stock_notifications_router, tags=["Stock Predictor CMU"])
 api_router.include_router(prescription_scanner_router, tags=["Prescription Scanner CMU"])
+api_router.include_router(pdf_prescription_router, tags=["Prescription Scanner CMU"])
 api_router.include_router(fhir_pharmacy_router, tags=["FHIR R4 Pharmacy"])
 api_router.include_router(epidemiology_router, tags=["Epidemiology"])
+api_router.include_router(bnpl_router, tags=["BNPL CMU"])

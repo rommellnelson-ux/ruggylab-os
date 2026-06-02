@@ -77,6 +77,11 @@ security: ## Run bandit (SAST) and pip-audit (dependency audit)
 	$(PYTHON) -m bandit -q -r app -c pyproject.toml
 	pip-audit -r requirements.txt --ignore-vuln PYSEC-2025-183
 
+# ── Monitoring ────────────────────────────────────────────────────────────────
+.PHONY: grafana-url
+grafana-url: ## Afficher l'URL Grafana
+	@echo "  Grafana : http://localhost:3000  (user: admin)"
+
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 .PHONY: clean
 clean: ## Stop containers AND delete all named volumes (DESTRUCTIVE)
