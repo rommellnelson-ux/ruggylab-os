@@ -1,0 +1,99 @@
+apiVersion: 1
+groups:
+  - name: RuggyLab Stock Alerts
+    folder: CMU Alertes
+    interval: 1m
+    rules:
+      - title: "Taux d'erreur > 5%"
+        uid: ruggylab-error-rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                rate(http_requests_total{status=~"5.."}[5m])
+                / rate(http_requests_total[5m]) * 100
+              instant: true
+              legendFormat: error_rate
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        noDataState: NoData
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "Taux d'erreur HTTP élevé"
+          description: "Le taux d'erreur HTTP 5xx dépasse 5% depuis 2 minutes."
+        labels:
+          severity: warning
+          team: ruggylab
+
+      - title: "Latence P95 > 2s"
+        uid: ruggylab-latency-p95
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                histogram_quantile(0.95,
+                  rate(http_request_duration_seconds_bucket[5m]))
+              instant: true
+              legendFormat: p95_latency
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 2
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        noDataState: NoData
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "Latence P95 élevée"
+          description: "La latence au 95e percentile dépasse 2 secondes depuis 2 minutes."
+        labels:
+          severity: warning
+          team: ruggylab
