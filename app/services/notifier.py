@@ -54,7 +54,7 @@ class StockNotifier:
         from app.services.stock_predictor import StockPredictor  # éviter import circulaire
 
         predictor: StockPredictor = (
-            self._predictor_factory  # type: ignore[assignment]
+            self._predictor_factory
             if isinstance(self._predictor_factory, StockPredictor)
             else get_stock_predictor()
         )
