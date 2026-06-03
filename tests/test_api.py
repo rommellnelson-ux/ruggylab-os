@@ -18,6 +18,11 @@ def test_cockpit_ui_is_served(client) -> None:
     assert response.status_code == 200
     assert "RuggyLab OS" in response.text
     assert "/api/v1/login/access-token" in response.text
+    assert "API_PREFIX = \"/api/v1\"" in response.text
+    assert "/stock/notify" in response.text
+    assert "/billing/bnpl/schedule" in response.text
+    assert "/api/v1/prescription/report" in response.text
+    assert "normalizeApiPath" in response.text
 
 
 def test_login_with_seeded_admin(client) -> None:
