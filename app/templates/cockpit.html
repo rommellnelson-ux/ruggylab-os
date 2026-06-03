@@ -1900,7 +1900,8 @@
             `</td>` +
             `<td><button class="ghost" style="font-size:11px;padding:3px 8px;" onclick="showView('stocks')">↑ Réapprovisionner</button></td>`
           );
-          if (r.current_stock === 0) tr.classList.add('row-critical');
+          if (r.current_stock === 0)                                   tr.classList.add('row-critical');
+          else if (r.current_stock <= r.alert_threshold)              tr.classList.add('row-warning');
           return tr;
         }));
         showToast("Tableau de bord actualisé", "success");
@@ -2226,7 +2227,8 @@
             `<button class="ghost" onclick='editReagent(${JSON.stringify(r)})'>Éditer</button>` +
           `</td>`
         );
-        if (isLow) tr.classList.add('row-critical');
+        if (r.current_stock === 0)              tr.classList.add('row-critical');
+        else if (isLow)                         tr.classList.add('row-warning');
         return tr;
       }));
     }
