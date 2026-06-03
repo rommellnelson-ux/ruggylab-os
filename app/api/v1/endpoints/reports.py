@@ -1,4 +1,5 @@
 import csv
+import datetime as dt
 import json
 from datetime import UTC, datetime, timedelta
 from io import StringIO
@@ -26,6 +27,7 @@ from app.schemas.audit_event import AuditEventRead
 from app.schemas.reagent import ReagentRead
 from app.schemas.report_signature import ReportSignatureCreate, ReportSignatureRead
 from app.schemas.qc import QC_REJECT_RULES, QcStatusEntry, QcSummaryResponse
+from app.services.qc_pdf_report import build_qc_html_report
 from app.schemas.reports import (
     AuditActivityEntry,
     AuditDashboardResponse,
@@ -538,3 +540,29 @@ def audit_activity_dashboard(
             )
         )
     return AuditUserActivityDashboardResponse(items=items)
+
+
+@router.get(
+    "/qc-report",
+    summary="Rapport QC mensuel HTML (imprimable / export PDF navigateur)",
+    responses={200: {"content": {"text/html": {}}}},
+)
+def qc_html_report(
+    year: int = Query(default=None, ge=2020, le=2099),
+    month: int = Query(default=None, ge=1, le=12),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Response:
+    """Retourne un document HTML standalone avec les graphes Levey-Jennings SVG
+    et le tableau de synthese mensuel. Ouvrir dans un onglet et imprimer / Ctrl+P."""
+    del current_user
+    today = dt.date.today()
+    effective_year = year if year is not None else today.year
+    effective_month = month if month is not None else today.month
+    html = build_qc_html_report(effective_year, effective_month, db)
+    filename = f"qc-rapport-{effective_year}-{effective_month:02d}.html"
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )

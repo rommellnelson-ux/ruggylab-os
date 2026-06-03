@@ -29,5 +29,8 @@ class ResultRead(ResultBase):
     is_validated: bool = False
     critical_ack_at: dt.datetime | None = None
     critical_ack_by_id: int | None = None
+    delta_exceeded: bool = False
+    delta_analytes: dict | None = None
+    flags: dict | None = None
 
     model_config = ConfigDict(from_attributes=True)

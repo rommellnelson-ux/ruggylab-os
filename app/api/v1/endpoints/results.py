@@ -10,8 +10,10 @@ from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import ResultCreate, ResultRead
 from app.services.critical_checker import check_critical
+from app.services.delta_checker import check_delta
 from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
+from app.services.reference_checker import compute_flags
 from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
@@ -126,6 +128,18 @@ def create_result(
     result_data["is_critical"] = payload.is_critical or check_critical(
         payload.data_points, db
     )
+    # Resolve patient for delta-check and reference flags
+    patient = sample.patient
+    patient_id = patient.id if patient else None
+    patient_sex = patient.sex if patient else None
+    patient_birth = patient.birth_date if patient else None
+    # Delta-check: detect abrupt inter-result variation
+    delta_exceeded, delta_analytes = check_delta(payload.data_points, patient_id, db)
+    result_data["delta_exceeded"] = delta_exceeded
+    result_data["delta_analytes"] = delta_analytes if delta_analytes else None
+    # Reference flags: HH/H/N/L/LL per analyte
+    computed_flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
+    result_data["flags"] = computed_flags if computed_flags else None
     result = Result(**result_data)
     db.add(result)
     db.flush()

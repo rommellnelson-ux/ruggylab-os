@@ -861,7 +861,7 @@
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
-            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Acquittement</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Flags</th><th>Acquittement</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
           <!-- Panneau seuils critiques (panic values) -->
           <div class="panel" style="margin-top:12px;">
@@ -885,6 +885,85 @@
                 <thead><tr><th>Analyte</th><th>Bas critique</th><th>Haut critique</th><th>Unité</th><th></th></tr></thead>
                 <tbody></tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- Panneau delta-check patient -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>△ Delta-Check Patient</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Détecte les variations inter-résultats anormales pour un même patient (inversions d'échantillon, dégradation rapide).
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Analyte</label><input id="dcAnalyte" placeholder="ex. HGB" /></div>
+                  <div><label>Unité</label><input id="dcUnit" placeholder="ex. g/L" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Seuil Δ absolu</label><input id="dcAbs" type="number" step="any" placeholder="ex. 30" /></div>
+                  <div><label>Seuil Δ % (1-100)</label><input id="dcPct" type="number" step="any" min="0.1" max="100" placeholder="ex. 20" /></div>
+                </div>
+                <div><label>Fenêtre (jours)</label><input id="dcLookback" type="number" value="30" min="1" max="365" /></div>
+                <button onclick="createDeltaRule(this)">Enregistrer règle</button>
+              </div>
+              <table id="deltaRulesTable">
+                <thead><tr><th>Analyte</th><th>Δ absolu</th><th>Δ %</th><th>Fenêtre</th><th>Unité</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panneau valeurs de référence -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📊 Valeurs de référence (HH/H/N/L/LL)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Génère des flags d'interprétation (HH/H/N/L/LL) sur chaque analyte selon l'âge et le sexe du patient.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid3">
+                  <div><label>Analyte</label><input id="rrAnalyte" placeholder="ex. WBC" /></div>
+                  <div><label>Sexe</label><select id="rrSex"><option value="*">Tous (*)</option><option value="M">Masculin (M)</option><option value="F">Féminin (F)</option></select></div>
+                  <div><label>Unité</label><input id="rrUnit" placeholder="ex. ×10³/μL" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Âge min (ans)</label><input id="rrAgeMin" type="number" step="any" min="0" placeholder="—" /></div>
+                  <div><label>Âge max (ans)</label><input id="rrAgeMax" type="number" step="any" min="0" placeholder="—" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Borne basse normale</label><input id="rrLow" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                  <div><label>Borne haute normale</label><input id="rrHigh" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                </div>
+                <button onclick="createRefRange(this)">Enregistrer plage</button>
+              </div>
+              <table id="refRangesTable">
+                <thead><tr><th>Analyte</th><th>Sexe</th><th>Âge</th><th>Bas</th><th>Haut</th><th>Unité</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panneau alertes critiques non-acquittées -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🔔 Alertes critiques <span id="pendingBadge" style="display:none;" class="pill bad">!</span></h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Webhook envoyé automatiquement si un résultat critique reste non-acquitté au-delà du délai configuré.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div><label>URL Webhook</label><input id="notifWebhook" placeholder="https://hooks.example.com/…" /></div>
+                <div><label>Délai avant alerte (minutes)</label><input id="notifDelay" type="number" value="30" min="1" max="1440" /></div>
+                <button onclick="createNotifConfig(this)">Enregistrer config</button>
+                <button class="secondary" onclick="checkAndNotify(this)" style="margin-left:8px;">▶ Vérifier et notifier</button>
+              </div>
+              <div>
+                <table id="notifConfigsTable">
+                  <thead><tr><th>Webhook</th><th>Délai</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+                <div id="pendingCriticalsDiv" style="margin-top:10px;"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -1062,6 +1141,16 @@
               <div class="panel" id="qcEmptyPanel">
                 <p style="color:var(--muted);text-align:center;padding:30px 20px;">← Sélectionnez un contrôle pour afficher le graphe Levey-Jennings</p>
               </div>
+            </div>
+          </div>
+          <!-- Rapport QC mensuel -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📄 Rapport QC Mensuel</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">Génère un document HTML imprimable (A4) avec graphes Levey-Jennings et tableau de synthèse.</p>
+            <div class="toolbar" style="gap:10px;align-items:flex-end;">
+              <div><label style="display:block;font-size:11px;margin-bottom:4px;">Année</label><input id="qcReportYear" type="number" value="2026" min="2020" max="2099" style="width:80px;" /></div>
+              <div><label style="display:block;font-size:11px;margin-bottom:4px;">Mois</label><input id="qcReportMonth" type="number" value="6" min="1" max="12" style="width:60px;" /></div>
+              <button onclick="openQcReport()">📄 Ouvrir rapport</button>
             </div>
           </div>
         </div>
@@ -1956,7 +2045,9 @@
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
       if (currentView === "patients") await loadPatients();
 
-      if (currentView === "results") { await loadResults(); await loadCriticalRanges(); }
+      if (currentView === "results") {
+        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals()]);
+      }
       if (currentView === "stocks") await loadReagents();
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
@@ -2210,6 +2301,12 @@
         await loadSamples();
       }, 'createSample').finally(() => setLoading(btn, false));
     }
+    // Flag colors: HH→dark red, H→rose, N→green, L→blue, LL→dark blue
+    const _flagStyle = { HH: 'background:#7f1d1d;color:white', H: 'background:#be123c;color:white', N: 'background:#16a34a;color:white', L: 'background:#1d4ed8;color:white', LL: 'background:#1e1b4b;color:white' };
+    function _flagBadge(analyte, flag) {
+      const s = _flagStyle[flag] || 'background:#6b7280;color:white';
+      return '<span class="pill" style="' + s + ';margin:1px;font-size:10px;" title="' + security.escapeHtml(analyte) + '">' + security.escapeHtml(analyte) + ':' + flag + '</span>';
+    }
     async function loadResults() {
       const tbody = $("resultsTable").querySelector("tbody");
       loadingStates.showSkeleton(tbody, 5);
@@ -2217,7 +2314,16 @@
       try {
         const data = await api("/api/v1/results", { headers: headers(false) });
         const rows = data.items.map((r) => {
-          // Build ack cell
+          // Critical cell (includes delta badge)
+          let critCell = r.is_critical ? '<span class="pill bad">⛔</span>' : '<span style="color:var(--muted)">—</span>';
+          if (r.delta_exceeded) critCell += ' <span class="pill" style="background:#b45309;color:white;font-size:10px;" title="Delta-check dépassé">△ Delta</span>';
+
+          // Flags cell
+          const flagsHtml = r.flags && Object.keys(r.flags).length > 0
+            ? Object.entries(r.flags).map(([a, f]) => _flagBadge(a, f)).join('')
+            : '<span style="color:var(--muted);font-size:11px;">—</span>';
+
+          // Ack cell
           let ackCell;
           if (!r.is_critical) {
             ackCell = '<td style="color:var(--muted);font-size:11px;">—</td>';
@@ -2225,23 +2331,25 @@
             const ts = new Date(r.critical_ack_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
             ackCell = '<td><span class="pill ok" title="Acquitté le ' + ts + '">✅ ' + ts + '</span></td>';
           } else {
-            ackCell = '<td><span class="pill bad" style="margin-right:6px;">⛔ Critique</span><button class="ghost" style="font-size:11px;padding:2px 8px;color:var(--rose);border-color:var(--rose);" onclick="ackCritical(' + r.id + ', this)">Acquitter</button></td>';
+            ackCell = '<td><button class="ghost" style="font-size:11px;padding:2px 8px;color:var(--rose);border-color:var(--rose);" onclick="ackCritical(' + r.id + ', this)">Acquitter</button></td>';
           }
           const tr = row(
             '<td>' + r.id + '</td>' +
             '<td>' + r.sample_id + '</td>' +
-            '<td>' + (r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non') + '</td>' +
+            '<td>' + critCell + '</td>' +
+            '<td style="white-space:nowrap;">' + flagsHtml + '</td>' +
             ackCell +
             '<td>' + (r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non') + '</td>' +
             '<td><button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button></td>'
           );
           if (r.is_critical && !r.critical_ack_at) tr.classList.add('row-critical');
           else if (r.is_critical && r.critical_ack_at) tr.classList.add('row-warning');
+          else if (r.delta_exceeded) tr.classList.add('row-warning');
           return tr;
         });
         setRows("resultsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
     }
@@ -2427,6 +2535,174 @@
       } catch(e) {
         showToast(e.message || 'Erreur', 'error');
       }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Delta-check rules
+    // ══════════════════════════════════════════════════════════════
+    async function loadDeltaRules() {
+      try {
+        const data = await api('/api/v1/delta-check-rules', { headers: headers(false) });
+        setRows('deltaRulesTable', data.map(function(r) {
+          return row(
+            '<td><strong>' + security.escapeHtml(r.analyte) + '</strong></td>' +
+            '<td style="text-align:center;">' + (r.delta_abs !== null && r.delta_abs !== undefined ? r.delta_abs : '—') + '</td>' +
+            '<td style="text-align:center;">' + (r.delta_pct !== null && r.delta_pct !== undefined ? r.delta_pct + ' %' : '—') + '</td>' +
+            '<td style="text-align:center;">' + r.lookback_days + ' j</td>' +
+            '<td style="color:var(--muted);">' + security.escapeHtml(r.unit || '—') + '</td>' +
+            '<td><button class="ghost" style="font-size:11px;color:#b45309;" onclick="deleteDeltaRule(' + r.id + ')">✕</button></td>'
+          );
+        }));
+      } catch(e) { /* ignore */ }
+    }
+    async function createDeltaRule(btn) {
+      setLoading(btn, true);
+      try {
+        const body = { analyte: $('dcAnalyte').value.trim(), unit: $('dcUnit').value.trim(), lookback_days: Number($('dcLookback').value) || 30 };
+        if ($('dcAbs').value) body.delta_abs = Number($('dcAbs').value);
+        if ($('dcPct').value) body.delta_pct = Number($('dcPct').value);
+        await api('/api/v1/delta-check-rules', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Règle delta-check enregistrée', 'success');
+        ['dcAnalyte','dcUnit','dcAbs','dcPct'].forEach(function(id){ $(id).value = ''; });
+        $('dcLookback').value = '30';
+        await loadDeltaRules();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteDeltaRule(id) {
+      if (!confirm('Désactiver cette règle delta-check ?')) return;
+      try {
+        await api('/api/v1/delta-check-rules/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Règle désactivée', 'success');
+        await loadDeltaRules();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Valeurs de référence (HH/H/N/L/LL)
+    // ══════════════════════════════════════════════════════════════
+    async function loadRefRanges() {
+      try {
+        const data = await api('/api/v1/reference-ranges', { headers: headers(false) });
+        setRows('refRangesTable', data.map(function(r) {
+          const age = (r.age_min_years !== null && r.age_min_years !== undefined) || (r.age_max_years !== null && r.age_max_years !== undefined)
+            ? (r.age_min_years !== null && r.age_min_years !== undefined ? r.age_min_years : '0') + '–' + (r.age_max_years !== null && r.age_max_years !== undefined ? r.age_max_years : '∞') + ' ans'
+            : '—';
+          return row(
+            '<td><strong>' + security.escapeHtml(r.analyte) + '</strong></td>' +
+            '<td style="text-align:center;">' + r.sex + '</td>' +
+            '<td style="text-align:center;font-size:11px;">' + age + '</td>' +
+            '<td style="text-align:center;color:#1d4ed8;">' + (r.low_normal !== null && r.low_normal !== undefined ? r.low_normal : '—') + '</td>' +
+            '<td style="text-align:center;color:#be123c;">' + (r.high_normal !== null && r.high_normal !== undefined ? r.high_normal : '—') + '</td>' +
+            '<td style="color:var(--muted);">' + security.escapeHtml(r.unit || '—') + '</td>' +
+            '<td><button class="ghost" style="font-size:11px;" onclick="deleteRefRange(' + r.id + ')">✕</button></td>'
+          );
+        }));
+      } catch(e) { /* ignore */ }
+    }
+    async function createRefRange(btn) {
+      setLoading(btn, true);
+      try {
+        const body = { analyte: $('rrAnalyte').value.trim(), sex: $('rrSex').value, unit: $('rrUnit').value.trim() };
+        if ($('rrLow').value) body.low_normal = Number($('rrLow').value);
+        if ($('rrHigh').value) body.high_normal = Number($('rrHigh').value);
+        if ($('rrAgeMin').value) body.age_min_years = Number($('rrAgeMin').value);
+        if ($('rrAgeMax').value) body.age_max_years = Number($('rrAgeMax').value);
+        await api('/api/v1/reference-ranges', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Plage de référence enregistrée', 'success');
+        ['rrAnalyte','rrUnit','rrLow','rrHigh','rrAgeMin','rrAgeMax'].forEach(function(id){ $(id).value = ''; });
+        $('rrSex').value = '*';
+        await loadRefRanges();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteRefRange(id) {
+      if (!confirm('Désactiver cette plage de référence ?')) return;
+      try {
+        await api('/api/v1/reference-ranges/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Plage désactivée', 'success');
+        await loadRefRanges();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Alertes critiques — config + pending + notification
+    // ══════════════════════════════════════════════════════════════
+    async function loadNotifConfigs() {
+      try {
+        const data = await api('/api/v1/critical-alerts/config', { headers: headers(false) });
+        setRows('notifConfigsTable', data.map(function(c) {
+          return row(
+            '<td style="font-size:11px;word-break:break-all;">' + security.escapeHtml(c.webhook_url || c.email || '—') + '</td>' +
+            '<td style="text-align:center;">' + c.delay_minutes + ' min</td>' +
+            '<td><button class="ghost" style="font-size:11px;color:#be123c;" onclick="deleteNotifConfig(' + c.id + ')">✕</button></td>'
+          );
+        }));
+      } catch(e) { /* ignore */ }
+    }
+    async function createNotifConfig(btn) {
+      setLoading(btn, true);
+      try {
+        const body = { delay_minutes: Number($('notifDelay').value) || 30 };
+        if ($('notifWebhook').value) body.webhook_url = $('notifWebhook').value.trim();
+        await api('/api/v1/critical-alerts/config', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Configuration de notification enregistrée', 'success');
+        $('notifWebhook').value = '';
+        await loadNotifConfigs();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteNotifConfig(id) {
+      if (!confirm('Désactiver cette configuration ?')) return;
+      try {
+        await api('/api/v1/critical-alerts/config/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Configuration désactivée', 'success');
+        await loadNotifConfigs();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+    }
+    async function loadPendingCriticals() {
+      try {
+        const data = await api('/api/v1/critical-alerts/pending', { headers: headers(false) });
+        const badge = $('pendingBadge');
+        if (badge) { badge.style.display = data.length > 0 ? '' : 'none'; badge.textContent = data.length; }
+        const div = $('pendingCriticalsDiv');
+        if (!div) return;
+        if (data.length === 0) { div.innerHTML = '<p style="color:var(--muted);font-size:12px;">Aucun résultat critique en attente.</p>'; return; }
+        div.innerHTML = '<table style="font-size:11px;width:100%;"><thead><tr><th>Résultat</th><th>Échantillon</th><th>Écoulé</th><th>Statut</th></tr></thead><tbody>' +
+          data.map(function(p) {
+            const rowBg = p.overdue ? '#fee2e2' : '#fef3c7';
+            return '<tr style="background:' + rowBg + ';"><td>' + p.result_id + '</td><td>' + p.sample_id + '</td><td>' + p.elapsed_minutes + ' min</td><td>' +
+              (p.overdue ? '<span class="pill bad">En retard</span>' : '<span style="color:#ca8a04;">En attente</span>') + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      } catch(e) { /* ignore */ }
+    }
+    async function checkAndNotify(btn) {
+      setLoading(btn, true);
+      try {
+        const result = await api('/api/v1/critical-alerts/check', { method: 'POST', headers: headers() });
+        showToast('Vérification : ' + result.notified + ' notifiés, ' + result.pending + ' en attente', result.pending > 0 ? 'error' : 'success');
+        await loadPendingCriticals();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Rapport QC mensuel
+    // ══════════════════════════════════════════════════════════════
+    function openQcReport() {
+      const year = $('qcReportYear') ? $('qcReportYear').value || new Date().getFullYear() : new Date().getFullYear();
+      const month = $('qcReportMonth') ? $('qcReportMonth').value || (new Date().getMonth() + 1) : (new Date().getMonth() + 1);
+      const authHeader = headers(false);
+      const tok = authHeader['Authorization'] ? authHeader['Authorization'].replace('Bearer ', '') : '';
+      // Fetch the report HTML and open it in a new tab
+      fetch('/api/v1/reports/qc-report?year=' + year + '&month=' + month, { headers: authHeader })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          const w = window.open('', '_blank');
+          if (w) { w.document.write(html); w.document.close(); }
+          else { showToast('Autorisez les popups pour ouvrir le rapport', 'error'); }
+        })
+        .catch(function() { showToast('Erreur lors du chargement du rapport QC', 'error'); });
     }
 
     // ══════════════════════════════════════════════════════════════

@@ -109,6 +109,13 @@ class Result(Base):
     is_critical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     critical_ack_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     critical_ack_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    delta_exceeded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    delta_analytes: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
+    flags: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
 
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")
@@ -373,6 +380,48 @@ class QcResult(Base):
     )
 
     control: Mapped["QcControl"] = relationship(back_populates="results")
+
+
+class DeltaCheckRule(Base):
+    """Règles de delta-check patient (variation inter-résultats)."""
+
+    __tablename__ = "delta_check_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    delta_pct: Mapped[float | None] = mapped_column(Float)
+    delta_abs: Mapped[float | None] = mapped_column(Float)
+    lookback_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class ReferenceRange(Base):
+    """Plages de référence par analyte, sexe et tranche d'âge."""
+
+    __tablename__ = "reference_ranges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(50), nullable=False)
+    sex: Mapped[str] = mapped_column(String(1), nullable=False, default="*")
+    age_min_years: Mapped[float | None] = mapped_column(Float)
+    age_max_years: Mapped[float | None] = mapped_column(Float)
+    low_normal: Mapped[float | None] = mapped_column(Float)
+    high_normal: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class NotifConfig(Base):
+    """Configuration des alertes pour valeurs critiques non-acquittées."""
+
+    __tablename__ = "notif_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    webhook_url: Mapped[str | None] = mapped_column(String(500))
+    email: Mapped[str | None] = mapped_column(String(200))
+    delay_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
 class MilitaryFacility(Base):
