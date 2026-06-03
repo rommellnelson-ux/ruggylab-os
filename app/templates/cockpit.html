@@ -808,7 +808,7 @@
                 <button class="success" style="margin-top:10px;" onclick="useCreatedPatientForSample()">Creer ses echantillons</button>
               </div>
             </div></div>
-            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
 
@@ -829,7 +829,7 @@
               <div><label>Statut</label><select id="sampleStatus"><option>Recu</option><option>En cours</option><option>Termine</option></select></div>
               <button onclick="createSample(this)" aria-label="Créer un nouvel échantillon">Creer echantillon</button>
             </div></div>
-            <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Barcode</th><th>Patient</th><th>Statut</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Code-barres</th><th>Patient ID</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
 
@@ -1239,6 +1239,7 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
   <script src="/static/ai/training_data_manager.js"></script>
@@ -1886,7 +1887,13 @@
       
       try {
         const data = await api(`/api/v1/patients?q=${encodeURIComponent($("patientQuery").value || "")}`, { headers: headers(false) });
-        const rows = data.items.map((p) => row(`<td>${p.id}</td><td>${p.ipp_unique_id}</td><td>${p.first_name} ${p.last_name}</td><td>${p.sex || ""}</td>`));
+        const rows = data.items.map((p) => row(
+          `<td>${p.id}</td>` +
+          `<td><code>${security.escapeHtml(p.ipp_unique_id)}</code></td>` +
+          `<td>${security.escapeHtml(p.first_name + ' ' + p.last_name)}</td>` +
+          `<td>${p.sex || ''}</td>` +
+          `<td><button class="ghost" title="Imprimer étiquettes tubes" onclick='printPatientLabels(${JSON.stringify(p)})'>🏷️ Étiquettes</button></td>`
+        ));
         setRows("patientsTable", rows);
       } catch (error) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
@@ -1961,7 +1968,13 @@
       
       try {
         const data = await api("/api/v1/samples", { headers: headers(false) });
-        const rows = data.items.map((s) => row(`<td>${s.id}</td><td>${s.barcode}</td><td>${s.patient_id}</td><td>${s.status || ""}</td>`));
+        const rows = data.items.map((s) => row(
+          `<td>${s.id}</td>` +
+          `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code></td>` +
+          `<td>${s.patient_id || '—'}</td>` +
+          `<td>${s.status || '—'}</td>` +
+          `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(s)})'>🖨️</button></td>`
+        ));
         setRows("samplesTable", rows);
       } catch (error) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
@@ -3937,6 +3950,123 @@
       } catch {
         showToast('Erreur modification statut', 'error');
       }
+    }
+
+    // ── Impression étiquettes tubes ───────────────────────────────────────────
+    /**
+     * Ouvre une fenêtre dédiée avec des étiquettes imprimables (format tube 56 × 21 mm).
+     * @param {Array<{barcode,patient,ipp,sex,dob,date,exam}>} labels
+     */
+    function printTubeLabels(labels) {
+      if (!labels || !labels.length) {
+        showToast('Aucun échantillon à imprimer', 'warning');
+        return;
+      }
+      const _esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+      );
+      const labelCards = labels.map((l, i) => `
+        <div class="label">
+          <div class="patient-name">${_esc(l.patient)}</div>
+          <div class="ipp">${_esc(l.ipp)}${l.sex ? ' &bull; ' + _esc(l.sex) : ''}${l.dob ? ' &bull; ' + _esc(l.dob) : ''}</div>
+          <svg id="bc${i}" class="bc-svg"></svg>
+          <div class="barcode-val">${_esc(l.barcode)}</div>
+          ${l.date || l.exam ? `<div class="meta">${_esc(l.date)}${l.exam ? ' &mdash; ' + _esc(l.exam) : ''}</div>` : ''}
+        </div>`).join('');
+
+      const initJs = labels.map((l, i) => {
+        const safeVal = l.barcode.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `try {
+          JsBarcode('#bc${i}','${safeVal}',{format:'CODE128',lineColor:'#000',width:1.6,height:38,displayValue:false,margin:0});
+        } catch(e) { document.getElementById('bc${i}').insertAdjacentHTML('afterend','<div style="color:red;font-size:9px;">Err: '+e.message+'</div>'); }`;
+      }).join('\n');
+
+      const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>Étiquettes tubes — RuggyLab OS</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f0f0;padding:16px;}
+  .actions{margin-bottom:14px;display:flex;gap:8px;}
+  .actions button{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;color:#fff;background:#2563eb;}
+  .actions button.sec{background:#64748b;}
+  .page-title{font-size:13px;color:#555;margin-bottom:12px;}
+  .labels{display:flex;flex-wrap:wrap;gap:8px;}
+  .label{
+    background:#fff;border:1px solid #bbb;border-radius:4px;
+    width:56mm;padding:2.5mm 2mm;
+    display:flex;flex-direction:column;align-items:center;gap:1.5px;
+    page-break-inside:avoid;
+  }
+  .patient-name{font-size:8.5pt;font-weight:700;color:#111;text-align:center;line-height:1.2;}
+  .ipp{font-size:7pt;color:#444;text-align:center;}
+  .bc-svg{width:52mm;height:13mm;}
+  .barcode-val{font-size:7pt;font-family:monospace;letter-spacing:1px;color:#333;}
+  .meta{font-size:7pt;color:#666;}
+  @media print{
+    body{background:#fff;padding:0;}
+    .actions,.page-title{display:none;}
+    .labels{gap:4px;}
+    .label{border:1px solid #aaa;}
+    @page{margin:8mm;}
+  }
+</style>
+</head>
+<body>
+<div class="actions">
+  <button onclick="window.print()">🖨️ Imprimer</button>
+  <button class="sec" onclick="window.close()">✕ Fermer</button>
+</div>
+<div class="page-title">RuggyLab OS — ${labels.length} étiquette(s) de tube de prélèvement</div>
+<div class="labels">${labelCards}</div>
+<script>
+window.onload = function() { ${initJs} };
+<\/script>
+</body>
+</html>`;
+      const win = window.open('', '_blank', 'width=820,height=680,menubar=no,toolbar=no');
+      if (!win) { showToast('Fenêtre bloquée par le navigateur — autorisez les popups', 'error'); return; }
+      win.document.write(html);
+      win.document.close();
+    }
+
+    /** Récupère tous les échantillons d'un patient et ouvre la feuille d'étiquettes */
+    async function printPatientLabels(p) {
+      try {
+        const data = await api('/api/v1/samples', { headers: headers(false) });
+        const patientSamples = (data.items || []).filter(s => s.patient_id === p.id);
+        if (!patientSamples.length) {
+          showToast(`Aucun échantillon enregistré pour ${p.first_name} ${p.last_name}`, 'warning');
+          return;
+        }
+        printTubeLabels(patientSamples.map(s => ({
+          barcode: s.barcode,
+          patient: `${p.first_name} ${p.last_name}`,
+          ipp: p.ipp_unique_id,
+          sex: p.sex || '',
+          dob: p.birth_date || '',
+          date: s.collection_date ? s.collection_date.slice(0, 10) : '',
+          exam: s.status || '',
+        })));
+      } catch {
+        showToast('Erreur récupération échantillons', 'error');
+      }
+    }
+
+    /** Imprime l'étiquette d'un échantillon individuel (depuis la liste Échantillons) */
+    function printSampleLabel(s) {
+      printTubeLabels([{
+        barcode: s.barcode,
+        patient: s.patient_id ? `Patient #${s.patient_id}` : '—',
+        ipp: '',
+        sex: '',
+        dob: '',
+        date: s.collection_date ? s.collection_date.slice(0, 10) : '',
+        exam: s.status || '',
+      }]);
     }
 
     // ── Password toggle ────────────────────────────────────────────────────────
