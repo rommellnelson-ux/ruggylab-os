@@ -900,13 +900,15 @@
               <div><label>Nom</label><input id="reagentName" /></div>
               <div class="grid2"><div><label>Categorie</label><input id="reagentCategory" /></div><div><label>Unite</label><input id="reagentUnit" value="unit" /></div></div>
               <div class="grid2"><div><label>Stock</label><input id="reagentStock" type="number" step="0.001" /></div><div><label>Seuil</label><input id="reagentThreshold" type="number" step="0.001" /></div></div>
+              <div class="grid2"><div><label>N° Lot</label><input id="reagentLot" placeholder="ex. LOT-2024-001" /></div><div><label>Fournisseur</label><input id="reagentSupplier" /></div></div>
+              <div><label>Date péremption</label><input id="reagentExpiry" type="date" /></div>
               <button onclick="createReagent(this)">Creer reactif</button>
             </div></div>
             <div class="panel">
               <h3>Réactifs</h3>
               <div class="toolbar"><button class="ghost" onclick="loadReagents()">↻ Actualiser</button></div>
               <table id="reagentsTable">
-                <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
+                <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Lot</th><th>Péremption</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
                 <tbody></tbody>
               </table>
             </div>
@@ -927,6 +929,11 @@
                   <div><label>Stock actuel</label><input id="editReagentStock" type="number" step="0.001" /></div>
                   <div><label>Seuil alerte</label><input id="editReagentThreshold" type="number" step="0.001" /></div>
                 </div>
+                <div class="grid2">
+                  <div><label>N° Lot</label><input id="editReagentLot" placeholder="ex. LOT-2024-001" /></div>
+                  <div><label>Fournisseur</label><input id="editReagentSupplier" /></div>
+                </div>
+                <div><label>Date péremption</label><input id="editReagentExpiry" type="date" /></div>
                 <div class="actions">
                   <button onclick="saveReagent(this)">Enregistrer</button>
                   <button class="ghost" onclick="closeReagentEdit()">Annuler</button>
@@ -2213,22 +2220,40 @@
         setLoading(btn, false);
       }
     }
+    function _expiryDays(dateStr) {
+      if (!dateStr) return null;
+      const d = new Date(dateStr + 'T00:00:00');
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      return Math.round((d - now) / 86400000);
+    }
+    function _expiryBadge(dateStr) {
+      if (!dateStr) return '<span style="color:var(--muted);font-size:11px;">—</span>';
+      const d = new Date(dateStr + 'T00:00:00');
+      const days = _expiryDays(dateStr);
+      const fmt = d.toLocaleDateString('fr-FR');
+      if (days < 0)   return '<span style="color:#be123c;font-weight:600;font-size:12px;">⚠️ Périmé</span>';
+      if (days <= 30) return '<span style="color:#b45309;font-size:12px;">⏳ ' + fmt + ' <small>(' + days + 'j)</small></span>';
+      return '<span style="font-size:12px;">' + fmt + '</span>';
+    }
     async function loadReagents() {
       const data = await api("/api/v1/reagents", { headers: headers(false) });
       setRows("reagentsTable", data.items.map((r) => {
         const isLow = r.alert_threshold > 0 && r.current_stock <= r.alert_threshold;
+        const ed = _expiryDays(r.expiry_date);
         const tr = row(
           `<td>${r.id}</td>` +
           `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
           `<td>${security.escapeHtml(r.category || '—')}</td>` +
+          `<td style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.lot_number || '—')}</td>` +
+          `<td>${_expiryBadge(r.expiry_date)}</td>` +
           `<td>${r.current_stock} <span style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.unit || '')}</span></td>` +
           `<td>${r.alert_threshold}</td>` +
           `<td style="white-space:nowrap;">` +
             `<button class="ghost" onclick='editReagent(${JSON.stringify(r)})'>Éditer</button>` +
           `</td>`
         );
-        if (r.current_stock === 0)              tr.classList.add('row-critical');
-        else if (isLow)                         tr.classList.add('row-warning');
+        if (r.current_stock === 0 || (ed !== null && ed < 0)) tr.classList.add('row-critical');
+        else if (isLow || (ed !== null && ed <= 30))          tr.classList.add('row-warning');
         return tr;
       }));
     }
@@ -2256,12 +2281,15 @@
           throw new Error('Veuillez corriger les erreurs dans le formulaire');
         }
         
-        const body = { 
-          name: security.sanitize($("reagentName").value), 
-          category: security.sanitize($("reagentCategory").value) || null, 
-          unit: security.sanitize($("reagentUnit").value), 
-          current_stock: Number(security.sanitizeNumber($("reagentStock").value)), 
-          alert_threshold: Number(security.sanitizeNumber($("reagentThreshold").value)) 
+        const body = {
+          name: security.sanitize($("reagentName").value),
+          category: security.sanitize($("reagentCategory").value) || null,
+          unit: security.sanitize($("reagentUnit").value),
+          current_stock: Number(security.sanitizeNumber($("reagentStock").value)),
+          alert_threshold: Number(security.sanitizeNumber($("reagentThreshold").value)),
+          lot_number: security.sanitize($("reagentLot").value) || null,
+          supplier: security.sanitize($("reagentSupplier").value) || null,
+          expiry_date: $("reagentExpiry").value || null,
         };
         
         await perfMonitor.measureAsync('createReagent', () =>
@@ -2271,7 +2299,7 @@
         showToast("Réactif créé avec succès", "success");
         
         // Clear form
-        ["reagentName", "reagentCategory", "reagentStock", "reagentThreshold"].forEach(id => {
+        ["reagentName", "reagentCategory", "reagentStock", "reagentThreshold", "reagentLot", "reagentSupplier", "reagentExpiry"].forEach(id => {
           const field = $(id);
           field.value = "";
           field.classList.remove('success-input', 'error-input');
@@ -2291,6 +2319,9 @@
       $('editReagentUnit').value = r.unit || 'unit';
       $('editReagentStock').value = r.current_stock;
       $('editReagentThreshold').value = r.alert_threshold;
+      $('editReagentLot').value = r.lot_number || '';
+      $('editReagentSupplier').value = r.supplier || '';
+      $('editReagentExpiry').value = r.expiry_date || '';
       $('restockQty').value = '';
       const panel = $('reagentEditPanel');
       panel.style.display = '';
@@ -2311,6 +2342,9 @@
           unit: $('editReagentUnit').value.trim() || 'unit',
           current_stock: Number($('editReagentStock').value),
           alert_threshold: Number($('editReagentThreshold').value),
+          lot_number: $('editReagentLot').value.trim() || null,
+          supplier: $('editReagentSupplier').value.trim() || null,
+          expiry_date: $('editReagentExpiry').value || null,
         };
         if (!payload.name) throw new Error('Nom obligatoire');
         await api(`/api/v1/reagents/${id}`, {
@@ -2339,6 +2373,9 @@
           unit: $('editReagentUnit').value.trim() || 'unit',
           current_stock: newStock,
           alert_threshold: Number($('editReagentThreshold').value),
+          lot_number: $('editReagentLot').value.trim() || null,
+          supplier: $('editReagentSupplier').value.trim() || null,
+          expiry_date: $('editReagentExpiry').value || null,
         };
         await api(`/api/v1/reagents/${id}`, {
           method: 'PUT', headers: headers(), body: JSON.stringify(payload),

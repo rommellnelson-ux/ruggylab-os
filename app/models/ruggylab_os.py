@@ -127,6 +127,9 @@ class Reagent(Base):
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="unit")
     current_stock: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     alert_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    lot_number: Mapped[str | None] = mapped_column(String(100))
+    expiry_date: Mapped[dt.date | None] = mapped_column(Date)
+    supplier: Mapped[str | None] = mapped_column(String(200))
     equipment_ratios: Mapped[list["EquipmentReagentRatio"]] = relationship(
         back_populates="reagent",
         cascade="all, delete-orphan",
