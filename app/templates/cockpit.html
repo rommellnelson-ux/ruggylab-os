@@ -3977,7 +3977,15 @@
       const initJs = labels.map((l, i) => {
         const safeVal = l.barcode.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         return `try {
-          JsBarcode('#bc${i}','${safeVal}',{format:'CODE128',lineColor:'#000',width:1.6,height:38,displayValue:false,margin:0});
+          JsBarcode('#bc${i}','${safeVal}',{
+            format:'CODE128',
+            lineColor:'#000000',   /* noir pur */
+            background:'#ffffff',
+            width:1.6,
+            height:36,
+            displayValue:false,
+            margin:4               /* marge interne SVG ~1mm — complète les 2mm du padding label */
+          });
         } catch(e) { document.getElementById('bc${i}').insertAdjacentHTML('afterend','<div style="color:red;font-size:9px;">Err: '+e.message+'</div>'); }`;
       }).join('\n');
 
@@ -3989,30 +3997,35 @@
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f0f0;padding:16px;}
+  /* ── Typographie : sans-empattement, noir pur pour contraste scanner ── */
+  body{font-family:Arial,Helvetica,sans-serif;color:#000000;background:#f0f0f0;padding:16px;}
   .actions{margin-bottom:14px;display:flex;gap:8px;}
   .actions button{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;color:#fff;background:#2563eb;}
   .actions button.sec{background:#64748b;}
   .page-title{font-size:13px;color:#555;margin-bottom:12px;}
   .no-print{}
   .labels{display:flex;flex-wrap:wrap;gap:8px;}
+  /* ── Étiquette : padding ≥ 2mm latéral = zone de silence Code128 ── */
   .label{
-    background:#fff;border:1px solid #bbb;border-radius:4px;
-    width:56mm;padding:2.5mm 2mm;
-    display:flex;flex-direction:column;align-items:center;gap:1.5px;
+    background:#fff;border:1px solid #bbb;border-radius:3px;
+    width:56mm;
+    padding:2mm;          /* quiet zone ≥ 2mm sur tous les bords */
+    display:flex;flex-direction:column;align-items:center;gap:1px;
     page-break-inside:avoid;
   }
-  .patient-name{font-size:8.5pt;font-weight:700;color:#111;text-align:center;line-height:1.2;}
-  .ipp{font-size:7pt;color:#444;text-align:center;}
-  .bc-svg{width:52mm;height:13mm;}
-  .barcode-val{font-size:7pt;font-family:monospace;letter-spacing:1px;color:#333;}
-  .meta{font-size:7pt;color:#666;}
+  /* Texte noir pur — tous les éléments */
+  .patient-name{font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;font-weight:700;color:#000000;text-align:center;line-height:1.2;}
+  .ipp         {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;text-align:center;}
+  .bc-svg      {width:52mm;height:13mm;}  /* 56mm - 2×2mm padding = 52mm max */
+  .barcode-val {font-family:Arial,Helvetica,monospace;font-size:7pt;letter-spacing:1px;color:#000000;}
+  .meta        {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;}
   @media print{
     @page{size:56mm 21mm;margin:0;}
     body{margin:0;background:#fff;padding:0;}
     .no-print{display:none;}
     .labels{gap:0;}
-    .label{border:none;width:56mm;min-height:21mm;padding:1mm 1.5mm;}
+    /* En impression : on conserve le padding 2mm pour la zone de silence */
+    .label{border:none;width:56mm;min-height:21mm;padding:2mm;}
   }
 </style>
 </head>
