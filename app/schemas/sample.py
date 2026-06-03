@@ -48,6 +48,21 @@ class SampleCreate(SampleBase):
     model_config = ConfigDict(extra="forbid")
 
 
+class SampleUpdate(BaseModel):
+    """Partial update — only status for now."""
+    status: str | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value not in ALLOWED_SAMPLE_STATUSES:
+            raise ValueError("status is not supported")
+        return value
+
+
 class SampleRead(SampleBase):
     id: int
 

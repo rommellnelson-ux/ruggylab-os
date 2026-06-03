@@ -789,7 +789,7 @@
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
-            <div class="panel"><h3>Stocks bas</h3><table id="lowStockTable"><thead><tr><th>Reactif</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Stocks bas ⚠️</h3><table id="lowStockTable"><thead><tr><th>Réactif</th><th>Stock</th><th>Seuil</th><th>Niveau</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
 
@@ -841,7 +841,7 @@
               <div><label>Statut</label><select id="sampleStatus"><option>Recu</option><option>En cours</option><option>Termine</option></select></div>
               <button onclick="createSample(this)" aria-label="Créer un nouvel échantillon">Creer echantillon</button>
             </div></div>
-            <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Code-barres</th><th>Patient ID</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Code-barres</th><th>Patient</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
 
@@ -1859,11 +1859,12 @@
     async function refreshCurrent() {
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
       if (currentView === "patients") await loadPatients();
-      if (currentView === "samples") await loadSamples();
+
       if (currentView === "results") await loadResults();
       if (currentView === "stocks") await loadReagents();
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
+      if (currentView === "samples") { await loadSamples(); setTimeout(() => $('barcodeScanner')?.focus(), 150); }
       if (currentView === "equipments") await loadEquipments();
       if (currentView === "audit") await loadAudit();
     }
@@ -1885,7 +1886,23 @@
           mLSP.classList.add(lowStockCount > 0 ? "metric-amber" : "metric-teal");
         }
         setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
-        setRows("lowStockTable", stock.low_stock_reagents.map((r) => row(`<td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
+        setRows("lowStockTable", stock.low_stock_reagents.map(r => {
+          const pct = r.alert_threshold > 0 ? Math.round((r.current_stock / r.alert_threshold) * 100) : 0;
+          const barColor = r.current_stock === 0 ? '#be123c' : '#b45309';
+          const tr = row(
+            `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
+            `<td style="font-variant-numeric:tabular-nums;">${r.current_stock} <small style="color:var(--muted);">${security.escapeHtml(r.unit || '')}</small></td>` +
+            `<td>${r.alert_threshold}</td>` +
+            `<td style="min-width:70px;">` +
+              `<div style="background:#e5e7eb;border-radius:3px;height:6px;width:72px;overflow:hidden;" title="${pct}% du seuil">` +
+                `<div style="width:${Math.min(pct,100)}%;height:100%;background:${barColor};transition:width .3s;"></div>` +
+              `</div>` +
+            `</td>` +
+            `<td><button class="ghost" style="font-size:11px;padding:3px 8px;" onclick="showView('stocks')">↑ Réapprovisionner</button></td>`
+          );
+          if (r.current_stock === 0) tr.classList.add('row-critical');
+          return tr;
+        }));
         showToast("Tableau de bord actualisé", "success");
       } catch (e) {
         showToast("Erreur lors du chargement du dashboard", "error");
@@ -2001,11 +2018,21 @@
             date: s.collection_date ? s.collection_date.slice(0, 10) : '',
             exam: s.status || '',
           };
+          // Workflow statut : Recu → En cours → Termine
+          const STATUS_NEXT  = { 'Recu': 'En cours', 'En cours': 'Termine' };
+          const STATUS_CLASS = { 'Recu': 'warn', 'En cours': '', 'Termine': 'ok', 'Annule': 'bad' };
+          const STATUS_ICON  = { 'Recu': '📥', 'En cours': '⚗️', 'Termine': '✅', 'Annule': '❌' };
+          const nextSt = STATUS_NEXT[s.status];
+          const statusCell =
+            `<span class="pill ${STATUS_CLASS[s.status] || ''}">${STATUS_ICON[s.status] || ''}${security.escapeHtml(s.status || '—')}</span>` +
+            (nextSt
+              ? ` <button class="ghost" style="font-size:11px;padding:3px 7px;" onclick="advanceSampleStatus(${s.id},'${nextSt}')">→ ${nextSt}</button>`
+              : '');
           return row(
             `<td>${s.id}</td>` +
             `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code></td>` +
             `<td>${pLabel}</td>` +
-            `<td>${s.status || '—'}</td>` +
+            `<td style="white-space:nowrap;">${statusCell}</td>` +
             `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(labelData)})'>🖨️</button></td>`
           );
         });
@@ -3985,6 +4012,19 @@
         await loadUsers();
       } catch {
         showToast('Erreur modification statut', 'error');
+      }
+    }
+
+    // ── Workflow statut échantillon ───────────────────────────────────────────
+    async function advanceSampleStatus(id, newStatus) {
+      try {
+        await api(`/api/v1/samples/${id}`, {
+          method: 'PATCH', headers: headers(), body: JSON.stringify({ status: newStatus }),
+        });
+        showToast(`Statut → ${newStatus}`, 'success');
+        await loadSamples();
+      } catch (e) {
+        showToast(e.message || 'Erreur mise à jour statut', 'error');
       }
     }
 

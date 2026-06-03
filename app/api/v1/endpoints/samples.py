@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models import Patient, Sample, User
-from app.schemas.sample import SampleCreate, SampleRead
+from app.schemas.sample import SampleCreate, SampleRead, SampleUpdate
 
 router = APIRouter(prefix="/samples")
 
@@ -42,6 +42,28 @@ def create_sample(
     sample_data = payload.model_dump(exclude_none=True)
     sample = Sample(**sample_data)
     db.add(sample)
+    db.commit()
+    db.refresh(sample)
+    return sample
+
+
+@router.patch("/{sample_id}", response_model=SampleRead)
+def update_sample(
+    sample_id: int,
+    payload: SampleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Sample:
+    """Partial update — change status (Recu → En cours → Termine / Annule)."""
+    del current_user
+    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    if not sample:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Echantillon introuvable.",
+        )
+    if payload.status is not None:
+        sample.status = payload.status
     db.commit()
     db.refresh(sample)
     return sample
