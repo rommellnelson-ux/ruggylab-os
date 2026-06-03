@@ -1,4 +1,5 @@
 import csv
+import json
 from datetime import UTC, datetime, timedelta
 from io import StringIO
 from typing import TypedDict
@@ -13,6 +14,8 @@ from app.models import (
     AuditEvent,
     EquipmentReagentRatio,
     Patient,
+    QcControl,
+    QcResult,
     Reagent,
     ReportSignature,
     Result,
@@ -22,6 +25,7 @@ from app.models import (
 from app.schemas.audit_event import AuditEventRead
 from app.schemas.reagent import ReagentRead
 from app.schemas.report_signature import ReportSignatureCreate, ReportSignatureRead
+from app.schemas.qc import QC_REJECT_RULES, QcStatusEntry, QcSummaryResponse
 from app.schemas.reports import (
     AuditActivityEntry,
     AuditDashboardResponse,
@@ -77,6 +81,65 @@ def stock_dashboard(
         total_reagents=total_reagents,
         low_stock_reagents=[ReagentRead.model_validate(item) for item in low_stock],
         total_stock_units=float(total_stock_units),
+    )
+
+
+@router.get("/qc-summary", response_model=QcSummaryResponse)
+def qc_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> QcSummaryResponse:
+    """Return the latest QC result status for every active control."""
+    del current_user
+    controls = (
+        db.query(QcControl)
+        .filter(QcControl.is_active.is_(True))
+        .order_by(QcControl.analyte, QcControl.level)
+        .all()
+    )
+    entries: list[QcStatusEntry] = []
+    for ctrl in controls:
+        last: QcResult | None = (
+            db.query(QcResult)
+            .filter(QcResult.control_id == ctrl.id)
+            .order_by(QcResult.measured_at.desc(), QcResult.id.desc())
+            .first()
+        )
+        if last:
+            violations: list[str] = json.loads(last.violations or "[]")
+            if any(r in QC_REJECT_RULES for r in violations):
+                qc_status = "reject"
+            elif violations:
+                qc_status = "warn"
+            else:
+                qc_status = "ok"
+            entry = QcStatusEntry(
+                control_id=ctrl.id,
+                analyte=ctrl.analyte,
+                level=ctrl.level,
+                unit=ctrl.unit,
+                last_date=last.measured_at,
+                last_value=last.value,
+                violations=violations,
+                status=qc_status,
+            )
+        else:
+            entry = QcStatusEntry(
+                control_id=ctrl.id,
+                analyte=ctrl.analyte,
+                level=ctrl.level,
+                unit=ctrl.unit,
+                last_date=None,
+                last_value=None,
+                violations=[],
+                status="no_data",
+            )
+        entries.append(entry)
+
+    return QcSummaryResponse(
+        controls=entries,
+        reject_count=sum(1 for e in entries if e.status == "reject"),
+        warn_count=sum(1 for e in entries if e.status == "warn"),
     )
 
 

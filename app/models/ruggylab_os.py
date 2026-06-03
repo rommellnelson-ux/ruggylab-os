@@ -107,6 +107,8 @@ class Result(Base):
     validator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_critical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    critical_ack_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    critical_ack_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")

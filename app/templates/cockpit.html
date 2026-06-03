@@ -787,10 +787,15 @@
             <div class="panel metric metric-rose"><div id="mCritical" class="value">—</div><div class="label">Valeurs critiques</div></div>
             <div class="panel metric metric-teal"><div id="mMalaria" class="value">—</div><div class="label">Paludisme positif</div></div>
             <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
+            <div class="panel metric" id="mQcPanel"><div id="mQc" class="value">—</div><div class="label">Contrôles QC</div></div>
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
             <div class="panel"><h3>Stocks bas ⚠️</h3><table id="lowStockTable"><thead><tr><th>Réactif</th><th>Stock</th><th>Seuil</th><th>Niveau</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>📈 Contrôle Qualité Analytique <span id="qcRejectBadge" style="display:none;" class="pill bad">Rejet</span><span id="qcWarnBadge" style="display:none;" class="pill" style="background:var(--amber);">Alerte</span></h3>
+            <table id="dashQcTable"><thead><tr><th>Analyte</th><th>Niveau</th><th>Dernière valeur</th><th>Date</th><th>Violations</th><th>Statut</th></tr></thead><tbody></tbody></table>
           </div>
         </div>
 
@@ -856,7 +861,7 @@
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
-            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Acquittement</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
           <!-- Panneau seuils critiques (panic values) -->
           <div class="panel" style="margin-top:12px;">
@@ -1963,9 +1968,10 @@
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
       try {
-        const [epi, stock] = await Promise.all([
+        const [epi, stock, qc] = await Promise.all([
           api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
-          api("/api/v1/reports/stock-dashboard", { headers: headers(false) })
+          api("/api/v1/reports/stock-dashboard", { headers: headers(false) }),
+          api("/api/v1/reports/qc-summary", { headers: headers(false) })
         ]);
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
@@ -1977,6 +1983,41 @@
           mLSP.classList.remove("metric-amber", "metric-teal");
           mLSP.classList.add(lowStockCount > 0 ? "metric-amber" : "metric-teal");
         }
+        // QC metric panel
+        const mQcEl = $("mQc");
+        const mQcPanel = $("mQcPanel");
+        if (mQcEl && mQcPanel) {
+          const total = qc.controls.length;
+          const rejects = qc.reject_count;
+          const warns = qc.warn_count;
+          mQcEl.textContent = total > 0 ? (rejects > 0 ? rejects + " ⛔" : warns > 0 ? warns + " ⚠" : total + " ✓") : "—";
+          mQcPanel.classList.remove("metric-rose", "metric-amber", "metric-teal");
+          mQcPanel.classList.add(rejects > 0 ? "metric-rose" : warns > 0 ? "metric-amber" : "metric-teal");
+        }
+        // QC reject/warn badges
+        const rb = $("qcRejectBadge"); const wb = $("qcWarnBadge");
+        if (rb) rb.style.display = qc.reject_count > 0 ? "" : "none";
+        if (wb) wb.style.display = (qc.warn_count > 0 && qc.reject_count === 0) ? "" : "none";
+        // QC summary table
+        const _statusBadge = (s) => {
+          if (s === "reject") return '<span class="pill bad">Rejet</span>';
+          if (s === "warn")   return '<span class="pill" style="background:var(--amber);color:#fff;">Alerte 1-2s</span>';
+          if (s === "ok")     return '<span class="pill ok">OK</span>';
+          return '<span class="pill" style="background:var(--muted);color:#fff;">Aucune donnée</span>';
+        };
+        setRows("dashQcTable", qc.controls.map(c => {
+          const tr = row(
+            `<td><strong>${security.escapeHtml(c.analyte)}</strong></td>` +
+            `<td>${security.escapeHtml(c.level)}</td>` +
+            `<td style="font-variant-numeric:tabular-nums;">${c.last_value !== null ? c.last_value : '—'} <small style="color:var(--muted);">${security.escapeHtml(c.unit || '')}</small></td>` +
+            `<td>${c.last_date || '—'}</td>` +
+            `<td><small style="color:var(--rose);">${(c.violations || []).join(', ') || '—'}</small></td>` +
+            `<td>${_statusBadge(c.status)}</td>`
+          );
+          if (c.status === "reject") tr.classList.add("row-critical");
+          else if (c.status === "warn") tr.classList.add("row-warning");
+          return tr;
+        }));
         setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
         setRows("lowStockTable", stock.low_stock_reagents.map(r => {
           const pct = r.alert_threshold > 0 ? Math.round((r.current_stock / r.alert_threshold) * 100) : 0;
@@ -2172,18 +2213,47 @@
     async function loadResults() {
       const tbody = $("resultsTable").querySelector("tbody");
       loadingStates.showSkeleton(tbody, 5);
-      
+
       try {
         const data = await api("/api/v1/results", { headers: headers(false) });
         const rows = data.items.map((r) => {
-          const tr = row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`);
-          if (r.is_critical) tr.classList.add('row-critical');
+          // Build ack cell
+          let ackCell;
+          if (!r.is_critical) {
+            ackCell = '<td style="color:var(--muted);font-size:11px;">—</td>';
+          } else if (r.critical_ack_at) {
+            const ts = new Date(r.critical_ack_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+            ackCell = '<td><span class="pill ok" title="Acquitté le ' + ts + '">✅ ' + ts + '</span></td>';
+          } else {
+            ackCell = '<td><span class="pill bad" style="margin-right:6px;">⛔ Critique</span><button class="ghost" style="font-size:11px;padding:2px 8px;color:var(--rose);border-color:var(--rose);" onclick="ackCritical(' + r.id + ', this)">Acquitter</button></td>';
+          }
+          const tr = row(
+            '<td>' + r.id + '</td>' +
+            '<td>' + r.sample_id + '</td>' +
+            '<td>' + (r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non') + '</td>' +
+            ackCell +
+            '<td>' + (r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non') + '</td>' +
+            '<td><button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button></td>'
+          );
+          if (r.is_critical && !r.critical_ack_at) tr.classList.add('row-critical');
+          else if (r.is_critical && r.critical_ack_at) tr.classList.add('row-warning');
           return tr;
         });
         setRows("resultsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
+      }
+    }
+    async function ackCritical(resultId, btn) {
+      if (btn) { btn.disabled = true; btn.textContent = "…"; }
+      try {
+        await api("/api/v1/results/" + resultId + "/ack-critical", { method: "PATCH", headers: headers() });
+        showToast("Valeur critique acquittée", "success");
+        await loadResults();
+      } catch (e) {
+        showToast("Erreur lors de l'acquittement", "error");
+        if (btn) { btn.disabled = false; btn.textContent = "Acquitter"; }
       }
     }
     function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }

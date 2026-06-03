@@ -3,6 +3,27 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+# ── QC dashboard summary ─────────────────────────────────────────────────────
+
+QC_REJECT_RULES = frozenset({"1-3s", "2-2s", "R-4s", "4-1s", "10x"})
+
+
+class QcStatusEntry(BaseModel):
+    control_id: int
+    analyte: str
+    level: str
+    unit: str
+    last_date: dt.date | None
+    last_value: float | None
+    violations: list[str]
+    status: str  # "ok" | "warn" | "reject" | "no_data"
+
+
+class QcSummaryResponse(BaseModel):
+    controls: list[QcStatusEntry]
+    reject_count: int
+    warn_count: int
+
 
 class QcControlCreate(BaseModel):
     analyte: str = Field(..., min_length=1, max_length=100)

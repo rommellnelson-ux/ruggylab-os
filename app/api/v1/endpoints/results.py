@@ -12,6 +12,7 @@ from app.schemas.result import ResultCreate, ResultRead
 from app.services.critical_checker import check_critical
 from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
+from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
 
@@ -143,6 +144,35 @@ def create_result(
                 "items": [item.__dict__ for item in exc.items],
             },
         ) from exc
+    db.commit()
+    db.refresh(result)
+    return result
+
+
+@router.patch("/{result_id}/ack-critical", response_model=ResultRead)
+def ack_critical(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Result:
+    """Acknowledge a critical value — records operator and timestamp."""
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable."
+        )
+    if not result.is_critical:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ce résultat n'est pas marqué critique.",
+        )
+    if result.critical_ack_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Valeur critique déjà acquittée.",
+        )
+    result.critical_ack_at = utcnow_naive()
+    result.critical_ack_by_id = current_user.id
     db.commit()
     db.refresh(result)
     return result

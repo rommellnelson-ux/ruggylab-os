@@ -27,5 +27,7 @@ class ResultRead(ResultBase):
     id: int
     validator_id: int | None = None
     is_validated: bool = False
+    critical_ack_at: dt.datetime | None = None
+    critical_ack_by_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
