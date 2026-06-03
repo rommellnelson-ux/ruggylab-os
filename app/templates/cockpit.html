@@ -752,6 +752,7 @@
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
         <div class="nav-section">Système</div>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
+        <button data-view="users" onclick="showView('users')">👥 Utilisateurs</button>
       </nav>
       <div class="side-footer" id="sideFooter" style="display:none;">
         <div class="side-avatar" id="sideAvatar">—</div>
@@ -1096,6 +1097,50 @@
             </div></div>
           </div>
           <div class="panel"><h3>📊 Statistiques Dataset</h3><div id="datasetStats" style="padding: 15px;"></div></div>
+        </div>
+
+        <!-- ── Vue Gestion des utilisateurs ─────────────────────────────── -->
+        <div id="users" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3 id="userFormTitle">Nouvel utilisateur</h3>
+              <div class="form">
+                <div>
+                  <label>Identifiant</label>
+                  <input id="userUsername" placeholder="marie.konan" autocomplete="off" />
+                </div>
+                <div>
+                  <label>Mot de passe</label>
+                  <div class="pw-wrap">
+                    <input id="userPassword" type="password" placeholder="Min. 8 caractères" autocomplete="new-password" />
+                    <button class="pw-toggle" type="button" onclick="toggleUserPw()" aria-label="Afficher/masquer">👁</button>
+                  </div>
+                </div>
+                <div><label>Nom complet</label><input id="userFullName" placeholder="Marie Konan" /></div>
+                <div>
+                  <label>Rôle</label>
+                  <select id="userRole">
+                    <option value="technician">🟢 Technicien</option>
+                    <option value="officer">🟡 Officier</option>
+                    <option value="admin">🔴 Administrateur</option>
+                  </select>
+                </div>
+                <div class="actions">
+                  <button id="userSubmitBtn" onclick="submitUserForm(this)">Créer utilisateur</button>
+                  <button class="ghost" id="userCancelBtn" onclick="resetUserForm()" style="display:none;">Annuler</button>
+                </div>
+                <div id="userFormError" role="alert" style="color:var(--rose);font-size:13px;min-height:16px;"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Utilisateurs enregistrés</h3>
+              <div class="toolbar"><button class="ghost" onclick="loadUsers()">↻ Actualiser</button></div>
+              <table id="usersTable">
+                <thead><tr><th>ID</th><th>Identifiant</th><th>Nom</th><th>Rôle</th><th>Actif</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <div class="band" id="logPanel">
@@ -1717,6 +1762,7 @@
       if (currentView === "results") await loadResults();
       if (currentView === "stocks") await loadReagents();
       if (currentView === "epidemio") await loadEpidemio();
+      if (currentView === "users") await loadUsers();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -3502,6 +3548,127 @@
         await navigator.clipboard.writeText(text);
         showToast('JSON copié dans le presse-papiers', 'success');
       } catch { showToast('Copie impossible (HTTP non sécurisé)', 'error'); }
+    }
+
+    // ── Gestion des utilisateurs ──────────────────────────────────────────────
+    let _editingUserId = null;
+
+    async function loadUsers() {
+      const tbody = $('usersTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 4);
+      try {
+        const data = await api('/api/v1/users', { headers: headers(false) });
+        const roleLabel = { admin: '🔴 Admin', officer: '🟡 Officier', technician: '🟢 Tech.' };
+        const rolePill  = { admin: 'bad',       officer: 'warn',         technician: 'ok' };
+        const rows = data.map(u => {
+          const tr = row(
+            `<td>${u.id}</td>` +
+            `<td><strong>${security.escapeHtml(u.username)}</strong></td>` +
+            `<td>${security.escapeHtml(u.full_name || '—')}</td>` +
+            `<td><span class="pill ${rolePill[u.role] || ''}">${roleLabel[u.role] || u.role}</span></td>` +
+            `<td>${u.is_active ? '<span class="pill ok">Oui</span>' : '<span class="pill bad">Non</span>'}</td>` +
+            `<td style="white-space:nowrap;">` +
+              `<button class="ghost" style="margin-right:4px;" onclick='selectUserForEdit(${JSON.stringify(u)})'>Éditer</button>` +
+              `<button class="${u.is_active ? 'warn' : 'success'}" onclick="toggleUserActive(${u.id},${u.is_active})">${u.is_active ? 'Désactiver' : 'Activer'}</button>` +
+            `</td>`
+          );
+          if (!u.is_active) tr.style.opacity = '0.55';
+          return tr;
+        });
+        setRows('usersTable', rows);
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur — droits admin requis</td></tr>';
+      }
+    }
+
+    function selectUserForEdit(u) {
+      _editingUserId = u.id;
+      $('userUsername').value = u.username;
+      $('userUsername').disabled = true;
+      $('userPassword').value = '';
+      $('userPassword').placeholder = 'Laisser vide = inchangé';
+      $('userFullName').value = u.full_name || '';
+      $('userRole').value = u.role;
+      $('userFormTitle').textContent = `Modifier — ${u.username}`;
+      $('userSubmitBtn').textContent = 'Enregistrer';
+      $('userCancelBtn').style.display = '';
+      $('userFormError').textContent = '';
+      $('userFormTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function resetUserForm() {
+      _editingUserId = null;
+      $('userUsername').value = '';
+      $('userUsername').disabled = false;
+      $('userPassword').value = '';
+      $('userPassword').placeholder = 'Min. 8 caractères';
+      $('userFullName').value = '';
+      $('userRole').value = 'technician';
+      $('userFormTitle').textContent = 'Nouvel utilisateur';
+      $('userSubmitBtn').textContent = 'Créer utilisateur';
+      $('userCancelBtn').style.display = 'none';
+      $('userFormError').textContent = '';
+    }
+
+    async function submitUserForm(btn) {
+      $('userFormError').textContent = '';
+      setLoading(btn, true);
+      try {
+        if (_editingUserId) {
+          // PATCH — rôle + nom complet
+          const payload = {
+            full_name: $('userFullName').value.trim() || null,
+            role: $('userRole').value,
+          };
+          await api(`/api/v1/users/${_editingUserId}`, {
+            method: 'PATCH', headers: headers(), body: JSON.stringify(payload),
+          });
+          showToast('Utilisateur mis à jour', 'success');
+          resetUserForm();
+        } else {
+          // POST — création
+          const username = $('userUsername').value.trim();
+          const password = $('userPassword').value;
+          if (username.length < 3) throw new Error('Identifiant trop court (min. 3 caractères)');
+          if (password.length < 8) throw new Error('Mot de passe trop court (min. 8 caractères)');
+          const payload = {
+            username,
+            password,
+            full_name: $('userFullName').value.trim() || null,
+            role: $('userRole').value,
+          };
+          const created = await api('/api/v1/users', {
+            method: 'POST', headers: headers(), body: JSON.stringify(payload),
+          });
+          showToast(`Utilisateur « ${created.username} » créé`, 'success');
+          resetUserForm();
+        }
+        await loadUsers();
+      } catch (e) {
+        $('userFormError').textContent = e.message || 'Erreur inconnue';
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    function toggleUserPw() {
+      const inp = $('userPassword');
+      if (inp) inp.type = inp.type === 'text' ? 'password' : 'text';
+    }
+
+    async function toggleUserActive(id, currentActive) {
+      try {
+        await api(`/api/v1/users/${id}`, {
+          method: 'PATCH', headers: headers(),
+          body: JSON.stringify({ is_active: !currentActive }),
+        });
+        showToast(currentActive ? 'Utilisateur désactivé' : 'Utilisateur réactivé',
+                  currentActive ? 'warning' : 'success');
+        await loadUsers();
+      } catch {
+        showToast('Erreur modification statut', 'error');
+      }
     }
 
     // ── Password toggle ────────────────────────────────────────────────────────
