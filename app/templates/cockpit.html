@@ -123,10 +123,10 @@
       font-size: 12px;
       margin-bottom: 5px;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; min-width: min(520px, 100%); border-collapse: collapse; font-size: 13px; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px 7px; text-align: left; vertical-align: top; }
     th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-    .shell { min-height: 100vh; display: grid; grid-template-columns: 246px 1fr; }
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr); }
     .side {
       background: var(--nav);
       color: #e8f0f7;
@@ -134,6 +134,9 @@
       position: sticky;
       top: 0;
       height: 100vh;
+      width: 260px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
     .brand { padding: 6px 8px 18px; border-bottom: 1px solid rgba(255,255,255,0.14); }
     .brand h1 { margin: 0; font-size: 19px; letter-spacing: 0; }
@@ -150,7 +153,7 @@
       background: rgba(255,255,255,0.10);
       border-color: rgba(255,255,255,0.16);
     }
-    .main { min-width: 0; }
+    .main { min-width: 0; overflow: hidden; }
     .topbar {
       display: flex;
       align-items: center;
@@ -176,19 +179,20 @@
       padding: 16px;
     }
     .band h3, .panel h3 { margin: 0 0 10px; font-size: 16px; }
-    .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; }
+    .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 14px;
       min-width: 0;
+      overflow-x: auto;
     }
     .metric { min-height: 92px; display: grid; align-content: center; gap: 6px; }
     .metric .value { font-size: 28px; font-weight: 700; }
-    .metric .label { color: var(--muted); font-size: 12px; }
+    .metric .label { color: var(--muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
     .form { display: grid; gap: 11px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -223,6 +227,18 @@
     .tube-card .tube { font-size: 18px; font-weight: 700; }
     .tube-card .order { color: var(--amber); font-weight: 700; margin-top: 4px; }
     .field-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .stack { display: grid; gap: 12px; }
+    .result-box {
+      min-height: 120px;
+      max-height: 360px;
+      overflow: auto;
+      color: #dce8f3;
+      background: #101c2a;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
     .hidden { display: none !important; }
     .login {
       min-height: 100vh;
@@ -236,21 +252,22 @@
       .side { 
         position: fixed; 
         height: 100vh;
-        z-index: 50;
+        width: min(84vw, 320px);
+        z-index: 60;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
       }
       .side.open { transform: translateX(0); }
-      .grid4, .grid3, .grid2 { grid-template-columns: 1fr; }
       .field-list { grid-template-columns: 1fr; }
       .topbar { position: static; align-items: flex-start; flex-direction: column; }
-      .sidebar-toggle { display: block; }
+      .topbar .actions { width: 100%; }
+      .sidebar-toggle { display: block; z-index: 70; }
       .sidebar-overlay {
         display: none;
         position: fixed;
         inset: 0;
         background: rgba(0,0,0,0.5);
-        z-index: 40;
+        z-index: 55;
       }
       .sidebar-overlay.show { display: block; }
     }
@@ -264,13 +281,23 @@
       .metric .value { font-size: 24px; }
       .metric { min-height: 80px; }
       .toolbar { gap: 6px; }
+      table { min-width: 460px; }
       button { 
         padding: 8px 10px;
         font-size: 14px;
         min-height: 36px;
       }
       .toast {
-        min-width: 240px;
+        min-width: 0;
+      }
+      .toast-container {
+        top: auto;
+        right: 12px;
+        bottom: 86px;
+        left: 12px;
+      }
+      .toast {
+        min-width: 0;
         padding: 10px 12px;
       }
     }
@@ -283,6 +310,8 @@
       .metric .value { font-size: 20px; }
       .metric .label { font-size: 11px; }
       .metric { min-height: 70px; }
+      table { min-width: 100%; font-size: 11px; }
+      th, td { padding: 8px 5px; }
       h2 { font-size: 18px; }
       h3 { font-size: 15px; }
       button { 
@@ -293,7 +322,7 @@
       .actions { gap: 6px; }
       .form { gap: 8px; }
       .toast {
-        min-width: 200px;
+        min-width: 0;
         padding: 8px 10px;
         font-size: 13px;
       }
@@ -547,26 +576,152 @@
         border: 1px solid #000;
       }
     }
+    /* ── Nav section separators ───────────────────── */
     .nav-section {
-      font-size: 10px;
+      font-size: 9px;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: rgba(168, 183, 199, 0.55);
-      padding: 14px 8px 3px;
+      letter-spacing: 0.14em;
+      color: rgba(168, 183, 199, 0.42);
+      padding: 16px 4px 4px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
     }
+    .nav-section::before, .nav-section::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+    }
+    /* ── Nav active + hover ────────────────────────── */
+    .nav button.active {
+      background: rgba(37,99,235,0.20) !important;
+      border-left: 3px solid #3b82f6 !important;
+      border-color: rgba(59,130,246,0.35) !important;
+      color: #ffffff !important;
+    }
+    .nav button:hover:not(.active) {
+      background: rgba(255,255,255,0.07) !important;
+    }
+    /* ── Sidebar layout flex ─────────────────────── */
+    .side { display: flex; flex-direction: column; }
+    .nav { flex: 1; }
+    /* ── Sidebar user footer ─────────────────────── */
+    .side-footer {
+      position: sticky;
+      bottom: 0;
+      background: rgba(9,18,29,0.85);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 10px 10px;
+      margin: 8px -14px -18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(8px);
+    }
+    .side-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2563eb, #0f766e);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .side-user-name { font-size: 12px; color: #d0e0ef; line-height: 1.3; font-weight: 500; }
+    .side-user-role { font-size: 10px; color: rgba(168,183,199,0.55); }
+    /* ── Metric color variants ───────────────────── */
+    .metric-blue  { border-top: 3px solid #2563eb; }
+    .metric-blue  .value { color: #2563eb; }
+    .metric-rose  { border-top: 3px solid #be123c; }
+    .metric-rose  .value { color: #be123c; }
+    .metric-amber { border-top: 3px solid #b45309; }
+    .metric-amber .value { color: #b45309; }
+    .metric-teal  { border-top: 3px solid #0f766e; }
+    .metric-teal  .value { color: #0f766e; }
+    /* ── Empty table state ───────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .empty-state::before { content: '—'; display: block; font-size: 24px; opacity: .35; margin-bottom: 6px; }
+    /* ── Row status highlighting ─────────────────── */
+    tr.row-critical > td:first-child { border-left: 3px solid var(--rose); padding-left: 10px; }
+    tr.row-warning  > td:first-child { border-left: 3px solid var(--amber); padding-left: 10px; }
+    /* ── Log collapsible ─────────────────────────── */
+    .log-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0;
+      font-size: 15px;
+    }
+    .log-caret { font-size: 10px; color: var(--muted); transition: transform 0.2s; }
+    .log-panel-body { overflow: hidden; transition: max-height 0.3s ease, opacity 0.25s; max-height: 400px; opacity: 1; margin-top: 10px; }
+    .log-collapsed .log-panel-body { max-height: 0; opacity: 0; margin-top: 0; }
+    .log-collapsed .log-caret { transform: rotate(180deg); }
+    /* ── Login polish ────────────────────────────── */
+    .login-logo { font-size: 44px; text-align: center; margin-bottom: 2px; line-height: 1; }
+    .login-title { text-align: center; font-size: 22px; font-weight: 700; margin: 6px 0 2px; }
+    .login-sub { text-align: center; color: var(--muted); font-size: 12.5px; margin: 0 0 22px; line-height: 1.5; }
+    .login-divider { border: none; border-top: 1px solid var(--line); margin: 6px 0 14px; }
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 42px; }
+    .pw-toggle {
+      position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+      background: none !important; border: none !important; color: var(--muted);
+      padding: 4px; cursor: pointer; min-height: auto !important; font-size: 15px;
+      line-height: 1; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px !important;
+    }
+    .pw-toggle:hover { background: rgba(0,0,0,0.06) !important; }
+    /* ── Topbar clock ────────────────────────────── */
+    #topbarClock {
+      font-size: 12px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    /* ── Topbar brand on mobile ──────────────────── */
+    .topbar-brand { font-weight: 600; font-size: 14px; color: var(--ink); display: none; }
+    @media (max-width: 980px) { .topbar-brand { display: block; } }
+    /* ── Table header sort hint ──────────────────── */
+    th { cursor: default; }
+    /* ── Pill status ─────────────────────────────── */
+    .pill.warn { background: #fef3c7; color: #92400e; }
+    .pill.done { background: #dcfce7; color: #166534; }
   </style>
 </head>
 <body>
   <div id="toastContainer" class="toast-container"></div>
   <div id="loginView" class="login">
-    <section class="panel">
-      <h3>RuggyLab OS</h3>
-      <p class="status">Connexion au cockpit local du laboratoire.</p>
-      <div class="form" style="margin-top:14px;">
-        <div><label for="username">Utilisateur</label><input id="username" value="admin" autocomplete="username" required aria-describedby="loginError" /></div>
-        <div><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError" /></div>
-        <button onclick="login()" aria-describedby="loginError">Connexion</button>
-        <div id="loginError" class="status" role="alert" aria-live="polite"></div>
+    <section class="panel" style="width:min(400px,100%);">
+      <div class="login-logo">🧪</div>
+      <h2 class="login-title">RuggyLab OS</h2>
+      <p class="login-sub">Centre de Santé de la Garde Républicaine<br>Connexion sécurisée au cockpit</p>
+      <hr class="login-divider" />
+      <div class="form">
+        <div>
+          <label for="username">Identifiant</label>
+          <input id="username" value="admin" autocomplete="username" required aria-describedby="loginError"
+                 onkeydown="if(event.key==='Enter')$('password').focus()" />
+        </div>
+        <div>
+          <label for="password">Mot de passe</label>
+          <div class="pw-wrap">
+            <input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError"
+                   onkeydown="if(event.key==='Enter')login()" />
+            <button class="pw-toggle" type="button" id="pwToggleBtn" onclick="togglePw()" aria-label="Afficher/masquer le mot de passe">👁</button>
+          </div>
+        </div>
+        <button onclick="login()" style="margin-top:4px;">Connexion</button>
+        <div id="loginError" class="status" role="alert" aria-live="polite" style="text-align:center;color:var(--rose);font-size:13px;min-height:18px;"></div>
       </div>
     </section>
   </div>
@@ -580,42 +735,55 @@
         <p>Centre de Santé de la Garde Républicaine</p>
       </div>
       <nav class="nav" role="navigation" aria-label="Navigation principale">
-        <div class="nav-section">── CLINIQUE ──</div>
+        <div class="nav-section">Clinique</div>
         <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">🏠 Tableau de bord</button>
         <button data-view="patients" onclick="showView('patients')">👤 Patients</button>
         <button data-view="samples" onclick="showView('samples')">🧪 Échantillons</button>
         <button data-view="results" onclick="showView('results')">📋 Résultats</button>
-        <div class="nav-section">── ANALYTIQUE ──</div>
+        <div class="nav-section">Analytique</div>
         <button data-view="epidemio" onclick="showView('epidemio')">📊 Épidémiologie</button>
         <button data-view="machines" onclick="showView('machines')">🔬 DH36 &amp; POCT</button>
         <button data-view="imaging" onclick="showView('imaging')">👁 Imagerie IA</button>
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
-        <div class="nav-section">── LOGISTIQUE ──</div>
+        <div class="nav-section">Logistique</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
+        <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
+        <button data-view="bnpl" onclick="showView('bnpl')">💳 Paiements BNPL</button>
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
-        <div class="nav-section">── SYSTÈME ──</div>
+        <div class="nav-section">Système</div>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
+        <button data-view="users" onclick="showView('users')">👥 Utilisateurs</button>
       </nav>
+      <div class="side-footer" id="sideFooter" style="display:none;">
+        <div class="side-avatar" id="sideAvatar">—</div>
+        <div>
+          <div class="side-user-name" id="sideUserName">—</div>
+          <div class="side-user-role" id="sideUserRole">—</div>
+        </div>
+      </div>
     </aside>
     <main class="main">
       <header class="topbar">
-        <div>
-          <h2 id="viewTitle">Tableau de bord</h2>
-          <div id="userStatus" class="status">Session active</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div>
+            <h2 id="viewTitle" style="margin:0;font-size:18px;">Tableau de bord</h2>
+            <div id="userStatus" class="status" style="font-size:12px;color:var(--muted);">Session active</div>
+          </div>
         </div>
-        <div class="actions">
-          <button class="theme-toggle" onclick="toggleTheme()" title="Changer le theme" aria-label="Basculer entre mode clair et sombre">☀️</button>
-          <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraichir la vue actuelle">Rafraichir</button>
-          <button class="secondary" onclick="logout()" aria-label="Se deconnecter">Deconnexion</button>
+        <div class="actions" style="align-items:center;">
+          <span id="topbarClock"></span>
+          <button class="theme-toggle" onclick="toggleTheme()" title="Changer le thème" aria-label="Basculer entre mode clair et sombre">☀️</button>
+          <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraîchir">↻</button>
+          <button class="secondary" onclick="logout()" aria-label="Se déconnecter">⏻ Quitter</button>
         </div>
       </header>
       <section class="content">
         <div id="dashboard" class="view band">
           <div class="grid4">
-            <div class="panel metric"><div id="mResults" class="value">0</div><div class="label">Resultats 30 jours</div></div>
-            <div class="panel metric"><div id="mCritical" class="value">0</div><div class="label">Critiques</div></div>
-            <div class="panel metric"><div id="mMalaria" class="value">0</div><div class="label">Paludisme positif</div></div>
-            <div class="panel metric"><div id="mLowStock" class="value">0</div><div class="label">Stocks bas</div></div>
+            <div class="panel metric metric-blue"><div id="mResults" class="value">—</div><div class="label">Résultats · 30 jours</div></div>
+            <div class="panel metric metric-rose"><div id="mCritical" class="value">—</div><div class="label">Valeurs critiques</div></div>
+            <div class="panel metric metric-teal"><div id="mMalaria" class="value">—</div><div class="label">Paludisme positif</div></div>
+            <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
@@ -721,10 +889,32 @@
               <button onclick="createReagent(this)">Creer reactif</button>
             </div></div>
             <div class="panel"><h3>Reactifs</h3>
-              <div style="margin-bottom: 10px;">
-                <button onclick="predictInventoryNeeds()" class="primary">🤖 Prédictions IA Stocks</button>
-              </div>
               <table id="reagentsTable"><thead><tr><th>ID</th><th>Nom</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>Prédiction et notifications CMU</h3>
+            <div class="grid2">
+              <div class="form">
+                <div id="stockDrugLines" class="stack"></div>
+                <button class="ghost" onclick="addStockDrugLine()" style="width:100%;">+ Ajouter médicament</button>
+                <div class="grid3">
+                  <div><label>Horizon</label><select id="stockHorizon"><option value="30">30 jours</option><option value="60">60 jours</option><option selected value="90">90 jours</option><option value="180">6 mois</option></select></div>
+                  <div><label>FHIR</label><select id="stockIncludeFhir"><option value="false">Non</option><option value="true">Oui</option></select></div>
+                  <div><label>Sévérité notification</label><select id="stockSeverity"><option value="RUPTURE_IMMINENTE">Rupture imminente</option><option selected value="ALERTE_ET_PLUS">Alerte et plus</option><option value="TOUTES">Toutes les alertes</option></select></div>
+                </div>
+                <div class="grid3">
+                  <div><label>Canal</label><select id="stockChannel"><option value="WEBHOOK">Webhook</option><option value="EMAIL">Email</option><option value="BOTH">Webhook + Email</option></select></div>
+                  <div><label>Webhook</label><input id="stockWebhook" placeholder="https://..." /></div>
+                  <div><label>Email(s)</label><input id="stockEmails" placeholder="pharma@exemple.ci, chef@exemple.ci" /></div>
+                </div>
+                <div><label>Facility ID</label><input id="stockFacility" placeholder="CSGR-PHARM" /></div>
+                <div class="actions">
+                  <button onclick="predictInventoryNeeds(this)">Prédire les besoins</button>
+                  <button class="warn" onclick="notifyStockAlerts(this)">Notifier alertes</button>
+                </div>
+              </div>
+              <pre id="stockPredictionResult" class="result-box">Aucune prédiction lancée.</pre>
             </div>
           </div>
         </div>
@@ -826,6 +1016,59 @@
           </div>
         </div>
 
+        <div id="prescription" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3>Scanner ordonnance CMU / ONMCI</h3>
+              <div class="form">
+                <div class="grid2"><div><label>Patient ID</label><input id="rxPatientId" placeholder="IPP-CI-2026-001234" /></div><div><label>Prescripteur ONMCI</label><input id="rxPrescriber" placeholder="ONMCI-2026-001" /></div></div>
+                <div class="grid2"><div><label>Date ordonnance</label><input id="rxDate" type="date" /></div><div><label>QR token</label><input id="rxQrToken" placeholder="Token QR optionnel" /></div></div>
+                <div><label>Diagnostics CIM-10 (séparés par virgule)</label><input id="rxDiagnoses" value="B54" /></div>
+                <div><label>Médicaments DCI (un par ligne: DCI, dose mg, fréquence/j, durée j)</label><textarea id="rxDrugs">ARTEMETHER-LUMEFANTRINE, 80, 2, 3</textarea></div>
+                <div class="grid3">
+                  <div><label>Age</label><input id="rxAge" type="number" value="30" /></div>
+                  <div><label>Poids kg</label><input id="rxWeight" type="number" value="70" /></div>
+                  <div><label>Sexe</label><select id="rxSex"><option>M</option><option>F</option></select></div>
+                </div>
+                <div class="actions">
+                  <button onclick="scanPrescription(this)">Scanner ordonnance</button>
+                  <button class="success" onclick="openPrescriptionPdf(this)">Rapport PDF</button>
+                </div>
+              </div>
+            </div>
+            <pre id="rxResult" class="result-box">Aucune ordonnance scannée.</pre>
+          </div>
+        </div>
+
+        <div id="bnpl" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3>Plan de paiement BNPL</h3>
+              <div class="form">
+                <div><label>Référence patient</label><input id="bnplPatientRef" placeholder="IPP ou dossier CMU" /></div>
+                <div class="grid2"><div><label>Montant total XOF</label><input id="bnplTotal" type="number" value="30000" /></div><div><label>Mensualités</label><input id="bnplMonths" type="number" min="2" max="24" value="3" /></div></div>
+                <div><label>Prescripteur</label><input id="bnplPrescriber" placeholder="ONMCI-..." /></div>
+                <div class="actions">
+                  <button onclick="createBnplSchedule(this)">Créer plan</button>
+                  <button class="secondary" onclick="loadOverdueBnpl(this)">Retards</button>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Paiement échéance</h3>
+              <div class="form">
+                <div><label>Plan ID</label><input id="bnplScheduleId" type="number" /></div>
+                <div class="grid2"><div><label>Echéance n°</label><input id="bnplInstallment" type="number" value="1" /></div><div><label>Montant XOF</label><input id="bnplAmount" type="number" /></div></div>
+                <div class="actions">
+                  <button class="success" onclick="payBnplInstallment(this)">Enregistrer paiement</button>
+                  <button class="ghost" onclick="loadBnplSummary(this)">Résumé</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <pre id="bnplResult" class="result-box" style="margin-top:12px;">Aucun plan chargé.</pre>
+        </div>
+
         <div id="ai_training" class="view band hidden">
           <div class="grid2">
             <div class="panel"><h3>🤖 Dataset Entraînement IA</h3><div class="form">
@@ -856,7 +1099,54 @@
           <div class="panel"><h3>📊 Statistiques Dataset</h3><div id="datasetStats" style="padding: 15px;"></div></div>
         </div>
 
-        <div class="band"><h3>Journal</h3><div id="log" class="log">Pret.</div></div>
+        <!-- ── Vue Gestion des utilisateurs ─────────────────────────────── -->
+        <div id="users" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3 id="userFormTitle">Nouvel utilisateur</h3>
+              <div class="form">
+                <div>
+                  <label>Identifiant</label>
+                  <input id="userUsername" placeholder="marie.konan" autocomplete="off" />
+                </div>
+                <div>
+                  <label>Mot de passe</label>
+                  <div class="pw-wrap">
+                    <input id="userPassword" type="password" placeholder="Min. 8 caractères" autocomplete="new-password" />
+                    <button class="pw-toggle" type="button" onclick="toggleUserPw()" aria-label="Afficher/masquer">👁</button>
+                  </div>
+                </div>
+                <div><label>Nom complet</label><input id="userFullName" placeholder="Marie Konan" /></div>
+                <div>
+                  <label>Rôle</label>
+                  <select id="userRole">
+                    <option value="technician">🟢 Technicien</option>
+                    <option value="officer">🟡 Officier</option>
+                    <option value="admin">🔴 Administrateur</option>
+                  </select>
+                </div>
+                <div class="actions">
+                  <button id="userSubmitBtn" onclick="submitUserForm(this)">Créer utilisateur</button>
+                  <button class="ghost" id="userCancelBtn" onclick="resetUserForm()" style="display:none;">Annuler</button>
+                </div>
+                <div id="userFormError" role="alert" style="color:var(--rose);font-size:13px;min-height:16px;"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Utilisateurs enregistrés</h3>
+              <div class="toolbar"><button class="ghost" onclick="loadUsers()">↻ Actualiser</button></div>
+              <table id="usersTable">
+                <thead><tr><th>ID</th><th>Identifiant</th><th>Nom</th><th>Rôle</th><th>Actif</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="band" id="logPanel">
+          <h3 class="log-header" onclick="toggleLog()">Journal&nbsp;<span class="log-caret">▲</span></h3>
+          <div class="log-panel-body"><div id="log" class="log">Prêt.</div></div>
+        </div>
       </section>
     </main>
   </div>
@@ -890,10 +1180,10 @@
         }
       }
     };
-    storage.removeItem("ruggylab_token");
     let token = "";
     let currentView = "dashboard";
     let lastCreatedPatient = null;
+    const API_PREFIX = "/api/v1";
     
     // Error handling and logging
     const errorHandler = {
@@ -1133,7 +1423,12 @@
       const toast = document.createElement("div");
       toast.className = `toast ${type}`;
       const icon = type === "success" ? "✓" : type === "error" ? "✗" : "⚠";
-      toast.innerHTML = `<span style="font-size:18px">${icon}</span><span>${message}</span>`;
+      const iconEl = document.createElement("span");
+      iconEl.style.fontSize = "18px";
+      iconEl.textContent = icon;
+      const messageEl = document.createElement("span");
+      messageEl.textContent = message;
+      toast.append(iconEl, messageEl);
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.animation = "slideIn 0.3s ease reverse";
@@ -1312,6 +1607,10 @@
       return h;
     }
     function log(value) { $("log").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2); }
+    function normalizeApiPath(path) {
+      if (path.startsWith("http") || path.startsWith(API_PREFIX)) return path;
+      return `${API_PREFIX}${path.startsWith("/") ? path : `/${path}`}`;
+    }
     async function api(path, options = {}) {
       if (!security.validateToken() && !path.includes('/login/access-token')) {
         throw new Error('Session expirée');
@@ -1325,7 +1624,7 @@
         }
       }
       
-      const response = await fetch(path, options);
+      const response = await fetch(normalizeApiPath(path), options);
       const text = await response.text();
       let payload = text;
       try { payload = JSON.parse(text); } catch {}
@@ -1336,7 +1635,20 @@
       return payload;
     }
     function row(html) { const tr = document.createElement("tr"); tr.innerHTML = html; return tr; }
-    function setRows(tableId, rows) { const body = $(tableId).querySelector("tbody"); body.innerHTML = ""; rows.forEach((r) => body.appendChild(r)); }
+    function setRows(tableId, rows) {
+      const table = $(tableId);
+      const body = table?.querySelector("tbody");
+      if (!body) return;
+      body.innerHTML = "";
+      if (rows.length === 0) {
+        const colCount = table.querySelectorAll("thead th").length || 1;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="${colCount}"><div class="empty-state">Aucune donnée</div></td>`;
+        body.appendChild(tr);
+      } else {
+        rows.forEach((r) => body.appendChild(r));
+      }
+    }
     function stamp() {
       const d = new Date();
       return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
@@ -1405,17 +1717,42 @@
         $("userStatus").textContent = `${me.full_name || me.username} - ${me.role}`;
         $("loginView").classList.add("hidden");
         $("appView").classList.remove("hidden");
+        // Sidebar user footer
+        const initials = (me.full_name || me.username || '?')
+          .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const sf = $('sideFooter'); if (sf) sf.style.display = 'flex';
+        const sa = $('sideAvatar'); if (sa) sa.textContent = initials;
+        const sn = $('sideUserName'); if (sn) sn.textContent = me.full_name || me.username;
+        const sr = $('sideUserRole'); if (sr) sr.textContent = me.role || 'Utilisateur';
+        startClock();
         updateTubeGuide();
         renderResultTemplate();
+        if ($('stockDrugLines') && $('stockDrugLines').children.length === 0) {
+          addStockDrugLine({
+            dci_code: 'ARTEMETHER-LUMEFANTRINE',
+            current_stock: 80,
+            cmm_units: 120,
+            disease_category: 'ANTIMALARIAL',
+            unit_cost_xof: 250
+          });
+        }
         await loadDashboard();
       } catch { logout(); }
     }
     function showView(name) {
+      const view = $(name);
+      const navButton = document.querySelector(`.nav button[data-view="${name}"]`);
+      if (!view || !navButton) {
+        showToast(`Vue indisponible: ${name}`, "error");
+        return;
+      }
       currentView = name;
       document.querySelectorAll(".view").forEach((el) => el.classList.add("hidden"));
-      $(name).classList.remove("hidden");
+      view.classList.remove("hidden");
       document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
-      $("viewTitle").textContent = document.querySelector(`.nav button[data-view="${name}"]`).textContent;
+      $("viewTitle").textContent = navButton.textContent;
+      document.querySelector(".side.open")?.classList.remove("open");
+      document.querySelector(".sidebar-overlay.show")?.classList.remove("show");
       refreshCurrent();
     }
     async function refreshCurrent() {
@@ -1425,6 +1762,7 @@
       if (currentView === "results") await loadResults();
       if (currentView === "stocks") await loadReagents();
       if (currentView === "epidemio") await loadEpidemio();
+      if (currentView === "users") await loadUsers();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -1436,7 +1774,13 @@
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
         $("mMalaria").textContent = epi.malaria_positive;
-        $("mLowStock").textContent = stock.low_stock_reagents.length;
+        const lowStockCount = stock.low_stock_reagents.length;
+        $("mLowStock").textContent = lowStockCount;
+        const mLSP = $("mLowStockPanel");
+        if (mLSP) {
+          mLSP.classList.remove("metric-amber", "metric-teal");
+          mLSP.classList.add(lowStockCount > 0 ? "metric-amber" : "metric-teal");
+        }
         setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
         setRows("lowStockTable", stock.low_stock_reagents.map((r) => row(`<td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
         showToast("Tableau de bord actualisé", "success");
@@ -1574,7 +1918,11 @@
       
       try {
         const data = await api("/api/v1/results", { headers: headers(false) });
-        const rows = data.items.map((r) => row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`));
+        const rows = data.items.map((r) => {
+          const tr = row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`);
+          if (r.is_critical) tr.classList.add('row-critical');
+          return tr;
+        });
         setRows("resultsTable", rows);
       } catch (error) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
@@ -1609,7 +1957,7 @@
         }
         
         // Validate result fields
-        const resultFields = document.querySelectorAll("#resultFields input[data-result-key]");
+        const resultFields = document.querySelectorAll("#dataPoints input[data-result-key]");
         let hasResultErrors = false;
         
         resultFields.forEach(input => {
@@ -1777,7 +2125,12 @@
       }
     }
     function downloadEpiCsv() { window.open("/api/v1/reports/epidemiology-export.csv?days=30", "_blank"); }
-    logout();
+    token = storage.getItem("ruggylab_token") || "";
+    if (token) {
+      boot();
+    } else {
+      logout();
+    }
     
     // Initialize keyboard shortcuts
     keyboard.init();
@@ -1837,8 +2190,6 @@
       
       async init() {
         try {
-          loadingStates.showLoadingOverlay('Initialisation IA...');
-          
           // Charger les modèles IA
           await this.loadModels();
           
@@ -1847,10 +2198,8 @@
           
           this.isInitialized = true;
           showToast('Moteur IA initialisé avec succès', 'success');
-          loadingStates.hideLoadingOverlay();
         } catch (error) {
           errorHandler.handle(error, 'AI initialization');
-          loadingStates.hideLoadingOverlay();
         }
       },
       
@@ -2716,19 +3065,251 @@
       log('Analyse IA dédiée : vue Imagerie IA → Analyser IA avec un Result ID.\nPour l\'analyse NFS, les statuts critiques sont calculés automatiquement à la saisie du résultat.');
     }
 
-    // ── predictInventoryNeeds (appel stock predictor) ───────────────────────────
-    async function predictInventoryNeeds() {
+    // ── Stock predictor / notifications CMU ────────────────────────────────────
+    function addStockDrugLine(defaults = {}) {
+      const div = document.createElement('div');
+      div.className = 'panel';
+      div.style.cssText = 'padding:10px;';
+      div.innerHTML = `
+        <div class="grid3" style="gap:6px;align-items:end;">
+          <div><label>DCI</label><input data-stock-dci value="${defaults.dci_code || ''}" placeholder="ARTEMETHER-LUMEFANTRINE" /></div>
+          <div><label>Stock actuel</label><input data-stock-current type="number" min="0" value="${defaults.current_stock ?? 80}" /></div>
+          <div><label>CMM</label><input data-stock-cmm type="number" min="1" value="${defaults.cmm_units ?? 120}" /></div>
+        </div>
+        <div class="grid3" style="gap:6px;margin-top:6px;align-items:end;">
+          <div><label>Catégorie</label><select data-stock-category>
+            ${['ANTIMALARIAL','ANTIBIOTIC','ANALGESIC','ANTIDIABETIC','ANTIHYPERTENSIVE','RESPIRATORY','GENERAL'].map(c => `<option ${c === (defaults.disease_category || 'GENERAL') ? 'selected' : ''}>${c}</option>`).join('')}
+          </select></div>
+          <div><label>Coût unit. XOF</label><input data-stock-cost type="number" min="1" value="${defaults.unit_cost_xof || ''}" placeholder="opt." /></div>
+          <div><button class="danger" style="width:100%;" onclick="this.closest('.panel').remove()">Supprimer</button></div>
+        </div>
+      `;
+      $('stockDrugLines').appendChild(div);
+    }
+
+    function collectStockDrugLines() {
+      const drugs = Array.from($('stockDrugLines').children).map(panel => {
+        const dci = panel.querySelector('[data-stock-dci]')?.value?.trim();
+        const current = panel.querySelector('[data-stock-current]')?.value;
+        const cmm = panel.querySelector('[data-stock-cmm]')?.value;
+        if (!dci || current === '' || cmm === '') return null;
+        const line = {
+          dci_code: dci,
+          current_stock: Number(current),
+          cmm_units: Number(cmm),
+          disease_category: panel.querySelector('[data-stock-category]')?.value || 'GENERAL'
+        };
+        const cost = panel.querySelector('[data-stock-cost]')?.value;
+        if (cost) line.unit_cost_xof = Number(cost);
+        return line;
+      }).filter(Boolean);
+      if (!drugs.length) throw new Error('Ajoutez au moins un médicament à prédire.');
+      return drugs;
+    }
+
+    function stockBasePayload() {
+      return {
+        drugs: collectStockDrugLines(),
+        horizon_days: Number($('stockHorizon').value)
+      };
+    }
+
+    async function predictInventoryNeeds(btn) {
+      if (btn) setLoading(btn, true);
       try {
-        const data = await api('/api/v1/stock/predict', {
+        const payload = {
+          ...stockBasePayload(),
+          include_fhir: $('stockIncludeFhir').value === 'true'
+        };
+        const data = await api('/stock/predict', {
           method: 'POST',
           headers: headers(),
-          body: JSON.stringify({ include_fhir: false })
+          body: JSON.stringify(payload)
         });
+        $('stockPredictionResult').textContent = JSON.stringify(data, null, 2);
         log(data);
         const n = data.drug_predictions?.length ?? 0;
-        showToast(`Prédictions IA stocks : ${n} médicament(s) analysé(s)`, 'success');
+        showToast(`Prédictions stocks : ${n} médicament(s) analysé(s)`, 'success');
       } catch (e) {
+        $('stockPredictionResult').textContent = e.message || String(e);
         showToast('Erreur prédiction stock', 'error');
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
+    }
+
+    async function notifyStockAlerts(btn) {
+      if (btn) setLoading(btn, true);
+      try {
+        const channel = $('stockChannel').value;
+        const payload = {
+          ...stockBasePayload(),
+          channel,
+          severity_filter: $('stockSeverity').value,
+          facility_id: $('stockFacility').value || null,
+          webhook_url: $('stockWebhook').value || null,
+          email_to: $('stockEmails').value ? $('stockEmails').value.split(',').map(v => v.trim()).filter(Boolean) : null
+        };
+        const data = await api('/stock/notify', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload)
+        });
+        $('stockPredictionResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`${data.notifications_sent ?? 0} notification(s) envoyée(s)`, 'success');
+      } catch (e) {
+        $('stockPredictionResult').textContent = e.message || String(e);
+        showToast('Erreur notification stock', 'error');
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
+    }
+
+    function buildPrescriptionPayload() {
+      const diagnoses = ($('rxDiagnoses').value || '')
+        .split(',')
+        .map(code => code.trim())
+        .filter(Boolean)
+        .map(code => ({ code }));
+      const drugs = ($('rxDrugs').value || '')
+        .split('\n')
+        .map(line => line.split(',').map(part => part.trim()))
+        .filter(parts => parts[0])
+        .map(([dci, dose, freq, duration]) => ({
+          dci: { code: dci },
+          dose_mg: dose ? Number(dose) : null,
+          frequency_per_day: freq ? Number(freq) : null,
+          duration_days: duration ? Number(duration) : null,
+          route: 'oral'
+        }));
+      if (!diagnoses.length) throw new Error('Ajoutez au moins un diagnostic CIM-10.');
+      if (!drugs.length) throw new Error('Ajoutez au moins un médicament DCI.');
+      return {
+        diagnoses,
+        drugs,
+        patient: {
+          age_years: Number($('rxAge').value || 0),
+          sex: $('rxSex').value,
+          weight_kg: $('rxWeight').value ? Number($('rxWeight').value) : null
+        },
+        prescriber_id: $('rxPrescriber').value || null,
+        prescription_date: $('rxDate').value || null,
+        qr_code_token: $('rxQrToken').value || null
+      };
+    }
+
+    async function scanPrescription(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api('/prescription/scan', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(buildPrescriptionPayload())
+        });
+        $('rxResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`Ordonnance: ${data.status} (${Math.round((data.confidence_score || 0) * 100)}%)`, data.status === 'BLOCKED' ? 'warning' : 'success');
+      } catch (e) {
+        $('rxResult').textContent = e.message || String(e);
+        showToast('Erreur scan ordonnance', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function openPrescriptionPdf(btn) {
+      setLoading(btn, true);
+      try {
+        const response = await fetch('/api/v1/prescription/report', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(buildPrescriptionPayload())
+        });
+        if (!response.ok) throw new Error('Rapport PDF indisponible');
+        const blob = await response.blob();
+        window.open(URL.createObjectURL(blob), '_blank');
+        showToast('Rapport PDF ordonnance ouvert', 'success');
+      } catch (e) {
+        $('rxResult').textContent = e.message || String(e);
+        showToast('Erreur rapport PDF ordonnance', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function createBnplSchedule(btn) {
+      setLoading(btn, true);
+      try {
+        const payload = {
+          patient_ref: $('bnplPatientRef').value,
+          total_amount_xof: Number($('bnplTotal').value),
+          installment_months: Number($('bnplMonths').value),
+          prescriber_id: $('bnplPrescriber').value || null
+        };
+        const data = await api('/billing/bnpl/schedule', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload)
+        });
+        $('bnplScheduleId').value = data.id;
+        $('bnplAmount').value = data.monthly_amount_xof;
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`Plan BNPL #${data.id} créé`, 'success');
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur création BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function payBnplInstallment(btn) {
+      setLoading(btn, true);
+      try {
+        const scheduleId = $('bnplScheduleId').value;
+        const payload = {
+          schedule_id: Number(scheduleId),
+          installment_number: Number($('bnplInstallment').value),
+          amount_xof: Number($('bnplAmount').value)
+        };
+        const data = await api(`/billing/bnpl/schedule/${scheduleId}/pay`, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload)
+        });
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+        showToast('Paiement BNPL enregistré', 'success');
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur paiement BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function loadBnplSummary(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api(`/billing/bnpl/summary/${$('bnplScheduleId').value}`, { headers: headers(false) });
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur résumé BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function loadOverdueBnpl(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api('/billing/bnpl/overdue', { headers: headers(false) });
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`${data.length ?? 0} plan(s) en retard`, 'success');
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur retards BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
       }
     }
 
@@ -2812,9 +3393,17 @@
         : ''
       ).join('');
 
+      const gridlines = [0.25, 0.5, 0.75].map(frac => {
+        const gv = Math.round(maxC * frac);
+        const gy = yS(gv).toFixed(1);
+        return `<line x1="${pad.left}" y1="${gy}" x2="${(pad.left + chartW).toFixed(1)}" y2="${gy}" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>` +
+               `<text x="${(pad.left - 4)}" y="${(parseFloat(gy) + 3).toFixed(0)}" text-anchor="end" font-size="9" fill="var(--muted)">${gv}</text>`;
+      }).join('');
+
       svg.setAttribute('height', H);
       svg.innerHTML = `
         <polygon points="${area}" fill="rgba(37,99,235,0.10)" stroke="none"/>
+        ${gridlines}
         <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         ${dots}
         ${xLabels}
@@ -2959,6 +3548,157 @@
         await navigator.clipboard.writeText(text);
         showToast('JSON copié dans le presse-papiers', 'success');
       } catch { showToast('Copie impossible (HTTP non sécurisé)', 'error'); }
+    }
+
+    // ── Gestion des utilisateurs ──────────────────────────────────────────────
+    let _editingUserId = null;
+
+    async function loadUsers() {
+      const tbody = $('usersTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 4);
+      try {
+        const data = await api('/api/v1/users', { headers: headers(false) });
+        const roleLabel = { admin: '🔴 Admin', officer: '🟡 Officier', technician: '🟢 Tech.' };
+        const rolePill  = { admin: 'bad',       officer: 'warn',         technician: 'ok' };
+        const rows = data.map(u => {
+          const tr = row(
+            `<td>${u.id}</td>` +
+            `<td><strong>${security.escapeHtml(u.username)}</strong></td>` +
+            `<td>${security.escapeHtml(u.full_name || '—')}</td>` +
+            `<td><span class="pill ${rolePill[u.role] || ''}">${roleLabel[u.role] || u.role}</span></td>` +
+            `<td>${u.is_active ? '<span class="pill ok">Oui</span>' : '<span class="pill bad">Non</span>'}</td>` +
+            `<td style="white-space:nowrap;">` +
+              `<button class="ghost" style="margin-right:4px;" onclick='selectUserForEdit(${JSON.stringify(u)})'>Éditer</button>` +
+              `<button class="${u.is_active ? 'warn' : 'success'}" onclick="toggleUserActive(${u.id},${u.is_active})">${u.is_active ? 'Désactiver' : 'Activer'}</button>` +
+            `</td>`
+          );
+          if (!u.is_active) tr.style.opacity = '0.55';
+          return tr;
+        });
+        setRows('usersTable', rows);
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur — droits admin requis</td></tr>';
+      }
+    }
+
+    function selectUserForEdit(u) {
+      _editingUserId = u.id;
+      $('userUsername').value = u.username;
+      $('userUsername').disabled = true;
+      $('userPassword').value = '';
+      $('userPassword').placeholder = 'Laisser vide = inchangé';
+      $('userFullName').value = u.full_name || '';
+      $('userRole').value = u.role;
+      $('userFormTitle').textContent = `Modifier — ${u.username}`;
+      $('userSubmitBtn').textContent = 'Enregistrer';
+      $('userCancelBtn').style.display = '';
+      $('userFormError').textContent = '';
+      $('userFormTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function resetUserForm() {
+      _editingUserId = null;
+      $('userUsername').value = '';
+      $('userUsername').disabled = false;
+      $('userPassword').value = '';
+      $('userPassword').placeholder = 'Min. 8 caractères';
+      $('userFullName').value = '';
+      $('userRole').value = 'technician';
+      $('userFormTitle').textContent = 'Nouvel utilisateur';
+      $('userSubmitBtn').textContent = 'Créer utilisateur';
+      $('userCancelBtn').style.display = 'none';
+      $('userFormError').textContent = '';
+    }
+
+    async function submitUserForm(btn) {
+      $('userFormError').textContent = '';
+      setLoading(btn, true);
+      try {
+        if (_editingUserId) {
+          // PATCH — rôle + nom complet
+          const payload = {
+            full_name: $('userFullName').value.trim() || null,
+            role: $('userRole').value,
+          };
+          await api(`/api/v1/users/${_editingUserId}`, {
+            method: 'PATCH', headers: headers(), body: JSON.stringify(payload),
+          });
+          showToast('Utilisateur mis à jour', 'success');
+          resetUserForm();
+        } else {
+          // POST — création
+          const username = $('userUsername').value.trim();
+          const password = $('userPassword').value;
+          if (username.length < 3) throw new Error('Identifiant trop court (min. 3 caractères)');
+          if (password.length < 8) throw new Error('Mot de passe trop court (min. 8 caractères)');
+          const payload = {
+            username,
+            password,
+            full_name: $('userFullName').value.trim() || null,
+            role: $('userRole').value,
+          };
+          const created = await api('/api/v1/users', {
+            method: 'POST', headers: headers(), body: JSON.stringify(payload),
+          });
+          showToast(`Utilisateur « ${created.username} » créé`, 'success');
+          resetUserForm();
+        }
+        await loadUsers();
+      } catch (e) {
+        $('userFormError').textContent = e.message || 'Erreur inconnue';
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    function toggleUserPw() {
+      const inp = $('userPassword');
+      if (inp) inp.type = inp.type === 'text' ? 'password' : 'text';
+    }
+
+    async function toggleUserActive(id, currentActive) {
+      try {
+        await api(`/api/v1/users/${id}`, {
+          method: 'PATCH', headers: headers(),
+          body: JSON.stringify({ is_active: !currentActive }),
+        });
+        showToast(currentActive ? 'Utilisateur désactivé' : 'Utilisateur réactivé',
+                  currentActive ? 'warning' : 'success');
+        await loadUsers();
+      } catch {
+        showToast('Erreur modification statut', 'error');
+      }
+    }
+
+    // ── Password toggle ────────────────────────────────────────────────────────
+    function togglePw() {
+      const inp = $('password');
+      const btn = $('pwToggleBtn');
+      if (!inp) return;
+      const isText = inp.type === 'text';
+      inp.type = isText ? 'password' : 'text';
+      if (btn) btn.textContent = isText ? '👁' : '🙈';
+    }
+
+    // ── Topbar live clock ─────────────────────────────────────────────────────
+    let _clockInterval = null;
+    function startClock() {
+      const el = $('topbarClock');
+      if (!el) return;
+      function tick() {
+        el.textContent = new Date().toLocaleTimeString('fr-FR', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+      }
+      tick();
+      if (_clockInterval) clearInterval(_clockInterval);
+      _clockInterval = setInterval(tick, 1000);
+    }
+
+    // ── Log panel collapsible ─────────────────────────────────────────────────
+    function toggleLog() {
+      $('logPanel')?.classList.toggle('log-collapsed');
     }
 
     // Initialiser le moteur IA au chargement de la page
