@@ -3994,6 +3994,7 @@
   .actions button{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;color:#fff;background:#2563eb;}
   .actions button.sec{background:#64748b;}
   .page-title{font-size:13px;color:#555;margin-bottom:12px;}
+  .no-print{}
   .labels{display:flex;flex-wrap:wrap;gap:8px;}
   .label{
     background:#fff;border:1px solid #bbb;border-radius:4px;
@@ -4007,20 +4008,20 @@
   .barcode-val{font-size:7pt;font-family:monospace;letter-spacing:1px;color:#333;}
   .meta{font-size:7pt;color:#666;}
   @media print{
-    body{background:#fff;padding:0;}
-    .actions,.page-title{display:none;}
-    .labels{gap:4px;}
-    .label{border:1px solid #aaa;}
-    @page{margin:8mm;}
+    @page{size:56mm 21mm;margin:0;}
+    body{margin:0;background:#fff;padding:0;}
+    .no-print{display:none;}
+    .labels{gap:0;}
+    .label{border:none;width:56mm;min-height:21mm;padding:1mm 1.5mm;}
   }
 </style>
 </head>
 <body>
-<div class="actions">
+<div class="actions no-print">
   <button onclick="window.print()">🖨️ Imprimer</button>
   <button class="sec" onclick="window.close()">✕ Fermer</button>
 </div>
-<div class="page-title">RuggyLab OS — ${labels.length} étiquette(s) de tube de prélèvement</div>
+<div class="page-title no-print">RuggyLab OS — ${labels.length} étiquette(s) de tube de prélèvement</div>
 <div class="labels">${labelCards}</div>
 <script>
 window.onload = function() { ${initJs} };
