@@ -13,6 +13,7 @@ from app.schemas.notif_config import (
     PendingCriticalEntry,
 )
 from app.services.critical_notifier import check_and_notify, get_pending_criticals
+from app.services.expiry_notifier import check_and_notify_expiry, get_expiring_reagents
 
 router = APIRouter(prefix="/critical-alerts")
 
@@ -67,6 +68,28 @@ def create_notif_config(
     db.commit()
     db.refresh(cfg)
     return cfg
+
+
+@router.get("/expiry-alerts")
+def list_expiry_alerts(
+    days: int = Query(default=30, ge=0, le=365),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> list[dict]:
+    """Réactifs expirant dans les ``days`` prochains jours."""
+    del current_user
+    return get_expiring_reagents(db, days=days)
+
+
+@router.post("/expiry-check")
+def trigger_expiry_notification(
+    days: int = Query(default=30, ge=0, le=365),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Envoie des webhooks pour les réactifs expirant bientôt."""
+    del current_user
+    return check_and_notify_expiry(db, days=days)
 
 
 @router.delete("/config/{config_id}", status_code=status.HTTP_200_OK)

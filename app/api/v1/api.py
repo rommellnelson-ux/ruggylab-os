@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.billing import router as billing_router
+from app.api.v1.endpoints.auto_validation import router as auto_validation_router
 from app.api.v1.endpoints.bnpl import router as bnpl_router
 from app.api.v1.endpoints.critical_alerts import router as critical_alerts_router
 from app.api.v1.endpoints.critical_ranges import router as critical_ranges_router
@@ -57,6 +58,7 @@ api_router.include_router(equipment_maintenance_router, tags=["Equipment Mainten
 api_router.include_router(stats_router, tags=["Lab Stats"])
 api_router.include_router(samples_router, tags=["samples"])
 api_router.include_router(results_router, tags=["results"])
+api_router.include_router(auto_validation_router, tags=["Auto-Validation"])
 api_router.include_router(results_poct_router, tags=["poct"])
 api_router.include_router(military_facilities_router, tags=["military-facilities"])
 api_router.include_router(dh36_router, tags=["dh36"])

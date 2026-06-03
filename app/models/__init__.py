@@ -1,5 +1,6 @@
 from app.models.ruggylab_os import (
     AuditEvent,
+    AutoValidationConfig,
     CriticalRange,
     DeltaCheckRule,
     DH36InboundMessage,
@@ -42,6 +43,7 @@ __all__ = [
     "UserRole",
     "Reagent",
     "AuditEvent",
+    "AutoValidationConfig",
     "DH36InboundMessage",
     "EquipmentReagentRatio",
     "EquipmentReagentRatioVersion",

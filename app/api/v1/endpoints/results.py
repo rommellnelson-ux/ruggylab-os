@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func
@@ -5,10 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import Equipment, Result, Sample, User
+from app.models import AuditEvent, Equipment, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
-from app.schemas.result import ResultCreate, ResultRead
+from app.schemas.result import ResultAmend, ResultCreate, ResultRead
+from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
 from app.services.fhir_builder import build_diagnostic_report
@@ -79,15 +82,7 @@ def get_result_fhir(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
-    """Return a FHIR R4 DiagnosticReport for the requested result.
-
-    The response is a self-contained FHIR document: the patient resource and
-    all CBC Observation resources are embedded as ``contained`` entries so the
-    document can be imported into any FHIR server without prior resource
-    registration.
-
-    MIME type is ``application/fhir+json`` as required by the FHIR R4 spec.
-    """
+    """Return a FHIR R4 DiagnosticReport for the requested result."""
     del current_user
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
@@ -125,9 +120,7 @@ def create_result(
     result_data["validator_id"] = current_user.id
     result_data["is_validated"] = True
     # Auto-detect critical values against configured thresholds (OR with manual flag)
-    result_data["is_critical"] = payload.is_critical or check_critical(
-        payload.data_points, db
-    )
+    result_data["is_critical"] = payload.is_critical or check_critical(payload.data_points, db)
     # Resolve patient for delta-check and reference flags
     patient = sample.patient
     patient_id = patient.id if patient else None
@@ -158,6 +151,81 @@ def create_result(
                 "items": [item.__dict__ for item in exc.items],
             },
         ) from exc
+    # Auto-validation ISO 15189 §5.8
+    try_auto_validate(result, db)
+    db.commit()
+    db.refresh(result)
+    return result
+
+
+@router.patch("/{result_id}/amend", response_model=ResultRead)
+def amend_result(
+    result_id: int,
+    payload: ResultAmend,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Result:
+    """Corriger les data_points d'un résultat validé.
+
+    Recalcule automatiquement flags, delta-check et statut critique.
+    Crée une entrée d'audit avec l'état avant/après et le motif obligatoire.
+    Réinitialise l'auto-validation (le résultat corrigé doit être requalifié).
+    """
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable."
+        )
+
+    # Snapshot de l'ancien état pour l'audit
+    old_data_points = result.data_points
+    old_is_critical = result.is_critical
+
+    # Mise à jour des données
+    result.data_points = payload.data_points
+    result.amendment_reason = payload.amendment_reason
+
+    # Recalcul critique
+    result.is_critical = check_critical(payload.data_points, db)
+
+    # Recalcul delta
+    patient = result.sample.patient if result.sample else None
+    patient_id = patient.id if patient else None
+    patient_sex = patient.sex if patient else None
+    patient_birth = patient.birth_date if patient else None
+    delta_exceeded, delta_analytes = check_delta(payload.data_points, patient_id, db)
+    result.delta_exceeded = delta_exceeded
+    result.delta_analytes = delta_analytes if delta_analytes else None
+
+    # Recalcul flags
+    computed_flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
+    result.flags = computed_flags if computed_flags else None
+
+    # Réinitialisation auto-validation (les données ont changé)
+    result.is_auto_validated = False
+    result.auto_validated_at = None
+
+    # Tentative d'auto-revalidation sur le résultat corrigé
+    try_auto_validate(result, db)
+
+    # Audit trail
+    audit = AuditEvent(
+        user_id=current_user.id,
+        event_type="result.amend",
+        entity_type="result",
+        entity_id=str(result_id),
+        payload=json.dumps(
+            {
+                "amendment_reason": payload.amendment_reason,
+                "old_data_points": old_data_points,
+                "new_data_points": payload.data_points,
+                "old_is_critical": old_is_critical,
+                "new_is_critical": result.is_critical,
+                "is_auto_validated": result.is_auto_validated,
+            }
+        ),
+    )
+    db.add(audit)
     db.commit()
     db.refresh(result)
     return result

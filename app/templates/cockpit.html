@@ -790,6 +790,7 @@
             <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
             <div class="panel metric" id="mQcPanel"><div id="mQc" class="value">—</div><div class="label">Contrôles QC</div></div>
             <div class="panel metric" id="mMntPanel"><div id="mMnt" class="value">—</div><div class="label">Maintenance ≤7j</div></div>
+            <div class="panel metric" id="mExpiryPanel"><div id="mExpiry" class="value">—</div><div class="label">⚠ Péremptions ≤30j</div></div>
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
@@ -863,7 +864,7 @@
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
-            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Flags</th><th>Acquittement</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Flags</th><th>Acquittement</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
           <!-- Panneau seuils critiques (panic values) -->
           <div class="panel" style="margin-top:12px;">
@@ -941,6 +942,68 @@
               </div>
               <table id="refRangesTable">
                 <thead><tr><th>Analyte</th><th>Sexe</th><th>Âge</th><th>Bas</th><th>Haut</th><th>Unité</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panneau correction / ré-analyse de résultat -->
+          <div id="amendPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>✏️ Corriger un résultat — <span id="amendResultLabel"></span></h3>
+            <input type="hidden" id="amendResultId" />
+            <div class="grid2">
+              <div class="form">
+                <div>
+                  <label>Données analytiques (JSON)</label>
+                  <textarea id="amendDataPoints" rows="6" placeholder='{"WBC":4.5,"RBC":4.2,"HGB":130}'></textarea>
+                </div>
+                <div>
+                  <label>Motif de correction (5 – 500 car.)</label>
+                  <input id="amendReason" placeholder="ex. Erreur de saisie initiale, valeur recalibrée" />
+                </div>
+                <div class="actions">
+                  <button onclick="submitAmend(this)">Enregistrer correction</button>
+                  <button class="ghost" onclick="closeAmendPanel()">Annuler</button>
+                </div>
+              </div>
+              <div>
+                <p style="font-size:12px;color:var(--muted);">
+                  La correction recalcule automatiquement les flags (HH/H/N/L/LL), le delta-check et le statut critique.<br>
+                  L'auto-validation est réinitialisée et réévaluée sur les données corrigées.<br>
+                  Un événement d'audit est créé avec l'état avant/après et le motif.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panneau auto-validation ISO 15189 §5.8 -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🤖 Auto-validation ISO 15189 §5.8</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Un résultat est auto-validé si toutes les conditions de la règle active sont satisfaites.
+              Cliquez <em>Appliquer maintenant</em> pour traiter rétroactivement les résultats existants.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div><label>Nom de la règle</label><input id="avName" value="Règle par défaut" /></div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin:8px 0;">
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" id="avFlagsNormal" checked /> Tous les flags doivent être N (normaux)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" id="avNoDelta" checked /> Pas de dépassement delta-check
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" id="avNotCritical" checked /> Résultat non critique
+                  </label>
+                </div>
+                <div class="actions">
+                  <button onclick="createAutoValidationConfig(this)">Enregistrer règle</button>
+                  <button class="secondary" onclick="runAutoValidation(this)" style="margin-left:8px;">▶ Appliquer maintenant</button>
+                </div>
+              </div>
+              <table id="autoValidConfigTable">
+                <thead><tr><th>Règle</th><th>Flags N</th><th>Δ-check</th><th>Non critique</th><th></th></tr></thead>
                 <tbody></tbody>
               </table>
             </div>
@@ -1059,6 +1122,24 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Panneau péremptions réactifs -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📅 Péremptions réactifs</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Réactifs dont la date de péremption approche ou est dépassée.
+            </p>
+            <div class="toolbar" style="margin-bottom:10px;">
+              <label style="font-size:13px;">Horizon (jours) :</label>
+              <input id="expiryDays" type="number" value="30" min="0" max="365" style="width:70px;margin-left:6px;" />
+              <button class="ghost" style="margin-left:8px;" onclick="loadExpiryAlerts()">↻ Actualiser</button>
+              <button class="warn" style="margin-left:8px;" onclick="notifyExpiryAlerts(this)">📨 Notifier</button>
+            </div>
+            <table id="expiryTable">
+              <thead><tr><th>Réactif</th><th>Lot</th><th>Péremption</th><th>Jours restants</th><th>Stock</th></tr></thead>
+              <tbody></tbody>
+            </table>
           </div>
 
           <div class="panel" style="margin-top:12px;">
@@ -2113,9 +2194,9 @@
       if (currentView === "patients") await loadPatients();
 
       if (currentView === "results") {
-        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals()]);
+        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs()]);
       }
-      if (currentView === "stocks") await loadReagents();
+      if (currentView === "stocks") { await loadReagents(); await loadExpiryAlerts(); }
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
       if (currentView === "samples") { await loadSamples(); setTimeout(() => $('barcodeScanner')?.focus(), 150); }
@@ -2127,11 +2208,12 @@
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
       try {
-        const [epi, stock, qc, perf] = await Promise.all([
+        const [epi, stock, qc, perf, expiry] = await Promise.all([
           api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
           api("/api/v1/reports/stock-dashboard", { headers: headers(false) }),
           api("/api/v1/reports/qc-summary", { headers: headers(false) }),
           api("/api/v1/stats/summary?days=30", { headers: headers(false) }).catch(() => null),
+          api("/api/v1/reagents/expiring?days=30", { headers: headers(false) }).catch(() => null),
         ]);
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
@@ -2205,6 +2287,17 @@
           if (mMntP) {
             mMntP.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
             mMntP.classList.add(mntCount > 0 ? 'metric-amber' : 'metric-teal');
+          }
+        }
+        // Expiry metric
+        if (expiry !== null && $('mExpiry')) {
+          const expiryCount = Array.isArray(expiry) ? expiry.length : 0;
+          $('mExpiry').textContent = expiryCount;
+          const mExpiryP = $('mExpiryPanel');
+          if (mExpiryP) {
+            mExpiryP.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+            const expiredCount = Array.isArray(expiry) ? expiry.filter(r => r.is_expired).length : 0;
+            mExpiryP.classList.add(expiredCount > 0 ? 'metric-rose' : expiryCount > 0 ? 'metric-amber' : 'metric-teal');
           }
         }
         showToast("Tableau de bord actualisé", "success");
@@ -2412,6 +2505,9 @@
           } else {
             ackCell = '<td><button class="ghost" style="font-size:11px;padding:2px 8px;color:var(--rose);border-color:var(--rose);" onclick="ackCritical(' + r.id + ', this)">Acquitter</button></td>';
           }
+          const autoCell = r.is_auto_validated
+            ? '<span class="pill ok" title="Auto-validé ISO 15189 §5.8">🤖 Auto</span>'
+            : '<span style="color:var(--muted);font-size:11px;">—</span>';
           const tr = row(
             '<td>' + r.id + '</td>' +
             '<td>' + r.sample_id + '</td>' +
@@ -2419,7 +2515,11 @@
             '<td style="white-space:nowrap;">' + flagsHtml + '</td>' +
             ackCell +
             '<td>' + (r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non') + '</td>' +
-            '<td><button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button></td>'
+            '<td>' + autoCell + '</td>' +
+            '<td style="white-space:nowrap;">' +
+              '<button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button> ' +
+              '<button class="ghost" style="font-size:11px;padding:2px 8px;" onclick=\'openAmendPanel(' + r.id + ',' + JSON.stringify(r.data_points || {}) + ')\'>✏️</button>' +
+            '</td>'
           );
           if (r.is_critical && !r.critical_ack_at) tr.classList.add('row-critical');
           else if (r.is_critical && r.critical_ack_at) tr.classList.add('row-warning');
@@ -2428,7 +2528,7 @@
         });
         setRows("resultsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
     }
@@ -5225,6 +5325,125 @@ window.onload=renderLabels;
         showToast('Erreur chargement statistiques', 'error');
         log('loadStats: ' + (e.message || e));
       }
+    }
+
+    // ── Auto-validation ISO 15189 §5.8 ────────────────────────────────────────
+    async function loadAutoValidationConfigs() {
+      try {
+        const data = await api("/api/v1/auto-validation/config", { headers: headers(false) });
+        setRows("autoValidConfigTable", data.map(c => row(
+          `<td><strong>${security.escapeHtml(c.name)}</strong></td>` +
+          `<td>${c.require_all_flags_normal ? '✅' : '—'}</td>` +
+          `<td>${c.require_no_delta ? '✅' : '—'}</td>` +
+          `<td>${c.require_not_critical ? '✅' : '—'}</td>` +
+          `<td><button class="ghost" style="color:var(--rose);font-size:11px;" onclick="deleteAutoValidationConfig(${c.id}, this)">Supprimer</button></td>`
+        )));
+      } catch (e) { log('loadAutoValidationConfigs: ' + (e.message || e)); }
+    }
+    async function createAutoValidationConfig(btn) {
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/auto-validation/config", {
+          method: "POST", headers: headers(),
+          body: JSON.stringify({
+            name: $('avName').value || 'Règle par défaut',
+            require_all_flags_normal: $('avFlagsNormal').checked,
+            require_no_delta: $('avNoDelta').checked,
+            require_not_critical: $('avNotCritical').checked,
+          }),
+        });
+        showToast("Règle d'auto-validation créée", "success");
+        await loadAutoValidationConfigs();
+      } catch (e) { showToast("Erreur création règle", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteAutoValidationConfig(id, btn) {
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/auto-validation/config/" + id, { method: "DELETE", headers: headers() });
+        showToast("Règle désactivée", "success");
+        await loadAutoValidationConfigs();
+      } catch (e) { showToast("Erreur suppression règle", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function runAutoValidation(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api("/api/v1/auto-validation/run", { method: "POST", headers: headers() });
+        showToast(`Auto-validation : ${res.auto_validated}/${res.processed} résultat(s) validé(s)`, "success");
+        await loadResults();
+      } catch (e) { showToast("Erreur auto-validation", "error"); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ── Correction / ré-analyse résultat ─────────────────────────────────────
+    function openAmendPanel(resultId, dataPoints) {
+      $('amendResultId').value = resultId;
+      $('amendResultLabel').textContent = 'Résultat #' + resultId;
+      $('amendDataPoints').value = JSON.stringify(dataPoints, null, 2);
+      $('amendReason').value = '';
+      const panel = $('amendPanel');
+      if (panel) { panel.style.display = ''; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
+    function closeAmendPanel() {
+      const panel = $('amendPanel');
+      if (panel) panel.style.display = 'none';
+    }
+    async function submitAmend(btn) {
+      const resultId = $('amendResultId').value;
+      const rawJson = $('amendDataPoints').value;
+      const reason = ($('amendReason').value || '').trim();
+      if (!resultId) { showToast("Aucun résultat sélectionné", "error"); return; }
+      if (reason.length < 5) { showToast("Motif trop court (min 5 car.)", "error"); return; }
+      let dataPoints;
+      try { dataPoints = JSON.parse(rawJson); } catch { showToast("JSON invalide dans les données analytiques", "error"); return; }
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/results/" + resultId + "/amend", {
+          method: "PATCH", headers: headers(),
+          body: JSON.stringify({ data_points: dataPoints, amendment_reason: reason }),
+        });
+        showToast("Résultat corrigé avec succès", "success");
+        closeAmendPanel();
+        await loadResults();
+      } catch (e) {
+        showToast((e.detail || e.message || "Erreur correction"), "error");
+      } finally { setLoading(btn, false); }
+    }
+
+    // ── Péremptions réactifs ───────────────────────────────────────────────────
+    async function loadExpiryAlerts() {
+      const days = parseInt($('expiryDays')?.value || '30', 10);
+      try {
+        const data = await api(`/api/v1/reagents/expiring?days=${days}`, { headers: headers(false) });
+        setRows("expiryTable", data.map(r => {
+          const daysLeft = r.days_remaining;
+          let badge;
+          if (r.is_expired) badge = '<span class="pill bad">Expiré</span>';
+          else if (daysLeft <= 7) badge = `<span class="pill bad">${daysLeft}j</span>`;
+          else if (daysLeft <= 30) badge = `<span class="pill" style="background:var(--amber);color:#fff;">${daysLeft}j</span>`;
+          else badge = `<span class="pill ok">${daysLeft}j</span>`;
+          const tr = row(
+            `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
+            `<td><code>${security.escapeHtml(r.lot_number || '—')}</code></td>` +
+            `<td>${r.expiry_date || '—'}</td>` +
+            `<td>${badge}</td>` +
+            `<td style="font-variant-numeric:tabular-nums;">${r.current_stock} <small style="color:var(--muted);">${security.escapeHtml(r.unit || '')}</small></td>`
+          );
+          if (r.is_expired) tr.classList.add('row-critical');
+          else if (daysLeft <= 7) tr.classList.add('row-warning');
+          return tr;
+        }));
+      } catch (e) { showToast("Erreur chargement péremptions", "error"); log('loadExpiryAlerts: ' + (e.message || e)); }
+    }
+    async function notifyExpiryAlerts(btn) {
+      const days = parseInt($('expiryDays')?.value || '30', 10);
+      setLoading(btn, true);
+      try {
+        const res = await api(`/api/v1/critical-alerts/expiry-check?days=${days}`, { method: "POST", headers: headers() });
+        showToast(`Notifications envoyées : ${res.notified} webhook(s), ${res.expiring} réactif(s) concerné(s)`, "success");
+      } catch (e) { showToast("Erreur envoi notifications péremption", "error"); }
+      finally { setLoading(btn, false); }
     }
 
     function _renderTatChart(tatData) {

@@ -120,6 +120,9 @@ class Result(Base):
     flags: Mapped[dict | None] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=True
     )
+    is_auto_validated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    auto_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    amendment_reason: Mapped[str | None] = mapped_column(String(500))
 
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")
@@ -426,6 +429,20 @@ class NotifConfig(Base):
     email: Mapped[str | None] = mapped_column(String(200))
     delay_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class AutoValidationConfig(Base):
+    """Règle d'auto-validation ISO 15189 §5.8 pour les résultats normaux."""
+
+    __tablename__ = "auto_validation_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, default="Règle par défaut")
+    require_all_flags_normal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    require_no_delta: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    require_not_critical: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
 
 class EquipmentMaintenance(Base):
