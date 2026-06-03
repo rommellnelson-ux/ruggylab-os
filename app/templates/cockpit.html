@@ -576,26 +576,152 @@
         border: 1px solid #000;
       }
     }
+    /* ── Nav section separators ───────────────────── */
     .nav-section {
-      font-size: 10px;
+      font-size: 9px;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: rgba(168, 183, 199, 0.55);
-      padding: 14px 8px 3px;
+      letter-spacing: 0.14em;
+      color: rgba(168, 183, 199, 0.42);
+      padding: 16px 4px 4px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
     }
+    .nav-section::before, .nav-section::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+    }
+    /* ── Nav active + hover ────────────────────────── */
+    .nav button.active {
+      background: rgba(37,99,235,0.20) !important;
+      border-left: 3px solid #3b82f6 !important;
+      border-color: rgba(59,130,246,0.35) !important;
+      color: #ffffff !important;
+    }
+    .nav button:hover:not(.active) {
+      background: rgba(255,255,255,0.07) !important;
+    }
+    /* ── Sidebar layout flex ─────────────────────── */
+    .side { display: flex; flex-direction: column; }
+    .nav { flex: 1; }
+    /* ── Sidebar user footer ─────────────────────── */
+    .side-footer {
+      position: sticky;
+      bottom: 0;
+      background: rgba(9,18,29,0.85);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 10px 10px;
+      margin: 8px -14px -18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(8px);
+    }
+    .side-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #2563eb, #0f766e);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .side-user-name { font-size: 12px; color: #d0e0ef; line-height: 1.3; font-weight: 500; }
+    .side-user-role { font-size: 10px; color: rgba(168,183,199,0.55); }
+    /* ── Metric color variants ───────────────────── */
+    .metric-blue  { border-top: 3px solid #2563eb; }
+    .metric-blue  .value { color: #2563eb; }
+    .metric-rose  { border-top: 3px solid #be123c; }
+    .metric-rose  .value { color: #be123c; }
+    .metric-amber { border-top: 3px solid #b45309; }
+    .metric-amber .value { color: #b45309; }
+    .metric-teal  { border-top: 3px solid #0f766e; }
+    .metric-teal  .value { color: #0f766e; }
+    /* ── Empty table state ───────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .empty-state::before { content: '—'; display: block; font-size: 24px; opacity: .35; margin-bottom: 6px; }
+    /* ── Row status highlighting ─────────────────── */
+    tr.row-critical > td:first-child { border-left: 3px solid var(--rose); padding-left: 10px; }
+    tr.row-warning  > td:first-child { border-left: 3px solid var(--amber); padding-left: 10px; }
+    /* ── Log collapsible ─────────────────────────── */
+    .log-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0;
+      font-size: 15px;
+    }
+    .log-caret { font-size: 10px; color: var(--muted); transition: transform 0.2s; }
+    .log-panel-body { overflow: hidden; transition: max-height 0.3s ease, opacity 0.25s; max-height: 400px; opacity: 1; margin-top: 10px; }
+    .log-collapsed .log-panel-body { max-height: 0; opacity: 0; margin-top: 0; }
+    .log-collapsed .log-caret { transform: rotate(180deg); }
+    /* ── Login polish ────────────────────────────── */
+    .login-logo { font-size: 44px; text-align: center; margin-bottom: 2px; line-height: 1; }
+    .login-title { text-align: center; font-size: 22px; font-weight: 700; margin: 6px 0 2px; }
+    .login-sub { text-align: center; color: var(--muted); font-size: 12.5px; margin: 0 0 22px; line-height: 1.5; }
+    .login-divider { border: none; border-top: 1px solid var(--line); margin: 6px 0 14px; }
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 42px; }
+    .pw-toggle {
+      position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+      background: none !important; border: none !important; color: var(--muted);
+      padding: 4px; cursor: pointer; min-height: auto !important; font-size: 15px;
+      line-height: 1; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px !important;
+    }
+    .pw-toggle:hover { background: rgba(0,0,0,0.06) !important; }
+    /* ── Topbar clock ────────────────────────────── */
+    #topbarClock {
+      font-size: 12px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    /* ── Topbar brand on mobile ──────────────────── */
+    .topbar-brand { font-weight: 600; font-size: 14px; color: var(--ink); display: none; }
+    @media (max-width: 980px) { .topbar-brand { display: block; } }
+    /* ── Table header sort hint ──────────────────── */
+    th { cursor: default; }
+    /* ── Pill status ─────────────────────────────── */
+    .pill.warn { background: #fef3c7; color: #92400e; }
+    .pill.done { background: #dcfce7; color: #166534; }
   </style>
 </head>
 <body>
   <div id="toastContainer" class="toast-container"></div>
   <div id="loginView" class="login">
-    <section class="panel">
-      <h3>RuggyLab OS</h3>
-      <p class="status">Connexion au cockpit local du laboratoire.</p>
-      <div class="form" style="margin-top:14px;">
-        <div><label for="username">Utilisateur</label><input id="username" value="admin" autocomplete="username" required aria-describedby="loginError" /></div>
-        <div><label for="password">Mot de passe</label><input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError" /></div>
-        <button onclick="login()" aria-describedby="loginError">Connexion</button>
-        <div id="loginError" class="status" role="alert" aria-live="polite"></div>
+    <section class="panel" style="width:min(400px,100%);">
+      <div class="login-logo">🧪</div>
+      <h2 class="login-title">RuggyLab OS</h2>
+      <p class="login-sub">Centre de Santé de la Garde Républicaine<br>Connexion sécurisée au cockpit</p>
+      <hr class="login-divider" />
+      <div class="form">
+        <div>
+          <label for="username">Identifiant</label>
+          <input id="username" value="admin" autocomplete="username" required aria-describedby="loginError"
+                 onkeydown="if(event.key==='Enter')$('password').focus()" />
+        </div>
+        <div>
+          <label for="password">Mot de passe</label>
+          <div class="pw-wrap">
+            <input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError"
+                   onkeydown="if(event.key==='Enter')login()" />
+            <button class="pw-toggle" type="button" id="pwToggleBtn" onclick="togglePw()" aria-label="Afficher/masquer le mot de passe">👁</button>
+          </div>
+        </div>
+        <button onclick="login()" style="margin-top:4px;">Connexion</button>
+        <div id="loginError" class="status" role="alert" aria-live="polite" style="text-align:center;color:var(--rose);font-size:13px;min-height:18px;"></div>
       </div>
     </section>
   </div>
@@ -609,44 +735,54 @@
         <p>Centre de Santé de la Garde Républicaine</p>
       </div>
       <nav class="nav" role="navigation" aria-label="Navigation principale">
-        <div class="nav-section">── CLINIQUE ──</div>
+        <div class="nav-section">Clinique</div>
         <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">🏠 Tableau de bord</button>
         <button data-view="patients" onclick="showView('patients')">👤 Patients</button>
         <button data-view="samples" onclick="showView('samples')">🧪 Échantillons</button>
         <button data-view="results" onclick="showView('results')">📋 Résultats</button>
-        <div class="nav-section">── ANALYTIQUE ──</div>
+        <div class="nav-section">Analytique</div>
         <button data-view="epidemio" onclick="showView('epidemio')">📊 Épidémiologie</button>
         <button data-view="machines" onclick="showView('machines')">🔬 DH36 &amp; POCT</button>
         <button data-view="imaging" onclick="showView('imaging')">👁 Imagerie IA</button>
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
-        <div class="nav-section">── LOGISTIQUE ──</div>
+        <div class="nav-section">Logistique</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
         <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
         <button data-view="bnpl" onclick="showView('bnpl')">💳 Paiements BNPL</button>
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
-        <div class="nav-section">── SYSTÈME ──</div>
+        <div class="nav-section">Système</div>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
       </nav>
+      <div class="side-footer" id="sideFooter" style="display:none;">
+        <div class="side-avatar" id="sideAvatar">—</div>
+        <div>
+          <div class="side-user-name" id="sideUserName">—</div>
+          <div class="side-user-role" id="sideUserRole">—</div>
+        </div>
+      </div>
     </aside>
     <main class="main">
       <header class="topbar">
-        <div>
-          <h2 id="viewTitle">Tableau de bord</h2>
-          <div id="userStatus" class="status">Session active</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div>
+            <h2 id="viewTitle" style="margin:0;font-size:18px;">Tableau de bord</h2>
+            <div id="userStatus" class="status" style="font-size:12px;color:var(--muted);">Session active</div>
+          </div>
         </div>
-        <div class="actions">
-          <button class="theme-toggle" onclick="toggleTheme()" title="Changer le theme" aria-label="Basculer entre mode clair et sombre">☀️</button>
-          <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraichir la vue actuelle">Rafraichir</button>
-          <button class="secondary" onclick="logout()" aria-label="Se deconnecter">Deconnexion</button>
+        <div class="actions" style="align-items:center;">
+          <span id="topbarClock"></span>
+          <button class="theme-toggle" onclick="toggleTheme()" title="Changer le thème" aria-label="Basculer entre mode clair et sombre">☀️</button>
+          <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraîchir">↻</button>
+          <button class="secondary" onclick="logout()" aria-label="Se déconnecter">⏻ Quitter</button>
         </div>
       </header>
       <section class="content">
         <div id="dashboard" class="view band">
           <div class="grid4">
-            <div class="panel metric"><div id="mResults" class="value">0</div><div class="label">Resultats 30 jours</div></div>
-            <div class="panel metric"><div id="mCritical" class="value">0</div><div class="label">Critiques</div></div>
-            <div class="panel metric"><div id="mMalaria" class="value">0</div><div class="label">Paludisme positif</div></div>
-            <div class="panel metric"><div id="mLowStock" class="value">0</div><div class="label">Stocks bas</div></div>
+            <div class="panel metric metric-blue"><div id="mResults" class="value">—</div><div class="label">Résultats · 30 jours</div></div>
+            <div class="panel metric metric-rose"><div id="mCritical" class="value">—</div><div class="label">Valeurs critiques</div></div>
+            <div class="panel metric metric-teal"><div id="mMalaria" class="value">—</div><div class="label">Paludisme positif</div></div>
+            <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
@@ -962,7 +1098,10 @@
           <div class="panel"><h3>📊 Statistiques Dataset</h3><div id="datasetStats" style="padding: 15px;"></div></div>
         </div>
 
-        <div class="band"><h3>Journal</h3><div id="log" class="log">Pret.</div></div>
+        <div class="band" id="logPanel">
+          <h3 class="log-header" onclick="toggleLog()">Journal&nbsp;<span class="log-caret">▲</span></h3>
+          <div class="log-panel-body"><div id="log" class="log">Prêt.</div></div>
+        </div>
       </section>
     </main>
   </div>
@@ -1456,7 +1595,14 @@
       const body = table?.querySelector("tbody");
       if (!body) return;
       body.innerHTML = "";
-      rows.forEach((r) => body.appendChild(r));
+      if (rows.length === 0) {
+        const colCount = table.querySelectorAll("thead th").length || 1;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="${colCount}"><div class="empty-state">Aucune donnée</div></td>`;
+        body.appendChild(tr);
+      } else {
+        rows.forEach((r) => body.appendChild(r));
+      }
     }
     function stamp() {
       const d = new Date();
@@ -1526,6 +1672,14 @@
         $("userStatus").textContent = `${me.full_name || me.username} - ${me.role}`;
         $("loginView").classList.add("hidden");
         $("appView").classList.remove("hidden");
+        // Sidebar user footer
+        const initials = (me.full_name || me.username || '?')
+          .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const sf = $('sideFooter'); if (sf) sf.style.display = 'flex';
+        const sa = $('sideAvatar'); if (sa) sa.textContent = initials;
+        const sn = $('sideUserName'); if (sn) sn.textContent = me.full_name || me.username;
+        const sr = $('sideUserRole'); if (sr) sr.textContent = me.role || 'Utilisateur';
+        startClock();
         updateTubeGuide();
         renderResultTemplate();
         if ($('stockDrugLines') && $('stockDrugLines').children.length === 0) {
@@ -1574,7 +1728,13 @@
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
         $("mMalaria").textContent = epi.malaria_positive;
-        $("mLowStock").textContent = stock.low_stock_reagents.length;
+        const lowStockCount = stock.low_stock_reagents.length;
+        $("mLowStock").textContent = lowStockCount;
+        const mLSP = $("mLowStockPanel");
+        if (mLSP) {
+          mLSP.classList.remove("metric-amber", "metric-teal");
+          mLSP.classList.add(lowStockCount > 0 ? "metric-amber" : "metric-teal");
+        }
         setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
         setRows("lowStockTable", stock.low_stock_reagents.map((r) => row(`<td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
         showToast("Tableau de bord actualisé", "success");
@@ -1712,7 +1872,11 @@
       
       try {
         const data = await api("/api/v1/results", { headers: headers(false) });
-        const rows = data.items.map((r) => row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`));
+        const rows = data.items.map((r) => {
+          const tr = row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`);
+          if (r.is_critical) tr.classList.add('row-critical');
+          return tr;
+        });
         setRows("resultsTable", rows);
       } catch (error) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
@@ -3183,9 +3347,17 @@
         : ''
       ).join('');
 
+      const gridlines = [0.25, 0.5, 0.75].map(frac => {
+        const gv = Math.round(maxC * frac);
+        const gy = yS(gv).toFixed(1);
+        return `<line x1="${pad.left}" y1="${gy}" x2="${(pad.left + chartW).toFixed(1)}" y2="${gy}" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>` +
+               `<text x="${(pad.left - 4)}" y="${(parseFloat(gy) + 3).toFixed(0)}" text-anchor="end" font-size="9" fill="var(--muted)">${gv}</text>`;
+      }).join('');
+
       svg.setAttribute('height', H);
       svg.innerHTML = `
         <polygon points="${area}" fill="rgba(37,99,235,0.10)" stroke="none"/>
+        ${gridlines}
         <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         ${dots}
         ${xLabels}
@@ -3330,6 +3502,36 @@
         await navigator.clipboard.writeText(text);
         showToast('JSON copié dans le presse-papiers', 'success');
       } catch { showToast('Copie impossible (HTTP non sécurisé)', 'error'); }
+    }
+
+    // ── Password toggle ────────────────────────────────────────────────────────
+    function togglePw() {
+      const inp = $('password');
+      const btn = $('pwToggleBtn');
+      if (!inp) return;
+      const isText = inp.type === 'text';
+      inp.type = isText ? 'password' : 'text';
+      if (btn) btn.textContent = isText ? '👁' : '🙈';
+    }
+
+    // ── Topbar live clock ─────────────────────────────────────────────────────
+    let _clockInterval = null;
+    function startClock() {
+      const el = $('topbarClock');
+      if (!el) return;
+      function tick() {
+        el.textContent = new Date().toLocaleTimeString('fr-FR', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+      }
+      tick();
+      if (_clockInterval) clearInterval(_clockInterval);
+      _clockInterval = setInterval(tick, 1000);
+    }
+
+    // ── Log panel collapsible ─────────────────────────────────────────────────
+    function toggleLog() {
+      $('logPanel')?.classList.toggle('log-collapsed');
     }
 
     // Initialiser le moteur IA au chargement de la page
