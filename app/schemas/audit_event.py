@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 class AuditEventRead(BaseModel):
     id: int
     user_id: int | None = None
+    username: str | None = None
     event_type: str
     entity_type: str
     entity_id: str | None = None

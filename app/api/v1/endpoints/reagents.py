@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, require_officer
 from app.db.session import get_db
 from app.models import EquipmentReagentRatio, Reagent, StockMovement, User
 from app.schemas.pagination import PaginationMeta, ReagentListResponse
@@ -50,7 +50,7 @@ def get_reagent(
 def create_reagent(
     payload: ReagentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_officer),
 ) -> Reagent:
     existing = db.query(Reagent).filter(Reagent.name == payload.name).first()
     if existing:
@@ -80,7 +80,7 @@ def update_reagent(
     reagent_id: int,
     payload: ReagentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_officer),
 ) -> Reagent:
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not reagent:
@@ -115,7 +115,7 @@ def update_reagent(
 def delete_reagent(
     reagent_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_officer),
 ) -> dict[str, str]:
     reagent = db.query(Reagent).filter(Reagent.id == reagent_id).first()
     if not reagent:

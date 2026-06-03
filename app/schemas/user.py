@@ -18,6 +18,7 @@ class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, max_length=150)
     role: UserRole | None = None
     is_active: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=255)
 
     model_config = ConfigDict(extra="forbid")
 

@@ -89,6 +89,9 @@ def update_user(
     if payload.is_active is not None:
         target.is_active = payload.is_active
         changes["is_active"] = payload.is_active
+    if payload.password is not None:
+        target.hashed_password = get_password_hash(payload.password)
+        changes["password_changed"] = True
 
     log_audit_event(
         db,

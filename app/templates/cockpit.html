@@ -751,8 +751,10 @@
         <button data-view="bnpl" onclick="showView('bnpl')">💳 Paiements BNPL</button>
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
         <div class="nav-section">Système</div>
+        <button data-view="equipments" onclick="showView('equipments')">🔬 Équipements</button>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
         <button data-view="users" onclick="showView('users')">👥 Utilisateurs</button>
+        <button data-view="audit" onclick="showView('audit')">🔍 Audit</button>
       </nav>
       <div class="side-footer" id="sideFooter" style="display:none;">
         <div class="side-avatar" id="sideAvatar">—</div>
@@ -836,7 +838,7 @@
             <div class="panel"><h3>Nouveau resultat</h3><div class="form">
               <div><label>Sample ID</label><input id="resultSampleId" type="number" /></div>
               <div><label>Equipment ID</label><input id="resultEquipmentId" type="number" /></div>
-              <div><label>Template</label><select id="resultTemplate" onchange="templateDataPoints()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
+              <div><label>Template</label><select id="resultTemplate" onchange="renderResultTemplate()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
               <div id="dataPoints"></div>
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
@@ -888,10 +890,47 @@
               <div class="grid2"><div><label>Stock</label><input id="reagentStock" type="number" step="0.001" /></div><div><label>Seuil</label><input id="reagentThreshold" type="number" step="0.001" /></div></div>
               <button onclick="createReagent(this)">Creer reactif</button>
             </div></div>
-            <div class="panel"><h3>Reactifs</h3>
-              <table id="reagentsTable"><thead><tr><th>ID</th><th>Nom</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table>
+            <div class="panel">
+              <h3>Réactifs</h3>
+              <div class="toolbar"><button class="ghost" onclick="loadReagents()">↻ Actualiser</button></div>
+              <table id="reagentsTable">
+                <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
             </div>
           </div>
+
+          <!-- Panneau édition / réapprovisionnement (masqué par défaut) -->
+          <div id="reagentEditPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>Modifier réactif — <span id="reagentEditName"></span></h3>
+            <input type="hidden" id="reagentEditId" />
+            <div class="grid2">
+              <div class="form">
+                <div><label>Nom</label><input id="editReagentName" /></div>
+                <div class="grid2">
+                  <div><label>Catégorie</label><input id="editReagentCategory" /></div>
+                  <div><label>Unité</label><input id="editReagentUnit" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Stock actuel</label><input id="editReagentStock" type="number" step="0.001" /></div>
+                  <div><label>Seuil alerte</label><input id="editReagentThreshold" type="number" step="0.001" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="saveReagent(this)">Enregistrer</button>
+                  <button class="ghost" onclick="closeReagentEdit()">Annuler</button>
+                </div>
+              </div>
+              <div class="form">
+                <h4 style="margin:0 0 8px;">➕ Réapprovisionner</h4>
+                <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Ajouter des unités au stock actuel sans écraser les autres champs.</p>
+                <div><label>Unités à ajouter</label><input id="restockQty" type="number" step="0.001" min="0.001" placeholder="ex. 50" /></div>
+                <div class="actions" style="margin-top:10px;">
+                  <button class="success" onclick="restockReagent(this)">+ Réapprovisionner</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="panel" style="margin-top:12px;">
             <h3>Prédiction et notifications CMU</h3>
             <div class="grid2">
@@ -1140,6 +1179,55 @@
                 <tbody></tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <!-- ── Vue Équipements ──────────────────────────────────────────────── -->
+        <div id="equipments" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3>Nouvel équipement</h3>
+              <div class="form">
+                <div><label>Nom</label><input id="eqName" placeholder="DH36, Précis Expert…" /></div>
+                <div class="grid2">
+                  <div><label>Type</label><input id="eqType" placeholder="Hématologie, Biochimie…" /></div>
+                  <div><label>N° série</label><input id="eqSerial" placeholder="SN-2024-001" /></div>
+                </div>
+                <div><label>Localisation</label><input id="eqLocation" placeholder="Salle labo 1" /></div>
+                <div><label>Dernière calibration</label><input id="eqCalib" type="date" /></div>
+                <div class="actions">
+                  <button onclick="createEquipment(this)">Enregistrer équipement</button>
+                </div>
+                <div id="eqFormError" role="alert" style="color:var(--rose);font-size:13px;min-height:16px;"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Équipements enregistrés</h3>
+              <div class="toolbar"><button class="ghost" onclick="loadEquipments()">↻ Actualiser</button></div>
+              <table id="equipmentsTable">
+                <thead><tr><th>ID</th><th>Nom</th><th>Type</th><th>N° Série</th><th>Localisation</th><th>Calibration</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Vue Audit (admin) ────────────────────────────────────────────── -->
+        <div id="audit" class="view band hidden">
+          <div class="panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+              <h3 style="margin:0;">Journal d'audit <small style="font-size:13px;font-weight:400;color:var(--muted);">— Réservé admin</small></h3>
+              <div class="toolbar">
+                <button class="ghost" onclick="loadAudit()">↻ Actualiser</button>
+                <button class="ghost" onclick="auditPage(-1)">← Précédent</button>
+                <button class="ghost" onclick="auditPage(+1)">Suivant →</button>
+              </div>
+            </div>
+            <table id="auditTable">
+              <thead><tr><th>#</th><th>Date</th><th>Utilisateur</th><th>Événement</th><th>Entité</th><th>ID entité</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div id="auditPagerInfo" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
           </div>
         </div>
 
@@ -1763,6 +1851,8 @@
       if (currentView === "stocks") await loadReagents();
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
+      if (currentView === "equipments") await loadEquipments();
+      if (currentView === "audit") await loadAudit();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -2050,7 +2140,21 @@
     }
     async function loadReagents() {
       const data = await api("/api/v1/reagents", { headers: headers(false) });
-      setRows("reagentsTable", data.items.map((r) => row(`<td>${r.id}</td><td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
+      setRows("reagentsTable", data.items.map((r) => {
+        const isLow = r.alert_threshold > 0 && r.current_stock <= r.alert_threshold;
+        const tr = row(
+          `<td>${r.id}</td>` +
+          `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
+          `<td>${security.escapeHtml(r.category || '—')}</td>` +
+          `<td>${r.current_stock} <span style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.unit || '')}</span></td>` +
+          `<td>${r.alert_threshold}</td>` +
+          `<td style="white-space:nowrap;">` +
+            `<button class="ghost" onclick='editReagent(${JSON.stringify(r)})'>Éditer</button>` +
+          `</td>`
+        );
+        if (isLow) tr.classList.add('row-critical');
+        return tr;
+      }));
     }
     async function createReagent(btn) {
       return errorHandler.safeExecute(async () => {
@@ -2102,6 +2206,78 @@
         await loadReagents();
       }, 'createReagent').finally(() => setLoading(btn, false));
     }
+    // ── Édition / réapprovisionnement réactifs ─────────────────────────────
+    function editReagent(r) {
+      $('reagentEditId').value = r.id;
+      $('reagentEditName').textContent = r.name;
+      $('editReagentName').value = r.name;
+      $('editReagentCategory').value = r.category || '';
+      $('editReagentUnit').value = r.unit || 'unit';
+      $('editReagentStock').value = r.current_stock;
+      $('editReagentThreshold').value = r.alert_threshold;
+      $('restockQty').value = '';
+      const panel = $('reagentEditPanel');
+      panel.style.display = '';
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function closeReagentEdit() {
+      $('reagentEditPanel').style.display = 'none';
+    }
+
+    async function saveReagent(btn) {
+      setLoading(btn, true);
+      try {
+        const id = $('reagentEditId').value;
+        const payload = {
+          name: $('editReagentName').value.trim(),
+          category: $('editReagentCategory').value.trim() || null,
+          unit: $('editReagentUnit').value.trim() || 'unit',
+          current_stock: Number($('editReagentStock').value),
+          alert_threshold: Number($('editReagentThreshold').value),
+        };
+        if (!payload.name) throw new Error('Nom obligatoire');
+        await api(`/api/v1/reagents/${id}`, {
+          method: 'PUT', headers: headers(), body: JSON.stringify(payload),
+        });
+        showToast('Réactif mis à jour', 'success');
+        closeReagentEdit();
+        await loadReagents();
+      } catch (e) {
+        showToast(e.message || 'Erreur enregistrement', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function restockReagent(btn) {
+      setLoading(btn, true);
+      try {
+        const id = $('reagentEditId').value;
+        const qty = Number($('restockQty').value);
+        if (!qty || qty <= 0) throw new Error('Quantité invalide (doit être > 0)');
+        const newStock = Number($('editReagentStock').value) + qty;
+        const payload = {
+          name: $('editReagentName').value.trim(),
+          category: $('editReagentCategory').value.trim() || null,
+          unit: $('editReagentUnit').value.trim() || 'unit',
+          current_stock: newStock,
+          alert_threshold: Number($('editReagentThreshold').value),
+        };
+        await api(`/api/v1/reagents/${id}`, {
+          method: 'PUT', headers: headers(), body: JSON.stringify(payload),
+        });
+        $('editReagentStock').value = newStock;
+        $('restockQty').value = '';
+        showToast(`Réapprovisionné +${qty} → stock: ${newStock}`, 'success');
+        await loadReagents();
+      } catch (e) {
+        showToast(e.message || 'Erreur réapprovisionnement', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
     async function openPdf() {
       try {
         const response = await fetch(`/api/v1/reports/results/${$("reportResultId").value}/pdf`, { headers: headers(false) });
@@ -3550,6 +3726,93 @@
       } catch { showToast('Copie impossible (HTTP non sécurisé)', 'error'); }
     }
 
+    // ── Équipements ───────────────────────────────────────────────────────────
+    async function loadEquipments() {
+      const tbody = $('equipmentsTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 5);
+      try {
+        const data = await api('/api/v1/equipments', { headers: headers(false) });
+        setRows('equipmentsTable', data.map(e => row(
+          `<td>${e.id}</td>` +
+          `<td><strong>${security.escapeHtml(e.name)}</strong></td>` +
+          `<td>${security.escapeHtml(e.type || '—')}</td>` +
+          `<td>${security.escapeHtml(e.serial_number || '—')}</td>` +
+          `<td>${security.escapeHtml(e.location || '—')}</td>` +
+          `<td>${e.last_calibration || '—'}</td>`
+        )));
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur chargement équipements</td></tr>';
+      }
+    }
+
+    async function createEquipment(btn) {
+      $('eqFormError').textContent = '';
+      setLoading(btn, true);
+      try {
+        const name = $('eqName').value.trim();
+        if (!name) throw new Error('Le nom est obligatoire');
+        const payload = {
+          name,
+          type: $('eqType').value.trim() || null,
+          serial_number: $('eqSerial').value.trim() || null,
+          location: $('eqLocation').value.trim() || null,
+          last_calibration: $('eqCalib').value || null,
+        };
+        await api('/api/v1/equipments', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+        showToast(`Équipement « ${security.escapeHtml(name)} » enregistré`, 'success');
+        ['eqName', 'eqType', 'eqSerial', 'eqLocation', 'eqCalib'].forEach(id => { if ($(id)) $(id).value = ''; });
+        await loadEquipments();
+      } catch (e) {
+        $('eqFormError').textContent = e.message || 'Erreur inconnue';
+        showToast(e.message || 'Erreur création équipement', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // ── Journal d'audit ───────────────────────────────────────────────────────
+    let _auditSkip = 0;
+    const _auditLimit = 50;
+
+    async function loadAudit() {
+      const tbody = $('auditTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 5);
+      try {
+        const data = await api(`/api/v1/audit-events?skip=${_auditSkip}&limit=${_auditLimit}`, { headers: headers(false) });
+        const fmt = d => d ? new Date(d).toLocaleString('fr-FR') : '—';
+        const typeLabel = {
+          'user.create':    '👤 Création user',
+          'user.update':    '✏️ Modif. user',
+          'reagent.create': '🧪 Nouveau réactif',
+          'reagent.update': '✏️ Modif. réactif',
+          'reagent.delete': '🗑️ Suppression réactif',
+        };
+        setRows('auditTable', (data.items || []).map(e => row(
+          `<td>${e.id}</td>` +
+          `<td style="white-space:nowrap;">${fmt(e.created_at)}</td>` +
+          `<td><strong>${security.escapeHtml(e.username || '—')}</strong></td>` +
+          `<td>${typeLabel[e.event_type] || security.escapeHtml(e.event_type)}</td>` +
+          `<td>${security.escapeHtml(e.entity_type)}</td>` +
+          `<td>${security.escapeHtml(e.entity_id || '—')}</td>`
+        )));
+        const m = data.meta || {};
+        if ($('auditPagerInfo')) {
+          const from = _auditSkip + 1;
+          const to = Math.min(_auditSkip + _auditLimit, m.total || 0);
+          $('auditPagerInfo').textContent = `Événements ${from}–${to} sur ${m.total || 0}`;
+        }
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Droits admin requis</td></tr>';
+      }
+    }
+
+    function auditPage(dir) {
+      _auditSkip = Math.max(0, _auditSkip + dir * _auditLimit);
+      loadAudit();
+    }
+
     // ── Gestion des utilisateurs ──────────────────────────────────────────────
     let _editingUserId = null;
 
@@ -3616,11 +3879,16 @@
       setLoading(btn, true);
       try {
         if (_editingUserId) {
-          // PATCH — rôle + nom complet
+          // PATCH — rôle, nom complet, et mot de passe optionnel
           const payload = {
             full_name: $('userFullName').value.trim() || null,
             role: $('userRole').value,
           };
+          const pw = $('userPassword').value;
+          if (pw) {
+            if (pw.length < 8) throw new Error('Mot de passe trop court (min. 8 caractères)');
+            payload.password = pw;
+          }
           await api(`/api/v1/users/${_editingUserId}`, {
             method: 'PATCH', headers: headers(), body: JSON.stringify(payload),
           });
