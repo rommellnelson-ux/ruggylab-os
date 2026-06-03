@@ -321,6 +321,19 @@ class RefreshToken(Base):
         return self.revoked_at is None and self.expires_at > utcnow_naive()
 
 
+class CriticalRange(Base):
+    """Configurable critical (panic) thresholds for analyte values."""
+
+    __tablename__ = "critical_ranges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(50), nullable=False)
+    low_critical: Mapped[float | None] = mapped_column(Float)
+    high_critical: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class QcControl(Base):
     """Control material definition for Westgard / Levey-Jennings QC."""
 

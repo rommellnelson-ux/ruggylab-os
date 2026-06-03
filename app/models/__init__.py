@@ -1,5 +1,6 @@
 from app.models.ruggylab_os import (
     AuditEvent,
+    CriticalRange,
     DH36InboundMessage,
     Equipment,
     EquipmentReagentRatio,
@@ -22,6 +23,7 @@ from app.models.ruggylab_os import (
 )
 
 __all__ = [
+    "CriticalRange",
     "Equipment",
     "Patient",
     "QcControl",

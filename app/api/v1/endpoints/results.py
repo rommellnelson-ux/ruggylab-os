@@ -9,6 +9,7 @@ from app.models import Equipment, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import ResultCreate, ResultRead
+from app.services.critical_checker import check_critical
 from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 
@@ -120,6 +121,10 @@ def create_result(
     result_data = payload.model_dump(exclude_none=True)
     result_data["validator_id"] = current_user.id
     result_data["is_validated"] = True
+    # Auto-detect critical values against configured thresholds (OR with manual flag)
+    result_data["is_critical"] = payload.is_critical or check_critical(
+        payload.data_points, db
+    )
     result = Result(**result_data)
     db.add(result)
     db.flush()

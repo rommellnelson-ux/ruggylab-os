@@ -858,6 +858,30 @@
             </div></div>
             <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
+          <!-- Panneau seuils critiques (panic values) -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>⚠️ Seuils critiques (panic values)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Tout résultat dont une valeur dépasse ces seuils est automatiquement marqué <strong>critique</strong>.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Analyte</label><input id="crAnalyte" placeholder="ex. WBC" /></div>
+                  <div><label>Unité</label><input id="crUnit" placeholder="ex. ×10³/μL" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Seuil bas critique</label><input id="crLow" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                  <div><label>Seuil haut critique</label><input id="crHigh" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                </div>
+                <button onclick="createCriticalRange(this)">Enregistrer seuil</button>
+              </div>
+              <table id="criticalRangesTable">
+                <thead><tr><th>Analyte</th><th>Bas critique</th><th>Haut critique</th><th>Unité</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <div id="machines" class="view band hidden">
@@ -1927,7 +1951,7 @@
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
       if (currentView === "patients") await loadPatients();
 
-      if (currentView === "results") await loadResults();
+      if (currentView === "results") { await loadResults(); await loadCriticalRanges(); }
       if (currentView === "stocks") await loadReagents();
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
@@ -2281,6 +2305,60 @@
         setLoading(btn, false);
       }
     }
+    // ══════════════════════════════════════════════════════════════
+    //  Seuils critiques (panic values)
+    // ══════════════════════════════════════════════════════════════
+    async function loadCriticalRanges() {
+      const data = await api('/api/v1/critical-ranges', { headers: headers(false) });
+      setRows('criticalRangesTable', data.map(function(cr) {
+        return row(
+          '<td><strong>' + security.escapeHtml(cr.analyte) + '</strong></td>' +
+          '<td style="color:#be123c;">' + (cr.low_critical !== null ? cr.low_critical : '<span style="color:var(--muted);">—</span>') + '</td>' +
+          '<td style="color:#be123c;">' + (cr.high_critical !== null ? cr.high_critical : '<span style="color:var(--muted);">—</span>') + '</td>' +
+          '<td style="color:var(--muted);font-size:11px;">' + security.escapeHtml(cr.unit || '—') + '</td>' +
+          '<td><button class="ghost" style="color:#be123c;font-size:11px;" onclick="deleteCriticalRange(' + cr.id + ')">✕</button></td>'
+        );
+      }));
+    }
+
+    async function createCriticalRange(btn) {
+      setLoading(btn, true);
+      try {
+        const analyte = $('crAnalyte').value.trim();
+        const lowVal  = $('crLow').value.trim();
+        const highVal = $('crHigh').value.trim();
+        if (!analyte) throw new Error('Analyte obligatoire');
+        if (!lowVal && !highVal) throw new Error('Au moins un seuil (bas ou haut) requis');
+        await api('/api/v1/critical-ranges', {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({
+            analyte: analyte,
+            unit:  $('crUnit').value.trim(),
+            low_critical:  lowVal  !== '' ? Number(lowVal)  : null,
+            high_critical: highVal !== '' ? Number(highVal) : null,
+          })
+        });
+        showToast('Seuil critique enregistré', 'success');
+        ['crAnalyte','crUnit','crLow','crHigh'].forEach(function(id){ $(id).value = ''; });
+        await loadCriticalRanges();
+      } catch(e) {
+        showToast(e.message || 'Erreur', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function deleteCriticalRange(id) {
+      if (!confirm('Désactiver ce seuil critique ?')) return;
+      try {
+        await api('/api/v1/critical-ranges/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Seuil désactivé', 'success');
+        await loadCriticalRanges();
+      } catch(e) {
+        showToast(e.message || 'Erreur', 'error');
+      }
+    }
+
     // ══════════════════════════════════════════════════════════════
     //  QC Analytique — Westgard / Levey-Jennings
     // ══════════════════════════════════════════════════════════════
