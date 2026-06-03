@@ -751,8 +751,10 @@
         <button data-view="bnpl" onclick="showView('bnpl')">💳 Paiements BNPL</button>
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
         <div class="nav-section">Système</div>
+        <button data-view="equipments" onclick="showView('equipments')">🔬 Équipements</button>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
         <button data-view="users" onclick="showView('users')">👥 Utilisateurs</button>
+        <button data-view="audit" onclick="showView('audit')">🔍 Audit</button>
       </nav>
       <div class="side-footer" id="sideFooter" style="display:none;">
         <div class="side-avatar" id="sideAvatar">—</div>
@@ -787,7 +789,7 @@
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
-            <div class="panel"><h3>Stocks bas</h3><table id="lowStockTable"><thead><tr><th>Reactif</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Stocks bas ⚠️</h3><table id="lowStockTable"><thead><tr><th>Réactif</th><th>Stock</th><th>Seuil</th><th>Niveau</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
 
@@ -806,11 +808,23 @@
                 <button class="success" style="margin-top:10px;" onclick="useCreatedPatientForSample()">Creer ses echantillons</button>
               </div>
             </div></div>
-            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
 
         <div id="samples" class="view band hidden">
+          <!-- ── Scan express ───────────────────────────────────────────── -->
+          <div class="panel" style="margin-bottom:12px;">
+            <div class="toolbar" style="align-items:center;gap:10px;">
+              <span style="font-size:13px;font-weight:600;white-space:nowrap;">📡 Scan rapide</span>
+              <input id="barcodeScanner" type="text" autocomplete="off"
+                placeholder="Scannez ou tapez un code-barres, puis Entrée…"
+                style="flex:1;font-family:monospace;font-size:13px;"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();scanBarcode(this.value.trim());}" />
+              <button class="ghost" onclick="clearScanResult()" title="Effacer">✕</button>
+            </div>
+            <div id="scanResult" style="margin-top:10px;display:none;"></div>
+          </div>
           <div class="grid2">
             <div class="panel"><h3>Nouvel echantillon</h3><div class="form">
               <div><label>Patient ID</label><input id="samplePatientId" type="number" /></div>
@@ -827,7 +841,7 @@
               <div><label>Statut</label><select id="sampleStatus"><option>Recu</option><option>En cours</option><option>Termine</option></select></div>
               <button onclick="createSample(this)" aria-label="Créer un nouvel échantillon">Creer echantillon</button>
             </div></div>
-            <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Barcode</th><th>Patient</th><th>Statut</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Code-barres</th><th>Patient</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
 
@@ -836,7 +850,7 @@
             <div class="panel"><h3>Nouveau resultat</h3><div class="form">
               <div><label>Sample ID</label><input id="resultSampleId" type="number" /></div>
               <div><label>Equipment ID</label><input id="resultEquipmentId" type="number" /></div>
-              <div><label>Template</label><select id="resultTemplate" onchange="templateDataPoints()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
+              <div><label>Template</label><select id="resultTemplate" onchange="renderResultTemplate()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
               <div id="dataPoints"></div>
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
@@ -888,10 +902,47 @@
               <div class="grid2"><div><label>Stock</label><input id="reagentStock" type="number" step="0.001" /></div><div><label>Seuil</label><input id="reagentThreshold" type="number" step="0.001" /></div></div>
               <button onclick="createReagent(this)">Creer reactif</button>
             </div></div>
-            <div class="panel"><h3>Reactifs</h3>
-              <table id="reagentsTable"><thead><tr><th>ID</th><th>Nom</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table>
+            <div class="panel">
+              <h3>Réactifs</h3>
+              <div class="toolbar"><button class="ghost" onclick="loadReagents()">↻ Actualiser</button></div>
+              <table id="reagentsTable">
+                <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
             </div>
           </div>
+
+          <!-- Panneau édition / réapprovisionnement (masqué par défaut) -->
+          <div id="reagentEditPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>Modifier réactif — <span id="reagentEditName"></span></h3>
+            <input type="hidden" id="reagentEditId" />
+            <div class="grid2">
+              <div class="form">
+                <div><label>Nom</label><input id="editReagentName" /></div>
+                <div class="grid2">
+                  <div><label>Catégorie</label><input id="editReagentCategory" /></div>
+                  <div><label>Unité</label><input id="editReagentUnit" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Stock actuel</label><input id="editReagentStock" type="number" step="0.001" /></div>
+                  <div><label>Seuil alerte</label><input id="editReagentThreshold" type="number" step="0.001" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="saveReagent(this)">Enregistrer</button>
+                  <button class="ghost" onclick="closeReagentEdit()">Annuler</button>
+                </div>
+              </div>
+              <div class="form">
+                <h4 style="margin:0 0 8px;">➕ Réapprovisionner</h4>
+                <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Ajouter des unités au stock actuel sans écraser les autres champs.</p>
+                <div><label>Unités à ajouter</label><input id="restockQty" type="number" step="0.001" min="0.001" placeholder="ex. 50" /></div>
+                <div class="actions" style="margin-top:10px;">
+                  <button class="success" onclick="restockReagent(this)">+ Réapprovisionner</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="panel" style="margin-top:12px;">
             <h3>Prédiction et notifications CMU</h3>
             <div class="grid2">
@@ -1143,6 +1194,55 @@
           </div>
         </div>
 
+        <!-- ── Vue Équipements ──────────────────────────────────────────────── -->
+        <div id="equipments" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3>Nouvel équipement</h3>
+              <div class="form">
+                <div><label>Nom</label><input id="eqName" placeholder="DH36, Précis Expert…" /></div>
+                <div class="grid2">
+                  <div><label>Type</label><input id="eqType" placeholder="Hématologie, Biochimie…" /></div>
+                  <div><label>N° série</label><input id="eqSerial" placeholder="SN-2024-001" /></div>
+                </div>
+                <div><label>Localisation</label><input id="eqLocation" placeholder="Salle labo 1" /></div>
+                <div><label>Dernière calibration</label><input id="eqCalib" type="date" /></div>
+                <div class="actions">
+                  <button onclick="createEquipment(this)">Enregistrer équipement</button>
+                </div>
+                <div id="eqFormError" role="alert" style="color:var(--rose);font-size:13px;min-height:16px;"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Équipements enregistrés</h3>
+              <div class="toolbar"><button class="ghost" onclick="loadEquipments()">↻ Actualiser</button></div>
+              <table id="equipmentsTable">
+                <thead><tr><th>ID</th><th>Nom</th><th>Type</th><th>N° Série</th><th>Localisation</th><th>Calibration</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Vue Audit (admin) ────────────────────────────────────────────── -->
+        <div id="audit" class="view band hidden">
+          <div class="panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+              <h3 style="margin:0;">Journal d'audit <small style="font-size:13px;font-weight:400;color:var(--muted);">— Réservé admin</small></h3>
+              <div class="toolbar">
+                <button class="ghost" onclick="loadAudit()">↻ Actualiser</button>
+                <button class="ghost" onclick="auditPage(-1)">← Précédent</button>
+                <button class="ghost" onclick="auditPage(+1)">Suivant →</button>
+              </div>
+            </div>
+            <table id="auditTable">
+              <thead><tr><th>#</th><th>Date</th><th>Utilisateur</th><th>Événement</th><th>Entité</th><th>ID entité</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div id="auditPagerInfo" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+          </div>
+        </div>
+
         <div class="band" id="logPanel">
           <h3 class="log-header" onclick="toggleLog()">Journal&nbsp;<span class="log-caret">▲</span></h3>
           <div class="log-panel-body"><div id="log" class="log">Prêt.</div></div>
@@ -1151,6 +1251,7 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
   <script src="/static/ai/training_data_manager.js"></script>
@@ -1758,11 +1859,14 @@
     async function refreshCurrent() {
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
       if (currentView === "patients") await loadPatients();
-      if (currentView === "samples") await loadSamples();
+
       if (currentView === "results") await loadResults();
       if (currentView === "stocks") await loadReagents();
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
+      if (currentView === "samples") { await loadSamples(); setTimeout(() => $('barcodeScanner')?.focus(), 150); }
+      if (currentView === "equipments") await loadEquipments();
+      if (currentView === "audit") await loadAudit();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -1782,7 +1886,24 @@
           mLSP.classList.add(lowStockCount > 0 ? "metric-amber" : "metric-teal");
         }
         setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
-        setRows("lowStockTable", stock.low_stock_reagents.map((r) => row(`<td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
+        setRows("lowStockTable", stock.low_stock_reagents.map(r => {
+          const pct = r.alert_threshold > 0 ? Math.round((r.current_stock / r.alert_threshold) * 100) : 0;
+          const barColor = r.current_stock === 0 ? '#be123c' : '#b45309';
+          const tr = row(
+            `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
+            `<td style="font-variant-numeric:tabular-nums;">${r.current_stock} <small style="color:var(--muted);">${security.escapeHtml(r.unit || '')}</small></td>` +
+            `<td>${r.alert_threshold}</td>` +
+            `<td style="min-width:70px;">` +
+              `<div style="background:#e5e7eb;border-radius:3px;height:6px;width:72px;overflow:hidden;" title="${pct}% du seuil">` +
+                `<div style="width:${Math.min(pct,100)}%;height:100%;background:${barColor};transition:width .3s;"></div>` +
+              `</div>` +
+            `</td>` +
+            `<td><button class="ghost" style="font-size:11px;padding:3px 8px;" onclick="showView('stocks')">↑ Réapprovisionner</button></td>`
+          );
+          if (r.current_stock === 0)                                   tr.classList.add('row-critical');
+          else if (r.current_stock <= r.alert_threshold)              tr.classList.add('row-warning');
+          return tr;
+        }));
         showToast("Tableau de bord actualisé", "success");
       } catch (e) {
         showToast("Erreur lors du chargement du dashboard", "error");
@@ -1796,7 +1917,13 @@
       
       try {
         const data = await api(`/api/v1/patients?q=${encodeURIComponent($("patientQuery").value || "")}`, { headers: headers(false) });
-        const rows = data.items.map((p) => row(`<td>${p.id}</td><td>${p.ipp_unique_id}</td><td>${p.first_name} ${p.last_name}</td><td>${p.sex || ""}</td>`));
+        const rows = data.items.map((p) => row(
+          `<td>${p.id}</td>` +
+          `<td><code>${security.escapeHtml(p.ipp_unique_id)}</code></td>` +
+          `<td>${security.escapeHtml(p.first_name + ' ' + p.last_name)}</td>` +
+          `<td>${p.sex || ''}</td>` +
+          `<td><button class="ghost" title="Imprimer étiquettes tubes" onclick='printPatientLabels(${JSON.stringify(p)})'>🏷️ Étiquettes</button></td>`
+        ));
         setRows("patientsTable", rows);
       } catch (error) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
@@ -1868,13 +1995,51 @@
     async function loadSamples() {
       const tbody = $("samplesTable").querySelector("tbody");
       loadingStates.showSkeleton(tbody, 5);
-      
       try {
-        const data = await api("/api/v1/samples", { headers: headers(false) });
-        const rows = data.items.map((s) => row(`<td>${s.id}</td><td>${s.barcode}</td><td>${s.patient_id}</td><td>${s.status || ""}</td>`));
+        // Fetch samples + patients en parallèle pour enrichir l'affichage et les caches
+        const [samplesData, patientsData] = await Promise.all([
+          api("/api/v1/samples", { headers: headers(false) }),
+          api("/api/v1/patients", { headers: headers(false) }).catch(() => ({ items: [] })),
+        ]);
+        _patientsCache = {};
+        (patientsData.items || []).forEach(p => { _patientsCache[p.id] = p; });
+        _samplesCache = samplesData.items || [];
+
+        const rows = _samplesCache.map(s => {
+          const p = _patientsCache[s.patient_id] || null;
+          const pLabel = p
+            ? security.escapeHtml(p.first_name + ' ' + p.last_name)
+            : (s.patient_id ? '#' + s.patient_id : '—');
+          const labelData = {
+            barcode: s.barcode,
+            patient: p ? (p.first_name + ' ' + p.last_name) : (s.patient_id ? 'Patient #' + s.patient_id : '—'),
+            ipp:  p ? p.ipp_unique_id      : '',
+            sex:  p ? (p.sex || '')        : '',
+            dob:  p ? (p.birth_date || '') : '',
+            date: s.collection_date ? s.collection_date.slice(0, 10) : '',
+            exam: s.status || '',
+          };
+          // Workflow statut : Recu → En cours → Termine
+          const STATUS_NEXT  = { 'Recu': 'En cours', 'En cours': 'Termine' };
+          const STATUS_CLASS = { 'Recu': 'warn', 'En cours': '', 'Termine': 'ok', 'Annule': 'bad' };
+          const STATUS_ICON  = { 'Recu': '📥', 'En cours': '⚗️', 'Termine': '✅', 'Annule': '❌' };
+          const nextSt = STATUS_NEXT[s.status];
+          const statusCell =
+            `<span class="pill ${STATUS_CLASS[s.status] || ''}">${STATUS_ICON[s.status] || ''}${security.escapeHtml(s.status || '—')}</span>` +
+            (nextSt
+              ? ` <button class="ghost" style="font-size:11px;padding:3px 7px;" onclick="advanceSampleStatus(${s.id},'${nextSt}')">→ ${nextSt}</button>`
+              : '');
+          return row(
+            `<td>${s.id}</td>` +
+            `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code></td>` +
+            `<td>${pLabel}</td>` +
+            `<td style="white-space:nowrap;">${statusCell}</td>` +
+            `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(labelData)})'>🖨️</button></td>`
+          );
+        });
         setRows("samplesTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
     }
@@ -2050,7 +2215,22 @@
     }
     async function loadReagents() {
       const data = await api("/api/v1/reagents", { headers: headers(false) });
-      setRows("reagentsTable", data.items.map((r) => row(`<td>${r.id}</td><td>${r.name}</td><td>${r.current_stock}</td><td>${r.alert_threshold}</td>`)));
+      setRows("reagentsTable", data.items.map((r) => {
+        const isLow = r.alert_threshold > 0 && r.current_stock <= r.alert_threshold;
+        const tr = row(
+          `<td>${r.id}</td>` +
+          `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
+          `<td>${security.escapeHtml(r.category || '—')}</td>` +
+          `<td>${r.current_stock} <span style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.unit || '')}</span></td>` +
+          `<td>${r.alert_threshold}</td>` +
+          `<td style="white-space:nowrap;">` +
+            `<button class="ghost" onclick='editReagent(${JSON.stringify(r)})'>Éditer</button>` +
+          `</td>`
+        );
+        if (r.current_stock === 0)              tr.classList.add('row-critical');
+        else if (isLow)                         tr.classList.add('row-warning');
+        return tr;
+      }));
     }
     async function createReagent(btn) {
       return errorHandler.safeExecute(async () => {
@@ -2102,6 +2282,78 @@
         await loadReagents();
       }, 'createReagent').finally(() => setLoading(btn, false));
     }
+    // ── Édition / réapprovisionnement réactifs ─────────────────────────────
+    function editReagent(r) {
+      $('reagentEditId').value = r.id;
+      $('reagentEditName').textContent = r.name;
+      $('editReagentName').value = r.name;
+      $('editReagentCategory').value = r.category || '';
+      $('editReagentUnit').value = r.unit || 'unit';
+      $('editReagentStock').value = r.current_stock;
+      $('editReagentThreshold').value = r.alert_threshold;
+      $('restockQty').value = '';
+      const panel = $('reagentEditPanel');
+      panel.style.display = '';
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function closeReagentEdit() {
+      $('reagentEditPanel').style.display = 'none';
+    }
+
+    async function saveReagent(btn) {
+      setLoading(btn, true);
+      try {
+        const id = $('reagentEditId').value;
+        const payload = {
+          name: $('editReagentName').value.trim(),
+          category: $('editReagentCategory').value.trim() || null,
+          unit: $('editReagentUnit').value.trim() || 'unit',
+          current_stock: Number($('editReagentStock').value),
+          alert_threshold: Number($('editReagentThreshold').value),
+        };
+        if (!payload.name) throw new Error('Nom obligatoire');
+        await api(`/api/v1/reagents/${id}`, {
+          method: 'PUT', headers: headers(), body: JSON.stringify(payload),
+        });
+        showToast('Réactif mis à jour', 'success');
+        closeReagentEdit();
+        await loadReagents();
+      } catch (e) {
+        showToast(e.message || 'Erreur enregistrement', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function restockReagent(btn) {
+      setLoading(btn, true);
+      try {
+        const id = $('reagentEditId').value;
+        const qty = Number($('restockQty').value);
+        if (!qty || qty <= 0) throw new Error('Quantité invalide (doit être > 0)');
+        const newStock = Number($('editReagentStock').value) + qty;
+        const payload = {
+          name: $('editReagentName').value.trim(),
+          category: $('editReagentCategory').value.trim() || null,
+          unit: $('editReagentUnit').value.trim() || 'unit',
+          current_stock: newStock,
+          alert_threshold: Number($('editReagentThreshold').value),
+        };
+        await api(`/api/v1/reagents/${id}`, {
+          method: 'PUT', headers: headers(), body: JSON.stringify(payload),
+        });
+        $('editReagentStock').value = newStock;
+        $('restockQty').value = '';
+        showToast(`Réapprovisionné +${qty} → stock: ${newStock}`, 'success');
+        await loadReagents();
+      } catch (e) {
+        showToast(e.message || 'Erreur réapprovisionnement', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
     async function openPdf() {
       try {
         const response = await fetch(`/api/v1/reports/results/${$("reportResultId").value}/pdf`, { headers: headers(false) });
@@ -3550,8 +3802,97 @@
       } catch { showToast('Copie impossible (HTTP non sécurisé)', 'error'); }
     }
 
+    // ── Équipements ───────────────────────────────────────────────────────────
+    async function loadEquipments() {
+      const tbody = $('equipmentsTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 5);
+      try {
+        const data = await api('/api/v1/equipments', { headers: headers(false) });
+        setRows('equipmentsTable', data.map(e => row(
+          `<td>${e.id}</td>` +
+          `<td><strong>${security.escapeHtml(e.name)}</strong></td>` +
+          `<td>${security.escapeHtml(e.type || '—')}</td>` +
+          `<td>${security.escapeHtml(e.serial_number || '—')}</td>` +
+          `<td>${security.escapeHtml(e.location || '—')}</td>` +
+          `<td>${e.last_calibration || '—'}</td>`
+        )));
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur chargement équipements</td></tr>';
+      }
+    }
+
+    async function createEquipment(btn) {
+      $('eqFormError').textContent = '';
+      setLoading(btn, true);
+      try {
+        const name = $('eqName').value.trim();
+        if (!name) throw new Error('Le nom est obligatoire');
+        const payload = {
+          name,
+          type: $('eqType').value.trim() || null,
+          serial_number: $('eqSerial').value.trim() || null,
+          location: $('eqLocation').value.trim() || null,
+          last_calibration: $('eqCalib').value || null,
+        };
+        await api('/api/v1/equipments', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+        showToast(`Équipement « ${security.escapeHtml(name)} » enregistré`, 'success');
+        ['eqName', 'eqType', 'eqSerial', 'eqLocation', 'eqCalib'].forEach(id => { if ($(id)) $(id).value = ''; });
+        await loadEquipments();
+      } catch (e) {
+        $('eqFormError').textContent = e.message || 'Erreur inconnue';
+        showToast(e.message || 'Erreur création équipement', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // ── Journal d'audit ───────────────────────────────────────────────────────
+    let _auditSkip = 0;
+    const _auditLimit = 50;
+
+    async function loadAudit() {
+      const tbody = $('auditTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 5);
+      try {
+        const data = await api(`/api/v1/audit-events?skip=${_auditSkip}&limit=${_auditLimit}`, { headers: headers(false) });
+        const fmt = d => d ? new Date(d).toLocaleString('fr-FR') : '—';
+        const typeLabel = {
+          'user.create':    '👤 Création user',
+          'user.update':    '✏️ Modif. user',
+          'reagent.create': '🧪 Nouveau réactif',
+          'reagent.update': '✏️ Modif. réactif',
+          'reagent.delete': '🗑️ Suppression réactif',
+        };
+        setRows('auditTable', (data.items || []).map(e => row(
+          `<td>${e.id}</td>` +
+          `<td style="white-space:nowrap;">${fmt(e.created_at)}</td>` +
+          `<td><strong>${security.escapeHtml(e.username || '—')}</strong></td>` +
+          `<td>${typeLabel[e.event_type] || security.escapeHtml(e.event_type)}</td>` +
+          `<td>${security.escapeHtml(e.entity_type)}</td>` +
+          `<td>${security.escapeHtml(e.entity_id || '—')}</td>`
+        )));
+        const m = data.meta || {};
+        if ($('auditPagerInfo')) {
+          const from = _auditSkip + 1;
+          const to = Math.min(_auditSkip + _auditLimit, m.total || 0);
+          $('auditPagerInfo').textContent = `Événements ${from}–${to} sur ${m.total || 0}`;
+        }
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Droits admin requis</td></tr>';
+      }
+    }
+
+    function auditPage(dir) {
+      _auditSkip = Math.max(0, _auditSkip + dir * _auditLimit);
+      loadAudit();
+    }
+
     // ── Gestion des utilisateurs ──────────────────────────────────────────────
     let _editingUserId = null;
+    let _samplesCache  = [];   // cache pour scan express
+    let _patientsCache = {};   // { id → patient } partagé entre scan et impression
 
     async function loadUsers() {
       const tbody = $('usersTable')?.querySelector('tbody');
@@ -3616,11 +3957,16 @@
       setLoading(btn, true);
       try {
         if (_editingUserId) {
-          // PATCH — rôle + nom complet
+          // PATCH — rôle, nom complet, et mot de passe optionnel
           const payload = {
             full_name: $('userFullName').value.trim() || null,
             role: $('userRole').value,
           };
+          const pw = $('userPassword').value;
+          if (pw) {
+            if (pw.length < 8) throw new Error('Mot de passe trop court (min. 8 caractères)');
+            payload.password = pw;
+          }
           await api(`/api/v1/users/${_editingUserId}`, {
             method: 'PATCH', headers: headers(), body: JSON.stringify(payload),
           });
@@ -3669,6 +4015,249 @@
       } catch {
         showToast('Erreur modification statut', 'error');
       }
+    }
+
+    // ── Workflow statut échantillon ───────────────────────────────────────────
+    async function advanceSampleStatus(id, newStatus) {
+      try {
+        await api(`/api/v1/samples/${id}`, {
+          method: 'PATCH', headers: headers(), body: JSON.stringify({ status: newStatus }),
+        });
+        showToast(`Statut → ${newStatus}`, 'success');
+        await loadSamples();
+      } catch (e) {
+        showToast(e.message || 'Erreur mise à jour statut', 'error');
+      }
+    }
+
+    // ── Scan express barcode ──────────────────────────────────────────────────
+    async function scanBarcode(code) {
+      if (!code) return;
+      // Chercher dans le cache local ; si absent, rafraîchir puis réessayer
+      let found = _samplesCache.find(s => s.barcode === code);
+      if (!found) {
+        await loadSamples();
+        found = _samplesCache.find(s => s.barcode === code);
+      }
+      const resultDiv = $('scanResult');
+      if (!found) {
+        resultDiv.innerHTML =
+          '<div style="color:var(--rose);font-size:13px;padding:6px 0;">❌ Code-barres inconnu : <code>' +
+          security.escapeHtml(code) + '</code></div>';
+        resultDiv.style.display = '';
+        return;
+      }
+      const p = _patientsCache[found.patient_id] || null;
+      const labelData = {
+        barcode: found.barcode,
+        patient: p ? (p.first_name + ' ' + p.last_name) : (found.patient_id ? 'Patient #' + found.patient_id : '—'),
+        ipp:  p ? p.ipp_unique_id      : '',
+        sex:  p ? (p.sex || '')        : '',
+        dob:  p ? (p.birth_date || '') : '',
+        date: found.collection_date ? found.collection_date.slice(0, 10) : '',
+        exam: found.status || '',
+      };
+      resultDiv.innerHTML =
+        '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;' +
+            'background:var(--band);border:2px solid var(--teal);border-radius:8px;padding:10px;">' +
+          '<div>' +
+            '<div style="font-size:13px;font-weight:700;">✅ ' + security.escapeHtml(found.barcode) + '</div>' +
+            '<div style="font-size:12px;color:var(--muted);">' +
+              (p ? security.escapeHtml(p.first_name + ' ' + p.last_name) + ' · ' + security.escapeHtml(p.ipp_unique_id)
+                 : 'Patient #' + (found.patient_id || '?')) +
+            '</div>' +
+            '<div style="font-size:12px;">Statut : ' + security.escapeHtml(found.status || '—') + '</div>' +
+          '</div>' +
+          '<div class="actions" style="margin-left:auto;">' +
+            '<button class="ghost" onclick=\'printSampleLabel(' + JSON.stringify(labelData) + ')\'>🖨️ Étiquette</button>' +
+            '<button class="secondary" onclick="showView(\'results\')">📋 Résultats</button>' +
+          '</div>' +
+        '</div>';
+      resultDiv.style.display = '';
+      const inp = $('barcodeScanner');
+      if (inp) inp.value = '';
+    }
+
+    function clearScanResult() {
+      const r = $('scanResult');
+      if (r) { r.innerHTML = ''; r.style.display = 'none'; }
+      const inp = $('barcodeScanner');
+      if (inp) { inp.value = ''; inp.focus(); }
+    }
+
+    // ── Impression étiquettes tubes ───────────────────────────────────────────
+    /**
+     * Ouvre une fenêtre dédiée avec des étiquettes imprimables.
+     * Supporte : choix du format, nombre de copies, et code couleur tube.
+     * @param {Array<{barcode,patient,ipp,sex,dob,date,exam}>} labels
+     */
+    function printTubeLabels(labels) {
+      if (!labels || !labels.length) {
+        showToast('Aucun échantillon à imprimer', 'warning');
+        return;
+      }
+      // Les données sont sérialisées en JSON et injectées dans le popup
+      const labelsJson = JSON.stringify(labels).replace(/<\/script>/gi, '<\\/script>');
+
+      const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>Etiquettes tubes - RuggyLab OS</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+<style id="baseStyle">
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Arial,Helvetica,sans-serif;color:#000000;background:#f0f0f0;padding:12px;}
+  .ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px;background:#fff;
+        border:1px solid #ddd;border-radius:6px;margin-bottom:12px;}
+  .ctrl label{font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;}
+  .ctrl select,.ctrl input[type=number]{padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px;}
+  .ctrl input[type=number]{width:54px;}
+  .ctrl button{padding:7px 14px;border:none;border-radius:5px;cursor:pointer;font-size:12px;
+               font-weight:600;color:#fff;background:#2563eb;}
+  .ctrl button.sec{background:#64748b;}
+  .ctrl .info{font-size:11px;color:#888;margin-left:auto;}
+  .labels{display:flex;flex-wrap:wrap;gap:8px;}
+  /* base label — dimensions mises a jour par dynStyle */
+  .label{background:#fff;border:1px solid #bbb;border-radius:3px;width:56mm;padding:2mm;
+         display:flex;flex-direction:column;align-items:center;gap:1px;page-break-inside:avoid;overflow:hidden;}
+  /* Bande couleur tube (④) */
+  .tube-band{width:100%;height:4mm;border-radius:1px;margin-bottom:1.5mm;
+             display:flex;align-items:center;justify-content:center;}
+  .tube-band-lbl{font-size:6pt;font-weight:700;color:#fff;letter-spacing:.5px;}
+  /* Typographie : Arial, noir pur */
+  .pname{font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;font-weight:700;
+         color:#000000;text-align:center;line-height:1.2;}
+  .ipp  {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;text-align:center;}
+  .bcsvg{width:52mm;height:13mm;}
+  .bcval{font-family:Arial,Helvetica,monospace;font-size:7pt;letter-spacing:1px;color:#000000;}
+  .meta {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;}
+  @media print{body{background:#fff;padding:0;}.ctrl{display:none;}.labels{gap:0;}
+    .label{border:none;}}
+</style>
+<style id="dynStyle"></style>
+</head>
+<body>
+<div class="ctrl">
+  <label>Format :
+    <select id="fmtSel" onchange="renderLabels()">
+      <option value="56x21" selected>Tube standard 56x21 mm</option>
+      <option value="38x13">Micro-tube 38x13 mm</option>
+      <option value="102x38">Pot / conteneur 102x38 mm</option>
+    </select>
+  </label>
+  <label>Copies / tube :
+    <input type="number" id="copiesSel" value="1" min="1" max="9" onchange="renderLabels()" />
+  </label>
+  <button onclick="window.print()">Imprimer</button>
+  <button class="sec" onclick="window.close()">Fermer</button>
+  <span class="info" id="pgInfo"></span>
+</div>
+<div id="labelsContainer" class="labels"></div>
+<script>
+var LABELS = ${labelsJson};
+var FORMATS = {
+  '56x21' :{w:'56mm',h:'21mm',svgW:'52mm',svgH:'13mm',fs:'8.5pt',fss:'7pt', pad:'2mm',  bh:36},
+  '38x13' :{w:'38mm',h:'13mm',svgW:'34mm',svgH:'7mm', fs:'6pt',  fss:'5.5pt',pad:'1.5mm',bh:20},
+  '102x38':{w:'102mm',h:'38mm',svgW:'96mm',svgH:'22mm',fs:'10pt',fss:'8.5pt',pad:'3mm', bh:55}
+};
+/* ④ Correspondance examen → couleur bouchon tube */
+var TUBE = [
+  {p:['nfs','hgb','wbc','plt','rbc','mal'], e:['nfs','paludisme','malaria'],  c:'#7c3aed',n:'EDTA'},
+  {p:['bch','poc','glc','cre','alb'],       e:['biochimie','poct'],           c:'#d97706',n:'SST'},
+  {p:['coag','tp','tca','inr'],             e:['coagulation'],                c:'#2563eb',n:'Citrate'},
+  {p:['ur','ban'],                          e:['urine','urines','bandelette'], c:'#eab308',n:'Urine'}
+];
+function tubeInfo(barcode,exam){
+  var b=(barcode||'').toLowerCase(),e=(exam||'').toLowerCase();
+  for(var i=0;i<TUBE.length;i++){
+    var t=TUBE[i];
+    if(t.p.some(function(x){return b.indexOf(x)===0;})||t.e.some(function(x){return e.indexOf(x)>=0;}))
+      return {c:t.c,n:t.n};
+  }
+  return {c:'#6b7280',n:''};
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});}
+function renderLabels(){
+  var fk=document.getElementById('fmtSel').value;
+  var f=FORMATS[fk]||FORMATS['56x21'];
+  var copies=Math.max(1,Math.min(9,parseInt(document.getElementById('copiesSel').value)||1));
+  /* Mettre a jour le CSS dynamique (@page, dimensions) */
+  document.getElementById('dynStyle').textContent=
+    '@media print{@page{size:'+f.w+' '+f.h+';margin:0;}}'+
+    '.label{width:'+f.w+';min-height:'+f.h+';padding:'+f.pad+';}'+
+    '.bcsvg{width:'+f.svgW+';height:'+f.svgH+';}'+
+    '.pname{font-size:'+f.fs+';}'+
+    '.ipp,.bcval,.meta{font-size:'+f.fss+';}';
+  /* Generer les cartes (copies x labels) */
+  var expanded=[];
+  for(var c=0;c<copies;c++) for(var j=0;j<LABELS.length;j++) expanded.push(LABELS[j]);
+  document.getElementById('labelsContainer').innerHTML=expanded.map(function(l,i){
+    var t=tubeInfo(l.barcode,l.exam);
+    return '<div class="label">'+
+      '<div class="tube-band" style="background:'+t.c+';">'+
+        '<span class="tube-band-lbl">'+esc(t.n)+'</span>'+
+      '</div>'+
+      '<div class="pname">'+esc(l.patient)+'</div>'+
+      '<div class="ipp">'+esc(l.ipp)+(l.sex?' &bull; '+esc(l.sex):'')+(l.dob?' &bull; '+esc(l.dob):'')+'</div>'+
+      '<svg id="bcd'+i+'" class="bcsvg"></svg>'+
+      '<div class="bcval">'+esc(l.barcode)+'</div>'+
+      (l.date||l.exam?'<div class="meta">'+esc(l.date)+(l.exam?' &mdash; '+esc(l.exam):'')+'</div>':'')+
+    '</div>';
+  }).join('');
+  /* Rendre les codes-barres Code128 */
+  expanded.forEach(function(l,i){
+    try{
+      JsBarcode('#bcd'+i,l.barcode,{
+        format:'CODE128',lineColor:'#000000',background:'#ffffff',
+        width:1.6,height:f.bh,displayValue:false,margin:4
+      });
+    }catch(e){
+      var el=document.getElementById('bcd'+i);
+      if(el) el.outerHTML='<div style="font-size:8px;color:red;">Err barcode</div>';
+    }
+  });
+  var n=expanded.length;
+  document.getElementById('pgInfo').textContent=
+    n+' etiquette'+(n>1?'s':'')+' - '+copies+' copie'+(copies>1?'s':'')+' / tube';
+}
+window.onload=renderLabels;
+<\/script>
+</body>
+</html>`;
+      const win = window.open('', '_blank', 'width=920,height=720,menubar=no,toolbar=no');
+      if (!win) { showToast('Popup bloque par le navigateur — autorisez les popups', 'error'); return; }
+      win.document.write(html);
+      win.document.close();
+    }
+
+    /** Récupère tous les échantillons d'un patient et ouvre la feuille d'étiquettes */
+    async function printPatientLabels(p) {
+      try {
+        const data = await api('/api/v1/samples', { headers: headers(false) });
+        const patientSamples = (data.items || []).filter(s => s.patient_id === p.id);
+        if (!patientSamples.length) {
+          showToast(`Aucun échantillon enregistré pour ${p.first_name} ${p.last_name}`, 'warning');
+          return;
+        }
+        printTubeLabels(patientSamples.map(s => ({
+          barcode: s.barcode,
+          patient: `${p.first_name} ${p.last_name}`,
+          ipp: p.ipp_unique_id,
+          sex: p.sex || '',
+          dob: p.birth_date || '',
+          date: s.collection_date ? s.collection_date.slice(0, 10) : '',
+          exam: s.status || '',
+        })));
+      } catch {
+        showToast('Erreur récupération échantillons', 'error');
+      }
+    }
+
+    /** Imprime l'étiquette d'un échantillon individuel.
+     *  labelData est déjà enrichi (patient, ipp, sex, dob) depuis loadSamples() ou scanBarcode(). */
+    function printSampleLabel(labelData) {
+      printTubeLabels([labelData]);
     }
 
     // ── Password toggle ────────────────────────────────────────────────────────
