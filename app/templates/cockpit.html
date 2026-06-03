@@ -813,6 +813,18 @@
         </div>
 
         <div id="samples" class="view band hidden">
+          <!-- ── Scan express ───────────────────────────────────────────── -->
+          <div class="panel" style="margin-bottom:12px;">
+            <div class="toolbar" style="align-items:center;gap:10px;">
+              <span style="font-size:13px;font-weight:600;white-space:nowrap;">📡 Scan rapide</span>
+              <input id="barcodeScanner" type="text" autocomplete="off"
+                placeholder="Scannez ou tapez un code-barres, puis Entrée…"
+                style="flex:1;font-family:monospace;font-size:13px;"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();scanBarcode(this.value.trim());}" />
+              <button class="ghost" onclick="clearScanResult()" title="Effacer">✕</button>
+            </div>
+            <div id="scanResult" style="margin-top:10px;display:none;"></div>
+          </div>
           <div class="grid2">
             <div class="panel"><h3>Nouvel echantillon</h3><div class="form">
               <div><label>Patient ID</label><input id="samplePatientId" type="number" /></div>
@@ -1965,19 +1977,41 @@
     async function loadSamples() {
       const tbody = $("samplesTable").querySelector("tbody");
       loadingStates.showSkeleton(tbody, 5);
-      
       try {
-        const data = await api("/api/v1/samples", { headers: headers(false) });
-        const rows = data.items.map((s) => row(
-          `<td>${s.id}</td>` +
-          `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code></td>` +
-          `<td>${s.patient_id || '—'}</td>` +
-          `<td>${s.status || '—'}</td>` +
-          `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(s)})'>🖨️</button></td>`
-        ));
+        // Fetch samples + patients en parallèle pour enrichir l'affichage et les caches
+        const [samplesData, patientsData] = await Promise.all([
+          api("/api/v1/samples", { headers: headers(false) }),
+          api("/api/v1/patients", { headers: headers(false) }).catch(() => ({ items: [] })),
+        ]);
+        _patientsCache = {};
+        (patientsData.items || []).forEach(p => { _patientsCache[p.id] = p; });
+        _samplesCache = samplesData.items || [];
+
+        const rows = _samplesCache.map(s => {
+          const p = _patientsCache[s.patient_id] || null;
+          const pLabel = p
+            ? security.escapeHtml(p.first_name + ' ' + p.last_name)
+            : (s.patient_id ? '#' + s.patient_id : '—');
+          const labelData = {
+            barcode: s.barcode,
+            patient: p ? (p.first_name + ' ' + p.last_name) : (s.patient_id ? 'Patient #' + s.patient_id : '—'),
+            ipp:  p ? p.ipp_unique_id      : '',
+            sex:  p ? (p.sex || '')        : '',
+            dob:  p ? (p.birth_date || '') : '',
+            date: s.collection_date ? s.collection_date.slice(0, 10) : '',
+            exam: s.status || '',
+          };
+          return row(
+            `<td>${s.id}</td>` +
+            `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code></td>` +
+            `<td>${pLabel}</td>` +
+            `<td>${s.status || '—'}</td>` +
+            `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(labelData)})'>🖨️</button></td>`
+          );
+        });
         setRows("samplesTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
     }
@@ -3828,6 +3862,8 @@
 
     // ── Gestion des utilisateurs ──────────────────────────────────────────────
     let _editingUserId = null;
+    let _samplesCache  = [];   // cache pour scan express
+    let _patientsCache = {};   // { id → patient } partagé entre scan et impression
 
     async function loadUsers() {
       const tbody = $('usersTable')?.querySelector('tbody');
@@ -3952,9 +3988,65 @@
       }
     }
 
+    // ── Scan express barcode ──────────────────────────────────────────────────
+    async function scanBarcode(code) {
+      if (!code) return;
+      // Chercher dans le cache local ; si absent, rafraîchir puis réessayer
+      let found = _samplesCache.find(s => s.barcode === code);
+      if (!found) {
+        await loadSamples();
+        found = _samplesCache.find(s => s.barcode === code);
+      }
+      const resultDiv = $('scanResult');
+      if (!found) {
+        resultDiv.innerHTML =
+          '<div style="color:var(--rose);font-size:13px;padding:6px 0;">❌ Code-barres inconnu : <code>' +
+          security.escapeHtml(code) + '</code></div>';
+        resultDiv.style.display = '';
+        return;
+      }
+      const p = _patientsCache[found.patient_id] || null;
+      const labelData = {
+        barcode: found.barcode,
+        patient: p ? (p.first_name + ' ' + p.last_name) : (found.patient_id ? 'Patient #' + found.patient_id : '—'),
+        ipp:  p ? p.ipp_unique_id      : '',
+        sex:  p ? (p.sex || '')        : '',
+        dob:  p ? (p.birth_date || '') : '',
+        date: found.collection_date ? found.collection_date.slice(0, 10) : '',
+        exam: found.status || '',
+      };
+      resultDiv.innerHTML =
+        '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;' +
+            'background:var(--band);border:2px solid var(--teal);border-radius:8px;padding:10px;">' +
+          '<div>' +
+            '<div style="font-size:13px;font-weight:700;">✅ ' + security.escapeHtml(found.barcode) + '</div>' +
+            '<div style="font-size:12px;color:var(--muted);">' +
+              (p ? security.escapeHtml(p.first_name + ' ' + p.last_name) + ' · ' + security.escapeHtml(p.ipp_unique_id)
+                 : 'Patient #' + (found.patient_id || '?')) +
+            '</div>' +
+            '<div style="font-size:12px;">Statut : ' + security.escapeHtml(found.status || '—') + '</div>' +
+          '</div>' +
+          '<div class="actions" style="margin-left:auto;">' +
+            '<button class="ghost" onclick=\'printSampleLabel(' + JSON.stringify(labelData) + ')\'>🖨️ Étiquette</button>' +
+            '<button class="secondary" onclick="showView(\'results\')">📋 Résultats</button>' +
+          '</div>' +
+        '</div>';
+      resultDiv.style.display = '';
+      const inp = $('barcodeScanner');
+      if (inp) inp.value = '';
+    }
+
+    function clearScanResult() {
+      const r = $('scanResult');
+      if (r) { r.innerHTML = ''; r.style.display = 'none'; }
+      const inp = $('barcodeScanner');
+      if (inp) { inp.value = ''; inp.focus(); }
+    }
+
     // ── Impression étiquettes tubes ───────────────────────────────────────────
     /**
-     * Ouvre une fenêtre dédiée avec des étiquettes imprimables (format tube 56 × 21 mm).
+     * Ouvre une fenêtre dédiée avec des étiquettes imprimables.
+     * Supporte : choix du format, nombre de copies, et code couleur tube.
      * @param {Array<{barcode,patient,ipp,sex,dob,date,exam}>} labels
      */
     function printTubeLabels(labels) {
@@ -3962,87 +4054,137 @@
         showToast('Aucun échantillon à imprimer', 'warning');
         return;
       }
-      const _esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
-      );
-      const labelCards = labels.map((l, i) => `
-        <div class="label">
-          <div class="patient-name">${_esc(l.patient)}</div>
-          <div class="ipp">${_esc(l.ipp)}${l.sex ? ' &bull; ' + _esc(l.sex) : ''}${l.dob ? ' &bull; ' + _esc(l.dob) : ''}</div>
-          <svg id="bc${i}" class="bc-svg"></svg>
-          <div class="barcode-val">${_esc(l.barcode)}</div>
-          ${l.date || l.exam ? `<div class="meta">${_esc(l.date)}${l.exam ? ' &mdash; ' + _esc(l.exam) : ''}</div>` : ''}
-        </div>`).join('');
-
-      const initJs = labels.map((l, i) => {
-        const safeVal = l.barcode.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        return `try {
-          JsBarcode('#bc${i}','${safeVal}',{
-            format:'CODE128',
-            lineColor:'#000000',   /* noir pur */
-            background:'#ffffff',
-            width:1.6,
-            height:36,
-            displayValue:false,
-            margin:4               /* marge interne SVG ~1mm — complète les 2mm du padding label */
-          });
-        } catch(e) { document.getElementById('bc${i}').insertAdjacentHTML('afterend','<div style="color:red;font-size:9px;">Err: '+e.message+'</div>'); }`;
-      }).join('\n');
+      // Les données sont sérialisées en JSON et injectées dans le popup
+      const labelsJson = JSON.stringify(labels).replace(/<\/script>/gi, '<\\/script>');
 
       const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8"/>
-<title>Étiquettes tubes — RuggyLab OS</title>
+<title>Etiquettes tubes - RuggyLab OS</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<style>
+<style id="baseStyle">
   *{box-sizing:border-box;margin:0;padding:0;}
-  /* ── Typographie : sans-empattement, noir pur pour contraste scanner ── */
-  body{font-family:Arial,Helvetica,sans-serif;color:#000000;background:#f0f0f0;padding:16px;}
-  .actions{margin-bottom:14px;display:flex;gap:8px;}
-  .actions button{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;color:#fff;background:#2563eb;}
-  .actions button.sec{background:#64748b;}
-  .page-title{font-size:13px;color:#555;margin-bottom:12px;}
-  .no-print{}
+  body{font-family:Arial,Helvetica,sans-serif;color:#000000;background:#f0f0f0;padding:12px;}
+  .ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px;background:#fff;
+        border:1px solid #ddd;border-radius:6px;margin-bottom:12px;}
+  .ctrl label{font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;}
+  .ctrl select,.ctrl input[type=number]{padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px;}
+  .ctrl input[type=number]{width:54px;}
+  .ctrl button{padding:7px 14px;border:none;border-radius:5px;cursor:pointer;font-size:12px;
+               font-weight:600;color:#fff;background:#2563eb;}
+  .ctrl button.sec{background:#64748b;}
+  .ctrl .info{font-size:11px;color:#888;margin-left:auto;}
   .labels{display:flex;flex-wrap:wrap;gap:8px;}
-  /* ── Étiquette : padding ≥ 2mm latéral = zone de silence Code128 ── */
-  .label{
-    background:#fff;border:1px solid #bbb;border-radius:3px;
-    width:56mm;
-    padding:2mm;          /* quiet zone ≥ 2mm sur tous les bords */
-    display:flex;flex-direction:column;align-items:center;gap:1px;
-    page-break-inside:avoid;
-  }
-  /* Texte noir pur — tous les éléments */
-  .patient-name{font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;font-weight:700;color:#000000;text-align:center;line-height:1.2;}
-  .ipp         {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;text-align:center;}
-  .bc-svg      {width:52mm;height:13mm;}  /* 56mm - 2×2mm padding = 52mm max */
-  .barcode-val {font-family:Arial,Helvetica,monospace;font-size:7pt;letter-spacing:1px;color:#000000;}
-  .meta        {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;}
-  @media print{
-    @page{size:56mm 21mm;margin:0;}
-    body{margin:0;background:#fff;padding:0;}
-    .no-print{display:none;}
-    .labels{gap:0;}
-    /* En impression : on conserve le padding 2mm pour la zone de silence */
-    .label{border:none;width:56mm;min-height:21mm;padding:2mm;}
-  }
+  /* base label — dimensions mises a jour par dynStyle */
+  .label{background:#fff;border:1px solid #bbb;border-radius:3px;width:56mm;padding:2mm;
+         display:flex;flex-direction:column;align-items:center;gap:1px;page-break-inside:avoid;overflow:hidden;}
+  /* Bande couleur tube (④) */
+  .tube-band{width:100%;height:4mm;border-radius:1px;margin-bottom:1.5mm;
+             display:flex;align-items:center;justify-content:center;}
+  .tube-band-lbl{font-size:6pt;font-weight:700;color:#fff;letter-spacing:.5px;}
+  /* Typographie : Arial, noir pur */
+  .pname{font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;font-weight:700;
+         color:#000000;text-align:center;line-height:1.2;}
+  .ipp  {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;text-align:center;}
+  .bcsvg{width:52mm;height:13mm;}
+  .bcval{font-family:Arial,Helvetica,monospace;font-size:7pt;letter-spacing:1px;color:#000000;}
+  .meta {font-family:Arial,Helvetica,sans-serif;font-size:7pt;color:#000000;}
+  @media print{body{background:#fff;padding:0;}.ctrl{display:none;}.labels{gap:0;}
+    .label{border:none;}}
 </style>
+<style id="dynStyle"></style>
 </head>
 <body>
-<div class="actions no-print">
-  <button onclick="window.print()">🖨️ Imprimer</button>
-  <button class="sec" onclick="window.close()">✕ Fermer</button>
+<div class="ctrl">
+  <label>Format :
+    <select id="fmtSel" onchange="renderLabels()">
+      <option value="56x21" selected>Tube standard 56x21 mm</option>
+      <option value="38x13">Micro-tube 38x13 mm</option>
+      <option value="102x38">Pot / conteneur 102x38 mm</option>
+    </select>
+  </label>
+  <label>Copies / tube :
+    <input type="number" id="copiesSel" value="1" min="1" max="9" onchange="renderLabels()" />
+  </label>
+  <button onclick="window.print()">Imprimer</button>
+  <button class="sec" onclick="window.close()">Fermer</button>
+  <span class="info" id="pgInfo"></span>
 </div>
-<div class="page-title no-print">RuggyLab OS — ${labels.length} étiquette(s) de tube de prélèvement</div>
-<div class="labels">${labelCards}</div>
+<div id="labelsContainer" class="labels"></div>
 <script>
-window.onload = function() { ${initJs} };
+var LABELS = ${labelsJson};
+var FORMATS = {
+  '56x21' :{w:'56mm',h:'21mm',svgW:'52mm',svgH:'13mm',fs:'8.5pt',fss:'7pt', pad:'2mm',  bh:36},
+  '38x13' :{w:'38mm',h:'13mm',svgW:'34mm',svgH:'7mm', fs:'6pt',  fss:'5.5pt',pad:'1.5mm',bh:20},
+  '102x38':{w:'102mm',h:'38mm',svgW:'96mm',svgH:'22mm',fs:'10pt',fss:'8.5pt',pad:'3mm', bh:55}
+};
+/* ④ Correspondance examen → couleur bouchon tube */
+var TUBE = [
+  {p:['nfs','hgb','wbc','plt','rbc','mal'], e:['nfs','paludisme','malaria'],  c:'#7c3aed',n:'EDTA'},
+  {p:['bch','poc','glc','cre','alb'],       e:['biochimie','poct'],           c:'#d97706',n:'SST'},
+  {p:['coag','tp','tca','inr'],             e:['coagulation'],                c:'#2563eb',n:'Citrate'},
+  {p:['ur','ban'],                          e:['urine','urines','bandelette'], c:'#eab308',n:'Urine'}
+];
+function tubeInfo(barcode,exam){
+  var b=(barcode||'').toLowerCase(),e=(exam||'').toLowerCase();
+  for(var i=0;i<TUBE.length;i++){
+    var t=TUBE[i];
+    if(t.p.some(function(x){return b.indexOf(x)===0;})||t.e.some(function(x){return e.indexOf(x)>=0;}))
+      return {c:t.c,n:t.n};
+  }
+  return {c:'#6b7280',n:''};
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});}
+function renderLabels(){
+  var fk=document.getElementById('fmtSel').value;
+  var f=FORMATS[fk]||FORMATS['56x21'];
+  var copies=Math.max(1,Math.min(9,parseInt(document.getElementById('copiesSel').value)||1));
+  /* Mettre a jour le CSS dynamique (@page, dimensions) */
+  document.getElementById('dynStyle').textContent=
+    '@media print{@page{size:'+f.w+' '+f.h+';margin:0;}}'+
+    '.label{width:'+f.w+';min-height:'+f.h+';padding:'+f.pad+';}'+
+    '.bcsvg{width:'+f.svgW+';height:'+f.svgH+';}'+
+    '.pname{font-size:'+f.fs+';}'+
+    '.ipp,.bcval,.meta{font-size:'+f.fss+';}';
+  /* Generer les cartes (copies x labels) */
+  var expanded=[];
+  for(var c=0;c<copies;c++) for(var j=0;j<LABELS.length;j++) expanded.push(LABELS[j]);
+  document.getElementById('labelsContainer').innerHTML=expanded.map(function(l,i){
+    var t=tubeInfo(l.barcode,l.exam);
+    return '<div class="label">'+
+      '<div class="tube-band" style="background:'+t.c+';">'+
+        '<span class="tube-band-lbl">'+esc(t.n)+'</span>'+
+      '</div>'+
+      '<div class="pname">'+esc(l.patient)+'</div>'+
+      '<div class="ipp">'+esc(l.ipp)+(l.sex?' &bull; '+esc(l.sex):'')+(l.dob?' &bull; '+esc(l.dob):'')+'</div>'+
+      '<svg id="bcd'+i+'" class="bcsvg"></svg>'+
+      '<div class="bcval">'+esc(l.barcode)+'</div>'+
+      (l.date||l.exam?'<div class="meta">'+esc(l.date)+(l.exam?' &mdash; '+esc(l.exam):'')+'</div>':'')+
+    '</div>';
+  }).join('');
+  /* Rendre les codes-barres Code128 */
+  expanded.forEach(function(l,i){
+    try{
+      JsBarcode('#bcd'+i,l.barcode,{
+        format:'CODE128',lineColor:'#000000',background:'#ffffff',
+        width:1.6,height:f.bh,displayValue:false,margin:4
+      });
+    }catch(e){
+      var el=document.getElementById('bcd'+i);
+      if(el) el.outerHTML='<div style="font-size:8px;color:red;">Err barcode</div>';
+    }
+  });
+  var n=expanded.length;
+  document.getElementById('pgInfo').textContent=
+    n+' etiquette'+(n>1?'s':'')+' - '+copies+' copie'+(copies>1?'s':'')+' / tube';
+}
+window.onload=renderLabels;
 <\/script>
 </body>
 </html>`;
-      const win = window.open('', '_blank', 'width=820,height=680,menubar=no,toolbar=no');
-      if (!win) { showToast('Fenêtre bloquée par le navigateur — autorisez les popups', 'error'); return; }
+      const win = window.open('', '_blank', 'width=920,height=720,menubar=no,toolbar=no');
+      if (!win) { showToast('Popup bloque par le navigateur — autorisez les popups', 'error'); return; }
       win.document.write(html);
       win.document.close();
     }
@@ -4070,17 +4212,10 @@ window.onload = function() { ${initJs} };
       }
     }
 
-    /** Imprime l'étiquette d'un échantillon individuel (depuis la liste Échantillons) */
-    function printSampleLabel(s) {
-      printTubeLabels([{
-        barcode: s.barcode,
-        patient: s.patient_id ? `Patient #${s.patient_id}` : '—',
-        ipp: '',
-        sex: '',
-        dob: '',
-        date: s.collection_date ? s.collection_date.slice(0, 10) : '',
-        exam: s.status || '',
-      }]);
+    /** Imprime l'étiquette d'un échantillon individuel.
+     *  labelData est déjà enrichi (patient, ipp, sex, dob) depuis loadSamples() ou scanBarcode(). */
+    function printSampleLabel(labelData) {
+      printTubeLabels([labelData]);
     }
 
     // ── Password toggle ────────────────────────────────────────────────────────
