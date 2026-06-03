@@ -45,9 +45,7 @@ def check_westgard(values: list[float], mean: float, sd: float) -> list[str]:
         if abs(latest - prev) > 4:
             violations.append("R-4s")
         # 2-2s: two consecutive points both beyond ±2SD on the same side
-        if latest > 2 and prev > 2:
-            violations.append("2-2s")
-        elif latest < -2 and prev < -2:
+        if latest > 2 and prev > 2 or latest < -2 and prev < -2:
             violations.append("2-2s")
 
     # ── Four-point rule ──────────────────────────────────────────────────────

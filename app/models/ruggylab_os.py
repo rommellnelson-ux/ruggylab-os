@@ -59,6 +59,10 @@ class Equipment(Base):
         back_populates="equipment",
         cascade="all, delete-orphan",
     )
+    maintenances: Mapped[list["EquipmentMaintenance"]] = relationship(
+        back_populates="equipment",
+        cascade="all, delete-orphan",
+    )
 
 
 class Patient(Base):
@@ -422,6 +426,25 @@ class NotifConfig(Base):
     email: Mapped[str | None] = mapped_column(String(200))
     delay_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class EquipmentMaintenance(Base):
+    """Planification et suivi de maintenance / étalonnage des équipements."""
+
+    __tablename__ = "equipment_maintenances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipments.id"), nullable=False, index=True)
+    maintenance_type: Mapped[str] = mapped_column(String(30), nullable=False, default="preventive")
+    scheduled_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    performed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    performed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    notes: Mapped[str | None] = mapped_column(Text)
+    next_due_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    is_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    equipment: Mapped["Equipment"] = relationship(back_populates="maintenances")
 
 
 class MilitaryFacility(Base):

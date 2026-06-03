@@ -1,8 +1,9 @@
 """Schemas — Règles de delta-check patient."""
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class DeltaCheckRuleCreate(BaseModel):

@@ -24,10 +24,9 @@ from app.models import (
     User,
 )
 from app.schemas.audit_event import AuditEventRead
+from app.schemas.qc import QC_REJECT_RULES, QcStatusEntry, QcSummaryResponse
 from app.schemas.reagent import ReagentRead
 from app.schemas.report_signature import ReportSignatureCreate, ReportSignatureRead
-from app.schemas.qc import QC_REJECT_RULES, QcStatusEntry, QcSummaryResponse
-from app.services.qc_pdf_report import build_qc_html_report
 from app.schemas.reports import (
     AuditActivityEntry,
     AuditDashboardResponse,
@@ -40,6 +39,7 @@ from app.schemas.reports import (
     MonthlyConsumptionEntry,
     StockDashboardResponse,
 )
+from app.services.qc_pdf_report import build_qc_html_report
 from app.services.report_signing import build_result_report_pdf, create_report_signature
 
 router = APIRouter(prefix="/reports")

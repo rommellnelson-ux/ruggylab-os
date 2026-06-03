@@ -1,10 +1,7 @@
 """Tests — Valeurs de référence par analyte/sexe/âge (service + API + intégration)."""
 import datetime as dt
 
-import pytest
-
 from app.services.reference_checker import compute_flags
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Unit tests — compute_flags

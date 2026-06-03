@@ -8,25 +8,29 @@ from __future__ import annotations
 import datetime as dt
 import json
 import urllib.request
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
-from app.models import Result, Sample
+from app.models import Result
 from app.models.ruggylab_os import NotifConfig
 from app.utils.datetime_utils import utcnow_naive
 
 
 def _send_webhook(url: str, payload: dict) -> bool:
     """Envoie un POST JSON à `url`. Retourne True si HTTP 2xx."""
+    if urlparse(url).scheme not in {"http", "https"}:
+        return False
+
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
+    req = urllib.request.Request(  # noqa: S310 - scheme restricted above
         url,
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310  # nosec B310
             return resp.status < 400
     except Exception:  # noqa: BLE001
         return False

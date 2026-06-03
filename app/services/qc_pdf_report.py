@@ -26,33 +26,33 @@ _MONTH_NAMES = [
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> str:
-    W, H = 600, 180
-    ML, MR, MT, MB = 46, 16, 16, 28
-    PW = W - ML - MR
-    PH = H - MT - MB
+    width, height = 600, 180
+    margin_left, margin_right, margin_top, margin_bottom = 46, 16, 16, 28
+    plot_width = width - margin_left - margin_right
+    plot_height = height - margin_top - margin_bottom
 
     n = len(values)
     if n == 0 or sd <= 0:
         return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'style="border:1px solid #e5e7eb;border-radius:4px;">'
             f'<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">'
             f'Aucune donnée</text></svg>'
         )
 
     z_scores = [(v - mean) / sd for v in values]
-    Y_MIN, Y_MAX = -3.6, 3.6
-    Y_RANGE = Y_MAX - Y_MIN
+    y_min, y_max = -3.6, 3.6
+    y_range = y_max - y_min
 
     def px(i: int) -> float:
-        return ML + (i / max(n - 1, 1)) * PW
+        return margin_left + (i / max(n - 1, 1)) * plot_width
 
     def py(z: float) -> float:
-        return MT + (1.0 - (z - Y_MIN) / Y_RANGE) * PH
+        return margin_top + (1.0 - (z - y_min) / y_range) * plot_height
 
     parts: list[str] = []
     parts.append(
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
         f'style="border:1px solid #e5e7eb;border-radius:4px;background:#fafafa;">'
     )
 
@@ -66,7 +66,7 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
         ytop = py(zhi)
         ybot = py(zlo)
         parts.append(
-            f'<rect x="{ML}" y="{ytop:.1f}" width="{PW}" '
+            f'<rect x="{margin_left}" y="{ytop:.1f}" width="{plot_width}" '
             f'height="{ybot - ytop:.1f}" fill="{fill}" opacity="0.55"/>'
         )
 
@@ -81,12 +81,12 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
         y = py(z)
         da = f' stroke-dasharray="{dash}"' if dash != "none" else ""
         parts.append(
-            f'<line x1="{ML}" y1="{y:.1f}" x2="{ML + PW}" y2="{y:.1f}" '
+            f'<line x1="{margin_left}" y1="{y:.1f}" x2="{margin_left + plot_width}" y2="{y:.1f}" '
             f'stroke="{stroke}" stroke-width="{sw}"{da}/>'
         )
         lbl = f"{z:+.0f}σ"
         parts.append(
-            f'<text x="{ML - 3}" y="{y + 4:.1f}" text-anchor="end" '
+            f'<text x="{margin_left - 3}" y="{y + 4:.1f}" text-anchor="end" '
             f'font-size="8" fill="{stroke}">{lbl}</text>'
         )
 
@@ -98,7 +98,7 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
         )
 
     # Data points
-    for i, (z, v) in enumerate(zip(z_scores, values)):
+    for i, (z, v) in enumerate(zip(z_scores, values, strict=True)):
         col = "#dc2626" if abs(z) > 3 else "#ea580c" if abs(z) > 2 else "#2563eb"
         x, y = px(i), py(z)
         tooltip = f"{dates[i]}: {v:.3f}"
@@ -113,7 +113,7 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
         x = px(i)
         lbl = dates[i][-5:] if len(dates[i]) >= 5 else dates[i]
         parts.append(
-            f'<text x="{x:.1f}" y="{H - 4}" text-anchor="middle" '
+            f'<text x="{x:.1f}" y="{height - 4}" text-anchor="middle" '
             f'font-size="8" fill="#6b7280">{lbl}</text>'
         )
 

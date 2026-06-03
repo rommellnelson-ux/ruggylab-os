@@ -1,7 +1,5 @@
 """Tests — Delta-check patient (service + API + intégration create_result)."""
-import pytest
 
-from app.services.delta_checker import check_delta
 
 
 # ══════════════════════════════════════════════════════════════════════════════

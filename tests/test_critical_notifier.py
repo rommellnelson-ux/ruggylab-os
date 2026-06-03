@@ -1,5 +1,4 @@
 """Tests — Alertes critiques non-acquittées (service + API)."""
-import pytest
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -1,8 +1,6 @@
 """Tests for the Westgard multi-rule engine and QC API endpoints."""
-import pytest
 
 from app.services.westgard import check_westgard
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Unit tests — Westgard rule engine

@@ -746,6 +746,7 @@
         <button data-view="imaging" onclick="showView('imaging')">👁 Imagerie IA</button>
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
         <button data-view="qc" onclick="showView('qc')">📈 QC Analytique</button>
+        <button data-view="stats" onclick="showView('stats')">📊 Statistiques Labo</button>
         <div class="nav-section">Logistique</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
         <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
@@ -788,6 +789,7 @@
             <div class="panel metric metric-teal"><div id="mMalaria" class="value">—</div><div class="label">Paludisme positif</div></div>
             <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
             <div class="panel metric" id="mQcPanel"><div id="mQc" class="value">—</div><div class="label">Contrôles QC</div></div>
+            <div class="panel metric" id="mMntPanel"><div id="mMnt" class="value">—</div><div class="label">Maintenance ≤7j</div></div>
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
@@ -1406,6 +1408,71 @@
                 <tbody></tbody>
               </table>
             </div>
+          </div>
+
+          <!-- ── Planification maintenance / étalonnage ─────────────────────── -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🔧 Maintenance &amp; Étalonnage</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Planifiez les maintenances préventives, correctives et étalonnages. Les échéances ≤ 7 jours s'affichent dans le tableau de bord.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Équipement ID</label><input id="mntEqId" type="number" min="1" placeholder="ex. 1" /></div>
+                  <div><label>Type</label><select id="mntType">
+                    <option value="preventive">Préventive</option>
+                    <option value="corrective">Corrective</option>
+                    <option value="calibration">Étalonnage</option>
+                  </select></div>
+                </div>
+                <div><label>Programmée le</label><input id="mntScheduled" type="datetime-local" /></div>
+                <div><label>Prochaine échéance</label><input id="mntNextDue" type="datetime-local" /></div>
+                <div><label>Notes</label><textarea id="mntNotes" style="min-height:60px;" placeholder="Interventions effectuées, pièces remplacées…"></textarea></div>
+                <button onclick="createMaintenance(this)">Planifier</button>
+              </div>
+              <table id="maintenanceTable">
+                <thead><tr><th>Équip.</th><th>Type</th><th>Programmée</th><th>Prochaine échéance</th><th>Statut</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Vue Statistiques de performance ─────────────────────────────── -->
+        <div id="stats" class="view band hidden">
+          <div class="toolbar" style="margin-bottom:12px;gap:10px;align-items:center;">
+            <label style="margin:0;color:var(--ink);font-size:13px;white-space:nowrap;">Période :</label>
+            <select id="statsDays" onchange="loadStats()">
+              <option value="7">7 jours</option>
+              <option value="30" selected>30 jours</option>
+              <option value="60">60 jours</option>
+              <option value="90">90 jours</option>
+            </select>
+            <button class="ghost" onclick="loadStats()">↻ Actualiser</button>
+          </div>
+          <div class="grid4">
+            <div class="panel metric metric-blue"><div id="statTotal" class="value">—</div><div class="label">Résultats (période)</div></div>
+            <div class="panel metric" id="statCritPanel"><div id="statCrit" class="value">—</div><div class="label">Taux critique</div></div>
+            <div class="panel metric" id="statQcPanel"><div id="statQc" class="value">—</div><div class="label">Violations QC</div></div>
+            <div class="panel metric" id="statMntPanel"><div id="statMnt" class="value">—</div><div class="label">Maintenance échue ≤7j</div></div>
+          </div>
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel">
+              <h3>⏱ TAT moyen par équipement (h)</h3>
+              <div id="tatChartDiv" style="overflow-x:auto;min-height:80px;"></div>
+            </div>
+            <div class="panel">
+              <h3>📅 Volumes hebdomadaires</h3>
+              <div id="weeklyChartDiv" style="overflow-x:auto;min-height:80px;"></div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>📋 Détail TAT par équipement</h3>
+            <table id="tatDetailTable">
+              <thead><tr><th>Équipement</th><th>Résultats</th><th>TAT moy. (h)</th><th>TAT min (h)</th><th>TAT max (h)</th><th>TAT p95 (h)</th></tr></thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
 
@@ -2052,17 +2119,19 @@
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
       if (currentView === "samples") { await loadSamples(); setTimeout(() => $('barcodeScanner')?.focus(), 150); }
-      if (currentView === "equipments") await loadEquipments();
+      if (currentView === "equipments") await Promise.all([loadEquipments(), loadMaintenances()]);
       if (currentView === "audit") await loadAudit();
       if (currentView === "qc") await loadQc();
+      if (currentView === "stats") await loadStats();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
       try {
-        const [epi, stock, qc] = await Promise.all([
+        const [epi, stock, qc, perf] = await Promise.all([
           api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
           api("/api/v1/reports/stock-dashboard", { headers: headers(false) }),
-          api("/api/v1/reports/qc-summary", { headers: headers(false) })
+          api("/api/v1/reports/qc-summary", { headers: headers(false) }),
+          api("/api/v1/stats/summary?days=30", { headers: headers(false) }).catch(() => null),
         ]);
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
@@ -2128,6 +2197,16 @@
           else if (r.current_stock <= r.alert_threshold)              tr.classList.add('row-warning');
           return tr;
         }));
+        // Maintenance due metric
+        if (perf && $('mMnt')) {
+          const mntCount = perf.maintenance_due_count || 0;
+          $('mMnt').textContent = mntCount;
+          const mMntP = $('mMntPanel');
+          if (mMntP) {
+            mMntP.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+            mMntP.classList.add(mntCount > 0 ? 'metric-amber' : 'metric-teal');
+          }
+        }
         showToast("Tableau de bord actualisé", "success");
       } catch (e) {
         showToast("Erreur lors du chargement du dashboard", "error");
@@ -4998,6 +5077,211 @@ window.onload=renderLabels;
      *  labelData est déjà enrichi (patient, ipp, sex, dob) depuis loadSamples() ou scanBarcode(). */
     function printSampleLabel(labelData) {
       printTubeLabels([labelData]);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Maintenance équipements
+    // ══════════════════════════════════════════════════════════════
+    async function loadMaintenances() {
+      const tbody = $('maintenanceTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 4);
+      try {
+        const data = await api('/api/v1/equipment-maintenance?limit=50', { headers: headers(false) });
+        const fmt = d => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+        const typeLabel = { preventive: '🔧 Préventive', corrective: '🚨 Corrective', calibration: '📐 Étalonnage' };
+        const now = Date.now();
+        const sevenDays = 7 * 86400 * 1000;
+        setRows('maintenanceTable', data.map(m => {
+          const isDue = m.next_due_at && !m.is_completed && (new Date(m.next_due_at).getTime() - now) <= sevenDays;
+          const isOverdue = m.next_due_at && !m.is_completed && new Date(m.next_due_at) < new Date();
+          const dueCell = m.next_due_at
+            ? (isOverdue ? `<span class="pill bad">${fmt(m.next_due_at)} ⚠</span>`
+               : isDue ? `<span class="pill warn">${fmt(m.next_due_at)}</span>`
+               : fmt(m.next_due_at))
+            : '—';
+          const tr = row(
+            `<td><strong>${m.equipment_id}</strong></td>` +
+            `<td>${typeLabel[m.maintenance_type] || security.escapeHtml(m.maintenance_type)}</td>` +
+            `<td>${fmt(m.scheduled_at)}</td>` +
+            `<td>${dueCell}</td>` +
+            `<td>${m.is_completed ? '<span class="pill ok">✓ Terminée</span>' : '<span class="pill">En attente</span>'}</td>` +
+            `<td class="actions" style="white-space:nowrap;">` +
+              (!m.is_completed ? `<button class="success" style="font-size:11px;padding:3px 8px;" onclick="completeMaintenance(${m.id},this)" title="Marquer terminée">✓</button> ` : '') +
+              `<button class="danger" style="font-size:11px;padding:3px 8px;" onclick="deleteMaintenance(${m.id},this)" title="Supprimer">✕</button>` +
+            `</td>`
+          );
+          if (isOverdue) tr.classList.add('row-critical');
+          else if (isDue) tr.classList.add('row-warning');
+          if (m.is_completed) tr.style.opacity = '0.55';
+          return tr;
+        }));
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur chargement maintenance</td></tr>';
+      }
+    }
+
+    async function createMaintenance(btn) {
+      setLoading(btn, true);
+      try {
+        const eqId = parseInt($('mntEqId')?.value || '0');
+        if (!eqId) throw new Error("L'identifiant équipement est requis");
+        const payload = {
+          equipment_id: eqId,
+          maintenance_type: $('mntType')?.value || 'preventive',
+          scheduled_at: $('mntScheduled')?.value ? new Date($('mntScheduled').value).toISOString() : null,
+          next_due_at: $('mntNextDue')?.value ? new Date($('mntNextDue').value).toISOString() : null,
+          notes: $('mntNotes')?.value?.trim() || null,
+        };
+        await api('/api/v1/equipment-maintenance', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+        showToast('Maintenance planifiée avec succès', 'success');
+        ['mntEqId', 'mntScheduled', 'mntNextDue', 'mntNotes'].forEach(id => { if ($(id)) $(id).value = ''; });
+        await loadMaintenances();
+      } catch (e) {
+        showToast(e.message || 'Erreur création maintenance', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function completeMaintenance(id, btn) {
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/equipment-maintenance/${id}/complete`, { method: 'PATCH', headers: headers() });
+        showToast('Maintenance marquée comme terminée', 'success');
+        await loadMaintenances();
+      } catch (e) {
+        showToast(e.message || 'Erreur', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function deleteMaintenance(id, btn) {
+      if (!confirm('Supprimer cette entrée de maintenance ?')) return;
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/equipment-maintenance/${id}`, { method: 'DELETE', headers: headers() });
+        showToast('Maintenance supprimée', 'success');
+        await loadMaintenances();
+      } catch (e) {
+        showToast(e.message || 'Erreur', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Statistiques de performance laboratoire
+    // ══════════════════════════════════════════════════════════════
+    async function loadStats() {
+      const days = $('statsDays')?.value || 30;
+      try {
+        const data = await api(`/api/v1/stats/summary?days=${days}`, { headers: headers(false) });
+
+        $('statTotal').textContent = data.total_results ?? '—';
+
+        // Taux critique
+        const critPct = data.critical_rate_pct ?? 0;
+        if ($('statCrit')) $('statCrit').textContent = critPct + ' %';
+        const cp = $('statCritPanel');
+        if (cp) {
+          cp.classList.remove('metric-rose', 'metric-amber', 'metric-teal');
+          cp.classList.add(critPct > 10 ? 'metric-rose' : critPct > 3 ? 'metric-amber' : 'metric-teal');
+        }
+
+        // Violations QC
+        const qcPct = data.qc_violation_rate_pct ?? 0;
+        if ($('statQc')) $('statQc').textContent = qcPct + ' %';
+        const qp = $('statQcPanel');
+        if (qp) {
+          qp.classList.remove('metric-rose', 'metric-amber', 'metric-teal');
+          qp.classList.add(qcPct > 10 ? 'metric-rose' : qcPct > 0 ? 'metric-amber' : 'metric-teal');
+        }
+
+        // Maintenance due
+        const mnt = data.maintenance_due_count ?? 0;
+        if ($('statMnt')) $('statMnt').textContent = mnt;
+        const mp = $('statMntPanel');
+        if (mp) {
+          mp.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+          mp.classList.add(mnt > 0 ? 'metric-amber' : 'metric-teal');
+        }
+
+        // Graphes
+        _renderTatChart(data.tat_by_equipment || []);
+        _renderWeeklyChart(data.weekly_volumes || []);
+
+        // Tableau détail TAT
+        setRows('tatDetailTable', (data.tat_by_equipment || []).map(d => row(
+          `<td><strong>${security.escapeHtml(d.equipment)}</strong></td>` +
+          `<td>${d.count}</td>` +
+          `<td style="font-variant-numeric:tabular-nums;">${d.mean_h}</td>` +
+          `<td>${d.min_h}</td>` +
+          `<td>${d.max_h}</td>` +
+          `<td>${d.p95_h}</td>`
+        )));
+      } catch (e) {
+        showToast('Erreur chargement statistiques', 'error');
+        log('loadStats: ' + (e.message || e));
+      }
+    }
+
+    function _renderTatChart(tatData) {
+      const div = $('tatChartDiv');
+      if (!div) return;
+      if (!tatData.length) {
+        div.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0;">Aucune donnée TAT sur la période</p>';
+        return;
+      }
+      const maxTat = Math.max(...tatData.map(d => d.mean_h), 1);
+      const barH = 26;
+      const gap = 7;
+      const labelW = 130;
+      const totalW = 480;
+      const barAreaW = totalW - labelW - 40;
+      const svgH = tatData.length * (barH + gap) + 16;
+      let bars = '';
+      tatData.forEach((d, i) => {
+        const y = i * (barH + gap) + 8;
+        const bw = Math.max(2, Math.round((d.mean_h / maxTat) * barAreaW));
+        const color = d.mean_h > 48 ? '#be123c' : d.mean_h > 24 ? '#b45309' : '#0f766e';
+        bars +=
+          `<text x="${labelW - 8}" y="${y + barH / 2 + 4}" text-anchor="end" font-size="11" fill="currentColor"` +
+          ` style="font-family:var(--font);">${security.escapeHtml(d.equipment)}</text>` +
+          `<rect x="${labelW}" y="${y}" width="${bw}" height="${barH}" rx="4" fill="${color}" opacity="0.82"/>` +
+          `<text x="${labelW + bw + 6}" y="${y + barH / 2 + 4}" font-size="11" fill="currentColor"` +
+          ` style="font-family:var(--font);">${d.mean_h}h <tspan fill="var(--muted)" font-size="10">(n=${d.count})</tspan></text>`;
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${totalW} ${svgH}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
+    }
+
+    function _renderWeeklyChart(weeks) {
+      const div = $('weeklyChartDiv');
+      if (!div) return;
+      if (!weeks.length) {
+        div.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0;">Aucune donnée hebdomadaire</p>';
+        return;
+      }
+      const maxV = Math.max(...weeks.map(w => w.count), 1);
+      const W = 460; const H = 150;
+      const padL = 4; const padR = 4; const padTop = 16; const padBot = 24;
+      const chartW = W - padL - padR;
+      const chartH = H - padTop - padBot;
+      const bw = Math.floor(chartW / weeks.length) - 4;
+      let bars = '';
+      weeks.forEach((w, i) => {
+        const x = padL + i * (chartW / weeks.length) + 2;
+        const bh = Math.max(2, Math.round((w.count / maxV) * chartH));
+        const y = padTop + chartH - bh;
+        const color = '#2563eb';
+        bars +=
+          `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="${color}" opacity="0.76"/>` +
+          `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--muted)"` +
+          ` style="font-family:var(--font);">${security.escapeHtml(w.label)}</text>` +
+          (w.count > 0 ? `<text x="${x + bw / 2}" y="${y - 3}" text-anchor="middle" font-size="9" fill="currentColor">${w.count}</text>` : '');
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
     }
 
     // ── Password toggle ────────────────────────────────────────────────────────

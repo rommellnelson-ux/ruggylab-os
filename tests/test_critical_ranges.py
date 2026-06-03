@@ -1,8 +1,6 @@
 """Tests for critical ranges — unit tests for the checker service and API integration."""
-import pytest
 
-from app.services.critical_checker import _extract_numeric, check_critical
-
+from app.services.critical_checker import _extract_numeric
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Unit tests — _extract_numeric helper
