@@ -123,7 +123,7 @@
       font-size: 12px;
       margin-bottom: 5px;
     }
-    table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; min-width: min(520px, 100%); border-collapse: collapse; font-size: 13px; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px 7px; text-align: left; vertical-align: top; }
     th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
     .shell { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr); }
@@ -288,7 +288,16 @@
         min-height: 36px;
       }
       .toast {
-        min-width: 240px;
+        min-width: 0;
+      }
+      .toast-container {
+        top: auto;
+        right: 12px;
+        bottom: 86px;
+        left: 12px;
+      }
+      .toast {
+        min-width: 0;
         padding: 10px 12px;
       }
     }
@@ -301,7 +310,8 @@
       .metric .value { font-size: 20px; }
       .metric .label { font-size: 11px; }
       .metric { min-height: 70px; }
-      table { min-width: 420px; }
+      table { min-width: 100%; font-size: 11px; }
+      th, td { padding: 8px 5px; }
       h2 { font-size: 18px; }
       h3 { font-size: 15px; }
       button { 
@@ -312,7 +322,7 @@
       .actions { gap: 6px; }
       .form { gap: 8px; }
       .toast {
-        min-width: 200px;
+        min-width: 0;
         padding: 8px 10px;
         font-size: 13px;
       }
@@ -1542,6 +1552,8 @@
       view.classList.remove("hidden");
       document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
       $("viewTitle").textContent = navButton.textContent;
+      document.querySelector(".side.open")?.classList.remove("open");
+      document.querySelector(".sidebar-overlay.show")?.classList.remove("show");
       refreshCurrent();
     }
     async function refreshCurrent() {
@@ -1968,8 +1980,6 @@
       
       async init() {
         try {
-          loadingStates.showLoadingOverlay('Initialisation IA...');
-          
           // Charger les modèles IA
           await this.loadModels();
           
@@ -1978,10 +1988,8 @@
           
           this.isInitialized = true;
           showToast('Moteur IA initialisé avec succès', 'success');
-          loadingStates.hideLoadingOverlay();
         } catch (error) {
           errorHandler.handle(error, 'AI initialization');
-          loadingStates.hideLoadingOverlay();
         }
       },
       
