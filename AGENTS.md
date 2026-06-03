@@ -34,7 +34,7 @@ python -m pip_audit -r requirements.txt --ignore-vuln PYSEC-2025-183
 python -m pytest --tb=short -q
 ```
 
-La suite complete prend environ 1 a 2 minutes en local et doit finir autour de `354 passed, 4 skipped`.
+La suite complete prend environ 2 a 3 minutes en local et doit finir autour de `478 passed, 4 skipped`.
 
 Pour une passe ciblee apres changement auth/API:
 

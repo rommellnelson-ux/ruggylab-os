@@ -123,10 +123,10 @@
       font-size: 12px;
       margin-bottom: 5px;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px 7px; text-align: left; vertical-align: top; }
     th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-    .shell { min-height: 100vh; display: grid; grid-template-columns: 246px 1fr; }
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr); }
     .side {
       background: var(--nav);
       color: #e8f0f7;
@@ -134,6 +134,9 @@
       position: sticky;
       top: 0;
       height: 100vh;
+      width: 260px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
     .brand { padding: 6px 8px 18px; border-bottom: 1px solid rgba(255,255,255,0.14); }
     .brand h1 { margin: 0; font-size: 19px; letter-spacing: 0; }
@@ -150,7 +153,7 @@
       background: rgba(255,255,255,0.10);
       border-color: rgba(255,255,255,0.16);
     }
-    .main { min-width: 0; }
+    .main { min-width: 0; overflow: hidden; }
     .topbar {
       display: flex;
       align-items: center;
@@ -176,19 +179,20 @@
       padding: 16px;
     }
     .band h3, .panel h3 { margin: 0 0 10px; font-size: 16px; }
-    .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; }
+    .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 14px;
       min-width: 0;
+      overflow-x: auto;
     }
     .metric { min-height: 92px; display: grid; align-content: center; gap: 6px; }
     .metric .value { font-size: 28px; font-weight: 700; }
-    .metric .label { color: var(--muted); font-size: 12px; }
+    .metric .label { color: var(--muted); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
     .form { display: grid; gap: 11px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -223,6 +227,18 @@
     .tube-card .tube { font-size: 18px; font-weight: 700; }
     .tube-card .order { color: var(--amber); font-weight: 700; margin-top: 4px; }
     .field-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .stack { display: grid; gap: 12px; }
+    .result-box {
+      min-height: 120px;
+      max-height: 360px;
+      overflow: auto;
+      color: #dce8f3;
+      background: #101c2a;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
     .hidden { display: none !important; }
     .login {
       min-height: 100vh;
@@ -236,21 +252,22 @@
       .side { 
         position: fixed; 
         height: 100vh;
-        z-index: 50;
+        width: min(84vw, 320px);
+        z-index: 60;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
       }
       .side.open { transform: translateX(0); }
-      .grid4, .grid3, .grid2 { grid-template-columns: 1fr; }
       .field-list { grid-template-columns: 1fr; }
       .topbar { position: static; align-items: flex-start; flex-direction: column; }
-      .sidebar-toggle { display: block; }
+      .topbar .actions { width: 100%; }
+      .sidebar-toggle { display: block; z-index: 70; }
       .sidebar-overlay {
         display: none;
         position: fixed;
         inset: 0;
         background: rgba(0,0,0,0.5);
-        z-index: 40;
+        z-index: 55;
       }
       .sidebar-overlay.show { display: block; }
     }
@@ -264,6 +281,7 @@
       .metric .value { font-size: 24px; }
       .metric { min-height: 80px; }
       .toolbar { gap: 6px; }
+      table { min-width: 460px; }
       button { 
         padding: 8px 10px;
         font-size: 14px;
@@ -283,6 +301,7 @@
       .metric .value { font-size: 20px; }
       .metric .label { font-size: 11px; }
       .metric { min-height: 70px; }
+      table { min-width: 420px; }
       h2 { font-size: 18px; }
       h3 { font-size: 15px; }
       button { 
@@ -592,6 +611,8 @@
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
         <div class="nav-section">── LOGISTIQUE ──</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
+        <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
+        <button data-view="bnpl" onclick="showView('bnpl')">💳 Paiements BNPL</button>
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
         <div class="nav-section">── SYSTÈME ──</div>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
@@ -721,10 +742,32 @@
               <button onclick="createReagent(this)">Creer reactif</button>
             </div></div>
             <div class="panel"><h3>Reactifs</h3>
-              <div style="margin-bottom: 10px;">
-                <button onclick="predictInventoryNeeds()" class="primary">🤖 Prédictions IA Stocks</button>
-              </div>
               <table id="reagentsTable"><thead><tr><th>ID</th><th>Nom</th><th>Stock</th><th>Seuil</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>Prédiction et notifications CMU</h3>
+            <div class="grid2">
+              <div class="form">
+                <div id="stockDrugLines" class="stack"></div>
+                <button class="ghost" onclick="addStockDrugLine()" style="width:100%;">+ Ajouter médicament</button>
+                <div class="grid3">
+                  <div><label>Horizon</label><select id="stockHorizon"><option value="30">30 jours</option><option value="60">60 jours</option><option selected value="90">90 jours</option><option value="180">6 mois</option></select></div>
+                  <div><label>FHIR</label><select id="stockIncludeFhir"><option value="false">Non</option><option value="true">Oui</option></select></div>
+                  <div><label>Sévérité notification</label><select id="stockSeverity"><option value="RUPTURE_IMMINENTE">Rupture imminente</option><option selected value="ALERTE_ET_PLUS">Alerte et plus</option><option value="TOUTES">Toutes les alertes</option></select></div>
+                </div>
+                <div class="grid3">
+                  <div><label>Canal</label><select id="stockChannel"><option value="WEBHOOK">Webhook</option><option value="EMAIL">Email</option><option value="BOTH">Webhook + Email</option></select></div>
+                  <div><label>Webhook</label><input id="stockWebhook" placeholder="https://..." /></div>
+                  <div><label>Email(s)</label><input id="stockEmails" placeholder="pharma@exemple.ci, chef@exemple.ci" /></div>
+                </div>
+                <div><label>Facility ID</label><input id="stockFacility" placeholder="CSGR-PHARM" /></div>
+                <div class="actions">
+                  <button onclick="predictInventoryNeeds(this)">Prédire les besoins</button>
+                  <button class="warn" onclick="notifyStockAlerts(this)">Notifier alertes</button>
+                </div>
+              </div>
+              <pre id="stockPredictionResult" class="result-box">Aucune prédiction lancée.</pre>
             </div>
           </div>
         </div>
@@ -826,6 +869,59 @@
           </div>
         </div>
 
+        <div id="prescription" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3>Scanner ordonnance CMU / ONMCI</h3>
+              <div class="form">
+                <div class="grid2"><div><label>Patient ID</label><input id="rxPatientId" placeholder="IPP-CI-2026-001234" /></div><div><label>Prescripteur ONMCI</label><input id="rxPrescriber" placeholder="ONMCI-2026-001" /></div></div>
+                <div class="grid2"><div><label>Date ordonnance</label><input id="rxDate" type="date" /></div><div><label>QR token</label><input id="rxQrToken" placeholder="Token QR optionnel" /></div></div>
+                <div><label>Diagnostics CIM-10 (séparés par virgule)</label><input id="rxDiagnoses" value="B54" /></div>
+                <div><label>Médicaments DCI (un par ligne: DCI, dose mg, fréquence/j, durée j)</label><textarea id="rxDrugs">ARTEMETHER-LUMEFANTRINE, 80, 2, 3</textarea></div>
+                <div class="grid3">
+                  <div><label>Age</label><input id="rxAge" type="number" value="30" /></div>
+                  <div><label>Poids kg</label><input id="rxWeight" type="number" value="70" /></div>
+                  <div><label>Sexe</label><select id="rxSex"><option>M</option><option>F</option></select></div>
+                </div>
+                <div class="actions">
+                  <button onclick="scanPrescription(this)">Scanner ordonnance</button>
+                  <button class="success" onclick="openPrescriptionPdf(this)">Rapport PDF</button>
+                </div>
+              </div>
+            </div>
+            <pre id="rxResult" class="result-box">Aucune ordonnance scannée.</pre>
+          </div>
+        </div>
+
+        <div id="bnpl" class="view band hidden">
+          <div class="grid2">
+            <div class="panel">
+              <h3>Plan de paiement BNPL</h3>
+              <div class="form">
+                <div><label>Référence patient</label><input id="bnplPatientRef" placeholder="IPP ou dossier CMU" /></div>
+                <div class="grid2"><div><label>Montant total XOF</label><input id="bnplTotal" type="number" value="30000" /></div><div><label>Mensualités</label><input id="bnplMonths" type="number" min="2" max="24" value="3" /></div></div>
+                <div><label>Prescripteur</label><input id="bnplPrescriber" placeholder="ONMCI-..." /></div>
+                <div class="actions">
+                  <button onclick="createBnplSchedule(this)">Créer plan</button>
+                  <button class="secondary" onclick="loadOverdueBnpl(this)">Retards</button>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Paiement échéance</h3>
+              <div class="form">
+                <div><label>Plan ID</label><input id="bnplScheduleId" type="number" /></div>
+                <div class="grid2"><div><label>Echéance n°</label><input id="bnplInstallment" type="number" value="1" /></div><div><label>Montant XOF</label><input id="bnplAmount" type="number" /></div></div>
+                <div class="actions">
+                  <button class="success" onclick="payBnplInstallment(this)">Enregistrer paiement</button>
+                  <button class="ghost" onclick="loadBnplSummary(this)">Résumé</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <pre id="bnplResult" class="result-box" style="margin-top:12px;">Aucun plan chargé.</pre>
+        </div>
+
         <div id="ai_training" class="view band hidden">
           <div class="grid2">
             <div class="panel"><h3>🤖 Dataset Entraînement IA</h3><div class="form">
@@ -890,10 +986,10 @@
         }
       }
     };
-    storage.removeItem("ruggylab_token");
     let token = "";
     let currentView = "dashboard";
     let lastCreatedPatient = null;
+    const API_PREFIX = "/api/v1";
     
     // Error handling and logging
     const errorHandler = {
@@ -1133,7 +1229,12 @@
       const toast = document.createElement("div");
       toast.className = `toast ${type}`;
       const icon = type === "success" ? "✓" : type === "error" ? "✗" : "⚠";
-      toast.innerHTML = `<span style="font-size:18px">${icon}</span><span>${message}</span>`;
+      const iconEl = document.createElement("span");
+      iconEl.style.fontSize = "18px";
+      iconEl.textContent = icon;
+      const messageEl = document.createElement("span");
+      messageEl.textContent = message;
+      toast.append(iconEl, messageEl);
       container.appendChild(toast);
       setTimeout(() => {
         toast.style.animation = "slideIn 0.3s ease reverse";
@@ -1312,6 +1413,10 @@
       return h;
     }
     function log(value) { $("log").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2); }
+    function normalizeApiPath(path) {
+      if (path.startsWith("http") || path.startsWith(API_PREFIX)) return path;
+      return `${API_PREFIX}${path.startsWith("/") ? path : `/${path}`}`;
+    }
     async function api(path, options = {}) {
       if (!security.validateToken() && !path.includes('/login/access-token')) {
         throw new Error('Session expirée');
@@ -1325,7 +1430,7 @@
         }
       }
       
-      const response = await fetch(path, options);
+      const response = await fetch(normalizeApiPath(path), options);
       const text = await response.text();
       let payload = text;
       try { payload = JSON.parse(text); } catch {}
@@ -1336,7 +1441,13 @@
       return payload;
     }
     function row(html) { const tr = document.createElement("tr"); tr.innerHTML = html; return tr; }
-    function setRows(tableId, rows) { const body = $(tableId).querySelector("tbody"); body.innerHTML = ""; rows.forEach((r) => body.appendChild(r)); }
+    function setRows(tableId, rows) {
+      const table = $(tableId);
+      const body = table?.querySelector("tbody");
+      if (!body) return;
+      body.innerHTML = "";
+      rows.forEach((r) => body.appendChild(r));
+    }
     function stamp() {
       const d = new Date();
       return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
@@ -1407,15 +1518,30 @@
         $("appView").classList.remove("hidden");
         updateTubeGuide();
         renderResultTemplate();
+        if ($('stockDrugLines') && $('stockDrugLines').children.length === 0) {
+          addStockDrugLine({
+            dci_code: 'ARTEMETHER-LUMEFANTRINE',
+            current_stock: 80,
+            cmm_units: 120,
+            disease_category: 'ANTIMALARIAL',
+            unit_cost_xof: 250
+          });
+        }
         await loadDashboard();
       } catch { logout(); }
     }
     function showView(name) {
+      const view = $(name);
+      const navButton = document.querySelector(`.nav button[data-view="${name}"]`);
+      if (!view || !navButton) {
+        showToast(`Vue indisponible: ${name}`, "error");
+        return;
+      }
       currentView = name;
       document.querySelectorAll(".view").forEach((el) => el.classList.add("hidden"));
-      $(name).classList.remove("hidden");
+      view.classList.remove("hidden");
       document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
-      $("viewTitle").textContent = document.querySelector(`.nav button[data-view="${name}"]`).textContent;
+      $("viewTitle").textContent = navButton.textContent;
       refreshCurrent();
     }
     async function refreshCurrent() {
@@ -1609,7 +1735,7 @@
         }
         
         // Validate result fields
-        const resultFields = document.querySelectorAll("#resultFields input[data-result-key]");
+        const resultFields = document.querySelectorAll("#dataPoints input[data-result-key]");
         let hasResultErrors = false;
         
         resultFields.forEach(input => {
@@ -1777,7 +1903,12 @@
       }
     }
     function downloadEpiCsv() { window.open("/api/v1/reports/epidemiology-export.csv?days=30", "_blank"); }
-    logout();
+    token = storage.getItem("ruggylab_token") || "";
+    if (token) {
+      boot();
+    } else {
+      logout();
+    }
     
     // Initialize keyboard shortcuts
     keyboard.init();
@@ -2716,19 +2847,251 @@
       log('Analyse IA dédiée : vue Imagerie IA → Analyser IA avec un Result ID.\nPour l\'analyse NFS, les statuts critiques sont calculés automatiquement à la saisie du résultat.');
     }
 
-    // ── predictInventoryNeeds (appel stock predictor) ───────────────────────────
-    async function predictInventoryNeeds() {
+    // ── Stock predictor / notifications CMU ────────────────────────────────────
+    function addStockDrugLine(defaults = {}) {
+      const div = document.createElement('div');
+      div.className = 'panel';
+      div.style.cssText = 'padding:10px;';
+      div.innerHTML = `
+        <div class="grid3" style="gap:6px;align-items:end;">
+          <div><label>DCI</label><input data-stock-dci value="${defaults.dci_code || ''}" placeholder="ARTEMETHER-LUMEFANTRINE" /></div>
+          <div><label>Stock actuel</label><input data-stock-current type="number" min="0" value="${defaults.current_stock ?? 80}" /></div>
+          <div><label>CMM</label><input data-stock-cmm type="number" min="1" value="${defaults.cmm_units ?? 120}" /></div>
+        </div>
+        <div class="grid3" style="gap:6px;margin-top:6px;align-items:end;">
+          <div><label>Catégorie</label><select data-stock-category>
+            ${['ANTIMALARIAL','ANTIBIOTIC','ANALGESIC','ANTIDIABETIC','ANTIHYPERTENSIVE','RESPIRATORY','GENERAL'].map(c => `<option ${c === (defaults.disease_category || 'GENERAL') ? 'selected' : ''}>${c}</option>`).join('')}
+          </select></div>
+          <div><label>Coût unit. XOF</label><input data-stock-cost type="number" min="1" value="${defaults.unit_cost_xof || ''}" placeholder="opt." /></div>
+          <div><button class="danger" style="width:100%;" onclick="this.closest('.panel').remove()">Supprimer</button></div>
+        </div>
+      `;
+      $('stockDrugLines').appendChild(div);
+    }
+
+    function collectStockDrugLines() {
+      const drugs = Array.from($('stockDrugLines').children).map(panel => {
+        const dci = panel.querySelector('[data-stock-dci]')?.value?.trim();
+        const current = panel.querySelector('[data-stock-current]')?.value;
+        const cmm = panel.querySelector('[data-stock-cmm]')?.value;
+        if (!dci || current === '' || cmm === '') return null;
+        const line = {
+          dci_code: dci,
+          current_stock: Number(current),
+          cmm_units: Number(cmm),
+          disease_category: panel.querySelector('[data-stock-category]')?.value || 'GENERAL'
+        };
+        const cost = panel.querySelector('[data-stock-cost]')?.value;
+        if (cost) line.unit_cost_xof = Number(cost);
+        return line;
+      }).filter(Boolean);
+      if (!drugs.length) throw new Error('Ajoutez au moins un médicament à prédire.');
+      return drugs;
+    }
+
+    function stockBasePayload() {
+      return {
+        drugs: collectStockDrugLines(),
+        horizon_days: Number($('stockHorizon').value)
+      };
+    }
+
+    async function predictInventoryNeeds(btn) {
+      if (btn) setLoading(btn, true);
       try {
-        const data = await api('/api/v1/stock/predict', {
+        const payload = {
+          ...stockBasePayload(),
+          include_fhir: $('stockIncludeFhir').value === 'true'
+        };
+        const data = await api('/stock/predict', {
           method: 'POST',
           headers: headers(),
-          body: JSON.stringify({ include_fhir: false })
+          body: JSON.stringify(payload)
         });
+        $('stockPredictionResult').textContent = JSON.stringify(data, null, 2);
         log(data);
         const n = data.drug_predictions?.length ?? 0;
-        showToast(`Prédictions IA stocks : ${n} médicament(s) analysé(s)`, 'success');
+        showToast(`Prédictions stocks : ${n} médicament(s) analysé(s)`, 'success');
       } catch (e) {
+        $('stockPredictionResult').textContent = e.message || String(e);
         showToast('Erreur prédiction stock', 'error');
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
+    }
+
+    async function notifyStockAlerts(btn) {
+      if (btn) setLoading(btn, true);
+      try {
+        const channel = $('stockChannel').value;
+        const payload = {
+          ...stockBasePayload(),
+          channel,
+          severity_filter: $('stockSeverity').value,
+          facility_id: $('stockFacility').value || null,
+          webhook_url: $('stockWebhook').value || null,
+          email_to: $('stockEmails').value ? $('stockEmails').value.split(',').map(v => v.trim()).filter(Boolean) : null
+        };
+        const data = await api('/stock/notify', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload)
+        });
+        $('stockPredictionResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`${data.notifications_sent ?? 0} notification(s) envoyée(s)`, 'success');
+      } catch (e) {
+        $('stockPredictionResult').textContent = e.message || String(e);
+        showToast('Erreur notification stock', 'error');
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
+    }
+
+    function buildPrescriptionPayload() {
+      const diagnoses = ($('rxDiagnoses').value || '')
+        .split(',')
+        .map(code => code.trim())
+        .filter(Boolean)
+        .map(code => ({ code }));
+      const drugs = ($('rxDrugs').value || '')
+        .split('\n')
+        .map(line => line.split(',').map(part => part.trim()))
+        .filter(parts => parts[0])
+        .map(([dci, dose, freq, duration]) => ({
+          dci: { code: dci },
+          dose_mg: dose ? Number(dose) : null,
+          frequency_per_day: freq ? Number(freq) : null,
+          duration_days: duration ? Number(duration) : null,
+          route: 'oral'
+        }));
+      if (!diagnoses.length) throw new Error('Ajoutez au moins un diagnostic CIM-10.');
+      if (!drugs.length) throw new Error('Ajoutez au moins un médicament DCI.');
+      return {
+        diagnoses,
+        drugs,
+        patient: {
+          age_years: Number($('rxAge').value || 0),
+          sex: $('rxSex').value,
+          weight_kg: $('rxWeight').value ? Number($('rxWeight').value) : null
+        },
+        prescriber_id: $('rxPrescriber').value || null,
+        prescription_date: $('rxDate').value || null,
+        qr_code_token: $('rxQrToken').value || null
+      };
+    }
+
+    async function scanPrescription(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api('/prescription/scan', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(buildPrescriptionPayload())
+        });
+        $('rxResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`Ordonnance: ${data.status} (${Math.round((data.confidence_score || 0) * 100)}%)`, data.status === 'BLOCKED' ? 'warning' : 'success');
+      } catch (e) {
+        $('rxResult').textContent = e.message || String(e);
+        showToast('Erreur scan ordonnance', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function openPrescriptionPdf(btn) {
+      setLoading(btn, true);
+      try {
+        const response = await fetch('/api/v1/prescription/report', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(buildPrescriptionPayload())
+        });
+        if (!response.ok) throw new Error('Rapport PDF indisponible');
+        const blob = await response.blob();
+        window.open(URL.createObjectURL(blob), '_blank');
+        showToast('Rapport PDF ordonnance ouvert', 'success');
+      } catch (e) {
+        $('rxResult').textContent = e.message || String(e);
+        showToast('Erreur rapport PDF ordonnance', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function createBnplSchedule(btn) {
+      setLoading(btn, true);
+      try {
+        const payload = {
+          patient_ref: $('bnplPatientRef').value,
+          total_amount_xof: Number($('bnplTotal').value),
+          installment_months: Number($('bnplMonths').value),
+          prescriber_id: $('bnplPrescriber').value || null
+        };
+        const data = await api('/billing/bnpl/schedule', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload)
+        });
+        $('bnplScheduleId').value = data.id;
+        $('bnplAmount').value = data.monthly_amount_xof;
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`Plan BNPL #${data.id} créé`, 'success');
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur création BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function payBnplInstallment(btn) {
+      setLoading(btn, true);
+      try {
+        const scheduleId = $('bnplScheduleId').value;
+        const payload = {
+          schedule_id: Number(scheduleId),
+          installment_number: Number($('bnplInstallment').value),
+          amount_xof: Number($('bnplAmount').value)
+        };
+        const data = await api(`/billing/bnpl/schedule/${scheduleId}/pay`, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(payload)
+        });
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+        showToast('Paiement BNPL enregistré', 'success');
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur paiement BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function loadBnplSummary(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api(`/billing/bnpl/summary/${$('bnplScheduleId').value}`, { headers: headers(false) });
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur résumé BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function loadOverdueBnpl(btn) {
+      setLoading(btn, true);
+      try {
+        const data = await api('/billing/bnpl/overdue', { headers: headers(false) });
+        $('bnplResult').textContent = JSON.stringify(data, null, 2);
+        showToast(`${data.length ?? 0} plan(s) en retard`, 'success');
+      } catch (e) {
+        $('bnplResult').textContent = e.message || String(e);
+        showToast('Erreur retards BNPL', 'error');
+      } finally {
+        setLoading(btn, false);
       }
     }
 
