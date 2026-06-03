@@ -7,6 +7,8 @@ from app.models.ruggylab_os import (
     MalariaAnalysisJob,
     MilitaryFacility,
     Patient,
+    QcControl,
+    QcResult,
     RatioPreset,
     RatioPresetItem,
     Reagent,
@@ -22,6 +24,8 @@ from app.models.ruggylab_os import (
 __all__ = [
     "Equipment",
     "Patient",
+    "QcControl",
+    "QcResult",
     "Sample",
     "Result",
     "User",

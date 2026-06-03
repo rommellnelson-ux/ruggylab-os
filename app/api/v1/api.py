@@ -18,6 +18,7 @@ from app.api.v1.endpoints.maintenance import router as maintenance_router
 from app.api.v1.endpoints.military_facilities import router as military_facilities_router
 from app.api.v1.endpoints.operations import router as operations_router
 from app.api.v1.endpoints.patients import router as patients_router
+from app.api.v1.endpoints.qc import router as qc_router
 from app.api.v1.endpoints.pdf_prescription import router as pdf_prescription_router
 from app.api.v1.endpoints.prescription_scanner import router as prescription_scanner_router
 from app.api.v1.endpoints.ratio_presets import router as ratio_presets_router
@@ -40,6 +41,7 @@ api_router.include_router(equipment_reagent_ratios_router, tags=["equipment-reag
 api_router.include_router(ratio_presets_router, tags=["ratio-presets"])
 api_router.include_router(audit_events_router, tags=["audit-events"])
 api_router.include_router(patients_router, tags=["patients"])
+api_router.include_router(qc_router, tags=["QC Analytique"])
 api_router.include_router(equipments_router, tags=["equipments"])
 api_router.include_router(samples_router, tags=["samples"])
 api_router.include_router(results_router, tags=["results"])

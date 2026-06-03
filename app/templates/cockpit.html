@@ -745,6 +745,7 @@
         <button data-view="machines" onclick="showView('machines')">🔬 DH36 &amp; POCT</button>
         <button data-view="imaging" onclick="showView('imaging')">👁 Imagerie IA</button>
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
+        <button data-view="qc" onclick="showView('qc')">📈 QC Analytique</button>
         <div class="nav-section">Logistique</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
         <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
@@ -973,6 +974,65 @@
                 </div>
               </div>
               <pre id="stockPredictionResult" class="result-box">Aucune prédiction lancée.</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════════ QC Analytique (Westgard / Levey-Jennings) ══════════════════ -->
+        <div id="qc" class="view band hidden">
+          <div class="grid2">
+            <!-- Colonne gauche : création + liste des contrôles -->
+            <div>
+              <div class="panel">
+                <h3>Nouveau contrôle QC</h3>
+                <div class="form">
+                  <div class="grid2">
+                    <div><label>Analyte</label><input id="qcAnalyte" placeholder="ex. Glucose" /></div>
+                    <div><label>Niveau</label><input id="qcLevel" value="Niveau 1" /></div>
+                  </div>
+                  <div class="grid3">
+                    <div><label>Moyenne cible</label><input id="qcMean" type="number" step="any" /></div>
+                    <div><label>Écart-type (SD)</label><input id="qcSd" type="number" step="any" min="0.000001" /></div>
+                    <div><label>Unité</label><input id="qcUnit" placeholder="mmol/L" /></div>
+                  </div>
+                  <button onclick="createQcControl(this)">Créer contrôle</button>
+                </div>
+              </div>
+              <div class="panel" style="margin-top:12px;">
+                <h3>Contrôles actifs</h3>
+                <div class="toolbar"><button class="ghost" onclick="loadQc()">↻ Actualiser</button></div>
+                <table id="qcControlsTable">
+                  <thead><tr><th>Analyte</th><th>Niveau</th><th>Moyenne</th><th>SD</th><th>Unité</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Colonne droite : graphe + saisie -->
+            <div>
+              <div class="panel" id="qcChartPanel" style="display:none;">
+                <h3>📈 Levey-Jennings — <span id="qcChartTitle"></span></h3>
+                <div id="qcChartContainer" style="margin:10px 0 4px;overflow-x:auto;"></div>
+                <div id="qcResultsAlert" style="margin-top:8px;"></div>
+                <div class="form" style="margin-top:12px;">
+                  <h4 style="margin:0 0 8px;font-size:13px;">Saisir une mesure</h4>
+                  <input type="hidden" id="qcSelectedControlId" />
+                  <div class="grid3">
+                    <div><label>Valeur</label><input id="qcValue" type="number" step="any" /></div>
+                    <div><label>Date mesure</label><input id="qcDate" type="date" /></div>
+                    <div><label>Opérateur</label><input id="qcOperator" placeholder="Technicien" /></div>
+                  </div>
+                  <button onclick="addQcResult(this)">Enregistrer mesure</button>
+                </div>
+                <div style="margin-top:16px;">
+                  <table id="qcResultsTable" style="font-size:12px;">
+                    <thead><tr><th>Date</th><th>Valeur</th><th>z-score</th><th>Statut Westgard</th><th>Opérateur</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="panel" id="qcEmptyPanel">
+                <p style="color:var(--muted);text-align:center;padding:30px 20px;">← Sélectionnez un contrôle pour afficher le graphe Levey-Jennings</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1874,6 +1934,7 @@
       if (currentView === "samples") { await loadSamples(); setTimeout(() => $('barcodeScanner')?.focus(), 150); }
       if (currentView === "equipments") await loadEquipments();
       if (currentView === "audit") await loadAudit();
+      if (currentView === "qc") await loadQc();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -2220,6 +2281,224 @@
         setLoading(btn, false);
       }
     }
+    // ══════════════════════════════════════════════════════════════
+    //  QC Analytique — Westgard / Levey-Jennings
+    // ══════════════════════════════════════════════════════════════
+    let _qcSelectedControl = null;
+
+    function _ljSvg(control, results) {
+      const N = results.length;
+      const mean = control.target_mean;
+      const sd   = control.target_sd;
+      const W = 640, H = 220;
+      const P = { top: 14, right: 38, bottom: 38, left: 58 };
+      const w = W - P.left - P.right;
+      const h = H - P.top - P.bottom;
+      const yMin = mean - 3.6 * sd;
+      const yMax = mean + 3.6 * sd;
+      const yPx = v => P.top + h * (1 - (v - yMin) / (yMax - yMin));
+      const xPx = i => N <= 1 ? P.left + w / 2 : P.left + (i / (N - 1)) * w;
+      const REJECT_RULES = ['1-3s','2-2s','R-4s','4-1s','10x'];
+
+      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-height:220px;display:block;font-family:Arial,Helvetica,sans-serif;">';
+
+      // background bands
+      svg += '<rect x="' + P.left + '" y="' + yPx(mean+3*sd) + '" width="' + w + '" height="' + (yPx(mean-3*sd)-yPx(mean+3*sd)) + '" fill="#fef2f2"/>';
+      svg += '<rect x="' + P.left + '" y="' + yPx(mean+2*sd) + '" width="' + w + '" height="' + (yPx(mean-2*sd)-yPx(mean+2*sd)) + '" fill="#fffbeb"/>';
+      svg += '<rect x="' + P.left + '" y="' + yPx(mean+sd)   + '" width="' + w + '" height="' + (yPx(mean-sd)  -yPx(mean+sd))   + '" fill="#f0fdf4"/>';
+
+      // horizontal rules
+      [
+        { v: mean+3*sd, c:'#dc2626', d:'5,3', l:'+3s' },
+        { v: mean+2*sd, c:'#f59e0b', d:'4,3', l:'+2s' },
+        { v: mean+sd,   c:'#86efac', d:'2,3', l:'+1s' },
+        { v: mean,      c:'#16a34a', d:'',    l:'x̅'  },
+        { v: mean-sd,   c:'#86efac', d:'2,3', l:'-1s' },
+        { v: mean-2*sd, c:'#f59e0b', d:'4,3', l:'-2s' },
+        { v: mean-3*sd, c:'#dc2626', d:'5,3', l:'-3s' },
+      ].forEach(function(r) {
+        var y = yPx(r.v);
+        var da = r.d ? ' stroke-dasharray="' + r.d + '"' : '';
+        svg += '<line x1="' + P.left + '" y1="' + y + '" x2="' + (P.left+w) + '" y2="' + y + '" stroke="' + r.c + '" stroke-width="1"' + da + '/>';
+        svg += '<text x="' + (P.left-4) + '" y="' + (y+4) + '" text-anchor="end" font-size="9" fill="#6b7280">' + r.v.toFixed(1) + '</text>';
+        svg += '<text x="' + (P.left+w+4) + '" y="' + (y+4) + '" font-size="9" fill="#6b7280">' + r.l + '</text>';
+      });
+
+      // connecting line
+      if (N > 1) {
+        var path = 'M ' + xPx(0) + ' ' + yPx(results[0].value);
+        for (var i = 1; i < N; i++) path += ' L ' + xPx(i) + ' ' + yPx(results[i].value);
+        svg += '<path d="' + path + '" fill="none" stroke="#94a3b8" stroke-width="1.5"/>';
+      }
+
+      // points + x-axis labels
+      var step = N <= 12 ? 1 : Math.ceil(N / 12);
+      results.forEach(function(r, i) {
+        var x = xPx(i), y = yPx(r.value);
+        var v = r.violations || [];
+        var col = v.some(function(x){return REJECT_RULES.includes(x);}) ? '#dc2626'
+                : v.includes('1-2s') ? '#f59e0b' : '#16a34a';
+        svg += '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + col + '" stroke="white" stroke-width="1.5"><title>' + r.measured_at + (v.length ? ' ⚠ ' + v.join(', ') : ' ✓') + '</title></circle>';
+        if (i % step === 0) {
+          var lbl = r.measured_at ? r.measured_at.slice(5) : '';
+          svg += '<text x="' + x + '" y="' + (H-P.bottom+14) + '" text-anchor="middle" font-size="9" fill="#6b7280" transform="rotate(-40,' + x + ',' + (H-P.bottom+14) + ')">' + lbl + '</text>';
+        }
+      });
+
+      svg += '<rect x="' + P.left + '" y="' + P.top + '" width="' + w + '" height="' + h + '" fill="none" stroke="#e2e8f0" stroke-width="1"/>';
+      svg += '</svg>';
+      return svg;
+    }
+
+    async function loadQc() {
+      const controls = await api('/api/v1/qc/controls', { headers: headers(false) });
+      setRows('qcControlsTable', controls.map(function(c) {
+        var active = _qcSelectedControl && _qcSelectedControl.id === c.id;
+        var tr = row(
+          '<td><strong>' + security.escapeHtml(c.analyte) + '</strong></td>' +
+          '<td>' + security.escapeHtml(c.level) + '</td>' +
+          '<td>' + c.target_mean + '</td>' +
+          '<td>' + c.target_sd + '</td>' +
+          '<td style="color:var(--muted);">' + security.escapeHtml(c.unit || '—') + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            '<button class="ghost" onclick=\'selectQcControl(' + JSON.stringify(c) + ')\'>📈 Graphe</button> ' +
+            '<button class="ghost" style="color:#be123c;font-size:11px;" onclick="deleteQcControl(' + c.id + ')">✕</button>' +
+          '</td>'
+        );
+        if (active) tr.style.background = 'var(--teal-50, #f0fdfa)';
+        return tr;
+      }));
+    }
+
+    async function selectQcControl(control, scroll) {
+      _qcSelectedControl = control;
+      $('qcSelectedControlId').value = control.id;
+      $('qcChartTitle').textContent = control.analyte + ' — ' + control.level + ' (' + (control.unit || '') + ')';
+      $('qcDate').value = new Date().toISOString().slice(0, 10);
+      $('qcChartPanel').style.display = '';
+      $('qcEmptyPanel').style.display = 'none';
+
+      const results = await api('/api/v1/qc/controls/' + control.id + '/results', { headers: headers(false) });
+      $('qcChartContainer').innerHTML = results.length
+        ? _ljSvg(control, results)
+        : '<p style="color:var(--muted);font-size:13px;text-align:center;">Aucune mesure encore enregistrée.</p>';
+
+      // Alert banner for last result
+      const last = results[results.length - 1];
+      const alertDiv = $('qcResultsAlert');
+      const REJECT_RULES = ['1-3s','2-2s','R-4s','4-1s','10x'];
+      if (last && last.violations && last.violations.length > 0) {
+        const v = last.violations;
+        const isReject = v.some(function(x){return REJECT_RULES.includes(x);});
+        alertDiv.innerHTML = isReject
+          ? '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:8px 12px;border-radius:4px;font-size:13px;">⛔ <strong>Rejet Westgard</strong> — règle(s) ' + v.join(', ') + ' violée(s) sur la dernière mesure.</div>'
+          : '<div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:8px 12px;border-radius:4px;font-size:13px;">⚠️ <strong>Avertissement 1-2s</strong> — surveiller la dérive analytique.</div>';
+      } else {
+        alertDiv.innerHTML = '';
+      }
+
+      // Results table (most recent first)
+      setRows('qcResultsTable', [...results].reverse().map(function(r) {
+        const z = ((r.value - control.target_mean) / control.target_sd).toFixed(2);
+        const v = r.violations || [];
+        const isReject = v.some(function(x){return REJECT_RULES.includes(x);});
+        const badge = isReject
+          ? '<span style="color:#be123c;font-weight:600;">⛔ ' + v.join(' ') + '</span>'
+          : v.includes('1-2s')
+            ? '<span style="color:#b45309;">⚠️ 1-2s</span>'
+            : '<span style="color:#16a34a;">✅ OK</span>';
+        return row(
+          '<td>' + r.measured_at + '</td>' +
+          '<td><strong>' + r.value + '</strong></td>' +
+          '<td style="font-family:monospace;color:' + (Math.abs(Number(z)) > 2 ? '#b45309' : 'inherit') + ';">' + z + '</td>' +
+          '<td>' + badge + '</td>' +
+          '<td style="color:var(--muted);">' + security.escapeHtml(r.operator || '—') + '</td>'
+        );
+      }));
+
+      if (scroll !== false) $('qcChartPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      await loadQc();
+    }
+
+    async function createQcControl(btn) {
+      setLoading(btn, true);
+      try {
+        const analyte = $('qcAnalyte').value.trim();
+        const sd = Number($('qcSd').value);
+        if (!analyte) throw new Error('Analyte obligatoire');
+        if (!sd || sd <= 0) throw new Error('SD doit être > 0');
+        await api('/api/v1/qc/controls', {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({
+            analyte: analyte,
+            level:   $('qcLevel').value.trim() || 'Niveau 1',
+            unit:    $('qcUnit').value.trim(),
+            target_mean: Number($('qcMean').value),
+            target_sd:   sd,
+          })
+        });
+        showToast('Contrôle QC créé', 'success');
+        ['qcAnalyte','qcMean','qcSd','qcUnit'].forEach(function(id){ $(id).value = ''; });
+        $('qcLevel').value = 'Niveau 1';
+        await loadQc();
+      } catch(e) {
+        showToast(e.message || 'Erreur création contrôle', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function addQcResult(btn) {
+      setLoading(btn, true);
+      try {
+        const id = Number($('qcSelectedControlId').value);
+        const value = $('qcValue').value;
+        const date  = $('qcDate').value;
+        if (!id)    throw new Error('Aucun contrôle sélectionné');
+        if (value === '') throw new Error('Valeur obligatoire');
+        if (!date)  throw new Error('Date obligatoire');
+        const result = await api('/api/v1/qc/results', {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({
+            control_id: id,
+            value: Number(value),
+            measured_at: date,
+            operator: $('qcOperator').value.trim() || null,
+          })
+        });
+        $('qcValue').value = '';
+        const v = result.violations || [];
+        const REJECT_RULES = ['1-3s','2-2s','R-4s','4-1s','10x'];
+        const isReject = v.some(function(x){return REJECT_RULES.includes(x);});
+        if (isReject)         showToast('⛔ Rejet Westgard : ' + v.join(', '), 'error');
+        else if (v.includes('1-2s')) showToast('⚠️ Avertissement 1-2s — surveiller la dérive', 'warn');
+        else                  showToast('Mesure QC enregistrée ✅', 'success');
+        if (_qcSelectedControl) await selectQcControl(_qcSelectedControl, false);
+      } catch(e) {
+        showToast(e.message || 'Erreur saisie mesure', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function deleteQcControl(id) {
+      if (!confirm('Désactiver ce contrôle QC ? Les mesures existantes sont conservées.')) return;
+      try {
+        await api('/api/v1/qc/controls/' + id, { method: 'DELETE', headers: headers() });
+        if (_qcSelectedControl && _qcSelectedControl.id === id) {
+          _qcSelectedControl = null;
+          $('qcChartPanel').style.display = 'none';
+          $('qcEmptyPanel').style.display = '';
+        }
+        showToast('Contrôle désactivé', 'success');
+        await loadQc();
+      } catch(e) {
+        showToast(e.message || 'Erreur désactivation', 'error');
+      }
+    }
+
+    // ── Fin QC ───────────────────────────────────────────────────────────────
+
     function _expiryDays(dateStr) {
       if (!dateStr) return null;
       const d = new Date(dateStr + 'T00:00:00');

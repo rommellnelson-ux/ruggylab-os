@@ -321,6 +321,45 @@ class RefreshToken(Base):
         return self.revoked_at is None and self.expires_at > utcnow_naive()
 
 
+class QcControl(Base):
+    """Control material definition for Westgard / Levey-Jennings QC."""
+
+    __tablename__ = "qc_controls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(100), nullable=False)
+    level: Mapped[str] = mapped_column(String(50), nullable=False, default="Niveau 1")
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    target_mean: Mapped[float] = mapped_column(Float, nullable=False)
+    target_sd: Mapped[float] = mapped_column(Float, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    results: Mapped[list["QcResult"]] = relationship(
+        back_populates="control",
+        cascade="all, delete-orphan",
+    )
+
+
+class QcResult(Base):
+    """Single daily QC measurement with automatic Westgard rule evaluation."""
+
+    __tablename__ = "qc_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    control_id: Mapped[int] = mapped_column(
+        ForeignKey("qc_controls.id"), nullable=False, index=True
+    )
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    measured_at: Mapped[dt.date] = mapped_column(Date, nullable=False, index=True)
+    operator: Mapped[str | None] = mapped_column(String(100))
+    violations: Mapped[str | None] = mapped_column(Text)  # JSON list of rule codes
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, nullable=False, default=utcnow_naive
+    )
+
+    control: Mapped["QcControl"] = relationship(back_populates="results")
+
+
 class MilitaryFacility(Base):
     __tablename__ = "military_facilities"
 
