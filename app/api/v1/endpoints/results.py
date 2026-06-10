@@ -155,6 +155,14 @@ def create_result(
     try_auto_validate(result, db)
     db.commit()
     db.refresh(result)
+    # Push temps-réel : alerte immédiate si critique ou delta dépassé
+    if result.is_critical or result.delta_exceeded:
+        from app.services.notification_bus import publish_alert_event
+
+        publish_alert_event(
+            "critical" if result.is_critical else "delta",
+            result_id=result.id,
+        )
     return result
 
 

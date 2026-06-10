@@ -639,6 +639,156 @@ def compliance_summary(
     }
 
 
+def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
+    start = datetime(year, month, 1)
+    if month == 12:
+        end = datetime(year + 1, 1, 1)
+    else:
+        end = datetime(year, month + 1, 1)
+    return start, end
+
+
+def _compliance_for_window(db: Session, start: datetime, end: datetime) -> dict:
+    base = db.query(Result).filter(
+        Result.analysis_date >= start, Result.analysis_date < end
+    )
+    total = base.with_entities(func.count(Result.id)).scalar() or 0
+    validated = (
+        base.with_entities(func.count(Result.id)).filter(Result.is_validated.is_(True)).scalar()
+        or 0
+    )
+    auto = (
+        base.with_entities(func.count(Result.id))
+        .filter(Result.is_auto_validated.is_(True))
+        .scalar()
+        or 0
+    )
+    crit_total = (
+        base.with_entities(func.count(Result.id)).filter(Result.is_critical.is_(True)).scalar()
+        or 0
+    )
+    crit_acked = (
+        base.with_entities(func.count(Result.id))
+        .filter(Result.is_critical.is_(True), Result.critical_ack_at.is_not(None))
+        .scalar()
+        or 0
+    )
+
+    def _rate(num: int, denom: int) -> float:
+        return round((num / denom) * 100, 1) if denom else 0.0
+
+    return {
+        "total_results": total,
+        "validated_results": validated,
+        "validation_rate_pct": _rate(validated, total),
+        "auto_validation_rate_pct": _rate(auto, validated),
+        "critical_ack_rate_pct": _rate(crit_acked, crit_total),
+    }
+
+
+@router.get("/compliance-trend")
+def compliance_trend(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    months: int = Query(default=12, ge=1, le=36),
+    drift_threshold_pct: float = Query(default=99.0, ge=0, le=100),
+) -> dict:
+    """Série mensuelle des indicateurs de conformité + détection de dérive.
+
+    Renvoie une entrée par mois (du plus ancien au plus récent) et signale les
+    mois dont le taux de validation passe sous ``drift_threshold_pct``.
+    """
+    del current_user
+    today = datetime.now(UTC).replace(tzinfo=None)
+    year, month = today.year, today.month
+    # Construit la liste des (year, month) sur la fenêtre, du plus ancien au plus récent
+    periods: list[tuple[int, int]] = []
+    y, m = year, month
+    for _ in range(months):
+        periods.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    periods.reverse()
+
+    series: list[dict] = []
+    drift_months: list[str] = []
+    for yy, mm in periods:
+        start, end = _month_bounds(yy, mm)
+        metrics = _compliance_for_window(db, start, end)
+        label = f"{yy:04d}-{mm:02d}"
+        entry = {"month": label, **metrics}
+        # Dérive : uniquement si des résultats existent ce mois-là
+        if metrics["total_results"] > 0 and metrics["validation_rate_pct"] < drift_threshold_pct:
+            entry["drift"] = True
+            drift_months.append(label)
+        else:
+            entry["drift"] = False
+        series.append(entry)
+
+    return {
+        "months": months,
+        "drift_threshold_pct": drift_threshold_pct,
+        "drift_months": drift_months,
+        "has_drift": bool(drift_months),
+        "series": series,
+    }
+
+
+@router.get(
+    "/compliance-report",
+    summary="Rapport de conformité HTML (imprimable / export PDF navigateur)",
+    responses={200: {"content": {"text/html": {}}}},
+)
+def compliance_html_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    days: int = Query(default=30, ge=1, le=366),
+) -> Response:
+    """Document HTML standalone du rapport de conformité (impression / PDF navigateur)."""
+    del current_user
+    summary = compliance_summary(db=db, current_user=None, days=days)  # type: ignore[arg-type]
+    generated = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    status_color = "#0f766e" if summary["status"] == "compliant" else "#b45309"
+    rows = "".join(
+        f"<tr><td>{label}</td><td style='text-align:right'>{value}</td></tr>"
+        for label, value in (
+            ("Résultats (période)", summary["total_results"]),
+            ("Validés", summary["validated_results"]),
+            ("Auto-validés (§5.8)", summary["auto_validated_results"]),
+            ("Taux de validation", f"{summary['validation_rate_pct']} %"),
+            ("Taux d'auto-validation", f"{summary['auto_validation_rate_pct']} %"),
+            ("Valeurs critiques", summary["critical_total"]),
+            ("Critiques acquittées", summary["critical_acked"]),
+            ("Critiques en attente", summary["pending_criticals"]),
+            ("Taux d'acquittement critique", f"{summary['critical_ack_rate_pct']} %"),
+            ("Corrections (amend)", summary["amendments"]),
+            ("Comptes-rendus signés", summary["signed_reports"]),
+        )
+    )
+    html = f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<title>Rapport de conformité ISO 15189</title>
+<style>
+ body{{font-family:system-ui,sans-serif;max-width:720px;margin:32px auto;color:#1f2937;}}
+ h1{{font-size:20px;}} table{{width:100%;border-collapse:collapse;margin-top:16px;}}
+ td{{padding:7px 10px;border-bottom:1px solid #e5e7eb;}}
+ .badge{{display:inline-block;padding:4px 12px;border-radius:14px;color:#fff;font-weight:600;background:{status_color};}}
+ .meta{{color:#6b7280;font-size:13px;}}
+</style></head><body>
+<h1>Rapport de conformité — ISO 15189</h1>
+<p class="meta">Période : {summary['period_start']} → {summary['period_end']} ({days} jours) · Généré le {generated}</p>
+<p>Statut global : <span class="badge">{summary['status'].upper()}</span></p>
+<table><tbody>{rows}</tbody></table>
+<p class="meta" style="margin-top:24px;">Document généré par RuggyLab OS — à viser par le responsable qualité.</p>
+</body></html>"""
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={"Content-Disposition": 'inline; filename="rapport-conformite.html"'},
+    )
+
+
 @router.get(
     "/qc-report",
     summary="Rapport QC mensuel HTML (imprimable / export PDF navigateur)",

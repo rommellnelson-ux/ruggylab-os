@@ -12,6 +12,7 @@ from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models import User
+from app.services.notification_bus import bus
 from app.services.notification_hub import build_alert_snapshot
 from app.services.token_revocation import is_access_token_revoked
 
@@ -110,15 +111,25 @@ async def notifications_ws(
     else:
         await websocket.accept()
     _ws_connections[username] = _ws_connections.get(username, 0) + 1
+    queue = bus.subscribe()
+
+    def _snapshot() -> dict:
+        db = SessionLocal()
+        try:
+            return build_alert_snapshot(db)
+        finally:
+            db.close()
+
     try:
+        # Instantané initial
+        await websocket.send_json(_snapshot())
         while True:
-            db = SessionLocal()
+            # Attend un événement (push immédiat) OU le heartbeat (keepalive)
             try:
-                snapshot = build_alert_snapshot(db)
-            finally:
-                db.close()
-            await websocket.send_json(snapshot)
-            await asyncio.sleep(_WS_PUSH_INTERVAL)
+                await asyncio.wait_for(queue.get(), timeout=_WS_PUSH_INTERVAL)
+            except asyncio.TimeoutError:
+                pass  # tick heartbeat : on republie l'instantané courant
+            await websocket.send_json(_snapshot())
     except WebSocketDisconnect:
         return
     except Exception:  # noqa: BLE001 — toute erreur ferme proprement la connexion
@@ -127,6 +138,7 @@ async def notifications_ws(
         except Exception:  # noqa: BLE001
             pass
     finally:
+        bus.unsubscribe(queue)
         remaining = _ws_connections.get(username, 1) - 1
         if remaining > 0:
             _ws_connections[username] = remaining

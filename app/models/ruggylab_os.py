@@ -39,6 +39,9 @@ class User(Base):
         Enum(UserRole), default=UserRole.TECHNICIAN, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Unité / service de rattachement (cloisonnement RBAC des dossiers patient).
+    # NULL = agent transversal (accès à tous les dossiers).
+    unit: Mapped[str | None] = mapped_column(String(100))
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="user")
     report_signatures: Mapped[list["ReportSignature"]] = relationship(back_populates="signed_by")
@@ -75,6 +78,8 @@ class Patient(Base):
     birth_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     sex: Mapped[str | None] = mapped_column(CHAR(1))
     rank: Mapped[str | None] = mapped_column(String(50))
+    # Unité / service rattaché (cloisonnement RBAC). NULL = pool partagé.
+    unit: Mapped[str | None] = mapped_column(String(100))
 
     samples: Mapped[list["Sample"]] = relationship(back_populates="patient")
 
@@ -463,6 +468,65 @@ class AutoValidationConfig(Base):
     require_not_critical: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+
+class NonConformity(Base):
+    """Non-conformité (NC) — Système de management de la qualité ISO 15189 §4.9.
+
+    Source possible : contrôle qualité, valeur critique, maintenance, ou saisie
+    manuelle. Workflow : open → analysis → action → verification → closed.
+    """
+
+    __tablename__ = "non_conformities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    # source : qc | critical | maintenance | manual | other
+    source: Mapped[str] = mapped_column(String(30), nullable=False, default="manual")
+    # severity : minor | major | critical
+    severity: Mapped[str] = mapped_column(String(20), nullable=False, default="minor")
+    # status : open | analysis | action | verification | closed
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", index=True)
+    # Référence optionnelle à l'entité source (ex. result:42, qc_control:3)
+    linked_entity_type: Mapped[str | None] = mapped_column(String(50))
+    linked_entity_id: Mapped[str | None] = mapped_column(String(50))
+    detected_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    detected_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+    due_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    closed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    root_cause: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    actions: Mapped[list["CorrectiveAction"]] = relationship(
+        back_populates="non_conformity", cascade="all, delete-orphan"
+    )
+
+
+class CorrectiveAction(Base):
+    """Action corrective ou préventive (CAPA) liée à une non-conformité — §4.10."""
+
+    __tablename__ = "corrective_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    non_conformity_id: Mapped[int] = mapped_column(
+        ForeignKey("non_conformities.id"), nullable=False, index=True
+    )
+    # action_type : corrective | preventive
+    action_type: Mapped[str] = mapped_column(String(20), nullable=False, default="corrective")
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    responsible_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    due_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    # status : planned | in_progress | done
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="planned")
+    effectiveness_checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    effectiveness_notes: Mapped[str | None] = mapped_column(Text)
+    completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    non_conformity: Mapped["NonConformity"] = relationship(back_populates="actions")
 
 
 class EquipmentMaintenance(Base):

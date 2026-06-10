@@ -11,6 +11,7 @@ class PatientBase(BaseModel):
     birth_date: dt.date
     sex: str | None = Field(default=None, max_length=1)
     rank: str | None = Field(default=None, max_length=50)
+    unit: str | None = Field(default=None, max_length=100)
 
     @field_validator("sex")
     @classmethod

@@ -755,6 +755,7 @@
         <div class="nav-section">Système</div>
         <button data-view="equipments" onclick="showView('equipments')">🔬 Équipements</button>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
+        <button data-view="quality" onclick="showView('quality')">✅ Qualité (NC/CAPA)</button>
         <button data-view="users" onclick="showView('users')">👥 Utilisateurs</button>
         <button data-view="audit" onclick="showView('audit')">🔍 Audit</button>
       </nav>
@@ -820,7 +821,7 @@
               <div><label>IPP</label><input id="patientIpp" placeholder="IPP-..." /></div>
               <div class="grid2"><div><label>Prenom</label><input id="patientFirst" /></div><div><label>Nom</label><input id="patientLast" /></div></div>
               <div class="grid2"><div><label>Naissance</label><input id="patientBirth" type="date" /></div><div><label>Sexe</label><select id="patientSex"><option>M</option><option>F</option></select></div></div>
-              <div><label>Grade</label><input id="patientRank" /></div>
+              <div class="grid2"><div><label>Grade</label><input id="patientRank" /></div><div><label>Unité / service</label><input id="patientUnit" placeholder="ex. hematologie (vide = partagé)" /></div></div>
               <button onclick="createPatient(this)" aria-label="Créer un nouveau patient">Creer patient</button>
               <div id="patientCreated" class="notice hidden">
                 Patient enregistre
@@ -1517,6 +1518,7 @@
                     <option value="admin">🔴 Administrateur</option>
                   </select>
                 </div>
+                <div><label>Unité / service (vide = accès transversal)</label><input id="userUnit" placeholder="ex. hematologie" /></div>
                 <div class="actions">
                   <button id="userSubmitBtn" onclick="submitUserForm(this)">Créer utilisateur</button>
                   <button class="ghost" id="userCancelBtn" onclick="resetUserForm()" style="display:none;">Annuler</button>
@@ -1628,6 +1630,14 @@
               <tbody></tbody>
             </table>
           </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>📐 Tendance de conformité ISO 15189 <span id="complianceDriftBadge" style="display:none;" class="pill bad">Dérive détectée</span></h3>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <button class="ghost" onclick="loadComplianceTrend()">↻ Actualiser</button>
+              <button class="secondary" onclick="openComplianceReport()">⬇ Rapport conformité (PDF)</button>
+            </div>
+            <div id="complianceTrendChart" style="overflow-x:auto;min-height:100px;"></div>
+          </div>
         </div>
 
         <!-- ── Vue Audit (admin) ────────────────────────────────────────────── -->
@@ -1657,6 +1667,43 @@
             </table>
             <div id="auditPagerInfo" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
           </div>
+        </div>
+
+        <div id="quality" class="view band hidden">
+          <div class="grid4">
+            <div class="panel metric metric-blue"><div id="qmTotal" class="value">—</div><div class="label">NC totales</div></div>
+            <div class="panel metric" id="qmOpenPanel"><div id="qmOpen" class="value">—</div><div class="label">NC ouvertes</div></div>
+            <div class="panel metric" id="qmOverduePanel"><div id="qmOverdue" class="value">—</div><div class="label">En retard</div></div>
+            <div class="panel metric metric-rose"><div id="qmCritical" class="value">—</div><div class="label">Critiques ouvertes</div></div>
+          </div>
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel">
+              <h3>Déclarer une non-conformité</h3>
+              <div class="form">
+                <div><label>Titre</label><input id="ncTitle" placeholder="ex. Dérive QC niveau 2 sur DH36" /></div>
+                <div><label>Description</label><textarea id="ncDesc" rows="3"></textarea></div>
+                <div class="grid3">
+                  <div><label>Source</label><select id="ncSource"><option value="qc">QC</option><option value="critical">Valeur critique</option><option value="maintenance">Maintenance</option><option value="manual" selected>Manuel</option><option value="other">Autre</option></select></div>
+                  <div><label>Sévérité</label><select id="ncSeverity"><option value="minor">Mineure</option><option value="major" selected>Majeure</option><option value="critical">Critique</option></select></div>
+                  <div><label>Échéance</label><input id="ncDue" type="date" /></div>
+                </div>
+                <button onclick="createNonConformity(this)">Déclarer NC</button>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Non-conformités <button class="ghost" style="float:right;font-size:12px;" onclick="loadQuality()">↻</button></h3>
+              <div class="toolbar" style="margin-bottom:8px;">
+                <select id="ncFilterStatus" onchange="loadQuality()">
+                  <option value="">Tous statuts</option>
+                  <option value="open">Ouverte</option><option value="analysis">Analyse</option>
+                  <option value="action">Action</option><option value="verification">Vérification</option>
+                  <option value="closed">Clôturée</option>
+                </select>
+              </div>
+              <table id="ncTable"><thead><tr><th>#</th><th>Titre</th><th>Sév.</th><th>Statut</th><th>Échéance</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+          <div id="ncDetail" class="panel" style="margin-top:12px;display:none;"></div>
         </div>
 
         <div class="band" id="logPanel">
@@ -2304,6 +2351,7 @@
       if (currentView === "audit") await loadAudit();
       if (currentView === "qc") await loadQc();
       if (currentView === "stats") await loadStats();
+      if (currentView === "quality") await loadQuality();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -2472,8 +2520,9 @@
           first_name: $("patientFirst").value, 
           last_name: $("patientLast").value, 
           birth_date: $("patientBirth").value, 
-          sex: $("patientSex").value, 
-          rank: $("patientRank").value || null 
+          sex: $("patientSex").value,
+          rank: $("patientRank").value || null,
+          unit: ($("patientUnit")?.value || "").trim() || null
         };
         
         const created = await perfMonitor.measureAsync('createPatient', () =>
@@ -2487,7 +2536,7 @@
         showToast(`Patient ${created.first_name} ${created.last_name} créé avec succès`, "success");
         
         // Clear form
-        ["patientIpp", "patientFirst", "patientLast", "patientBirth", "patientRank"].forEach(id => {
+        ["patientIpp", "patientFirst", "patientLast", "patientBirth", "patientRank", "patientUnit"].forEach(id => {
           const field = $(id);
           field.value = "";
           field.classList.remove('success-input', 'error-input');
@@ -5031,6 +5080,7 @@
           const payload = {
             full_name: $('userFullName').value.trim() || null,
             role: $('userRole').value,
+            unit: ($('userUnit')?.value || '').trim() || null,
           };
           const pw = $('userPassword').value;
           if (pw) {
@@ -5053,6 +5103,7 @@
             password,
             full_name: $('userFullName').value.trim() || null,
             role: $('userRole').value,
+            unit: ($('userUnit')?.value || '').trim() || null,
           };
           const created = await api('/api/v1/users', {
             method: 'POST', headers: headers(), body: JSON.stringify(payload),
@@ -5472,10 +5523,58 @@ window.onload=renderLabels;
           `<td>${d.max_h}</td>` +
           `<td>${d.p95_h}</td>`
         )));
+
+        await loadComplianceTrend();
       } catch (e) {
         showToast('Erreur chargement statistiques', 'error');
         log('loadStats: ' + (e.message || e));
       }
+    }
+
+    async function loadComplianceTrend() {
+      try {
+        const data = await api('/api/v1/reports/compliance-trend?months=12', { headers: headers(false) });
+        const badge = $('complianceDriftBadge');
+        if (badge) badge.style.display = data.has_drift ? '' : 'none';
+        _renderComplianceTrend(data.series || []);
+      } catch (e) { log('loadComplianceTrend: ' + (e.message || e)); }
+    }
+    function _renderComplianceTrend(series) {
+      const div = $('complianceTrendChart');
+      if (!div) return;
+      if (!series.length) { div.innerHTML = '<p style="color:var(--muted);">Aucune donnée.</p>'; return; }
+      const W = 720, H = 160, padL = 36, padR = 10, padTop = 12, padBot = 28;
+      const chartW = W - padL - padR, chartH = H - padTop - padBot;
+      const step = series.length > 1 ? chartW / (series.length - 1) : 0;
+      const yFor = v => padTop + chartH - (v / 100) * chartH;
+      const pts = series.map((s, i) => `${(padL + i * step).toFixed(1)},${yFor(s.validation_rate_pct).toFixed(1)}`).join(' ');
+      const dots = series.map((s, i) => {
+        const x = padL + i * step, y = yFor(s.validation_rate_pct);
+        const color = s.drift ? '#be123c' : '#0f766e';
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${color}"><title>${s.month}: ${s.validation_rate_pct}%</title></circle>`;
+      }).join('');
+      const labels = series.map((s, i) => {
+        if (series.length > 8 && i % 2 !== 0) return '';
+        const x = padL + i * step;
+        return `<text x="${x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="9" fill="var(--muted)">${s.month.slice(2)}</text>`;
+      }).join('');
+      const grid = [0, 50, 99, 100].map(v =>
+        `<line x1="${padL}" y1="${yFor(v).toFixed(1)}" x2="${W - padR}" y2="${yFor(v).toFixed(1)}" stroke="#e5e7eb" stroke-width="1"/>` +
+        `<text x="2" y="${(yFor(v) + 3).toFixed(1)}" font-size="9" fill="var(--muted)">${v}</text>`
+      ).join('');
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">${grid}` +
+        `<polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="2"/>${dots}${labels}</svg>` +
+        `<p style="font-size:11px;color:var(--muted);margin:4px 0 0;">Taux de validation mensuel (%) · points rouges = sous le seuil de conformité</p>`;
+    }
+    async function openComplianceReport() {
+      try {
+        const resp = await fetch(normalizeApiPath('/api/v1/reports/compliance-report?days=30'), { headers: headers(false) });
+        if (!resp.ok) { showToast('Rapport indisponible', 'error'); return; }
+        const html = await resp.text();
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(html); w.document.close(); }
+        else showToast('Autoriser les pop-ups pour ouvrir le rapport', 'warning');
+      } catch { showToast('Erreur rapport conformité', 'error'); }
     }
 
     // ── Auto-validation ISO 15189 §5.8 ────────────────────────────────────────
@@ -5831,6 +5930,136 @@ window.onload=renderLabels;
         showToast('Erreur import (droits officier requis ?)', 'error');
         log('submitBulkImport: ' + (e.message || e));
       } finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Module qualité — NC / CAPA
+    // ══════════════════════════════════════════════════════════════════════
+    const _ncSeverityBadge = (s) => ({
+      minor: '<span class="pill">Mineure</span>',
+      major: '<span class="pill" style="background:var(--amber);color:#fff;">Majeure</span>',
+      critical: '<span class="pill bad">Critique</span>',
+    }[s] || s);
+    const _ncStatusLabel = { open: 'Ouverte', analysis: 'Analyse', action: 'Action', verification: 'Vérification', closed: 'Clôturée' };
+    const _ncNextStatuses = {
+      open: ['analysis', 'closed'], analysis: ['action', 'open', 'closed'],
+      action: ['verification', 'analysis', 'closed'], verification: ['closed', 'action'], closed: [],
+    };
+
+    async function loadQuality() {
+      try {
+        const [dash, list] = await Promise.all([
+          api('/api/v1/quality/dashboard', { headers: headers(false) }),
+          api(`/api/v1/quality/non-conformities${$('ncFilterStatus')?.value ? '?status=' + $('ncFilterStatus').value : ''}`, { headers: headers(false) }),
+        ]);
+        $('qmTotal').textContent = dash.total;
+        $('qmOpen').textContent = dash.open_count;
+        $('qmOverdue').textContent = dash.overdue_count;
+        $('qmCritical').textContent = dash.by_severity.critical || 0;
+        const op = $('qmOverduePanel');
+        if (op) { op.classList.remove('metric-rose', 'metric-teal'); op.classList.add(dash.overdue_count > 0 ? 'metric-rose' : 'metric-teal'); }
+        setRows('ncTable', list.map(nc => {
+          const due = nc.due_date ? new Date(nc.due_date).toLocaleDateString('fr-FR') : '—';
+          const tr = row(
+            `<td>${nc.id}</td>` +
+            `<td>${security.escapeHtml(nc.title)}</td>` +
+            `<td>${_ncSeverityBadge(nc.severity)}</td>` +
+            `<td><span class="pill">${_ncStatusLabel[nc.status] || nc.status}</span></td>` +
+            `<td>${due}</td>` +
+            `<td><button class="ghost" onclick="openNcDetail(${nc.id})">Ouvrir</button></td>`
+          );
+          if (nc.severity === 'critical' && nc.status !== 'closed') tr.classList.add('row-critical');
+          return tr;
+        }));
+      } catch (e) { showToast('Erreur chargement qualité', 'error'); log('loadQuality: ' + (e.message || e)); }
+    }
+
+    async function createNonConformity(btn) {
+      const title = ($('ncTitle')?.value || '').trim();
+      if (title.length < 3) { showToast('Titre trop court', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const body = {
+          title, description: $('ncDesc').value || null,
+          source: $('ncSource').value, severity: $('ncSeverity').value,
+        };
+        if ($('ncDue').value) body.due_date = $('ncDue').value + 'T00:00:00';
+        await api('/api/v1/quality/non-conformities', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Non-conformité déclarée', 'success');
+        ['ncTitle', 'ncDesc', 'ncDue'].forEach(id => { if ($(id)) $(id).value = ''; });
+        loadQuality();
+      } catch (e) { showToast('Erreur déclaration NC', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function openNcDetail(ncId) {
+      try {
+        const nc = await api(`/api/v1/quality/non-conformities/${ncId}`, { headers: headers(false) });
+        const transitions = (_ncNextStatuses[nc.status] || []).map(s =>
+          `<button class="ghost" style="font-size:12px;" onclick="transitionNc(${nc.id},'${s}')">→ ${_ncStatusLabel[s]}</button>`
+        ).join(' ');
+        const actions = (nc.actions || []).map(a =>
+          `<li>[${a.action_type === 'preventive' ? 'préventive' : 'corrective'}] ${security.escapeHtml(a.description)} — <strong>${a.status}</strong>` +
+          (a.status !== 'done' ? ` <button class="ghost" style="font-size:11px;" onclick="completeAction(${a.id})">✓ Terminer</button>` : ' ✓') + `</li>`
+        ).join('') || '<li style="color:var(--muted);">Aucune action.</li>';
+        $('ncDetail').style.display = '';
+        $('ncDetail').innerHTML =
+          `<div style="display:flex;justify-content:space-between;align-items:center;">` +
+            `<h3 style="margin:0;">NC #${nc.id} — ${security.escapeHtml(nc.title)}</h3>` +
+            `<button class="ghost" onclick="$('ncDetail').style.display='none'">✕</button></div>` +
+          `<p>${_ncSeverityBadge(nc.severity)} · Statut : <strong>${_ncStatusLabel[nc.status]}</strong> · Source : ${nc.source}</p>` +
+          (nc.description ? `<p>${security.escapeHtml(nc.description)}</p>` : '') +
+          (nc.root_cause ? `<p><strong>Cause racine :</strong> ${security.escapeHtml(nc.root_cause)}</p>` : '') +
+          `<div style="margin:8px 0;"><strong>Transitions :</strong> ${transitions || '<em>terminal</em>'}</div>` +
+          `<div style="margin:8px 0;"><strong>Actions correctives/préventives :</strong><ul>${actions}</ul></div>` +
+          `<div class="form" style="max-width:480px;"><div><label>Nouvelle action</label><input id="ncActionDesc" placeholder="Description de l'action" /></div>` +
+          `<div class="grid2"><div><label>Type</label><select id="ncActionType"><option value="corrective">Corrective</option><option value="preventive">Préventive</option></select></div>` +
+          `<div style="display:flex;align-items:flex-end;"><button onclick="addNcAction(${nc.id},this)">Ajouter action</button></div></div></div>`;
+        $('ncDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (e) { showToast('Erreur chargement NC', 'error'); }
+    }
+
+    async function transitionNc(ncId, target) {
+      let root_cause = null;
+      if (target === 'analysis' || target === 'closed') {
+        root_cause = prompt('Cause racine / commentaire (optionnel) :') || null;
+      }
+      try {
+        await api(`/api/v1/quality/non-conformities/${ncId}/transition`, {
+          method: 'POST', headers: headers(), body: JSON.stringify({ status: target, root_cause }),
+        });
+        showToast('Statut mis à jour', 'success');
+        await openNcDetail(ncId); loadQuality();
+      } catch (e) { showToast(e.message || 'Transition refusée', 'error'); }
+    }
+
+    async function addNcAction(ncId, btn) {
+      const desc = ($('ncActionDesc')?.value || '').trim();
+      if (desc.length < 3) { showToast('Description trop courte', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/quality/non-conformities/${ncId}/actions`, {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({ description: desc, action_type: $('ncActionType').value }),
+        });
+        showToast('Action ajoutée', 'success');
+        await openNcDetail(ncId);
+      } catch (e) { showToast('Erreur ajout action', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function completeAction(actionId) {
+      try {
+        await api(`/api/v1/quality/actions/${actionId}`, {
+          method: 'PATCH', headers: headers(),
+          body: JSON.stringify({ status: 'done', effectiveness_checked: true }),
+        });
+        showToast('Action terminée', 'success');
+        loadQuality();
+        const open = $('ncDetail'); if (open && open.style.display !== 'none') {
+          const m = open.innerHTML.match(/NC #(\d+)/); if (m) openNcDetail(Number(m[1]));
+        }
+      } catch (e) { showToast('Erreur', 'error'); }
     }
 
     function _renderTatChart(tatData) {
