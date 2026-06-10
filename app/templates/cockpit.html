@@ -838,6 +838,7 @@
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <h3 style="margin:0;">👤 Dossier — <span id="dossierName"></span></h3>
               <div class="toolbar">
+                <button class="ghost" onclick="editPatientUnit()" title="Modifier l'unité de rattachement">🏷️ Unité</button>
                 <button class="secondary" onclick="exportPatientFhir()">⬇ Export FHIR Bundle</button>
                 <button class="ghost" onclick="closeDossier()">✕ Fermer</button>
               </div>
@@ -5777,6 +5778,21 @@ window.onload=renderLabels;
         `<polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/>` +
         `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="#be123c"/>` +
         `</svg>`;
+    }
+    async function editPatientUnit() {
+      if (!_dossierPatientId) return;
+      const value = prompt("Unité / service de rattachement (laisser vide = pool partagé) :");
+      if (value === null) return;  // annulé
+      const unit = value.trim() || null;
+      try {
+        await api(`/api/v1/patients/${_dossierPatientId}`, {
+          method: "PATCH", headers: headers(), body: JSON.stringify({ unit }),
+        });
+        showToast("Unité du patient mise à jour", "success");
+        loadPatients();
+      } catch (e) {
+        showToast(e.message === "Forbidden" ? "Réservé officier/admin" : "Erreur mise à jour", "error");
+      }
     }
     async function exportPatientFhir() {
       if (!_dossierPatientId) return;

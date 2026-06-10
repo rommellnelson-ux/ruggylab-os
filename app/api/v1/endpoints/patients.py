@@ -3,11 +3,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, require_officer
 from app.db.session import get_db
 from app.models import Patient, User
 from app.schemas.pagination import PaginationMeta, PatientListResponse
-from app.schemas.patient import PatientCreate, PatientRead
+from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.services.audit import log_audit_event
 from app.services.patient_access import apply_patient_scope, can_access_patient
 from app.services.patient_history import build_patient_fhir_bundle, build_patient_history
@@ -145,6 +145,38 @@ def create_patient(
 
     patient = Patient(**payload.model_dump())
     db.add(patient)
+    db.commit()
+    db.refresh(patient)
+    return patient
+
+
+@router.patch("/{patient_id}", response_model=PatientRead)
+def update_patient(
+    patient_id: int,
+    payload: PatientUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+) -> Patient:
+    """Mise à jour partielle d'un patient, dont l'unité (réservé officier/admin).
+
+    Seuls les champs fournis sont modifiés ; ``unit: null`` retire l'affectation.
+    """
+    patient = _get_patient_or_404(db, patient_id)
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Aucun champ à mettre à jour."
+        )
+    for key, value in changes.items():
+        setattr(patient, key, value)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="patient.update",
+        entity_type="patient",
+        entity_id=str(patient_id),
+        payload={"fields": sorted(changes.keys())},
+    )
     db.commit()
     db.refresh(patient)
     return patient

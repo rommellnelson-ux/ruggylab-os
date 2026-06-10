@@ -13,6 +13,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import uuid
+from collections.abc import Callable
+
+# Identifiant unique de ce processus/worker — permet d'ignorer l'écho de ses
+# propres messages quand le fan-out Redis est actif (évite les doublons).
+WORKER_ID = uuid.uuid4().hex
 
 
 class NotificationBus:
@@ -42,14 +48,42 @@ class NotificationBus:
 # Instance partagée par le processus.
 bus = NotificationBus()
 
+# Éditeur Redis optionnel (fan-out multi-worker). None = mono-processus.
+# Une fonction sync qui accepte un dict d'événement et le publie sur Redis.
+_redis_publisher: Callable[[dict], None] | None = None
+
+
+def set_redis_publisher(publisher: Callable[[dict], None] | None) -> None:
+    """Active (ou désactive avec None) le fan-out Redis des événements."""
+    global _redis_publisher
+    _redis_publisher = publisher
+
+
+def inject_remote_event(event: dict) -> None:
+    """Injecte localement un événement reçu d'un autre worker (via Redis).
+
+    Ignore les messages émis par ce worker (écho) pour éviter les doublons.
+    """
+    if event.get("_origin") == WORKER_ID:
+        return
+    local = {k: v for k, v in event.items() if k != "_origin"}
+    bus.publish(local)
+
 
 def publish_alert_event(event_type: str, **fields: object) -> None:
-    """Publie un événement d'alerte sur le bus (best-effort, jamais bloquant).
+    """Publie un événement d'alerte (best-effort, jamais bloquant).
 
-    Sûr à appeler depuis du code synchrone (endpoints) : si une boucle asyncio
-    tourne, ``put_nowait`` fonctionne ; sinon l'appel est simplement ignoré.
+    - Diffusion locale immédiate (abonnés WebSocket de ce worker).
+    - Si le fan-out Redis est actif, diffusion aux autres workers (tagguée
+      avec l'identifiant de ce worker pour ignorer l'écho).
     """
+    event = {"type": event_type, **fields}
     try:
-        bus.publish({"type": event_type, **fields})
+        bus.publish(event)
     except Exception:  # noqa: BLE001 — la notification ne doit jamais casser l'appelant
         pass
+    if _redis_publisher is not None:
+        try:
+            _redis_publisher({**event, "_origin": WORKER_ID})
+        except Exception:  # noqa: BLE001
+            pass
