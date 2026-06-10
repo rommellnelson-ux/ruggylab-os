@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal, get_db
 from app.models import User
 from app.services.notification_hub import build_alert_snapshot
+from app.services.token_revocation import is_access_token_revoked
 
 router = APIRouter(prefix="/notifications")
 
@@ -38,15 +39,32 @@ def notifications_feed(
     return build_alert_snapshot(db, expiry_days=expiry_days)
 
 
-def _authenticate_ws_token(token: str | None) -> str | None:
-    """Valide un JWT passé en query-string. Retourne le username ou None."""
+def _extract_ws_token(websocket: WebSocket, query_token: str | None) -> tuple[str | None, bool]:
+    """Extrait le jeton du sous-protocole WebSocket (préféré) ou du query-string.
+
+    Convention sous-protocole : le client se connecte avec
+    ``["bearer", "<jeton>"]``. L'en-tête reçu est alors ``"bearer, <jeton>"``.
+    Le jeton dans l'en-tête n'apparaît pas dans les logs d'URL.
+
+    Retourne ``(token, via_subprotocol)``.
+    """
+    raw = websocket.headers.get("sec-websocket-protocol")
+    if raw:
+        parts = [p.strip() for p in raw.split(",")]
+        if len(parts) >= 2 and parts[0] == "bearer":
+            return parts[1], True
+    return query_token, False
+
+
+def _authenticate_ws_token(token: str | None) -> tuple[str | None, str | None]:
+    """Valide un JWT WebSocket. Retourne ``(username, jti)`` ou ``(None, None)``."""
     if not token:
-        return None
+        return None, None
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except InvalidTokenError:
-        return None
-    return payload.get("sub")
+        return None, None
+    return payload.get("sub"), payload.get("jti")
 
 
 @router.websocket("/ws")
@@ -56,17 +74,23 @@ async def notifications_ws(
 ) -> None:
     """Pousse l'instantané des alertes à la connexion puis toutes les ~15 s.
 
-    Authentification par jeton JWT en query-string (``?token=...``) car les
-    en-têtes Authorization ne sont pas exploitables côté navigateur pour les WS.
+    Authentification par jeton JWT : de préférence via le sous-protocole
+    WebSocket (``Sec-WebSocket-Protocol: bearer, <jeton>``) pour éviter de
+    journaliser le jeton dans les URL ; repli sur ``?token=...``.
+    Un jeton révoqué (déconnexion) est refusé.
     """
-    username = _authenticate_ws_token(token)
+    ws_token, via_subprotocol = _extract_ws_token(websocket, token)
+    username, jti = _authenticate_ws_token(ws_token)
     if not username:
         await websocket.close(code=4401)  # 4401 = non authentifié (convention applicative)
         return
 
-    # Vérifie que l'utilisateur existe et est actif
+    # Vérifie l'utilisateur + la denylist du jeton d'accès
     db = SessionLocal()
     try:
+        if is_access_token_revoked(jti, db):
+            await websocket.close(code=4401)  # jeton révoqué
+            return
         user = db.query(User).filter(User.username == username).first()
         if not user or not user.is_active:
             await websocket.close(code=4403)  # 4403 = interdit
@@ -79,7 +103,12 @@ async def notifications_ws(
         await websocket.close(code=4429)  # 4429 = trop de connexions
         return
 
-    await websocket.accept()
+    # Echo du sous-protocole négocié (requis par le protocole WebSocket si le
+    # client en a proposé un), sinon accept simple.
+    if via_subprotocol:
+        await websocket.accept(subprotocol="bearer")
+    else:
+        await websocket.accept()
     _ws_connections[username] = _ws_connections.get(username, 0) + 1
     try:
         while True:

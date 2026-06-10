@@ -337,6 +337,26 @@ class RefreshToken(Base):
         return self.revoked_at is None and self.expires_at > utcnow_naive()
 
 
+class RevokedToken(Base):
+    """Liste de révocation des jetons d'accès (JWT) par ``jti``.
+
+    Un jeton d'accès est sans état (stateless) : pour l'invalider avant son
+    expiration (déconnexion, compromission), on enregistre son ``jti`` ici.
+    ``get_current_user`` rejette tout jeton dont le ``jti`` figure dans cette
+    table tant que ``expires_at`` n'est pas dépassé.
+    """
+
+    __tablename__ = "revoked_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    jti: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+
+
 class CriticalRange(Base):
     """Configurable critical (panic) thresholds for analyte values."""
 

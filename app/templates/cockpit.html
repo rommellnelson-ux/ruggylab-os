@@ -2226,7 +2226,23 @@
         await boot();
       }, 'login');
     }
-    function logout() { disconnectNotifications(); storage.removeItem("ruggylab_token"); token = ""; $("appView").classList.add("hidden"); $("loginView").classList.remove("hidden"); }
+    async function logout() {
+      disconnectNotifications();
+      // Révocation serveur du jeton d'accès (denylist) — best-effort.
+      try {
+        if (token) {
+          await fetch(normalizeApiPath("/api/v1/login/logout"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({}),
+          });
+        }
+      } catch {}
+      storage.removeItem("ruggylab_token");
+      token = "";
+      $("appView").classList.add("hidden");
+      $("loginView").classList.remove("hidden");
+    }
     async function boot() {
       if (!token) return;
       try {
@@ -5739,10 +5755,11 @@ window.onload=renderLabels;
     }
     function connectNotifications() {
       if (!token) return;
-      // Tente WebSocket d'abord
+      // Tente WebSocket d'abord. Le jeton transite par le sous-protocole
+      // (et non l'URL) pour éviter de le journaliser côté serveur/proxy.
       try {
         const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-        const ws = new WebSocket(`${proto}://${location.host}${API_PREFIX}/notifications/ws?token=${encodeURIComponent(token)}`);
+        const ws = new WebSocket(`${proto}://${location.host}${API_PREFIX}/notifications/ws`, ['bearer', token]);
         _notifWs = ws;
         ws.onopen = () => { _setNotifWsDot(true); if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; } };
         ws.onmessage = (ev) => { try { renderNotifSnapshot(JSON.parse(ev.data)); } catch {} };

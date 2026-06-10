@@ -21,6 +21,7 @@ from app.models.ruggylab_os import (
     RefreshToken,
     ReportSignature,
     Result,
+    RevokedToken,
     Sample,
     StockMovement,
     User,
@@ -53,5 +54,6 @@ __all__ = [
     "RatioPresetItem",
     "RefreshToken",
     "ReportSignature",
+    "RevokedToken",
     "StockMovement",
 ]
