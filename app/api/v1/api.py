@@ -5,6 +5,8 @@ from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.billing import router as billing_router
 from app.api.v1.endpoints.auto_validation import router as auto_validation_router
 from app.api.v1.endpoints.bnpl import router as bnpl_router
+from app.api.v1.endpoints.bulk_import import router as bulk_import_router
+from app.api.v1.endpoints.notifications import router as notifications_router
 from app.api.v1.endpoints.critical_alerts import router as critical_alerts_router
 from app.api.v1.endpoints.critical_ranges import router as critical_ranges_router
 from app.api.v1.endpoints.delta_check import router as delta_check_router
@@ -74,3 +76,5 @@ api_router.include_router(pdf_prescription_router, tags=["Prescription Scanner C
 api_router.include_router(fhir_pharmacy_router, tags=["FHIR R4 Pharmacy"])
 api_router.include_router(epidemiology_router, tags=["Epidemiology"])
 api_router.include_router(bnpl_router, tags=["BNPL CMU"])
+api_router.include_router(notifications_router, tags=["Notifications temps-réel"])
+api_router.include_router(bulk_import_router, tags=["Import en lot"])

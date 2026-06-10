@@ -542,6 +542,96 @@ def audit_activity_dashboard(
     return AuditUserActivityDashboardResponse(items=items)
 
 
+@router.get("/compliance-summary")
+def compliance_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    days: int = Query(default=30, ge=1, le=366),
+) -> dict:
+    """Synthèse de conformité ISO 15189 sur la période.
+
+    Couvre la validation, l'auto-validation (§5.8), les corrections de résultats,
+    l'acquittement des valeurs critiques et la signature des comptes-rendus.
+    Renvoie aussi des taux et un statut global (compliant / attention).
+    """
+    del current_user
+    end_date = datetime.now(UTC).replace(tzinfo=None)
+    start_date = end_date - timedelta(days=days)
+
+    base = db.query(Result).filter(
+        Result.analysis_date >= start_date, Result.analysis_date <= end_date
+    )
+    total_results = base.with_entities(func.count(Result.id)).scalar() or 0
+    validated = (
+        base.with_entities(func.count(Result.id)).filter(Result.is_validated.is_(True)).scalar()
+        or 0
+    )
+    auto_validated = (
+        base.with_entities(func.count(Result.id))
+        .filter(Result.is_auto_validated.is_(True))
+        .scalar()
+        or 0
+    )
+    critical_total = (
+        base.with_entities(func.count(Result.id)).filter(Result.is_critical.is_(True)).scalar()
+        or 0
+    )
+    critical_acked = (
+        base.with_entities(func.count(Result.id))
+        .filter(Result.is_critical.is_(True), Result.critical_ack_at.is_not(None))
+        .scalar()
+        or 0
+    )
+
+    amendments = (
+        db.query(func.count(AuditEvent.id))
+        .filter(
+            AuditEvent.event_type == "result.amend",
+            AuditEvent.created_at >= start_date,
+            AuditEvent.created_at <= end_date,
+        )
+        .scalar()
+        or 0
+    )
+    signed_reports = (
+        db.query(func.count(ReportSignature.id))
+        .filter(
+            ReportSignature.signed_at >= start_date,
+            ReportSignature.signed_at <= end_date,
+        )
+        .scalar()
+        or 0
+    )
+
+    def _rate(num: int, denom: int) -> float:
+        return round((num / denom) * 100, 1) if denom else 0.0
+
+    validation_rate = _rate(validated, total_results)
+    critical_ack_rate = _rate(critical_acked, critical_total)
+    auto_validation_rate = _rate(auto_validated, validated)
+
+    # Statut global : conforme si validation ≥ 99 % et tous critiques acquittés
+    pending_criticals = critical_total - critical_acked
+    is_compliant = validation_rate >= 99.0 and pending_criticals == 0
+    return {
+        "period_days": days,
+        "period_start": start_date.date().isoformat(),
+        "period_end": end_date.date().isoformat(),
+        "total_results": total_results,
+        "validated_results": validated,
+        "auto_validated_results": auto_validated,
+        "critical_total": critical_total,
+        "critical_acked": critical_acked,
+        "pending_criticals": pending_criticals,
+        "amendments": amendments,
+        "signed_reports": signed_reports,
+        "validation_rate_pct": validation_rate,
+        "critical_ack_rate_pct": critical_ack_rate,
+        "auto_validation_rate_pct": auto_validation_rate,
+        "status": "compliant" if is_compliant else "attention",
+    }
+
+
 @router.get(
     "/qc-report",
     summary="Rapport QC mensuel HTML (imprimable / export PDF navigateur)",

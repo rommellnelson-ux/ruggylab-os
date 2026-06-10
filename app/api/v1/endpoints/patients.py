@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -7,8 +8,16 @@ from app.db.session import get_db
 from app.models import Patient, User
 from app.schemas.pagination import PaginationMeta, PatientListResponse
 from app.schemas.patient import PatientCreate, PatientRead
+from app.services.patient_history import build_patient_fhir_bundle, build_patient_history
 
 router = APIRouter(prefix="/patients")
+
+
+def _get_patient_or_404(db: Session, patient_id: int) -> Patient:
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient introuvable.")
+    return patient
 
 
 @router.get("", response_model=PatientListResponse)
@@ -40,6 +49,35 @@ def list_patients(
     )
 
 
+@router.get("/{patient_id}/history")
+def get_patient_history(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Dossier patient complet : timeline des résultats + tendances par analyte."""
+    del current_user
+    patient = _get_patient_or_404(db, patient_id)
+    return build_patient_history(db, patient)
+
+
+@router.get(
+    "/{patient_id}/fhir-bundle",
+    summary="Export du dossier patient en Bundle FHIR R4 (DiagnosticReports)",
+    responses={200: {"content": {"application/fhir+json": {}}}},
+)
+def get_patient_fhir_bundle(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> JSONResponse:
+    """Regroupe tous les résultats du patient en un Bundle FHIR R4."""
+    del current_user
+    patient = _get_patient_or_404(db, patient_id)
+    bundle = build_patient_fhir_bundle(db, patient)
+    return JSONResponse(content=bundle, media_type="application/fhir+json")
+
+
 @router.get("/{patient_id}", response_model=PatientRead)
 def get_patient(
     patient_id: int,
@@ -47,10 +85,7 @@ def get_patient(
     current_user: User = Depends(get_current_active_user),
 ) -> Patient:
     del current_user
-    patient = db.query(Patient).filter(Patient.id == patient_id).first()
-    if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient introuvable.")
-    return patient
+    return _get_patient_or_404(db, patient_id)
 
 
 @router.post("", response_model=PatientRead, status_code=status.HTTP_201_CREATED)

@@ -776,9 +776,20 @@
         </div>
         <div class="actions" style="align-items:center;">
           <span id="topbarClock"></span>
+          <button class="ghost" id="notifBell" onclick="toggleNotifPopover()" title="Alertes temps-réel" aria-label="Alertes temps-réel" style="position:relative;">
+            🔔<span id="notifBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--rose);color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;font-weight:700;">0</span>
+            <span id="notifWsDot" title="WebSocket déconnecté" style="position:absolute;bottom:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:var(--muted);"></span>
+          </button>
           <button class="theme-toggle" onclick="toggleTheme()" title="Changer le thème" aria-label="Basculer entre mode clair et sombre">☀️</button>
           <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraîchir">↻</button>
           <button class="secondary" onclick="logout()" aria-label="Se déconnecter">⏻ Quitter</button>
+        </div>
+        <div id="notifPopover" style="display:none;position:absolute;top:60px;right:16px;width:380px;max-height:60vh;overflow-y:auto;background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);z-index:200;padding:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>🔔 Alertes temps-réel</strong>
+            <button class="ghost" style="font-size:11px;padding:2px 8px;" onclick="toggleNotifPopover()">✕</button>
+          </div>
+          <div id="notifPopoverBody" style="font-size:13px;"><p style="color:var(--muted);">Aucune alerte active.</p></div>
         </div>
       </header>
       <section class="content">
@@ -791,6 +802,7 @@
             <div class="panel metric" id="mQcPanel"><div id="mQc" class="value">—</div><div class="label">Contrôles QC</div></div>
             <div class="panel metric" id="mMntPanel"><div id="mMnt" class="value">—</div><div class="label">Maintenance ≤7j</div></div>
             <div class="panel metric" id="mExpiryPanel"><div id="mExpiry" class="value">—</div><div class="label">⚠ Péremptions ≤30j</div></div>
+            <div class="panel metric" id="mCompliancePanel"><div id="mCompliance" class="value">—</div><div class="label">Conformité ISO 15189</div></div>
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
@@ -817,7 +829,46 @@
                 <button class="success" style="margin-top:10px;" onclick="useCreatedPatientForSample()">Creer ses echantillons</button>
               </div>
             </div></div>
-            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP, nom ou grade" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+
+          <!-- Dossier patient complet (masqué par défaut) -->
+          <div id="patientDossier" class="panel" style="margin-top:12px;display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <h3 style="margin:0;">👤 Dossier — <span id="dossierName"></span></h3>
+              <div class="toolbar">
+                <button class="secondary" onclick="exportPatientFhir()">⬇ Export FHIR Bundle</button>
+                <button class="ghost" onclick="closeDossier()">✕ Fermer</button>
+              </div>
+            </div>
+            <div class="grid4" style="margin-top:12px;">
+              <div class="panel metric metric-blue"><div id="dossierResults" class="value">—</div><div class="label">Résultats</div></div>
+              <div class="panel metric metric-rose"><div id="dossierCritical" class="value">—</div><div class="label">Critiques</div></div>
+              <div class="panel metric"><div id="dossierSamples" class="value">—</div><div class="label">Échantillons</div></div>
+              <div class="panel metric"><div id="dossierAnalytes" class="value">—</div><div class="label">Analytes suivis</div></div>
+            </div>
+            <div class="grid2" style="margin-top:12px;">
+              <div class="panel"><h4 style="margin-top:0;">📈 Tendances (sparklines)</h4><div id="dossierTrends"></div></div>
+              <div class="panel"><h4 style="margin-top:0;">🕑 Chronologie des résultats</h4>
+                <table id="dossierTimeline"><thead><tr><th>ID</th><th>Date</th><th>Échantillon</th><th>Critique</th><th>Flags</th></tr></thead><tbody></tbody></table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Import en lot de patients -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📥 Import en lot — Patients (CSV)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
+              Colonnes : <code>ipp_unique_id, first_name, last_name, birth_date, sex, rank</code>.
+              Première ligne = en-tête. Les lignes invalides sont ignorées et listées.
+            </p>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <input id="patientCsvFile" type="file" accept=".csv,text/csv" onchange="loadCsvIntoTextarea(this,'patientCsvText')" />
+              <button class="ghost" onclick="fillPatientCsvSample()">Exemple</button>
+            </div>
+            <textarea id="patientCsvText" rows="5" placeholder="ipp_unique_id,first_name,last_name,birth_date,sex,rank&#10;IPP-001,Awa,Koné,1990-05-12,F,Sergent"></textarea>
+            <div class="actions" style="margin-top:8px;"><button onclick="submitBulkImport('patients', this)">Importer patients</button></div>
+            <div id="patientImportReport" style="margin-top:10px;font-size:13px;"></div>
           </div>
         </div>
 
@@ -1140,6 +1191,22 @@
               <thead><tr><th>Réactif</th><th>Lot</th><th>Péremption</th><th>Jours restants</th><th>Stock</th></tr></thead>
               <tbody></tbody>
             </table>
+          </div>
+
+          <!-- Import en lot de réactifs -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📥 Import en lot — Réactifs (CSV)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
+              Colonnes : <code>name, category, unit, current_stock, alert_threshold, lot_number, expiry_date, supplier</code>.
+              Seul <code>name</code> est obligatoire. Lignes invalides ignorées et listées.
+            </p>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <input id="reagentCsvFile" type="file" accept=".csv,text/csv" onchange="loadCsvIntoTextarea(this,'reagentCsvText')" />
+              <button class="ghost" onclick="fillReagentCsvSample()">Exemple</button>
+            </div>
+            <textarea id="reagentCsvText" rows="5" placeholder="name,category,unit,current_stock,alert_threshold,lot_number,expiry_date,supplier&#10;Diluant DH36,Hématologie,L,20,5,LOT-A1,2027-01-01,Sysmex"></textarea>
+            <div class="actions" style="margin-top:8px;"><button onclick="submitBulkImport('reagents', this)">Importer réactifs</button></div>
+            <div id="reagentImportReport" style="margin-top:10px;font-size:13px;"></div>
           </div>
 
           <div class="panel" style="margin-top:12px;">
@@ -1566,7 +1633,17 @@
                 <button class="ghost" onclick="loadAudit()">↻ Actualiser</button>
                 <button class="ghost" onclick="auditPage(-1)">← Précédent</button>
                 <button class="ghost" onclick="auditPage(+1)">Suivant →</button>
+                <button class="secondary" onclick="exportAuditCsv()">⬇ Export CSV</button>
               </div>
+            </div>
+            <div class="toolbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+              <input id="auditFilterEventType" placeholder="Type d'événement (ex. result.amend)" style="width:230px;" />
+              <input id="auditFilterEntityType" placeholder="Entité (ex. result)" style="width:150px;" />
+              <input id="auditFilterUser" placeholder="Utilisateur" style="width:130px;" />
+              <label style="font-size:12px;">Du <input id="auditFilterFrom" type="date" /></label>
+              <label style="font-size:12px;">Au <input id="auditFilterTo" type="date" /></label>
+              <button class="ghost" onclick="applyAuditFilters()">🔎 Filtrer</button>
+              <button class="ghost" onclick="resetAuditFilters()">✕ Réinitialiser</button>
             </div>
             <table id="auditTable">
               <thead><tr><th>#</th><th>Date</th><th>Utilisateur</th><th>Événement</th><th>Entité</th><th>ID entité</th></tr></thead>
@@ -2143,7 +2220,7 @@
         await boot();
       }, 'login');
     }
-    function logout() { storage.removeItem("ruggylab_token"); token = ""; $("appView").classList.add("hidden"); $("loginView").classList.remove("hidden"); }
+    function logout() { disconnectNotifications(); storage.removeItem("ruggylab_token"); token = ""; $("appView").classList.add("hidden"); $("loginView").classList.remove("hidden"); }
     async function boot() {
       if (!token) return;
       try {
@@ -2159,6 +2236,7 @@
         const sn = $('sideUserName'); if (sn) sn.textContent = me.full_name || me.username;
         const sr = $('sideUserRole'); if (sr) sr.textContent = me.role || 'Utilisateur';
         startClock();
+        connectNotifications();
         updateTubeGuide();
         renderResultTemplate();
         if ($('stockDrugLines') && $('stockDrugLines').children.length === 0) {
@@ -2208,12 +2286,13 @@
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
       try {
-        const [epi, stock, qc, perf, expiry] = await Promise.all([
+        const [epi, stock, qc, perf, expiry, compliance] = await Promise.all([
           api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
           api("/api/v1/reports/stock-dashboard", { headers: headers(false) }),
           api("/api/v1/reports/qc-summary", { headers: headers(false) }),
           api("/api/v1/stats/summary?days=30", { headers: headers(false) }).catch(() => null),
           api("/api/v1/reagents/expiring?days=30", { headers: headers(false) }).catch(() => null),
+          api("/api/v1/reports/compliance-summary?days=30", { headers: headers(false) }).catch(() => null),
         ]);
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
@@ -2300,6 +2379,18 @@
             mExpiryP.classList.add(expiredCount > 0 ? 'metric-rose' : expiryCount > 0 ? 'metric-amber' : 'metric-teal');
           }
         }
+        // Compliance metric (ISO 15189)
+        if (compliance && $('mCompliance')) {
+          $('mCompliance').textContent = (compliance.validation_rate_pct ?? 0) + '%';
+          const mCompP = $('mCompliancePanel');
+          if (mCompP) {
+            mCompP.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+            mCompP.classList.add(compliance.status === 'compliant' ? 'metric-teal' : 'metric-amber');
+          }
+          $('mCompliance').title = compliance.status === 'compliant'
+            ? 'Conforme — validation ≥99 %, critiques acquittés'
+            : `Attention — ${compliance.pending_criticals} critique(s) en attente`;
+        }
         showToast("Tableau de bord actualisé", "success");
       } catch (e) {
         showToast("Erreur lors du chargement du dashboard", "error");
@@ -2318,11 +2409,14 @@
           `<td><code>${security.escapeHtml(p.ipp_unique_id)}</code></td>` +
           `<td>${security.escapeHtml(p.first_name + ' ' + p.last_name)}</td>` +
           `<td>${p.sex || ''}</td>` +
-          `<td><button class="ghost" title="Imprimer étiquettes tubes" onclick='printPatientLabels(${JSON.stringify(p)})'>🏷️ Étiquettes</button></td>`
+          `<td style="white-space:nowrap;">` +
+            `<button class="ghost" title="Dossier complet" onclick="openDossier(${p.id})">📂 Dossier</button> ` +
+            `<button class="ghost" title="Imprimer étiquettes tubes" onclick='printPatientLabels(${JSON.stringify(p)})'>🏷️</button>` +
+          `</td>`
         ));
         setRows("patientsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
     }
@@ -4770,12 +4864,46 @@
     let _auditSkip = 0;
     const _auditLimit = 50;
 
+    function _auditFilterQuery() {
+      const p = new URLSearchParams();
+      const et = $('auditFilterEventType')?.value.trim();
+      const en = $('auditFilterEntityType')?.value.trim();
+      const us = $('auditFilterUser')?.value.trim();
+      const df = $('auditFilterFrom')?.value;
+      const dt2 = $('auditFilterTo')?.value;
+      if (et) p.set('event_type', et);
+      if (en) p.set('entity_type', en);
+      if (us) p.set('username', us);
+      if (df) p.set('date_from', df);
+      if (dt2) p.set('date_to', dt2);
+      return p.toString();
+    }
+    function applyAuditFilters() { _auditSkip = 0; loadAudit(); }
+    function resetAuditFilters() {
+      ['auditFilterEventType','auditFilterEntityType','auditFilterUser','auditFilterFrom','auditFilterTo']
+        .forEach(id => { if ($(id)) $(id).value = ''; });
+      _auditSkip = 0; loadAudit();
+    }
+    async function exportAuditCsv() {
+      try {
+        const fq = _auditFilterQuery();
+        const resp = await fetch(normalizeApiPath('/api/v1/audit-events/export.csv' + (fq ? '?' + fq : '')), { headers: headers(false) });
+        if (!resp.ok) { showToast('Export refusé (droits admin requis)', 'error'); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'audit-export.csv'; a.click();
+        URL.revokeObjectURL(url);
+        showToast('Export CSV téléchargé', 'success');
+      } catch { showToast('Erreur export CSV', 'error'); }
+    }
     async function loadAudit() {
       const tbody = $('auditTable')?.querySelector('tbody');
       if (!tbody) return;
       loadingStates.showSkeleton(tbody, 5);
       try {
-        const data = await api(`/api/v1/audit-events?skip=${_auditSkip}&limit=${_auditLimit}`, { headers: headers(false) });
+        const fq = _auditFilterQuery();
+        const data = await api(`/api/v1/audit-events?skip=${_auditSkip}&limit=${_auditLimit}${fq ? '&' + fq : ''}`, { headers: headers(false) });
         const fmt = d => d ? new Date(d).toLocaleString('fr-FR') : '—';
         const typeLabel = {
           'user.create':    '👤 Création user',
@@ -4783,6 +4911,7 @@
           'reagent.create': '🧪 Nouveau réactif',
           'reagent.update': '✏️ Modif. réactif',
           'reagent.delete': '🗑️ Suppression réactif',
+          'result.amend':   '✏️ Correction résultat',
         };
         setRows('auditTable', (data.items || []).map(e => row(
           `<td>${e.id}</td>` +
@@ -5444,6 +5573,238 @@ window.onload=renderLabels;
         showToast(`Notifications envoyées : ${res.notified} webhook(s), ${res.expiring} réactif(s) concerné(s)`, "success");
       } catch (e) { showToast("Erreur envoi notifications péremption", "error"); }
       finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Feature 2 — Dossier patient complet (timeline + sparklines + FHIR)
+    // ══════════════════════════════════════════════════════════════════════
+    let _dossierPatientId = null;
+    function closeDossier() {
+      const d = $('patientDossier');
+      if (d) d.style.display = 'none';
+      _dossierPatientId = null;
+    }
+    async function openDossier(patientId) {
+      _dossierPatientId = patientId;
+      try {
+        const h = await api(`/api/v1/patients/${patientId}/history`, { headers: headers(false) });
+        const p = h.patient || {};
+        $('dossierName').textContent = `${p.first_name || ''} ${p.last_name || ''} — ${p.ipp_unique_id || ''}`;
+        $('dossierResults').textContent = h.result_count ?? 0;
+        $('dossierCritical').textContent = h.critical_count ?? 0;
+        $('dossierSamples').textContent = h.sample_count ?? 0;
+        const trends = h.trends || {};
+        const analyteKeys = Object.keys(trends);
+        $('dossierAnalytes').textContent = analyteKeys.length;
+
+        // Sparklines
+        const trendDiv = $('dossierTrends');
+        if (trendDiv) {
+          if (!analyteKeys.length) {
+            trendDiv.innerHTML = '<p style="color:var(--muted);">Aucune donnée numérique.</p>';
+          } else {
+            trendDiv.innerHTML = analyteKeys.slice(0, 12).map(a => {
+              const series = trends[a].map(pt => pt.value);
+              const last = series[series.length - 1];
+              return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">` +
+                `<span style="width:80px;font-size:12px;font-weight:600;">${security.escapeHtml(a)}</span>` +
+                _renderSparkline(series) +
+                `<span style="font-size:12px;color:var(--muted);">${last} <small>(n=${series.length})</small></span>` +
+                `</div>`;
+            }).join('');
+          }
+        }
+
+        // Timeline
+        setRows('dossierTimeline', (h.timeline || []).map(t => {
+          const flagsTxt = t.flags && Object.keys(t.flags).length
+            ? Object.entries(t.flags).map(([k, v]) => `${k}:${v}`).join(' ')
+            : '—';
+          const crit = t.is_critical ? '<span class="pill bad">⛔</span>' : (t.delta_exceeded ? '<span class="pill" style="background:var(--amber);color:#fff;">△</span>' : '—');
+          const tr = row(
+            `<td>${t.result_id}</td>` +
+            `<td style="white-space:nowrap;">${t.analysis_date ? new Date(t.analysis_date).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}) : '—'}</td>` +
+            `<td><code>${security.escapeHtml(t.sample_barcode || '')}</code></td>` +
+            `<td>${crit}</td>` +
+            `<td style="font-size:11px;">${security.escapeHtml(flagsTxt)}</td>`
+          );
+          if (t.is_critical) tr.classList.add('row-critical');
+          return tr;
+        }));
+
+        const dossier = $('patientDossier');
+        if (dossier) { dossier.style.display = ''; dossier.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      } catch (e) {
+        showToast('Erreur chargement dossier', 'error');
+        log('openDossier: ' + (e.message || e));
+      }
+    }
+    function _renderSparkline(values) {
+      if (!values.length) return '<svg width="120" height="28"></svg>';
+      const W = 120, H = 28, pad = 2;
+      const min = Math.min(...values), max = Math.max(...values);
+      const span = (max - min) || 1;
+      const step = values.length > 1 ? (W - 2 * pad) / (values.length - 1) : 0;
+      const pts = values.map((v, i) => {
+        const x = pad + i * step;
+        const y = H - pad - ((v - min) / span) * (H - 2 * pad);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+      const lastX = pad + (values.length - 1) * step;
+      const lastY = H - pad - ((values[values.length - 1] - min) / span) * (H - 2 * pad);
+      return `<svg width="${W}" height="${H}" style="overflow:visible;">` +
+        `<polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/>` +
+        `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="#be123c"/>` +
+        `</svg>`;
+    }
+    async function exportPatientFhir() {
+      if (!_dossierPatientId) return;
+      try {
+        const resp = await fetch(normalizeApiPath(`/api/v1/patients/${_dossierPatientId}/fhir-bundle`), { headers: headers(false) });
+        if (!resp.ok) { showToast('Export FHIR refusé', 'error'); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `patient-${_dossierPatientId}-fhir-bundle.json`; a.click();
+        URL.revokeObjectURL(url);
+        showToast('Bundle FHIR téléchargé', 'success');
+      } catch { showToast('Erreur export FHIR', 'error'); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Feature 3 — Notifications temps-réel (WebSocket + fallback polling)
+    // ══════════════════════════════════════════════════════════════════════
+    let _notifWs = null;
+    let _notifPollTimer = null;
+    let _lastCriticalCount = 0;
+    let _notifPopoverOpen = false;
+
+    function toggleNotifPopover() {
+      _notifPopoverOpen = !_notifPopoverOpen;
+      const pop = $('notifPopover');
+      if (pop) pop.style.display = _notifPopoverOpen ? 'block' : 'none';
+    }
+    function _setNotifWsDot(connected) {
+      const dot = $('notifWsDot');
+      if (!dot) return;
+      dot.style.background = connected ? 'var(--teal, #0f766e)' : 'var(--muted)';
+      dot.title = connected ? 'WebSocket connecté' : 'WebSocket déconnecté (polling)';
+    }
+    function renderNotifSnapshot(snap) {
+      if (!snap) return;
+      const total = snap.total || 0;
+      const badge = $('notifBadge');
+      if (badge) {
+        badge.textContent = total;
+        badge.style.display = total > 0 ? '' : 'none';
+      }
+      // Toast si nouvelle valeur critique apparaît
+      const critCount = (snap.counts && snap.counts.criticals) || 0;
+      if (critCount > _lastCriticalCount) {
+        showToast(`🔴 ${critCount} valeur(s) critique(s) non acquittée(s)`, 'error', 6000);
+      }
+      _lastCriticalCount = critCount;
+
+      const body = $('notifPopoverBody');
+      if (!body) return;
+      if (total === 0) { body.innerHTML = '<p style="color:var(--muted);">Aucune alerte active. ✅</p>'; return; }
+      const c = snap.counts || {};
+      let html = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">';
+      if (c.criticals) html += `<span class="pill bad">⛔ ${c.criticals} critiques</span>`;
+      if (c.deltas) html += `<span class="pill" style="background:var(--amber);color:#fff;">△ ${c.deltas} delta</span>`;
+      if (c.expiring) html += `<span class="pill" style="background:#b45309;color:#fff;">📅 ${c.expiring} péremptions</span>`;
+      if (c.qc_rejects) html += `<span class="pill bad">📈 ${c.qc_rejects} QC rejet</span>`;
+      html += '</div>';
+      if ((snap.criticals || []).length) {
+        html += '<strong style="font-size:12px;">Valeurs critiques :</strong><ul style="margin:4px 0 8px;padding-left:18px;">';
+        snap.criticals.slice(0, 6).forEach(x => {
+          html += `<li>Résultat #${x.result_id} (échantillon ${x.sample_id}) — ${x.elapsed_minutes} min${x.overdue ? ' <span class="pill bad" style="font-size:9px;">retard</span>' : ''}</li>`;
+        });
+        html += '</ul>';
+      }
+      if ((snap.expiring || []).length) {
+        html += '<strong style="font-size:12px;">Péremptions proches :</strong><ul style="margin:4px 0 8px;padding-left:18px;">';
+        snap.expiring.slice(0, 6).forEach(x => {
+          html += `<li>${security.escapeHtml(x.name)} — ${x.is_expired ? 'expiré' : x.days_remaining + 'j'}</li>`;
+        });
+        html += '</ul>';
+      }
+      body.innerHTML = html;
+    }
+    function connectNotifications() {
+      if (!token) return;
+      // Tente WebSocket d'abord
+      try {
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${proto}://${location.host}${API_PREFIX}/notifications/ws?token=${encodeURIComponent(token)}`);
+        _notifWs = ws;
+        ws.onopen = () => { _setNotifWsDot(true); if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; } };
+        ws.onmessage = (ev) => { try { renderNotifSnapshot(JSON.parse(ev.data)); } catch {} };
+        ws.onclose = () => { _setNotifWsDot(false); _notifWs = null; startNotifPolling(); };
+        ws.onerror = () => { try { ws.close(); } catch {} };
+      } catch {
+        startNotifPolling();
+      }
+    }
+    function startNotifPolling() {
+      if (_notifPollTimer) return;
+      const poll = async () => {
+        if (!token) return;
+        try { renderNotifSnapshot(await api('/api/v1/notifications/feed', { headers: headers(false) })); } catch {}
+      };
+      poll();
+      _notifPollTimer = setInterval(poll, 30000);
+    }
+    function disconnectNotifications() {
+      if (_notifWs) { try { _notifWs.close(); } catch {} _notifWs = null; }
+      if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Feature 4 — Import en lot CSV
+    // ══════════════════════════════════════════════════════════════════════
+    function loadCsvIntoTextarea(input, textareaId) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { const ta = $(textareaId); if (ta) ta.value = reader.result; };
+      reader.readAsText(file);
+    }
+    function fillPatientCsvSample() {
+      $('patientCsvText').value =
+        'ipp_unique_id,first_name,last_name,birth_date,sex,rank\n' +
+        'IPP-IMP-001,Awa,Koné,1990-05-12,F,Sergent\n' +
+        'IPP-IMP-002,Yao,Brou,1985-11-03,M,Caporal';
+    }
+    function fillReagentCsvSample() {
+      $('reagentCsvText').value =
+        'name,category,unit,current_stock,alert_threshold,lot_number,expiry_date,supplier\n' +
+        'Diluant DH36 (import),Hématologie,L,20,5,LOT-IMP-A1,2027-01-01,Sysmex\n' +
+        'Lyse WBC (import),Hématologie,mL,500,100,LOT-IMP-B2,2026-09-30,Sysmex';
+    }
+    async function submitBulkImport(kind, btn) {
+      const taId = kind === 'patients' ? 'patientCsvText' : 'reagentCsvText';
+      const reportId = kind === 'patients' ? 'patientImportReport' : 'reagentImportReport';
+      const csv = ($(taId)?.value || '').trim();
+      if (!csv) { showToast('CSV vide', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const res = await api(`/api/v1/bulk-import/${kind}`, {
+          method: 'POST', headers: headers(), body: JSON.stringify({ csv }),
+        });
+        let html = `<div class="notice">✅ ${res.created} créé(s) sur ${res.total} ligne(s).</div>`;
+        if (res.errors && res.errors.length) {
+          html += '<div style="margin-top:6px;color:var(--rose);"><strong>Erreurs :</strong><ul style="margin:4px 0;padding-left:18px;">';
+          res.errors.slice(0, 30).forEach(e => { html += `<li>Ligne ${e.row} : ${security.escapeHtml(e.error)}</li>`; });
+          html += '</ul></div>';
+        }
+        $(reportId).innerHTML = html;
+        showToast(`${res.created} ${kind === 'patients' ? 'patient(s)' : 'réactif(s)'} importé(s)`, 'success');
+        if (kind === 'patients') loadPatients(); else { loadReagents(); loadExpiryAlerts(); }
+      } catch (e) {
+        showToast('Erreur import (droits officier requis ?)', 'error');
+        log('submitBulkImport: ' + (e.message || e));
+      } finally { setLoading(btn, false); }
     }
 
     function _renderTatChart(tatData) {
