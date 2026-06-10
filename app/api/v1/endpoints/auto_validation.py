@@ -11,6 +11,7 @@ from app.schemas.auto_validation import (
     AutoValidationConfigRead,
     AutoValidationRunResult,
 )
+from app.services.audit import log_audit_event
 from app.services.auto_validator import batch_auto_validate
 
 router = APIRouter(prefix="/auto-validation")
@@ -42,9 +43,17 @@ def create_auto_validation_config(
     current_user: User = Depends(require_officer),
 ) -> AutoValidationConfig:
     """Crée une nouvelle règle d'auto-validation."""
-    del current_user
     cfg = AutoValidationConfig(**payload.model_dump())
     db.add(cfg)
+    db.flush()
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="auto_validation.config.create",
+        entity_type="auto_validation_config",
+        entity_id=str(cfg.id),
+        payload=payload.model_dump(),
+    )
     db.commit()
     db.refresh(cfg)
     return cfg
@@ -57,7 +66,6 @@ def deactivate_auto_validation_config(
     current_user: User = Depends(require_officer),
 ) -> dict[str, str]:
     """Désactive une règle d'auto-validation (suppression logique)."""
-    del current_user
     cfg = db.query(AutoValidationConfig).filter(AutoValidationConfig.id == config_id).first()
     if not cfg:
         raise HTTPException(
@@ -65,6 +73,14 @@ def deactivate_auto_validation_config(
             detail="Règle d'auto-validation introuvable.",
         )
     cfg.is_active = False
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="auto_validation.config.deactivate",
+        entity_type="auto_validation_config",
+        entity_id=str(config_id),
+        payload={"name": cfg.name},
+    )
     db.commit()
     return {"status": "deactivated"}
 
@@ -79,5 +95,14 @@ def run_auto_validation(
     Utile pour traiter rétroactivement les résultats existants après configuration
     d'une nouvelle règle.
     """
-    del current_user
-    return batch_auto_validate(db)
+    outcome = batch_auto_validate(db)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="auto_validation.run",
+        entity_type="auto_validation_config",
+        entity_id=None,
+        payload=outcome,
+    )
+    db.commit()
+    return outcome

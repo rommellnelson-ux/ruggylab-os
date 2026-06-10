@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models import Patient, User
 from app.schemas.pagination import PaginationMeta, PatientListResponse
 from app.schemas.patient import PatientCreate, PatientRead
+from app.services.audit import log_audit_event
 from app.services.patient_history import build_patient_fhir_bundle, build_patient_history
 
 router = APIRouter(prefix="/patients")
@@ -56,9 +57,19 @@ def get_patient_history(
     current_user: User = Depends(get_current_active_user),
 ) -> dict:
     """Dossier patient complet : timeline des résultats + tendances par analyte."""
-    del current_user
     patient = _get_patient_or_404(db, patient_id)
-    return build_patient_history(db, patient)
+    history = build_patient_history(db, patient)
+    # Traçabilité de la consultation du dossier (secret médical / ISO 15189)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="patient.history.view",
+        entity_type="patient",
+        entity_id=str(patient_id),
+        payload={"ipp": patient.ipp_unique_id},
+    )
+    db.commit()
+    return history
 
 
 @router.get(
@@ -72,9 +83,18 @@ def get_patient_fhir_bundle(
     current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """Regroupe tous les résultats du patient en un Bundle FHIR R4."""
-    del current_user
     patient = _get_patient_or_404(db, patient_id)
     bundle = build_patient_fhir_bundle(db, patient)
+    # Traçabilité de l'export de données patient
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="patient.fhir.export",
+        entity_type="patient",
+        entity_id=str(patient_id),
+        payload={"ipp": patient.ipp_unique_id, "resource_count": bundle.get("total", 0)},
+    )
+    db.commit()
     return JSONResponse(content=bundle, media_type="application/fhir+json")
 
 

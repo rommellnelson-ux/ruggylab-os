@@ -867,7 +867,10 @@
               <button class="ghost" onclick="fillPatientCsvSample()">Exemple</button>
             </div>
             <textarea id="patientCsvText" rows="5" placeholder="ipp_unique_id,first_name,last_name,birth_date,sex,rank&#10;IPP-001,Awa,Koné,1990-05-12,F,Sergent"></textarea>
-            <div class="actions" style="margin-top:8px;"><button onclick="submitBulkImport('patients', this)">Importer patients</button></div>
+            <div class="actions" style="margin-top:8px;align-items:center;gap:12px;">
+              <button onclick="submitBulkImport('patients', this)">Importer patients</button>
+              <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="patientCsvDryRun" /> Validation à blanc (dry-run)</label>
+            </div>
             <div id="patientImportReport" style="margin-top:10px;font-size:13px;"></div>
           </div>
         </div>
@@ -1205,7 +1208,10 @@
               <button class="ghost" onclick="fillReagentCsvSample()">Exemple</button>
             </div>
             <textarea id="reagentCsvText" rows="5" placeholder="name,category,unit,current_stock,alert_threshold,lot_number,expiry_date,supplier&#10;Diluant DH36,Hématologie,L,20,5,LOT-A1,2027-01-01,Sysmex"></textarea>
-            <div class="actions" style="margin-top:8px;"><button onclick="submitBulkImport('reagents', this)">Importer réactifs</button></div>
+            <div class="actions" style="margin-top:8px;align-items:center;gap:12px;">
+              <button onclick="submitBulkImport('reagents', this)">Importer réactifs</button>
+              <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="reagentCsvDryRun" /> Validation à blanc (dry-run)</label>
+            </div>
             <div id="reagentImportReport" style="margin-top:10px;font-size:13px;"></div>
           </div>
 
@@ -5785,22 +5791,25 @@ window.onload=renderLabels;
     async function submitBulkImport(kind, btn) {
       const taId = kind === 'patients' ? 'patientCsvText' : 'reagentCsvText';
       const reportId = kind === 'patients' ? 'patientImportReport' : 'reagentImportReport';
+      const dryRunId = kind === 'patients' ? 'patientCsvDryRun' : 'reagentCsvDryRun';
       const csv = ($(taId)?.value || '').trim();
+      const dryRun = !!$(dryRunId)?.checked;
       if (!csv) { showToast('CSV vide', 'error'); return; }
       setLoading(btn, true);
       try {
         const res = await api(`/api/v1/bulk-import/${kind}`, {
-          method: 'POST', headers: headers(), body: JSON.stringify({ csv }),
+          method: 'POST', headers: headers(), body: JSON.stringify({ csv, dry_run: dryRun }),
         });
-        let html = `<div class="notice">✅ ${res.created} créé(s) sur ${res.total} ligne(s).</div>`;
+        const verb = res.dry_run ? 'validable(s) (dry-run, rien enregistré)' : 'créé(s)';
+        let html = `<div class="notice">✅ ${res.created} ${verb} sur ${res.total} ligne(s).</div>`;
         if (res.errors && res.errors.length) {
           html += '<div style="margin-top:6px;color:var(--rose);"><strong>Erreurs :</strong><ul style="margin:4px 0;padding-left:18px;">';
           res.errors.slice(0, 30).forEach(e => { html += `<li>Ligne ${e.row} : ${security.escapeHtml(e.error)}</li>`; });
           html += '</ul></div>';
         }
         $(reportId).innerHTML = html;
-        showToast(`${res.created} ${kind === 'patients' ? 'patient(s)' : 'réactif(s)'} importé(s)`, 'success');
-        if (kind === 'patients') loadPatients(); else { loadReagents(); loadExpiryAlerts(); }
+        showToast(`${res.created} ${kind === 'patients' ? 'patient(s)' : 'réactif(s)'} ${res.dry_run ? 'validé(s) à blanc' : 'importé(s)'}`, 'success');
+        if (!res.dry_run) { if (kind === 'patients') loadPatients(); else { loadReagents(); loadExpiryAlerts(); } }
       } catch (e) {
         showToast('Erreur import (droits officier requis ?)', 'error');
         log('submitBulkImport: ' + (e.message || e));

@@ -5,9 +5,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, require_officer
 from app.db.session import get_db
-from app.models import AuditEvent, Equipment, Result, Sample, User
+from app.models import AuditEvent, Equipment, ReportSignature, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import ResultAmend, ResultCreate, ResultRead
@@ -163,13 +163,15 @@ def amend_result(
     result_id: int,
     payload: ResultAmend,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_officer),
 ) -> Result:
-    """Corriger les data_points d'un résultat validé.
+    """Corriger les data_points d'un résultat validé (réservé officier/admin).
 
     Recalcule automatiquement flags, delta-check et statut critique.
     Crée une entrée d'audit avec l'état avant/après et le motif obligatoire.
     Réinitialise l'auto-validation (le résultat corrigé doit être requalifié).
+    Si un compte-rendu a été signé, sa signature est révoquée (les données
+    signées ne correspondent plus) — intégrité ISO 15189.
     """
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
@@ -180,6 +182,18 @@ def amend_result(
     # Snapshot de l'ancien état pour l'audit
     old_data_points = result.data_points
     old_is_critical = result.is_critical
+
+    # Intégrité : révoquer toute signature de compte-rendu existante
+    signature_revoked = False
+    signature = (
+        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
+    )
+    if signature and signature.revoked_at is None:
+        signature.revoked_at = utcnow_naive()
+        signature.revocation_reason = (
+            f"Données corrigées (amend) — motif: {payload.amendment_reason}"
+        )
+        signature_revoked = True
 
     # Mise à jour des données
     result.data_points = payload.data_points
@@ -222,6 +236,7 @@ def amend_result(
                 "old_is_critical": old_is_critical,
                 "new_is_critical": result.is_critical,
                 "is_auto_validated": result.is_auto_validated,
+                "signature_revoked": signature_revoked,
             }
         ),
     )

@@ -18,6 +18,10 @@ router = APIRouter(prefix="/notifications")
 
 # Intervalle de push WebSocket (secondes)
 _WS_PUSH_INTERVAL = 15
+# Nombre maximal de connexions WebSocket simultanées par utilisateur
+_WS_MAX_PER_USER = 5
+# Compteur en mémoire des connexions actives par username
+_ws_connections: dict[str, int] = {}
 
 
 @router.get("/feed")
@@ -70,7 +74,13 @@ async def notifications_ws(
     finally:
         db.close()
 
+    # Limite anti-DoS : nombre de connexions simultanées par utilisateur
+    if _ws_connections.get(username, 0) >= _WS_MAX_PER_USER:
+        await websocket.close(code=4429)  # 4429 = trop de connexions
+        return
+
     await websocket.accept()
+    _ws_connections[username] = _ws_connections.get(username, 0) + 1
     try:
         while True:
             db = SessionLocal()
@@ -87,3 +97,9 @@ async def notifications_ws(
             await websocket.close()
         except Exception:  # noqa: BLE001
             pass
+    finally:
+        remaining = _ws_connections.get(username, 1) - 1
+        if remaining > 0:
+            _ws_connections[username] = remaining
+        else:
+            _ws_connections.pop(username, None)

@@ -13,6 +13,7 @@ import urllib.request
 from sqlalchemy.orm import Session
 
 from app.models.ruggylab_os import NotifConfig, Reagent
+from app.utils.url_safety import is_safe_external_url
 
 
 def get_expiring_reagents(db: Session, days: int = 30) -> list[dict]:
@@ -71,14 +72,17 @@ def check_and_notify_expiry(db: Session, days: int = 30) -> dict:
         }
     ).encode()
     for cfg in configs:
+        # Garde anti-SSRF : refuse loopback, IP privées, métadonnées cloud, etc.
+        if not is_safe_external_url(cfg.webhook_url):
+            continue
         try:
             req = urllib.request.Request(
-                cfg.webhook_url,
+                cfg.webhook_url,  # noqa: S310 — URL validée par is_safe_external_url
                 data=payload_bytes,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=5):
+            with urllib.request.urlopen(req, timeout=5):  # noqa: S310  # nosec B310
                 pass
             notified += 1
         except Exception:

@@ -97,12 +97,15 @@ def build_alert_snapshot(db: Session, *, expiry_days: int = 7) -> dict:
     }
     total = sum(counts.values())
 
+    # Les compteurs restent exacts ; les listes détaillées sont bornées pour
+    # éviter une charge réseau excessive (snapshot poussé toutes les ~15 s).
+    cap = 50
     return {
         "generated_at": utcnow_naive().isoformat(),
         "total": total,
         "counts": counts,
-        "criticals": criticals,
-        "deltas": deltas,
-        "expiring": expiring,
-        "qc_rejects": qc_rejects,
+        "criticals": criticals[:cap],
+        "deltas": deltas[:cap],
+        "expiring": expiring[:cap],
+        "qc_rejects": qc_rejects[:cap],
     }

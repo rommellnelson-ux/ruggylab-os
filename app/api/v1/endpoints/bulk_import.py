@@ -1,12 +1,12 @@
 """Import en lot CSV — patients et réactifs. Réservé aux officiers/admins."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_officer
 from app.db.session import get_db
 from app.models import User
 from app.schemas.bulk_import import BulkImportRequest, BulkImportResult
-from app.services.bulk_import import import_patients, import_reagents
+from app.services.bulk_import import BulkImportTooLarge, import_patients, import_reagents
 
 router = APIRouter(prefix="/bulk-import")
 
@@ -22,7 +22,10 @@ def bulk_import_patients(
     Colonnes : ipp_unique_id, first_name, last_name, birth_date, sex, rank.
     """
     del current_user
-    return import_patients(db, payload.csv)
+    try:
+        return import_patients(db, payload.csv, dry_run=payload.dry_run)
+    except BulkImportTooLarge as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
 
 
 @router.post("/reagents", response_model=BulkImportResult)
@@ -37,4 +40,7 @@ def bulk_import_reagents(
     lot_number, expiry_date, supplier.
     """
     del current_user
-    return import_reagents(db, payload.csv)
+    try:
+        return import_reagents(db, payload.csv, dry_run=payload.dry_run)
+    except BulkImportTooLarge as exc:
+        raise HTTPException(status_code=413, detail=str(exc))

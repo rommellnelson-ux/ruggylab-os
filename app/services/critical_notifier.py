@@ -15,10 +15,14 @@ from sqlalchemy.orm import Session
 from app.models import Result
 from app.models.ruggylab_os import NotifConfig
 from app.utils.datetime_utils import utcnow_naive
+from app.utils.url_safety import is_safe_external_url
 
 
 def _send_webhook(url: str, payload: dict) -> bool:
     """Envoie un POST JSON à `url`. Retourne True si HTTP 2xx."""
+    # Garde anti-SSRF : refuse loopback, IP privées, métadonnées cloud, etc.
+    if not is_safe_external_url(url):
+        return False
     if urlparse(url).scheme not in {"http", "https"}:
         return False
 

@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.models import AuditEvent, User
 from app.schemas.audit_event import AuditEventRead
 from app.schemas.pagination import AuditEventListResponse, PaginationMeta
+from app.utils.csv_safety import sanitize_csv_cell
 
 router = APIRouter(prefix="/audit-events")
 
@@ -107,13 +108,16 @@ def export_audit_events_csv(
     for e in events:
         writer.writerow(
             [
-                e.id,
-                e.created_at.isoformat() if e.created_at else "",
-                e.user.username if e.user else "",
-                e.event_type,
-                e.entity_type,
-                e.entity_id or "",
-                (e.payload or "").replace("\n", " "),
+                sanitize_csv_cell(x)
+                for x in (
+                    e.id,
+                    e.created_at.isoformat() if e.created_at else "",
+                    e.user.username if e.user else "",
+                    e.event_type,
+                    e.entity_type,
+                    e.entity_id or "",
+                    (e.payload or "").replace("\n", " "),
+                )
             ]
         )
     return Response(

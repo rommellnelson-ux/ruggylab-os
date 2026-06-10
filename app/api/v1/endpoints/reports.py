@@ -41,6 +41,7 @@ from app.schemas.reports import (
 )
 from app.services.qc_pdf_report import build_qc_html_report
 from app.services.report_signing import build_result_report_pdf, create_report_signature
+from app.utils.csv_safety import sanitize_csv_cell
 
 router = APIRouter(prefix="/reports")
 
@@ -288,22 +289,27 @@ def epidemiology_export_csv(
             malaria_confidence = malaria_ai.get("confidence", "")
         writer.writerow(
             [
-                result.id,
-                result.analysis_date.isoformat(),
-                result.sample.barcode if result.sample else "",
-                patient.ipp_unique_id if patient else "",
-                patient.sex if patient and patient.sex else "",
-                result.is_critical,
-                malaria_label,
-                malaria_confidence,
-            ]
-            + [
-                (
-                    data_points.get(marker, {}).get("value", "")
-                    if isinstance(data_points.get(marker), dict)
-                    else data_points.get(marker, "")
+                sanitize_csv_cell(x)
+                for x in (
+                    [
+                        result.id,
+                        result.analysis_date.isoformat(),
+                        result.sample.barcode if result.sample else "",
+                        patient.ipp_unique_id if patient else "",
+                        patient.sex if patient and patient.sex else "",
+                        result.is_critical,
+                        malaria_label,
+                        malaria_confidence,
+                    ]
+                    + [
+                        (
+                            data_points.get(marker, {}).get("value", "")
+                            if isinstance(data_points.get(marker), dict)
+                            else data_points.get(marker, "")
+                        )
+                        for marker in EPIDEMIOLOGY_MARKERS
+                    ]
                 )
-                for marker in EPIDEMIOLOGY_MARKERS
             ]
         )
     return Response(
@@ -598,6 +604,7 @@ def compliance_summary(
         .filter(
             ReportSignature.signed_at >= start_date,
             ReportSignature.signed_at <= end_date,
+            ReportSignature.revoked_at.is_(None),  # exclut les signatures révoquées
         )
         .scalar()
         or 0
