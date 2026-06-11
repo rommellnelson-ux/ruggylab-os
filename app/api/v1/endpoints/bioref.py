@@ -1,4 +1,5 @@
 """API — Référentiel biologique : valeurs de référence + interprétation."""
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -20,9 +21,7 @@ def list_ranges(
 ) -> list[BiologicalReferenceRange]:
     """Liste les valeurs de référence actives (filtres optionnels)."""
     del current_user
-    query = db.query(BiologicalReferenceRange).filter(
-        BiologicalReferenceRange.is_active.is_(True)
-    )
+    query = db.query(BiologicalReferenceRange).filter(BiologicalReferenceRange.is_active.is_(True))
     if test_code:
         query = query.filter(BiologicalReferenceRange.test_code == test_code)
     if category:

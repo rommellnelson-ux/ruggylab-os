@@ -1,4 +1,5 @@
 """Tests — Dossier patient complet (history + FHIR bundle)."""
+
 from __future__ import annotations
 
 import uuid

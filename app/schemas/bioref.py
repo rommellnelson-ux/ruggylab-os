@@ -24,7 +24,9 @@ class BioRefRangeRead(BaseModel):
 
 class BioRefInterpretRequest(BaseModel):
     test_code: str = Field(..., min_length=1, max_length=50)
-    value: float | None = Field(default=None, description="Valeur numérique ; None pour un test qualitatif")
+    value: float | None = Field(
+        default=None, description="Valeur numérique ; None pour un test qualitatif"
+    )
     sex: str | None = None
     age_years: float | None = Field(default=None, ge=0, le=130)
     model_config = ConfigDict(extra="forbid")

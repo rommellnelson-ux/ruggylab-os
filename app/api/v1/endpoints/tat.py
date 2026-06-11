@@ -1,4 +1,5 @@
 """API — Suivi du TAT (Turnaround Time) : cibles, saisie, tableau de bord, alertes."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/tat")
 
 # ── Catalogue d'examens (référentiel, dérivé du registre réel) ──────────────
 
+
 @router.get("/catalog")
 def exam_catalog(
     current_user: User = Depends(get_current_active_user),
@@ -31,6 +33,7 @@ def exam_catalog(
 
 
 # ── Cibles TAT par examen ───────────────────────────────────────────────────
+
 
 @router.get("/targets", response_model=list[TatTargetRead])
 def list_targets(
@@ -100,6 +103,7 @@ def seed_defaults(
 
 # ── Saisie / consultation TAT d'un résultat ────────────────────────────────
 
+
 @router.get("/results/{result_id}")
 def get_result_tat(
     result_id: int,
@@ -159,6 +163,7 @@ def update_result_tat(
 
 
 # ── Tableau de bord & alertes ───────────────────────────────────────────────
+
 
 @router.get("/dashboard")
 def tat_dashboard(

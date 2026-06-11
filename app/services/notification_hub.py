@@ -12,6 +12,7 @@ Ce snapshot alimente :
 
 Aucune dépendance externe — pure lecture base + réutilisation des services existants.
 """
+
 from __future__ import annotations
 
 import datetime as dt

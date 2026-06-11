@@ -7,6 +7,7 @@ ligne et le message d'erreur — sans interrompre le traitement des autres ligne
 Transaction : tout est committé en fin de traitement (un seul commit). Les
 lignes invalides sont ignorées et n'empêchent pas l'insertion des lignes valides.
 """
+
 from __future__ import annotations
 
 import csv

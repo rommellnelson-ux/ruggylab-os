@@ -8,6 +8,7 @@ Couche d'unification des vocabulaires biologiques : table de correspondance
 canonique + colonnes d'interprétation bioref complémentaires sur ``results``.
 Strictement additif et idempotent.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -56,9 +57,7 @@ def upgrade() -> None:
             sa.Column("updated_at", sa.DateTime(), nullable=False),
         )
         for col in ("canonical_code", "exam_code", "test_code", "analyte_code", "component_of"):
-            op.create_index(
-                f"ix_biological_code_mappings_{col}", "biological_code_mappings", [col]
-            )
+            op.create_index(f"ix_biological_code_mappings_{col}", "biological_code_mappings", [col])
 
 
 def downgrade() -> None:

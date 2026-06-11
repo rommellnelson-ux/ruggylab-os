@@ -1,4 +1,5 @@
 """Tests — Alertes péremption réactifs + correction de résultats (amend)."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -7,6 +8,7 @@ import uuid
 # ══════════════════════════════════════════════════════════════════════════════
 #  Helpers
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _auth(client) -> dict[str, str]:
     token = client.post(
@@ -79,6 +81,7 @@ def _today_plus(days: int) -> str:
 #  /reagents/expiring
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestReagentExpiry:
     def test_expiring_reagent_appears(self, client):
         """Réactif périmant dans 15j → visible avec days=30."""
@@ -138,7 +141,14 @@ class TestReagentExpiry:
         items = r.json()
         if items:
             item = items[0]
-            for field in ("id", "name", "expiry_date", "days_remaining", "is_expired", "current_stock"):
+            for field in (
+                "id",
+                "name",
+                "expiry_date",
+                "days_remaining",
+                "is_expired",
+                "current_stock",
+            ):
                 assert field in item, f"Champ manquant: {field}"
 
     def test_expiry_alerts_via_critical_alerts(self, client):
@@ -153,6 +163,7 @@ class TestReagentExpiry:
 # ══════════════════════════════════════════════════════════════════════════════
 #  /critical-alerts/expiry-check (webhook — no real target)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestExpiryWebhook:
     def test_expiry_check_without_config_returns_zero(self, client):
@@ -183,6 +194,7 @@ class TestExpiryWebhook:
 #  PATCH /results/{id}/amend
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestResultAmend:
     def test_amend_updates_data_points(self, client):
         """L'amendement met à jour les data_points du résultat."""
@@ -195,7 +207,10 @@ class TestResultAmend:
         r = client.patch(
             f"/api/v1/results/{result_id}/amend",
             headers=hdrs,
-            json={"data_points": {"HGB": 125.0, "WBC": 7.5}, "amendment_reason": "Correction après re-lecture lame"},
+            json={
+                "data_points": {"HGB": 125.0, "WBC": 7.5},
+                "amendment_reason": "Correction après re-lecture lame",
+            },
         )
         assert r.status_code == 200, r.text
         amended = r.json()
@@ -237,9 +252,12 @@ class TestResultAmend:
             "/api/v1/reference-ranges",
             headers=hdrs,
             json={
-                "analyte": analyte, "sex": "*",
-                "age_min": None, "age_max": None,
-                "low_normal": 4.0, "high_normal": 10.0,
+                "analyte": analyte,
+                "sex": "*",
+                "age_min": None,
+                "age_max": None,
+                "low_normal": 4.0,
+                "high_normal": 10.0,
                 "unit": "unit",
             },
         )

@@ -1,4 +1,5 @@
 """Tests — Filtres audit, export CSV, et synthèse de conformité ISO 15189."""
+
 from __future__ import annotations
 
 import uuid
@@ -72,10 +73,14 @@ class TestAuditFilters:
             headers=hdrs,
             json={"username": f"tech_{uid}", "password": "TechPass123!", "role": "technician"},
         )
-        tok = client.post(
-            "/api/v1/login/access-token",
-            data={"username": f"tech_{uid}", "password": "TechPass123!"},
-        ).json().get("access_token")
+        tok = (
+            client.post(
+                "/api/v1/login/access-token",
+                data={"username": f"tech_{uid}", "password": "TechPass123!"},
+            )
+            .json()
+            .get("access_token")
+        )
         if tok:
             r = client.get("/api/v1/audit-events", headers={"Authorization": f"Bearer {tok}"})
             assert r.status_code == 403
@@ -103,10 +108,14 @@ class TestAuditCsvExport:
             headers=hdrs,
             json={"username": f"tech_{uid}", "password": "TechPass123!", "role": "technician"},
         )
-        tok = client.post(
-            "/api/v1/login/access-token",
-            data={"username": f"tech_{uid}", "password": "TechPass123!"},
-        ).json().get("access_token")
+        tok = (
+            client.post(
+                "/api/v1/login/access-token",
+                data={"username": f"tech_{uid}", "password": "TechPass123!"},
+            )
+            .json()
+            .get("access_token")
+        )
         if tok:
             r = client.get(
                 "/api/v1/audit-events/export.csv", headers={"Authorization": f"Bearer {tok}"}
@@ -122,10 +131,18 @@ class TestComplianceSummary:
         assert r.status_code == 200
         data = r.json()
         for field in (
-            "total_results", "validated_results", "auto_validated_results",
-            "critical_total", "critical_acked", "pending_criticals",
-            "amendments", "signed_reports", "validation_rate_pct",
-            "critical_ack_rate_pct", "auto_validation_rate_pct", "status",
+            "total_results",
+            "validated_results",
+            "auto_validated_results",
+            "critical_total",
+            "critical_acked",
+            "pending_criticals",
+            "amendments",
+            "signed_reports",
+            "validation_rate_pct",
+            "critical_ack_rate_pct",
+            "auto_validation_rate_pct",
+            "status",
         ):
             assert field in data, f"Champ manquant: {field}"
         assert data["status"] in ("compliant", "attention")

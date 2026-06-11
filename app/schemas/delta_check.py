@@ -1,4 +1,5 @@
 """Schemas — Règles de delta-check patient."""
+
 from __future__ import annotations
 
 from typing import Self
@@ -16,9 +17,7 @@ class DeltaCheckRuleCreate(BaseModel):
     @model_validator(mode="after")
     def at_least_one_threshold(self) -> Self:
         if self.delta_pct is None and self.delta_abs is None:
-            raise ValueError(
-                "Au moins un seuil (delta_pct ou delta_abs) doit être défini."
-            )
+            raise ValueError("Au moins un seuil (delta_pct ou delta_abs) doit être défini.")
         return self
 
 

@@ -1,4 +1,5 @@
 """Tests — Catalogue d'examens (réel) + parseur du registre maître."""
+
 from __future__ import annotations
 
 from app.services.exam_catalog import EXAM_BY_CODE, EXAM_CATALOG, resolve_exam_code
@@ -19,6 +20,7 @@ def _auth(client) -> dict[str, str]:
 
 
 # ── Catalogue ───────────────────────────────────────────────────────────────
+
 
 class TestExamCatalog:
     def test_catalog_has_core_exams(self):
@@ -68,6 +70,7 @@ class TestCatalogEndpoint:
 
 
 # ── Parseur ─────────────────────────────────────────────────────────────────
+
 
 class TestParseExamToken:
     def test_simple_name(self):
@@ -128,12 +131,21 @@ class TestSplitAndCell:
 class TestImportPreview:
     def test_preview_aggregates(self):
         rows = [
-            {"nom": "M. ESSOH Paul", "date": "13/03/2025",
-             "examens": "NFS ; Urée 0,13 ; Créat 77,2", "montant": 7000,
-             "type_registre": "Hors CMU", "prescripteur": "Wognin"},
-            {"nom": "KOUADJO Ahou", "date": "20/03/2025",
-             "examens": "GE +145 trophozoïtes/champ", "montant": 2000,
-             "type_registre": "Hors CMU"},
+            {
+                "nom": "M. ESSOH Paul",
+                "date": "13/03/2025",
+                "examens": "NFS ; Urée 0,13 ; Créat 77,2",
+                "montant": 7000,
+                "type_registre": "Hors CMU",
+                "prescripteur": "Wognin",
+            },
+            {
+                "nom": "KOUADJO Ahou",
+                "date": "20/03/2025",
+                "examens": "GE +145 trophozoïtes/champ",
+                "montant": 2000,
+                "type_registre": "Hors CMU",
+            },
         ]
         prev = build_import_preview(rows)
         assert prev["total_rows"] == 2

@@ -11,10 +11,12 @@ def _create_engine(database_url: str) -> Engine:
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     engine = create_engine(database_url, future=True, connect_args=connect_args)
     if database_url.startswith("sqlite"):
+
         @event.listens_for(engine, "connect")
         def _set_sqlite_pragmas(dbapi_conn, _rec):  # noqa: ANN001
             dbapi_conn.execute("PRAGMA journal_mode=WAL")
             dbapi_conn.execute("PRAGMA synchronous=NORMAL")
+
     return engine
 
 

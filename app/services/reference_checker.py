@@ -7,6 +7,7 @@ Pour chaque analyte d'un résultat, retourne un flag parmi :
   L   →  basse  (< low_normal)
   LL  →  très basse (< low_normal × 0.70)
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -36,11 +37,7 @@ def compute_flags(
 
     Si aucune plage de référence n'existe pour un analyte, l'analyte est ignoré.
     """
-    ranges = (
-        db.query(ReferenceRange)
-        .filter(ReferenceRange.is_active.is_(True))
-        .all()
-    )
+    ranges = db.query(ReferenceRange).filter(ReferenceRange.is_active.is_(True)).all()
     if not ranges:
         return {}
 

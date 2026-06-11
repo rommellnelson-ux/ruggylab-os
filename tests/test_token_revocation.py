@@ -1,4 +1,5 @@
 """Tests — Révocation des jetons d'accès (denylist jti) + déconnexion + WS."""
+
 from __future__ import annotations
 
 import pytest

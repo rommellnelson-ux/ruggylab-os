@@ -4,6 +4,7 @@ Agrège tous les échantillons et résultats d'un patient, calcule des séries
 temporelles par analyte (pour les sparklines), et produit un Bundle FHIR R4
 regroupant un DiagnosticReport par résultat.
 """
+
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
@@ -31,10 +32,7 @@ def build_patient_history(db: Session, patient: Patient) -> dict:
       utilisable directement pour tracer des sparklines.
     """
     samples = (
-        db.query(Sample)
-        .filter(Sample.patient_id == patient.id)
-        .order_by(Sample.id.asc())
-        .all()
+        db.query(Sample).filter(Sample.patient_id == patient.id).order_by(Sample.id.asc()).all()
     )
     sample_ids = [s.id for s in samples]
     barcode_by_sample = {s.id: s.barcode for s in samples}

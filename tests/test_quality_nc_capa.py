@@ -1,4 +1,5 @@
 """Tests — Module qualité : non-conformités (NC) + actions correctives (CAPA)."""
+
 from __future__ import annotations
 
 import uuid
@@ -24,10 +25,14 @@ def _tech(client) -> dict[str, str] | None:
         headers=hdrs,
         json={"username": f"tech_{u}", "password": "TechPass123!", "role": "technician"},
     )
-    tok = client.post(
-        "/api/v1/login/access-token",
-        data={"username": f"tech_{u}", "password": "TechPass123!"},
-    ).json().get("access_token")
+    tok = (
+        client.post(
+            "/api/v1/login/access-token",
+            data={"username": f"tech_{u}", "password": "TechPass123!"},
+        )
+        .json()
+        .get("access_token")
+    )
     return {"Authorization": f"Bearer {tok}"} if tok else None
 
 
@@ -84,7 +89,9 @@ class TestNonConformityWorkflow:
             assert r.status_code == 200, r.text
             assert r.json()["status"] == target
         # Fermée → closed_at renseigné
-        assert client.get(f"/api/v1/quality/non-conformities/{nid}", headers=hdrs).json()["closed_at"]
+        assert client.get(f"/api/v1/quality/non-conformities/{nid}", headers=hdrs).json()[
+            "closed_at"
+        ]
 
     def test_invalid_transition_rejected(self, client):
         hdrs = _auth(client)

@@ -4,6 +4,7 @@ Génère un document HTML standalone, auto-suffisant (CSS inline, SVG inline),
 conçu pour l'impression A4 et l'export PDF via le navigateur.
 Aucune dépendance externe — stdlib Python uniquement.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -16,14 +17,26 @@ from app.models import QcControl, QcResult
 from app.schemas.qc import QC_REJECT_RULES
 
 _MONTH_NAMES = [
-    "", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-    "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+    "",
+    "Janvier",
+    "Février",
+    "Mars",
+    "Avril",
+    "Mai",
+    "Juin",
+    "Juillet",
+    "Août",
+    "Septembre",
+    "Octobre",
+    "Novembre",
+    "Décembre",
 ]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  SVG Levey-Jennings (server-side)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> str:
     width, height = 600, 180
@@ -37,7 +50,7 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'style="border:1px solid #e5e7eb;border-radius:4px;">'
             f'<text x="50%" y="50%" text-anchor="middle" fill="#9ca3af" font-size="12">'
-            f'Aucune donnée</text></svg>'
+            f"Aucune donnée</text></svg>"
         )
 
     z_scores = [(v - mean) / sd for v in values]
@@ -59,8 +72,10 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
     # Bands
     bands = [
         (-1, 1, "#fef9c3"),
-        (-2, -1, "#fed7aa"), (1, 2, "#fed7aa"),
-        (-3, -2, "#fecaca"), (2, 3, "#fecaca"),
+        (-2, -1, "#fed7aa"),
+        (1, 2, "#fed7aa"),
+        (-3, -2, "#fecaca"),
+        (2, 3, "#fecaca"),
     ]
     for zlo, zhi, fill in bands:
         ytop = py(zhi)
@@ -73,9 +88,12 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
     # Reference lines
     ref_lines = [
         (0, "#374151", 1.4, "none"),
-        (1, "#ca8a04", 0.6, "4 2"), (-1, "#ca8a04", 0.6, "4 2"),
-        (2, "#ea580c", 0.6, "4 2"), (-2, "#ea580c", 0.6, "4 2"),
-        (3, "#dc2626", 0.6, "4 2"), (-3, "#dc2626", 0.6, "4 2"),
+        (1, "#ca8a04", 0.6, "4 2"),
+        (-1, "#ca8a04", 0.6, "4 2"),
+        (2, "#ea580c", 0.6, "4 2"),
+        (-2, "#ea580c", 0.6, "4 2"),
+        (3, "#dc2626", 0.6, "4 2"),
+        (-3, "#dc2626", 0.6, "4 2"),
     ]
     for z, stroke, sw, dash in ref_lines:
         y = py(z)
@@ -93,9 +111,7 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
     # Data polyline
     if n > 1:
         pts = " ".join(f"{px(i):.1f},{py(z):.1f}" for i, z in enumerate(z_scores))
-        parts.append(
-            f'<polyline points="{pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/>'
-        )
+        parts.append(f'<polyline points="{pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/>')
 
     # Data points
     for i, (z, v) in enumerate(zip(z_scores, values, strict=True)):
@@ -124,6 +140,7 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
 # ──────────────────────────────────────────────────────────────────────────────
 #  HTML report builder
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _status_badge(status: str) -> str:
     mapping = {
@@ -174,11 +191,7 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
         # Statistiques observées
         if n > 0:
             obs_mean = sum(values) / n
-            obs_sd = (
-                math.sqrt(sum((v - obs_mean) ** 2 for v in values) / (n - 1))
-                if n > 1
-                else 0.0
-            )
+            obs_sd = math.sqrt(sum((v - obs_mean) ** 2 for v in values) / (n - 1)) if n > 1 else 0.0
         else:
             obs_mean, obs_sd = 0.0, 0.0
 
@@ -208,11 +221,7 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
         else:
             status = "ok"
 
-        row_bg = (
-            "#fee2e2" if status == "reject"
-            else "#fef3c7" if status == "warn"
-            else "white"
-        )
+        row_bg = "#fee2e2" if status == "reject" else "#fef3c7" if status == "warn" else "white"
         obs_mean_s = f"{obs_mean:.3f}" if n > 0 else "—"
         obs_sd_s = f"{obs_sd:.3f}" if n > 0 else "—"
         summary_rows_html += (
@@ -241,11 +250,7 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
                 viols = []
             is_reject = any(v in QC_REJECT_RULES for v in viols)
             is_warn = any(v == "1-2s" for v in viols) and not is_reject
-            zbg = (
-                "#fee2e2" if is_reject
-                else "#fef3c7" if is_warn
-                else "white"
-            )
+            zbg = "#fee2e2" if is_reject else "#fef3c7" if is_warn else "white"
             z = (r.value - ctrl.target_mean) / ctrl.target_sd if ctrl.target_sd > 0 else 0
             detail_rows += (
                 f"<tr style='background:{zbg};'>"
@@ -268,12 +273,8 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
         """
 
     total_controls = len(controls)
-    total_reject = sum(
-        1 for row in summary_rows_html.split("<tr") if "fee2e2" in row
-    )
-    total_warn = sum(
-        1 for row in summary_rows_html.split("<tr") if "fef3c7" in row
-    )
+    total_reject = sum(1 for row in summary_rows_html.split("<tr") if "fee2e2" in row)
+    total_warn = sum(1 for row in summary_rows_html.split("<tr") if "fef3c7" in row)
 
     html = f"""<!DOCTYPE html>
 <html lang="fr">

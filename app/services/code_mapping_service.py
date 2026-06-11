@@ -4,6 +4,7 @@ Relie exam_code ↔ test_code ↔ analyte via ``BiologicalCodeMapping`` et appli
 une interprétation bioref **complémentaire** au cycle de vie du résultat, sans
 modifier le moteur existant (ReferenceRange/compute_flags, CriticalRange).
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -19,8 +20,8 @@ from app.services.bioref_service import (
 )
 from app.services.code_mapping_data import CODE_MAPPING_SEED
 
-
 # ── Résolveurs ──────────────────────────────────────────────────────────────
+
 
 def _active(db: Session):
     return db.query(BiologicalCodeMapping).filter(BiologicalCodeMapping.is_active.is_(True))
@@ -70,7 +71,10 @@ def get_components(db: Session, panel_code: str) -> list[BiologicalCodeMapping]:
 
 
 def get_canonical_code(
-    db: Session, *, exam_code: str | None = None, test_code: str | None = None,
+    db: Session,
+    *,
+    exam_code: str | None = None,
+    test_code: str | None = None,
     analyte_code: str | None = None,
 ) -> str | None:
     """Renvoie le canonical_code à partir de n'importe quel vocabulaire."""
@@ -127,6 +131,7 @@ def get_bioref_code_for_result(
 
 # ── Extraction de valeur + interprétation ───────────────────────────────────
 
+
 def _to_number(raw) -> float | None:
     if isinstance(raw, bool):
         return None
@@ -159,8 +164,10 @@ def _patient_context(result) -> tuple[str | None, float | None]:
     age = None
     if patient.birth_date:
         today = dt.date.today()
-        age = today.year - patient.birth_date.year - (
-            (today.month, today.day) < (patient.birth_date.month, patient.birth_date.day)
+        age = (
+            today.year
+            - patient.birth_date.year
+            - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
         )
     return sex, age
 
@@ -214,8 +221,9 @@ def interpret_result_bioref(db: Session, result) -> dict | None:
         }
 
     # Test simple : valeur numérique si présente, sinon qualitatif (None)
-    value = _find_value(dp, [mapping.analyte_code, mapping.exam_code, mapping.test_code,
-                             mapping.canonical_code])
+    value = _find_value(
+        dp, [mapping.analyte_code, mapping.exam_code, mapping.test_code, mapping.canonical_code]
+    )
     interp = _interpret_one(db, mapping.test_code, value, sex, age)
     return {
         "is_panel": False,
@@ -243,6 +251,7 @@ def apply_bioref_to_result(db: Session, result) -> bool:
 
 
 # ── Seed + orphelins ────────────────────────────────────────────────────────
+
 
 def seed_mappings(db: Session) -> int:
     """Insère les correspondances absentes (idempotent). Retourne le nombre créé."""

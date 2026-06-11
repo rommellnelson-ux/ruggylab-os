@@ -1,4 +1,5 @@
 """Tests — Fan-out Redis du bus de notifications + édition patient (PATCH)."""
+
 from __future__ import annotations
 
 import uuid
@@ -31,6 +32,7 @@ def _make_patient(client, hdrs, **over) -> dict:
 
 
 # ── Fan-out Redis (seam testé sans Redis réel) ──────────────────────────────
+
 
 class TestRedisFanoutSeam:
     def test_publisher_receives_tagged_event(self):
@@ -77,7 +79,9 @@ class TestRedisFanoutSeam:
                 # Message émis par CE worker → ignoré
                 nb.inject_remote_event({"type": "critical", "_origin": nb.WORKER_ID})
                 # Message d'un AUTRE worker → injecté
-                nb.inject_remote_event({"type": "critical", "_origin": "other-worker", "result_id": 5})
+                nb.inject_remote_event(
+                    {"type": "critical", "_origin": "other-worker", "result_id": 5}
+                )
                 event = await asyncio.wait_for(q.get(), timeout=1)
                 # Le premier (écho) a été ignoré ; on reçoit donc le second
                 return event.get("result_id") == 5 and "_origin" not in event
@@ -95,6 +99,7 @@ class TestRedisFanoutSeam:
 
 
 # ── Édition patient (PATCH) ─────────────────────────────────────────────────
+
 
 class TestPatientUpdate:
     def test_update_unit(self, client):
@@ -156,10 +161,14 @@ class TestPatientUpdate:
             headers=admin,
             json={"username": f"tech_{u}", "password": "TechPass123!", "role": "technician"},
         )
-        tok = client.post(
-            "/api/v1/login/access-token",
-            data={"username": f"tech_{u}", "password": "TechPass123!"},
-        ).json().get("access_token")
+        tok = (
+            client.post(
+                "/api/v1/login/access-token",
+                data={"username": f"tech_{u}", "password": "TechPass123!"},
+            )
+            .json()
+            .get("access_token")
+        )
         if tok:
             r = client.patch(
                 f"/api/v1/patients/{p['id']}",

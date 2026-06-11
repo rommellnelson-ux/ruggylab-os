@@ -1,4 +1,5 @@
 """API — Alertes pour valeurs critiques non-acquittées."""
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -49,10 +50,7 @@ def list_notif_configs(
 ) -> list[NotifConfig]:
     del current_user
     return (
-        db.query(NotifConfig)
-        .filter(NotifConfig.is_active.is_(True))
-        .order_by(NotifConfig.id)
-        .all()
+        db.query(NotifConfig).filter(NotifConfig.is_active.is_(True)).order_by(NotifConfig.id).all()
     )
 
 

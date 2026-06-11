@@ -1,4 +1,5 @@
 """Tests — Import en lot CSV (patients + réactifs)."""
+
 from __future__ import annotations
 
 import uuid
@@ -69,7 +70,13 @@ class TestBulkImportPatients:
         client.post(
             "/api/v1/patients",
             headers=hdrs,
-            json={"ipp_unique_id": ipp, "first_name": "X", "last_name": "Y", "birth_date": "1980-01-01", "sex": "M"},
+            json={
+                "ipp_unique_id": ipp,
+                "first_name": "X",
+                "last_name": "Y",
+                "birth_date": "1980-01-01",
+                "sex": "M",
+            },
         )
         csv = f"ipp_unique_id,first_name,last_name,birth_date,sex\n{ipp},A,B,1990-01-01,M\n"
         r = client.post("/api/v1/bulk-import/patients", headers=hdrs, json={"csv": csv})
@@ -85,10 +92,14 @@ class TestBulkImportPatients:
             headers=hdrs,
             json={"username": f"tech_{u}", "password": "TechPass123!", "role": "technician"},
         )
-        tok = client.post(
-            "/api/v1/login/access-token",
-            data={"username": f"tech_{u}", "password": "TechPass123!"},
-        ).json().get("access_token")
+        tok = (
+            client.post(
+                "/api/v1/login/access-token",
+                data={"username": f"tech_{u}", "password": "TechPass123!"},
+            )
+            .json()
+            .get("access_token")
+        )
         if tok:
             r = client.post(
                 "/api/v1/bulk-import/patients",

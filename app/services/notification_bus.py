@@ -9,6 +9,7 @@ réveille tous les abonnés. Mono-processus ; pour le multi-worker, brancher un
 publish/subscribe Redis sur ``publish`` / un consommateur dédié (point
 d'extension documenté).
 """
+
 from __future__ import annotations
 
 import asyncio

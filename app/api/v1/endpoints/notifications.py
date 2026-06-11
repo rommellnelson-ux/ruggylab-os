@@ -1,4 +1,5 @@
 """Notifications temps-réel — feed REST (polling) + WebSocket (push périodique)."""
+
 from __future__ import annotations
 
 import asyncio

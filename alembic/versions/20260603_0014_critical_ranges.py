@@ -36,9 +36,7 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
         )
         op.create_index(op.f("ix_critical_ranges_id"), "critical_ranges", ["id"])
-        op.create_index(
-            op.f("ix_critical_ranges_analyte"), "critical_ranges", ["analyte"]
-        )
+        op.create_index(op.f("ix_critical_ranges_analyte"), "critical_ranges", ["analyte"])
 
 
 def downgrade() -> None:

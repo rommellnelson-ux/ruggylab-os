@@ -7,6 +7,7 @@ Create Date: 2026-06-03 00:00:23
 Liste de révocation des jetons d'accès JWT par ``jti``. Permet d'invalider
 un jeton d'accès avant son expiration (déconnexion, compromission).
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -30,9 +31,7 @@ def upgrade() -> None:
             sa.Column("expires_at", sa.DateTime(), nullable=False),
             sa.Column("revoked_at", sa.DateTime(), nullable=False),
         )
-        op.create_index(
-            "ix_revoked_tokens_jti", "revoked_tokens", ["jti"], unique=True
-        )
+        op.create_index("ix_revoked_tokens_jti", "revoked_tokens", ["jti"], unique=True)
 
 
 def downgrade() -> None:

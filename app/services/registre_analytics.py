@@ -5,6 +5,7 @@ JSON) sans rien persister : volumétrie, recettes et part CMU, top examens,
 positivité paludisme (goutte épaisse), répartition mensuelle, prescripteurs.
 Logique pure — aucun accès base, aucune donnée patient conservée.
 """
+
 from __future__ import annotations
 
 import collections
@@ -83,10 +84,7 @@ def compute_registre_analytics(rows: list[dict]) -> dict:
                 if token["qualitative"] == "positive":
                     malaria_positive += 1
 
-    months = [
-        {"month": m, **vals}
-        for m, vals in sorted(by_month.items())
-    ]
+    months = [{"month": m, **vals} for m, vals in sorted(by_month.items())]
     malaria_rate = round(malaria_positive / malaria_tested * 100, 1) if malaria_tested else 0.0
 
     return {

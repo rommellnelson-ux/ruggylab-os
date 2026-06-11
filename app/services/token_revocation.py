@@ -4,6 +4,7 @@ Les jetons d'accès sont sans état ; pour les invalider avant expiration on
 enregistre leur ``jti`` dans la table ``revoked_tokens``. Tout jeton dont le
 ``jti`` y figure (et non encore expiré) est rejeté.
 """
+
 from __future__ import annotations
 
 import datetime as dt

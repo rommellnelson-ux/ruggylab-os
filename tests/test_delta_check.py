@@ -1,7 +1,6 @@
 """Tests — Delta-check patient (service + API + intégration create_result)."""
 
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 #  Helpers
 # ══════════════════════════════════════════════════════════════════════════════
@@ -51,15 +50,17 @@ def _post_result(client, headers, sample_id: int, data_points: dict) -> dict:
 
 
 class TestDeltaCheckRuleApi:
-
     def test_list_requires_auth(self, client) -> None:
         assert client.get("/api/v1/delta-check-rules").status_code == 401
 
     def test_create_requires_officer(self, client) -> None:
-        assert client.post(
-            "/api/v1/delta-check-rules",
-            json={"analyte": "HGB", "delta_pct": 20.0},
-        ).status_code == 401
+        assert (
+            client.post(
+                "/api/v1/delta-check-rules",
+                json={"analyte": "HGB", "delta_pct": 20.0},
+            ).status_code
+            == 401
+        )
 
     def test_create_without_threshold_rejected(self, client) -> None:
         headers = _admin_headers(client)
@@ -88,19 +89,25 @@ class TestDeltaCheckRuleApi:
 
     def test_duplicate_analyte_rejected(self, client) -> None:
         headers = _admin_headers(client)
-        client.post("/api/v1/delta-check-rules", headers=headers,
-                    json={"analyte": "WBC", "delta_pct": 30.0})
-        resp = client.post("/api/v1/delta-check-rules", headers=headers,
-                           json={"analyte": "WBC", "delta_abs": 5.0})
+        client.post(
+            "/api/v1/delta-check-rules", headers=headers, json={"analyte": "WBC", "delta_pct": 30.0}
+        )
+        resp = client.post(
+            "/api/v1/delta-check-rules", headers=headers, json={"analyte": "WBC", "delta_abs": 5.0}
+        )
         assert resp.status_code == 409
 
     def test_deactivate_removes_from_list(self, client) -> None:
         headers = _admin_headers(client)
-        rule = client.post("/api/v1/delta-check-rules", headers=headers,
-                           json={"analyte": "PLT", "delta_abs": 100.0}).json()
-        assert client.delete(
-            f"/api/v1/delta-check-rules/{rule['id']}", headers=headers
-        ).status_code == 200
+        rule = client.post(
+            "/api/v1/delta-check-rules",
+            headers=headers,
+            json={"analyte": "PLT", "delta_abs": 100.0},
+        ).json()
+        assert (
+            client.delete(f"/api/v1/delta-check-rules/{rule['id']}", headers=headers).status_code
+            == 200
+        )
         ids = [r["id"] for r in client.get("/api/v1/delta-check-rules", headers=headers).json()]
         assert rule["id"] not in ids
 
@@ -115,12 +122,12 @@ class TestDeltaCheckRuleApi:
 
 
 class TestDeltaCheckIntegration:
-
     def test_first_result_no_delta(self, client) -> None:
         """Premier résultat pour un patient → pas de delta (pas de précédent)."""
         headers = _admin_headers(client)
-        client.post("/api/v1/delta-check-rules", headers=headers,
-                    json={"analyte": "HGB", "delta_abs": 20.0})
+        client.post(
+            "/api/v1/delta-check-rules", headers=headers, json={"analyte": "HGB", "delta_abs": 20.0}
+        )
         patient_id = _make_patient(client, headers, "IPP-DC-101")
         sample_id = _make_sample(client, headers, patient_id, "DC-S001")
         result = _post_result(client, headers, sample_id, {"HGB": 130.0})
@@ -130,8 +137,9 @@ class TestDeltaCheckIntegration:
     def test_delta_abs_flagged(self, client) -> None:
         """Variation absolue > seuil → delta_exceeded=True."""
         headers = _admin_headers(client)
-        client.post("/api/v1/delta-check-rules", headers=headers,
-                    json={"analyte": "HGB", "delta_abs": 20.0})
+        client.post(
+            "/api/v1/delta-check-rules", headers=headers, json={"analyte": "HGB", "delta_abs": 20.0}
+        )
         patient_id = _make_patient(client, headers, "IPP-DC-102")
         # Résultat 1
         s1 = _make_sample(client, headers, patient_id, "DC-S101")
@@ -145,8 +153,9 @@ class TestDeltaCheckIntegration:
     def test_delta_pct_flagged(self, client) -> None:
         """Variation en % > seuil → delta_exceeded=True."""
         headers = _admin_headers(client)
-        client.post("/api/v1/delta-check-rules", headers=headers,
-                    json={"analyte": "WBC", "delta_pct": 25.0})
+        client.post(
+            "/api/v1/delta-check-rules", headers=headers, json={"analyte": "WBC", "delta_pct": 25.0}
+        )
         patient_id = _make_patient(client, headers, "IPP-DC-103")
         s1 = _make_sample(client, headers, patient_id, "DC-S201")
         _post_result(client, headers, s1, {"WBC": 8.0})
@@ -158,8 +167,11 @@ class TestDeltaCheckIntegration:
     def test_within_threshold_not_flagged(self, client) -> None:
         """Petite variation → pas de flag."""
         headers = _admin_headers(client)
-        client.post("/api/v1/delta-check-rules", headers=headers,
-                    json={"analyte": "PLT", "delta_abs": 100.0})
+        client.post(
+            "/api/v1/delta-check-rules",
+            headers=headers,
+            json={"analyte": "PLT", "delta_abs": 100.0},
+        )
         patient_id = _make_patient(client, headers, "IPP-DC-104")
         s1 = _make_sample(client, headers, patient_id, "DC-S301")
         _post_result(client, headers, s1, {"PLT": 250.0})
@@ -170,10 +182,12 @@ class TestDeltaCheckIntegration:
     def test_no_patient_no_delta(self, client) -> None:
         """Échantillon sans patient → pas de delta-check possible."""
         headers = _admin_headers(client)
-        client.post("/api/v1/delta-check-rules", headers=headers,
-                    json={"analyte": "HGB", "delta_abs": 20.0})
+        client.post(
+            "/api/v1/delta-check-rules", headers=headers, json={"analyte": "HGB", "delta_abs": 20.0}
+        )
         sample_id = client.post(
-            "/api/v1/samples", headers=headers,
+            "/api/v1/samples",
+            headers=headers,
             json={"barcode": "DC-NOPATIENT", "status": "Recu"},
         ).json()["id"]
         result = _post_result(client, headers, sample_id, {"HGB": 90.0})

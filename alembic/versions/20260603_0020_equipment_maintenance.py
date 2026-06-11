@@ -7,6 +7,7 @@ Create Date: 2026-06-03 00:00:20
 Nouvelle table pour la planification et le suivi de maintenance / étalonnage
 des équipements de laboratoire.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -32,7 +33,9 @@ def upgrade() -> None:
                 nullable=False,
                 index=True,
             ),
-            sa.Column("maintenance_type", sa.String(30), nullable=False, server_default="preventive"),
+            sa.Column(
+                "maintenance_type", sa.String(30), nullable=False, server_default="preventive"
+            ),
             sa.Column("scheduled_at", sa.DateTime(), nullable=True),
             sa.Column("performed_at", sa.DateTime(), nullable=True),
             sa.Column(

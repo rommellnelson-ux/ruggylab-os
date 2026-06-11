@@ -1,10 +1,11 @@
 """E2E tests for RuggyLab OS using Playwright."""
-import asyncio
 
 import pytest
 
 # Optional dependency: skip cleanly if Playwright is not installed locally.
-async_playwright = pytest.importorskip("playwright.async_api", reason="Playwright not installed").async_playwright
+async_playwright = pytest.importorskip(
+    "playwright.async_api", reason="Playwright not installed"
+).async_playwright
 
 
 @pytest.mark.anyio
@@ -32,6 +33,7 @@ async def test_login_flow():
         await browser.close()
 
 
+@pytest.mark.anyio
 async def test_sample_creation_flow():
     """Test creating a sample via UI."""
     async with async_playwright() as p:
@@ -52,10 +54,3 @@ async def test_sample_creation_flow():
         assert await page.is_visible("text=Sample Code")
 
         await browser.close()
-
-
-@pytest.mark.anyio
-async def test_sample_creation_flow():
-    asyncio.run(test_login_flow())
-    asyncio.run(test_sample_creation_flow())
-    print("✓ E2E tests passed")

@@ -1,4 +1,5 @@
 """Schemas — Configuration des alertes critiques non-acquittées."""
+
 from __future__ import annotations
 
 from typing import Self
@@ -10,8 +11,10 @@ class NotifConfigCreate(BaseModel):
     webhook_url: str | None = Field(None, max_length=500)
     email: str | None = Field(None, max_length=200)
     delay_minutes: int = Field(
-        default=30, ge=1, le=1440,
-        description="Délai (min) avant envoi d'une alerte pour un résultat critique non-acquitté"
+        default=30,
+        ge=1,
+        le=1440,
+        description="Délai (min) avant envoi d'une alerte pour un résultat critique non-acquitté",
     )
 
     @model_validator(mode="after")

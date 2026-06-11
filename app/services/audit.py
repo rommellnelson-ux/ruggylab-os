@@ -27,7 +27,9 @@ def log_audit_event(
         event_type=event_type,
         entity_type=entity_type,
         entity_id=entity_id,
-        payload=json.dumps(payload, ensure_ascii=True, default=_json_default) if payload is not None else None,
+        payload=json.dumps(payload, ensure_ascii=True, default=_json_default)
+        if payload is not None
+        else None,
     )
     db.add(event)
     return event

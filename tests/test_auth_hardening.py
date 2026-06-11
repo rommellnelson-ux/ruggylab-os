@@ -1,4 +1,5 @@
 """Auth hardening tests: RBAC, token expiry, brute force protection."""
+
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -16,9 +17,7 @@ class TestAuthHardening:
             "sub": "test@example.com",
             "exp": datetime.now(UTC) - timedelta(hours=1),
         }
-        token = jwt.encode(
-            payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-        )
+        token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
         response = client.get(
             "/api/v1/users/me",

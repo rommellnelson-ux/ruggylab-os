@@ -3,6 +3,7 @@
 Les lignes du registre sont postées en JSON (le client extrait le tableur).
 Aucune donnée patient n'est conservée hors d'un import explicitement confirmé.
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -57,8 +58,6 @@ def registre_import(
             detail="Import réel : 'confirm' doit être true (dry_run=false).",
         )
     try:
-        return import_registre_rows(
-            db, payload.rows, user=current_user, dry_run=payload.dry_run
-        )
+        return import_registre_rows(db, payload.rows, user=current_user, dry_run=payload.dry_run)
     except RegistreImportTooLargeError as exc:
         raise HTTPException(status_code=413, detail=str(exc)) from exc

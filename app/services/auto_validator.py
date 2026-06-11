@@ -9,6 +9,7 @@ dans ``AutoValidationConfig`` sont satisfaites :
 Aucune modification de la session n'est commitée ici ; l'appelant
 doit faire le ``db.commit()`` après.
 """
+
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
@@ -24,9 +25,7 @@ def try_auto_validate(result: Result, db: Session) -> bool:
     auto-validé, ``False`` sinon.  Ne commite pas la session.
     """
     config: AutoValidationConfig | None = (
-        db.query(AutoValidationConfig)
-        .filter(AutoValidationConfig.is_active.is_(True))
-        .first()
+        db.query(AutoValidationConfig).filter(AutoValidationConfig.is_active.is_(True)).first()
     )
     if not config:
         return False
@@ -60,9 +59,7 @@ def batch_auto_validate(db: Session, limit: int = 200) -> dict:
     Retourne ``{"processed": int, "auto_validated": int}``.
     """
     config: AutoValidationConfig | None = (
-        db.query(AutoValidationConfig)
-        .filter(AutoValidationConfig.is_active.is_(True))
-        .first()
+        db.query(AutoValidationConfig).filter(AutoValidationConfig.is_active.is_(True)).first()
     )
     if not config:
         return {"processed": 0, "auto_validated": 0, "error": "Aucune règle active"}

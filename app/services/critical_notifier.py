@@ -3,6 +3,7 @@
 Surveille les résultats critiques non-acquittés depuis plus de `delay_minutes`
 et envoie des webhooks HTTP POST (stdlib uniquement, aucune dépendance externe).
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -55,11 +56,7 @@ def get_pending_criticals(db: Session, delay_minutes: int = 30) -> list[dict]:
     now = utcnow_naive()
     result = []
     for r in unacked:
-        elapsed = (
-            int((now - r.analysis_date).total_seconds() / 60)
-            if r.analysis_date
-            else 0
-        )
+        elapsed = int((now - r.analysis_date).total_seconds() / 60) if r.analysis_date else 0
         result.append(
             {
                 "result_id": r.id,
@@ -79,11 +76,7 @@ def check_and_notify(db: Session) -> dict:
     -------
     {"notified": int, "pending": int}
     """
-    configs = (
-        db.query(NotifConfig)
-        .filter(NotifConfig.is_active.is_(True))
-        .all()
-    )
+    configs = db.query(NotifConfig).filter(NotifConfig.is_active.is_(True)).all()
     if not configs:
         pending = (
             db.query(Result)

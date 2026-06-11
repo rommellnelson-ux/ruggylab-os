@@ -1,4 +1,5 @@
 """Auto-validation ISO 15189 §5.8 — configuration et déclenchement."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 

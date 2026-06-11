@@ -3,6 +3,7 @@
 Compare chaque nouvelle valeur d'analyte au résultat précédent du même patient.
 Déclenche un flag si la variation absolue ou en pourcentage dépasse le seuil configuré.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -49,11 +50,7 @@ def check_delta(
     if patient_id is None:
         return False, {}
 
-    rules = (
-        db.query(DeltaCheckRule)
-        .filter(DeltaCheckRule.is_active.is_(True))
-        .all()
-    )
+    rules = db.query(DeltaCheckRule).filter(DeltaCheckRule.is_active.is_(True)).all()
     if not rules:
         return False, {}
 

@@ -5,6 +5,7 @@ sauvegarde (savepoint) par ligne, insertion ORM directe (pas de consommation
 de réactifs ni d'auto-validation — il s'agit d'un historique). Mode dry-run
 par défaut : rien n'est persisté tant que ``dry_run=False`` ET ``confirm=True``.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -72,8 +73,11 @@ def import_registre_rows(
     for idx, row in enumerate(rows, start=1):
         try:
             full_name = (
-                row.get("nom") or row.get("patient") or row.get("nom_patient")
-                or row.get("Nom et prénoms") or ""
+                row.get("nom")
+                or row.get("patient")
+                or row.get("nom_patient")
+                or row.get("Nom et prénoms")
+                or ""
             ).strip()
             if not full_name:
                 raise ValueError("nom patient manquant")
@@ -93,9 +97,7 @@ def import_registre_rows(
             if not estimated:
                 estimated_birth += 1
             coll_date = _parse_date(row.get("date") or row.get("date_demande") or row.get("Date"))
-            coll_dt = (
-                dt.datetime.combine(coll_date, dt.time(8, 0)) if coll_date else utcnow_naive()
-            )
+            coll_dt = dt.datetime.combine(coll_date, dt.time(8, 0)) if coll_date else utcnow_naive()
             uid = uuid.uuid4().hex[:6]
 
             with db.begin_nested():

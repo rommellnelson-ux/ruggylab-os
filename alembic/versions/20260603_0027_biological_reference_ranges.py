@@ -7,6 +7,7 @@ Create Date: 2026-06-03 00:00:27
 Référentiel de valeurs biologiques de référence (IFCC/Tietz/OMS…), stratifié
 par sexe et âge, avec seuils critiques et interprétation. Migration idempotente.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

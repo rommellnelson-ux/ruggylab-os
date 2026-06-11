@@ -1,4 +1,5 @@
 """ML model serving utilities for RuggyLab OS."""
+
 from __future__ import annotations
 
 import logging

@@ -1,4 +1,5 @@
 """Tests — Valeurs de référence par analyte/sexe/âge (service + API + intégration)."""
+
 import datetime as dt
 
 from app.services.reference_checker import compute_flags
@@ -118,8 +119,7 @@ def _admin_headers(client) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _make_patient(client, headers, ipp: str, sex: str = "M",
-                  birth: str = "1990-01-01") -> int:
+def _make_patient(client, headers, ipp: str, sex: str = "M", birth: str = "1990-01-01") -> int:
     return client.post(
         "/api/v1/patients",
         headers=headers,
@@ -147,15 +147,17 @@ def _make_sample(client, headers, patient_id: int, barcode: str) -> int:
 
 
 class TestReferenceRangeApi:
-
     def test_list_requires_auth(self, client) -> None:
         assert client.get("/api/v1/reference-ranges").status_code == 401
 
     def test_create_requires_officer(self, client) -> None:
-        assert client.post(
-            "/api/v1/reference-ranges",
-            json={"analyte": "HGB", "low_normal": 110.0},
-        ).status_code == 401
+        assert (
+            client.post(
+                "/api/v1/reference-ranges",
+                json={"analyte": "HGB", "low_normal": 110.0},
+            ).status_code
+            == 401
+        )
 
     def test_create_without_any_bound_rejected(self, client) -> None:
         headers = _admin_headers(client)
@@ -171,8 +173,13 @@ class TestReferenceRangeApi:
         resp = client.post(
             "/api/v1/reference-ranges",
             headers=headers,
-            json={"analyte": "HGB", "sex": "M", "low_normal": 130.0,
-                  "high_normal": 175.0, "unit": "g/L"},
+            json={
+                "analyte": "HGB",
+                "sex": "M",
+                "low_normal": 130.0,
+                "high_normal": 175.0,
+                "unit": "g/L",
+            },
         )
         assert resp.status_code == 201, resp.text
         data = resp.json()
@@ -185,12 +192,15 @@ class TestReferenceRangeApi:
 
     def test_deactivate_removes_from_list(self, client) -> None:
         headers = _admin_headers(client)
-        rr = client.post("/api/v1/reference-ranges", headers=headers,
-                         json={"analyte": "WBC", "low_normal": 4.0,
-                               "high_normal": 10.0}).json()
-        assert client.delete(
-            f"/api/v1/reference-ranges/{rr['id']}", headers=headers
-        ).status_code == 200
+        rr = client.post(
+            "/api/v1/reference-ranges",
+            headers=headers,
+            json={"analyte": "WBC", "low_normal": 4.0, "high_normal": 10.0},
+        ).json()
+        assert (
+            client.delete(f"/api/v1/reference-ranges/{rr['id']}", headers=headers).status_code
+            == 200
+        )
         ids = [r["id"] for r in client.get("/api/v1/reference-ranges", headers=headers).json()]
         assert rr["id"] not in ids
 
@@ -205,54 +215,69 @@ class TestReferenceRangeApi:
 
 
 class TestReferenceFlagsIntegration:
-
     def test_high_flag_in_result(self, client) -> None:
         headers = _admin_headers(client)
-        client.post("/api/v1/reference-ranges", headers=headers,
-                    json={"analyte": "WBC", "low_normal": 4.0, "high_normal": 10.0})
+        client.post(
+            "/api/v1/reference-ranges",
+            headers=headers,
+            json={"analyte": "WBC", "low_normal": 4.0, "high_normal": 10.0},
+        )
         patient_id = _make_patient(client, headers, "IPP-RR-001")
         sample_id = _make_sample(client, headers, patient_id, "RR-S001")
-        result = client.post("/api/v1/results", headers=headers,
-                             json={"sample_id": sample_id,
-                                   "data_points": {"WBC": 12.0},
-                                   "is_critical": False}).json()
+        result = client.post(
+            "/api/v1/results",
+            headers=headers,
+            json={"sample_id": sample_id, "data_points": {"WBC": 12.0}, "is_critical": False},
+        ).json()
         assert result["flags"] is not None
         assert result["flags"].get("WBC") == "H"
 
     def test_very_high_flag_in_result(self, client) -> None:
         headers = _admin_headers(client)
-        client.post("/api/v1/reference-ranges", headers=headers,
-                    json={"analyte": "WBC", "low_normal": 4.0, "high_normal": 10.0})
+        client.post(
+            "/api/v1/reference-ranges",
+            headers=headers,
+            json={"analyte": "WBC", "low_normal": 4.0, "high_normal": 10.0},
+        )
         patient_id = _make_patient(client, headers, "IPP-RR-002")
         sample_id = _make_sample(client, headers, patient_id, "RR-S002")
-        result = client.post("/api/v1/results", headers=headers,
-                             json={"sample_id": sample_id,
-                                   "data_points": {"WBC": 14.0},
-                                   "is_critical": False}).json()
+        result = client.post(
+            "/api/v1/results",
+            headers=headers,
+            json={"sample_id": sample_id, "data_points": {"WBC": 14.0}, "is_critical": False},
+        ).json()
         assert result["flags"]["WBC"] == "HH"
 
     def test_low_flag_in_result(self, client) -> None:
         headers = _admin_headers(client)
-        client.post("/api/v1/reference-ranges", headers=headers,
-                    json={"analyte": "HGB", "low_normal": 120.0, "high_normal": 160.0})
+        client.post(
+            "/api/v1/reference-ranges",
+            headers=headers,
+            json={"analyte": "HGB", "low_normal": 120.0, "high_normal": 160.0},
+        )
         patient_id = _make_patient(client, headers, "IPP-RR-003")
         sample_id = _make_sample(client, headers, patient_id, "RR-S003")
-        result = client.post("/api/v1/results", headers=headers,
-                             json={"sample_id": sample_id,
-                                   "data_points": {"HGB": 110.0},
-                                   "is_critical": False}).json()
+        result = client.post(
+            "/api/v1/results",
+            headers=headers,
+            json={"sample_id": sample_id, "data_points": {"HGB": 110.0}, "is_critical": False},
+        ).json()
         assert result["flags"]["HGB"] == "L"
 
     def test_normal_flag_in_result(self, client) -> None:
         headers = _admin_headers(client)
-        client.post("/api/v1/reference-ranges", headers=headers,
-                    json={"analyte": "PLT", "low_normal": 150.0, "high_normal": 400.0})
+        client.post(
+            "/api/v1/reference-ranges",
+            headers=headers,
+            json={"analyte": "PLT", "low_normal": 150.0, "high_normal": 400.0},
+        )
         patient_id = _make_patient(client, headers, "IPP-RR-004")
         sample_id = _make_sample(client, headers, patient_id, "RR-S004")
-        result = client.post("/api/v1/results", headers=headers,
-                             json={"sample_id": sample_id,
-                                   "data_points": {"PLT": 250.0},
-                                   "is_critical": False}).json()
+        result = client.post(
+            "/api/v1/results",
+            headers=headers,
+            json={"sample_id": sample_id, "data_points": {"PLT": 250.0}, "is_critical": False},
+        ).json()
         assert result["flags"]["PLT"] == "N"
 
     def test_no_range_no_flag(self, client) -> None:
@@ -260,24 +285,27 @@ class TestReferenceFlagsIntegration:
         headers = _admin_headers(client)
         patient_id = _make_patient(client, headers, "IPP-RR-005")
         sample_id = _make_sample(client, headers, patient_id, "RR-S005")
-        result = client.post("/api/v1/results", headers=headers,
-                             json={"sample_id": sample_id,
-                                   "data_points": {"UNKNOWN": 99.0},
-                                   "is_critical": False}).json()
+        result = client.post(
+            "/api/v1/results",
+            headers=headers,
+            json={"sample_id": sample_id, "data_points": {"UNKNOWN": 99.0}, "is_critical": False},
+        ).json()
         assert result["flags"] is None or "UNKNOWN" not in (result["flags"] or {})
 
     def test_sex_specific_range_male_patient(self, client) -> None:
         """Plage masculine appliquée correctement à un patient M."""
         headers = _admin_headers(client)
-        client.post("/api/v1/reference-ranges", headers=headers,
-                    json={"analyte": "HGB", "sex": "M",
-                          "low_normal": 130.0, "high_normal": 175.0})
-        patient_id = _make_patient(client, headers, "IPP-RR-006", sex="M",
-                                   birth="1985-01-01")
+        client.post(
+            "/api/v1/reference-ranges",
+            headers=headers,
+            json={"analyte": "HGB", "sex": "M", "low_normal": 130.0, "high_normal": 175.0},
+        )
+        patient_id = _make_patient(client, headers, "IPP-RR-006", sex="M", birth="1985-01-01")
         sample_id = _make_sample(client, headers, patient_id, "RR-S006")
         # 125 < 130 → L
-        result = client.post("/api/v1/results", headers=headers,
-                             json={"sample_id": sample_id,
-                                   "data_points": {"HGB": 125.0},
-                                   "is_critical": False}).json()
+        result = client.post(
+            "/api/v1/results",
+            headers=headers,
+            json={"sample_id": sample_id, "data_points": {"HGB": 125.0}, "is_critical": False},
+        ).json()
         assert result["flags"]["HGB"] == "L"

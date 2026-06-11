@@ -9,6 +9,7 @@ Nouvelles colonnes sur la table results :
 - auto_validated_at   : datetime, horodatage de l'auto-validation
 - amendment_reason    : str(500), motif de la dernière correction de données
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

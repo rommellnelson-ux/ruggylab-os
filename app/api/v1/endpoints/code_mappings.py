@@ -1,4 +1,5 @@
 """API — Unification des vocabulaires biologiques (table de correspondance)."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -100,7 +101,9 @@ def deactivate_mapping(
     del current_user
     mapping = db.query(BiologicalCodeMapping).filter(BiologicalCodeMapping.id == mapping_id).first()
     if not mapping:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Correspondance introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Correspondance introuvable."
+        )
     mapping.is_active = False
     db.commit()
     return {"status": "deactivated"}

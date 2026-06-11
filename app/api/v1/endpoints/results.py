@@ -1,3 +1,4 @@
+import contextlib
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -186,13 +187,12 @@ def create_result(
         ) from exc
     # Auto-validation ISO 15189 §5.8
     try_auto_validate(result, db)
-    # Interprétation bioref complémentaire (additive, ne touche pas flags/critique)
-    try:
+    # Interprétation bioref complémentaire (additive, ne touche pas flags/critique).
+    # Best-effort : ne doit jamais empêcher la création du résultat.
+    with contextlib.suppress(Exception):
         from app.services.code_mapping_service import apply_bioref_to_result
 
         apply_bioref_to_result(db, result)
-    except Exception:  # noqa: BLE001 — ne doit jamais empêcher la création
-        pass
     db.commit()
     db.refresh(result)
     # Push temps-réel : alerte immédiate si critique ou delta dépassé
@@ -223,9 +223,7 @@ def amend_result(
     """
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
 
     # Snapshot de l'ancien état pour l'audit
     old_data_points = result.data_points
@@ -233,9 +231,7 @@ def amend_result(
 
     # Intégrité : révoquer toute signature de compte-rendu existante
     signature_revoked = False
-    signature = (
-        db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
-    )
+    signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
     if signature and signature.revoked_at is None:
         signature.revoked_at = utcnow_naive()
         signature.revocation_reason = (
@@ -303,9 +299,7 @@ def ack_critical(
     """Acknowledge a critical value — records operator and timestamp."""
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
     if not result.is_critical:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -4,6 +4,7 @@ Porte la logique d'interprétation fournie (flags NORMAL / BAS / HAUT /
 CRITIQUE BAS / CRITIQUE HAUT) et produit la sortie structurée attendue
 (result, unit, reference_range, flag, interpretation).
 """
+
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
@@ -12,9 +13,15 @@ from app.models import BiologicalReferenceRange
 from app.services.bioref_data import BIOREF_SEED
 
 _SEX_INPUT = {
-    "M": "Homme", "H": "Homme", "HOMME": "Homme", "MALE": "Homme",
-    "F": "Femme", "FEMME": "Femme", "FEMALE": "Femme",
-    "ALL": "ALL", "": "ALL",
+    "M": "Homme",
+    "H": "Homme",
+    "HOMME": "Homme",
+    "MALE": "Homme",
+    "F": "Femme",
+    "FEMME": "Femme",
+    "FEMALE": "Femme",
+    "ALL": "ALL",
+    "": "ALL",
 }
 
 

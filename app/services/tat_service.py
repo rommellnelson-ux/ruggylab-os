@@ -5,6 +5,7 @@ post-analytique, total) et un statut couleur par rapport au délai cible de
 l'examen ; agrège des indicateurs de performance (par examen, technicien,
 automate, journée) dans une logique d'amélioration continue ISO 15189.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -62,10 +63,7 @@ def compute_result_tat(result: Result, target: TatTarget | None) -> dict:
 
 
 def _targets_by_code(db: Session) -> dict[str, TatTarget]:
-    return {
-        t.exam_code: t
-        for t in db.query(TatTarget).filter(TatTarget.is_active.is_(True)).all()
-    }
+    return {t.exam_code: t for t in db.query(TatTarget).filter(TatTarget.is_active.is_(True)).all()}
 
 
 def _agg(values: list[float]) -> dict:

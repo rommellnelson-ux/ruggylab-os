@@ -376,9 +376,7 @@ class RevokedToken(Base):
     jti: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     expires_at: Mapped[dt.datetime] = mapped_column(DateTime, nullable=False)
-    revoked_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    revoked_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
 
 class TatTarget(Base):
@@ -502,9 +500,7 @@ class QcResult(Base):
     measured_at: Mapped[dt.date] = mapped_column(Date, nullable=False, index=True)
     operator: Mapped[str | None] = mapped_column(String(100))
     violations: Mapped[str | None] = mapped_column(Text)  # JSON list of rule codes
-    created_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, nullable=False, default=utcnow_naive
-    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, nullable=False, default=utcnow_naive)
 
     control: Mapped["QcControl"] = relationship(back_populates="results")
 
@@ -587,9 +583,7 @@ class NonConformity(Base):
     linked_entity_type: Mapped[str | None] = mapped_column(String(50))
     linked_entity_id: Mapped[str | None] = mapped_column(String(50))
     detected_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    detected_at: Mapped[dt.datetime] = mapped_column(
-        DateTime, default=utcnow_naive, nullable=False
-    )
+    detected_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
     due_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
     closed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     root_cause: Mapped[str | None] = mapped_column(Text)
@@ -630,7 +624,9 @@ class EquipmentMaintenance(Base):
     __tablename__ = "equipment_maintenances"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipments.id"), nullable=False, index=True)
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipments.id"), nullable=False, index=True
+    )
     maintenance_type: Mapped[str] = mapped_column(String(30), nullable=False, default="preventive")
     scheduled_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     performed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)

@@ -1,4 +1,5 @@
 """Tests — Durcissement sécurité : SSRF, injection CSV, RBAC amend, audit, dry-run."""
+
 from __future__ import annotations
 
 import uuid
@@ -27,14 +28,19 @@ def _tech_headers(client) -> dict[str, str] | None:
         headers=hdrs,
         json={"username": f"tech_{u}", "password": "TechPass123!", "role": "technician"},
     )
-    tok = client.post(
-        "/api/v1/login/access-token",
-        data={"username": f"tech_{u}", "password": "TechPass123!"},
-    ).json().get("access_token")
+    tok = (
+        client.post(
+            "/api/v1/login/access-token",
+            data={"username": f"tech_{u}", "password": "TechPass123!"},
+        )
+        .json()
+        .get("access_token")
+    )
     return {"Authorization": f"Bearer {tok}"} if tok else None
 
 
 # ── Garde anti-SSRF (unitaire) ──────────────────────────────────────────────
+
 
 class TestUrlSafety:
     def test_blocks_loopback(self):
@@ -64,6 +70,7 @@ class TestUrlSafety:
 
 # ── Neutralisation injection CSV (unitaire) ─────────────────────────────────
 
+
 class TestCsvSafety:
     def test_prefixes_formula_chars(self):
         assert sanitize_csv_cell("=1+1") == "'=1+1"
@@ -83,6 +90,7 @@ class TestCsvSafety:
 
 # ── Injection CSV bout-en-bout via l'export d'audit ─────────────────────────
 
+
 class TestAuditCsvInjection:
     def test_malicious_entity_id_is_neutralized(self, client):
         hdrs = _auth(client)
@@ -91,7 +99,12 @@ class TestAuditCsvInjection:
         client.post(
             "/api/v1/reagents",
             headers=hdrs,
-            json={"name": f"=HYPERLINK-{_uid()}", "unit": "u", "current_stock": 1, "alert_threshold": 0},
+            json={
+                "name": f"=HYPERLINK-{_uid()}",
+                "unit": "u",
+                "current_stock": 1,
+                "alert_threshold": 0,
+            },
         )
         r = client.get("/api/v1/audit-events/export.csv", headers=hdrs)
         assert r.status_code == 200
@@ -104,13 +117,19 @@ class TestAuditCsvInjection:
 
 # ── RBAC : amend réservé officier + révocation signature ────────────────────
 
+
 class TestAmendRbac:
     def _make_result(self, client, hdrs) -> int:
         pid = client.post(
             "/api/v1/patients",
             headers=hdrs,
-            json={"ipp_unique_id": f"SH-{_uid()}", "first_name": "A", "last_name": "B",
-                  "birth_date": "1980-01-01", "sex": "M"},
+            json={
+                "ipp_unique_id": f"SH-{_uid()}",
+                "first_name": "A",
+                "last_name": "B",
+                "birth_date": "1980-01-01",
+                "sex": "M",
+            },
         ).json()["id"]
         sid = client.post(
             "/api/v1/samples",
@@ -158,14 +177,19 @@ class TestAmendRbac:
 
 # ── Audit des changements d'auto-validation ─────────────────────────────────
 
+
 class TestAutoValidationAudit:
     def test_config_creation_is_audited(self, client):
         hdrs = _auth(client)
         client.post(
             "/api/v1/auto-validation/config",
             headers=hdrs,
-            json={"name": f"Audit-{_uid()}", "require_not_critical": True,
-                  "require_no_delta": False, "require_all_flags_normal": False},
+            json={
+                "name": f"Audit-{_uid()}",
+                "require_not_critical": True,
+                "require_no_delta": False,
+                "require_all_flags_normal": False,
+            },
         )
         r = client.get(
             "/api/v1/audit-events?event_type=auto_validation.config.create", headers=hdrs
@@ -178,8 +202,12 @@ class TestAutoValidationAudit:
         client.post(
             "/api/v1/auto-validation/config",
             headers=hdrs,
-            json={"name": f"Run-{_uid()}", "require_not_critical": False,
-                  "require_no_delta": False, "require_all_flags_normal": False},
+            json={
+                "name": f"Run-{_uid()}",
+                "require_not_critical": False,
+                "require_no_delta": False,
+                "require_all_flags_normal": False,
+            },
         )
         client.post("/api/v1/auto-validation/run", headers=hdrs)
         r = client.get("/api/v1/audit-events?event_type=auto_validation.run", headers=hdrs)
@@ -189,14 +217,20 @@ class TestAutoValidationAudit:
 
 # ── Traçabilité accès dossier patient ───────────────────────────────────────
 
+
 class TestPatientAccessAudit:
     def test_history_view_is_audited(self, client):
         hdrs = _auth(client)
         pid = client.post(
             "/api/v1/patients",
             headers=hdrs,
-            json={"ipp_unique_id": f"PA-{_uid()}", "first_name": "A", "last_name": "B",
-                  "birth_date": "1980-01-01", "sex": "F"},
+            json={
+                "ipp_unique_id": f"PA-{_uid()}",
+                "first_name": "A",
+                "last_name": "B",
+                "birth_date": "1980-01-01",
+                "sex": "F",
+            },
         ).json()["id"]
         client.get(f"/api/v1/patients/{pid}/history", headers=hdrs)
         r = client.get(
@@ -208,14 +242,12 @@ class TestPatientAccessAudit:
 
 # ── Import en lot : dry-run + savepoint + borne ─────────────────────────────
 
+
 class TestBulkImportHardening:
     def test_dry_run_does_not_persist(self, client):
         hdrs = _auth(client)
         u = _uid()
-        csv = (
-            "ipp_unique_id,first_name,last_name,birth_date,sex\n"
-            f"DRY-{u},Test,Dry,1990-01-01,M\n"
-        )
+        csv = f"ipp_unique_id,first_name,last_name,birth_date,sex\nDRY-{u},Test,Dry,1990-01-01,M\n"
         r = client.post(
             "/api/v1/bulk-import/patients", headers=hdrs, json={"csv": csv, "dry_run": True}
         )

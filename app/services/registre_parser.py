@@ -7,6 +7,7 @@ registres numérisés (« Créat 77,2 », « GE +145 trophozoïtes/champ »,
 Logique pure (aucun accès base, aucune donnée patient en dur) — destinée à
 alimenter une prévisualisation d'import (dry-run) avant toute écriture.
 """
+
 from __future__ import annotations
 
 import re
@@ -58,13 +59,17 @@ def parse_exam_token(raw: str | None) -> dict:
     raw = (raw or "").strip()
     if not raw:
         return {
-            "raw": "", "exam_code": None, "name": "", "numeric_value": None,
-            "qualitative": None, "recognized": False,
+            "raw": "",
+            "exam_code": None,
+            "name": "",
+            "numeric_value": None,
+            "qualitative": None,
+            "recognized": False,
         }
 
     name_match = _NAME_RE.match(raw)
     name_part = name_match.group(0).strip() if name_match else raw
-    rest = raw[len(name_part):] if name_match else ""
+    rest = raw[len(name_part) :] if name_match else ""
 
     # Résolution : nom complet, puis repli sur le premier mot (gère les suffixes
     # qualitatifs comme « CRP négative » → code CRP).
@@ -134,9 +139,9 @@ def build_import_preview(rows: list[dict]) -> dict:
         "recognized_exams": recognized,
         "unrecognized_exams": total_exams - recognized,
         "recognition_rate_pct": round(recognized / total_exams * 100, 1) if total_exams else 0.0,
-        "top_unrecognized": sorted(
-            unrecognized_labels.items(), key=lambda kv: kv[1], reverse=True
-        )[:15],
+        "top_unrecognized": sorted(unrecognized_labels.items(), key=lambda kv: kv[1], reverse=True)[
+            :15
+        ],
         "total_amount_fcfa": total_amount,
         "rows": preview,
     }

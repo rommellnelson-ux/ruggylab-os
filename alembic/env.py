@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -16,12 +17,10 @@ if config.config_file_name is not None:
 
 # Aligne les logs des migrations sur la configuration structurée de l'application
 # (best-effort : ne doit jamais empêcher l'exécution d'une migration).
-try:
+with contextlib.suppress(Exception):
     from app.core.logging_config import configure_logging
 
     configure_logging(level="INFO", json_logs=False, log_file=None)
-except Exception:  # noqa: BLE001
-    pass
 
 target_metadata = Base.metadata
 

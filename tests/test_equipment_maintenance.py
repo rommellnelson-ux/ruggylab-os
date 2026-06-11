@@ -1,9 +1,11 @@
 """Tests — Maintenance équipements et statistiques de performance laboratoire."""
+
 from __future__ import annotations
 
 import datetime as dt
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _auth(client) -> dict[str, str]:
     token = client.post(
@@ -26,6 +28,7 @@ def _create_equipment(client, hdrs, name="DH36-Test"):
 # ══════════════════════════════════════════════════════════════
 #  Maintenance CRUD
 # ══════════════════════════════════════════════════════════════
+
 
 class TestEquipmentMaintenanceCRUD:
     def test_create_preventive(self, client):
@@ -158,6 +161,7 @@ class TestEquipmentMaintenanceCRUD:
 #  Due list endpoint
 # ══════════════════════════════════════════════════════════════
 
+
 class TestDueMaintenances:
     def test_due_within_7_days_appears(self, client):
         hdrs = _auth(client)
@@ -196,7 +200,11 @@ class TestDueMaintenances:
         # (we just check that the far-future one is absent from the 7-day window)
         all_mnts = client.get("/api/v1/equipment-maintenance", headers=hdrs).json()
         far_mnt = next(
-            (m for m in all_mnts if m["equipment_id"] == eq_id and "calibration" in m["maintenance_type"]),
+            (
+                m
+                for m in all_mnts
+                if m["equipment_id"] == eq_id and "calibration" in m["maintenance_type"]
+            ),
             None,
         )
         if far_mnt:
@@ -225,6 +233,7 @@ class TestDueMaintenances:
 # ══════════════════════════════════════════════════════════════
 #  Lab stats summary endpoint
 # ══════════════════════════════════════════════════════════════
+
 
 class TestLabStats:
     def test_summary_returns_expected_keys(self, client):

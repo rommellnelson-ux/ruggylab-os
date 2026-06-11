@@ -50,6 +50,7 @@ class SampleCreate(SampleBase):
 
 class SampleUpdate(BaseModel):
     """Partial update — only status for now."""
+
     status: str | None = None
     model_config = ConfigDict(extra="forbid")
 

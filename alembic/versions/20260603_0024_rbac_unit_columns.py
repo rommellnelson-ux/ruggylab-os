@@ -7,6 +7,7 @@ Create Date: 2026-06-03 00:00:24
 Colonne ``unit`` (unité / service de rattachement) sur ``users`` et
 ``patients`` pour le cloisonnement RBAC des dossiers patient.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

@@ -24,6 +24,7 @@ def list_expiring_reagents(
     """
     del current_user
     from app.services.expiry_notifier import get_expiring_reagents
+
     return get_expiring_reagents(db, days=days)
 
 

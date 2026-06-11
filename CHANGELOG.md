@@ -1,0 +1,30 @@
+# Changelog
+
+Toutes les évolutions notables de RuggyLab OS sont consignées ici.
+Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
+
+## [Non publié]
+
+### Ajouté
+- **Unification des vocabulaires biologiques** : table de correspondance
+  canonique `biological_code_mappings` reliant `exam_code` ↔ `test_code` ↔
+  `analyte` (panels NFS/IONO inclus) et interprétation bioref complémentaire
+  des résultats (sans modifier le moteur de flags existant).
+- **Référentiel biologique** (IFCC/Tietz/OMS) : valeurs de référence par
+  sexe/âge, seuils critiques, interprétation (NORMAL/BAS/HAUT/CRITIQUE).
+- **Suivi TAT** (Turnaround Time) : horodatages de phase, cibles par examen,
+  tableau de bord et alertes de dépassement.
+- **Registre maître** : prévisualisation, import (dry-run + confirmation) et
+  analyse rétrospective (recettes, CMU, paludisme).
+- **Catalogue d'examens** et parseur de texte libre (registre papier).
+- **Module qualité** NC/CAPA, conformité avancée, notifications temps-réel
+  (WebSocket + fan-out Redis), import en lot, RBAC dossiers patient.
+
+### Sécurité
+- Durcissement : anti-SSRF des webhooks, neutralisation d'injection CSV,
+  RBAC sur l'amendement de résultats, révocation des jetons d'accès (denylist
+  JTI), traçabilité d'accès aux dossiers patient.
+
+### Infrastructure
+- CI consolidée (lint/format en gate dur, sécurité en advisory), tests
+  PostgreSQL des migrations, CodeQL, publication d'image Docker sur tag.

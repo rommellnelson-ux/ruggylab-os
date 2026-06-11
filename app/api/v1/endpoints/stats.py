@@ -1,4 +1,5 @@
 """Endpoint de statistiques de performance du laboratoire."""
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 

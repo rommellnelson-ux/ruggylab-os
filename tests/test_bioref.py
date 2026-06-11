@@ -1,4 +1,5 @@
 """Tests — Référentiel biologique : seed, sélection, interprétation."""
+
 from __future__ import annotations
 
 from app.models import BiologicalReferenceRange
@@ -34,6 +35,7 @@ def _ref(**over) -> BiologicalReferenceRange:
 
 # ── Logique d'interprétation (unitaire, fidèle au spec fourni) ──────────────
 
+
 class TestInterpretValue:
     def test_normal(self):
         assert interpret_value(15, _ref(lower_limit=13, upper_limit=17)) == "NORMAL"
@@ -46,10 +48,16 @@ class TestInterpretValue:
 
     def test_critique_bas_prioritaire(self):
         # 6 < critical_low 7 → CRITIQUE BAS (prioritaire sur BAS)
-        assert interpret_value(6, _ref(lower_limit=13, upper_limit=17, critical_low=7)) == "CRITIQUE BAS"
+        assert (
+            interpret_value(6, _ref(lower_limit=13, upper_limit=17, critical_low=7))
+            == "CRITIQUE BAS"
+        )
 
     def test_critique_haut_prioritaire(self):
-        assert interpret_value(25, _ref(lower_limit=13, upper_limit=17, critical_high=20)) == "CRITIQUE HAUT"
+        assert (
+            interpret_value(25, _ref(lower_limit=13, upper_limit=17, critical_high=20))
+            == "CRITIQUE HAUT"
+        )
 
     def test_qualitatif_valeur_none(self):
         assert interpret_value(None, _ref(normal_text="Négatif")) == "Négatif"
@@ -67,10 +75,16 @@ class TestInterpretValue:
 
 class TestFormatRange:
     def test_two_bounds(self):
-        assert format_reference_range(_ref(lower_limit=13, upper_limit=17, unit="g/dL")) == "13 - 17 g/dL"
+        assert (
+            format_reference_range(_ref(lower_limit=13, upper_limit=17, unit="g/dL"))
+            == "13 - 17 g/dL"
+        )
 
     def test_normal_text_priority(self):
-        assert format_reference_range(_ref(upper_limit=40, unit="UI/L", normal_text="< 40 UI/L")) == "< 40 UI/L"
+        assert (
+            format_reference_range(_ref(upper_limit=40, unit="UI/L", normal_text="< 40 UI/L"))
+            == "< 40 UI/L"
+        )
 
     def test_upper_only(self):
         assert format_reference_range(_ref(upper_limit=6, unit="mg/L")) == "< 6 mg/L"
@@ -86,6 +100,7 @@ class TestNormalizeSex:
 
 
 # ── Seed + endpoints ────────────────────────────────────────────────────────
+
 
 class TestBiorefSeed:
     def test_seed_creates_all(self, client):
@@ -107,24 +122,38 @@ class TestBiorefSeed:
 
     def test_seed_requires_officer(self, client):
         hdrs = _auth(client)
-        u = client.post("/api/v1/users", headers=hdrs,
-                        json={"username": "tref", "password": "TechPass123!", "role": "technician"})
+        u = client.post(
+            "/api/v1/users",
+            headers=hdrs,
+            json={"username": "tref", "password": "TechPass123!", "role": "technician"},
+        )
         assert u.status_code in (200, 201)
-        tok = client.post("/api/v1/login/access-token",
-                          data={"username": "tref", "password": "TechPass123!"}).json().get("access_token")
+        tok = (
+            client.post(
+                "/api/v1/login/access-token", data={"username": "tref", "password": "TechPass123!"}
+            )
+            .json()
+            .get("access_token")
+        )
         if tok:
-            r = client.post("/api/v1/bioref/seed-defaults", headers={"Authorization": f"Bearer {tok}"})
+            r = client.post(
+                "/api/v1/bioref/seed-defaults", headers={"Authorization": f"Bearer {tok}"}
+            )
             assert r.status_code == 403
 
 
 # ── Interprétation bout-en-bout (reproduit l'exemple fourni) ────────────────
 
+
 class TestInterpretEndpoint:
     def test_hb_homme_low_matches_example(self, client):
         hdrs = _auth(client)
         client.post("/api/v1/bioref/seed-defaults", headers=hdrs)
-        r = client.post("/api/v1/bioref/interpret", headers=hdrs,
-                        json={"test_code": "HB", "value": 12.4, "sex": "M"})
+        r = client.post(
+            "/api/v1/bioref/interpret",
+            headers=hdrs,
+            json={"test_code": "HB", "value": 12.4, "sex": "M"},
+        )
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["result"] == 12.4
@@ -137,29 +166,35 @@ class TestInterpretEndpoint:
         hdrs = _auth(client)
         client.post("/api/v1/bioref/seed-defaults", headers=hdrs)
         # 12.4 est NORMAL pour une femme (12-16) mais BAS pour un homme (13-17)
-        r = client.post("/api/v1/bioref/interpret", headers=hdrs,
-                        json={"test_code": "HB", "value": 12.4, "sex": "F"})
+        r = client.post(
+            "/api/v1/bioref/interpret",
+            headers=hdrs,
+            json={"test_code": "HB", "value": 12.4, "sex": "F"},
+        )
         assert r.json()["flag"] == "NORMAL"
 
     def test_glycemie_critique(self, client):
         hdrs = _auth(client)
         client.post("/api/v1/bioref/seed-defaults", headers=hdrs)
-        r = client.post("/api/v1/bioref/interpret", headers=hdrs,
-                        json={"test_code": "GLU_FAST", "value": 0.30})
+        r = client.post(
+            "/api/v1/bioref/interpret", headers=hdrs, json={"test_code": "GLU_FAST", "value": 0.30}
+        )
         assert r.json()["flag"] == "CRITIQUE BAS"
 
     def test_potassium_critique_high(self, client):
         hdrs = _auth(client)
         client.post("/api/v1/bioref/seed-defaults", headers=hdrs)
-        r = client.post("/api/v1/bioref/interpret", headers=hdrs,
-                        json={"test_code": "K", "value": 7.0})
+        r = client.post(
+            "/api/v1/bioref/interpret", headers=hdrs, json={"test_code": "K", "value": 7.0}
+        )
         assert r.json()["flag"] == "CRITIQUE HAUT"
 
     def test_qualitative_malaria(self, client):
         hdrs = _auth(client)
         client.post("/api/v1/bioref/seed-defaults", headers=hdrs)
-        r = client.post("/api/v1/bioref/interpret", headers=hdrs,
-                        json={"test_code": "MAL_GE", "value": None})
+        r = client.post(
+            "/api/v1/bioref/interpret", headers=hdrs, json={"test_code": "MAL_GE", "value": None}
+        )
         d = r.json()
         assert d["flag"] == "Négatif"
         assert d["reference_range"] == "Négatif"
@@ -167,6 +202,7 @@ class TestInterpretEndpoint:
     def test_unknown_test(self, client):
         hdrs = _auth(client)
         client.post("/api/v1/bioref/seed-defaults", headers=hdrs)
-        r = client.post("/api/v1/bioref/interpret", headers=hdrs,
-                        json={"test_code": "ZZZ", "value": 1})
+        r = client.post(
+            "/api/v1/bioref/interpret", headers=hdrs, json={"test_code": "ZZZ", "value": 1}
+        )
         assert "error" in r.json()

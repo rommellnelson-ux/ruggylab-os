@@ -1,4 +1,5 @@
 """Test migration safety: verify migrations can be applied and rolled back cleanly."""
+
 from pathlib import Path
 
 import pytest

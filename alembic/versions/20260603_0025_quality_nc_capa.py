@@ -7,6 +7,7 @@ Create Date: 2026-06-03 00:00:25
 Module qualité ISO 15189 §4.9/§4.10 : déclaration des non-conformités et
 actions correctives / préventives associées.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -58,9 +59,7 @@ def upgrade() -> None:
             sa.Column("responsible_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
             sa.Column("due_date", sa.DateTime(), nullable=True),
             sa.Column("status", sa.String(20), nullable=False, server_default="planned"),
-            sa.Column(
-                "effectiveness_checked", sa.Boolean(), nullable=False, server_default="0"
-            ),
+            sa.Column("effectiveness_checked", sa.Boolean(), nullable=False, server_default="0"),
             sa.Column("effectiveness_notes", sa.Text(), nullable=True),
             sa.Column("completed_at", sa.DateTime(), nullable=True),
             sa.Column("created_at", sa.DateTime(), nullable=False),

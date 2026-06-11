@@ -8,6 +8,7 @@ Règle métier :
 
 L'accès hors périmètre est refusé (403) et journalisé par l'appelant.
 """
+
 from __future__ import annotations
 
 from sqlalchemy import or_

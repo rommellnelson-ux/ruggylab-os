@@ -7,6 +7,7 @@ Calcule sur une fenêtre glissante :
 - Taux de violations QC
 - Nombre de maintenances échues dans les 7 prochains jours
 """
+
 from __future__ import annotations
 
 import datetime as dt

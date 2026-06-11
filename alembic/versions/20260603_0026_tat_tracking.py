@@ -7,6 +7,7 @@ Create Date: 2026-06-03 00:00:26
 Suivi du Turnaround Time : horodatages de phases (optionnels) sur ``results``
 et table ``tat_targets`` (délai cible par examen). Migration idempotente.
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

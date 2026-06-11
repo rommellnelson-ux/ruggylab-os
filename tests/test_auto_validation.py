@@ -1,4 +1,5 @@
 """Tests — Auto-validation ISO 15189 §5.8 (config CRUD + intégration create_result + amend)."""
+
 from __future__ import annotations
 
 import uuid
@@ -6,6 +7,7 @@ import uuid
 # ══════════════════════════════════════════════════════════════════════════════
 #  Helpers
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _auth(client) -> dict[str, str]:
     token = client.post(
@@ -95,6 +97,7 @@ def _create_auto_config(
 #  AutoValidationConfig CRUD
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestAutoValidationConfigCRUD:
     def test_create_config(self, client):
         hdrs = _auth(client)
@@ -155,6 +158,7 @@ class TestAutoValidationConfigCRUD:
 #  Integration — auto-validation on result creation
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestAutoValidationOnCreate:
     def test_no_config_no_auto_validated(self, client):
         """Sans config active, is_auto_validated reste False."""
@@ -178,7 +182,8 @@ class TestAutoValidationOnCreate:
             client.delete(f"/api/v1/auto-validation/config/{c['id']}", headers=hdrs)
 
         _create_auto_config(
-            client, hdrs,
+            client,
+            hdrs,
             require_all_flags_normal=False,
             require_no_delta=False,
             require_not_critical=True,
@@ -199,7 +204,8 @@ class TestAutoValidationOnCreate:
             client.delete(f"/api/v1/auto-validation/config/{c['id']}", headers=hdrs)
 
         _create_auto_config(
-            client, hdrs,
+            client,
+            hdrs,
             require_all_flags_normal=False,
             require_no_delta=False,
             require_not_critical=True,
@@ -229,7 +235,8 @@ class TestAutoValidationOnCreate:
         analyte = f"ANA{_uid()[:4].upper()}"
         _create_ref_range(client, hdrs, analyte, 4.0, 11.0)
         _create_auto_config(
-            client, hdrs,
+            client,
+            hdrs,
             require_all_flags_normal=True,
             require_no_delta=False,
             require_not_critical=False,
@@ -253,7 +260,8 @@ class TestAutoValidationOnCreate:
         analyte = f"ANB{_uid()[:4].upper()}"
         _create_ref_range(client, hdrs, analyte, 4.0, 11.0)
         _create_auto_config(
-            client, hdrs,
+            client,
+            hdrs,
             require_all_flags_normal=True,
             require_no_delta=False,
             require_not_critical=False,
@@ -272,11 +280,13 @@ class TestAutoValidationOnCreate:
 #  Batch auto-validation via /run
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TestBatchAutoValidation:
     def test_run_returns_counts(self, client):
         hdrs = _auth(client)
         _create_auto_config(
-            client, hdrs,
+            client,
+            hdrs,
             require_all_flags_normal=False,
             require_no_delta=False,
             require_not_critical=False,
@@ -304,10 +314,14 @@ class TestBatchAutoValidation:
                 "role": "technician",
             },
         )
-        token = client.post(
-            "/api/v1/login/access-token",
-            data={"username": f"usr_{uid}", "password": "TestPass123!"},
-        ).json().get("access_token")
+        token = (
+            client.post(
+                "/api/v1/login/access-token",
+                data={"username": f"usr_{uid}", "password": "TestPass123!"},
+            )
+            .json()
+            .get("access_token")
+        )
         if token:
             usr_hdrs = {"Authorization": f"Bearer {token}"}
             r = client.post("/api/v1/auto-validation/run", headers=usr_hdrs)
@@ -317,6 +331,7 @@ class TestBatchAutoValidation:
 # ══════════════════════════════════════════════════════════════════════════════
 #  Amend result + auto-revalidation
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestAmendResetsAutoValidation:
     def test_amend_resets_and_revalidates(self, client):
@@ -329,7 +344,8 @@ class TestAmendResetsAutoValidation:
 
         # Config : nothing blocking
         _create_auto_config(
-            client, hdrs,
+            client,
+            hdrs,
             require_all_flags_normal=False,
             require_no_delta=False,
             require_not_critical=False,
@@ -378,5 +394,7 @@ class TestAmendResetsAutoValidation:
         )
         if r.status_code == 200:
             events = r.json()
-            amend_events = [e for e in (events.get("items") or events) if e.get("event_type") == "result.amend"]
+            amend_events = [
+                e for e in (events.get("items") or events) if e.get("event_type") == "result.amend"
+            ]
             assert len(amend_events) >= 1

@@ -4,6 +4,7 @@ Une cellule commençant par =, +, -, @ (ou une tabulation / retour chariot)
 peut être interprétée comme une formule par Excel / LibreOffice / Google Sheets.
 On la préfixe d'une apostrophe pour forcer un traitement en texte.
 """
+
 from __future__ import annotations
 
 _DANGEROUS_PREFIXES = ("=", "+", "-", "@", "\t", "\r")

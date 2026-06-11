@@ -1,4 +1,5 @@
 """Tests — Notifications temps-réel (feed REST + WebSocket)."""
+
 from __future__ import annotations
 
 import uuid
@@ -65,7 +66,15 @@ class TestNotificationsFeed:
         r = client.get("/api/v1/notifications/feed", headers=hdrs)
         assert r.status_code == 200
         data = r.json()
-        for field in ("generated_at", "total", "counts", "criticals", "deltas", "expiring", "qc_rejects"):
+        for field in (
+            "generated_at",
+            "total",
+            "counts",
+            "criticals",
+            "deltas",
+            "expiring",
+            "qc_rejects",
+        ):
             assert field in data, f"Champ manquant: {field}"
         for c in ("criticals", "deltas", "expiring", "qc_rejects"):
             assert c in data["counts"]

@@ -23,9 +23,7 @@ depends_on = None
 def upgrade() -> None:
     with op.batch_alter_table("results") as batch_op:
         batch_op.add_column(sa.Column("critical_ack_at", sa.DateTime(), nullable=True))
-        batch_op.add_column(
-            sa.Column("critical_ack_by_id", sa.Integer(), nullable=True)
-        )
+        batch_op.add_column(sa.Column("critical_ack_by_id", sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:

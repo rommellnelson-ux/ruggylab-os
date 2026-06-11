@@ -149,13 +149,17 @@ def _make_control(client, headers, analyte="Glucose", mean=5.0, sd=0.25):
     return client.post(
         "/api/v1/qc/controls",
         headers=headers,
-        json={"analyte": analyte, "level": "Niveau 1", "unit": "mmol/L",
-              "target_mean": mean, "target_sd": sd},
+        json={
+            "analyte": analyte,
+            "level": "Niveau 1",
+            "unit": "mmol/L",
+            "target_mean": mean,
+            "target_sd": sd,
+        },
     )
 
 
 class TestQcApi:
-
     def test_list_controls_requires_auth(self, client) -> None:
         assert client.get("/api/v1/qc/controls").status_code == 401
 
@@ -234,9 +238,7 @@ class TestQcApi:
                 headers=headers,
                 json={"control_id": ctrl["id"], "value": val, "measured_at": dt},
             )
-        results = client.get(
-            f"/api/v1/qc/controls/{ctrl['id']}/results", headers=headers
-        ).json()
+        results = client.get(f"/api/v1/qc/controls/{ctrl['id']}/results", headers=headers).json()
         assert len(results) == 3
         dates = [r["measured_at"] for r in results]
         assert dates == sorted(dates)
@@ -245,18 +247,12 @@ class TestQcApi:
         headers = _admin_headers(client)
         ctrl = _make_control(client, headers, analyte="RBC", mean=4.5, sd=0.3).json()
 
-        del_resp = client.delete(
-            f"/api/v1/qc/controls/{ctrl['id']}", headers=headers
-        )
+        del_resp = client.delete(f"/api/v1/qc/controls/{ctrl['id']}", headers=headers)
         assert del_resp.status_code == 200
 
-        ids = [c["id"] for c in client.get(
-            "/api/v1/qc/controls", headers=headers
-        ).json()]
+        ids = [c["id"] for c in client.get("/api/v1/qc/controls", headers=headers).json()]
         assert ctrl["id"] not in ids
 
     def test_deactivate_unknown_control_returns_404(self, client) -> None:
         headers = _admin_headers(client)
-        assert client.delete(
-            "/api/v1/qc/controls/99999", headers=headers
-        ).status_code == 404
+        assert client.delete("/api/v1/qc/controls/99999", headers=headers).status_code == 404

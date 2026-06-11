@@ -4,6 +4,7 @@ ISO 15189 §4.9 (NC) / §4.10 (CAPA). Déclaration ouverte à tout agent ; les
 transitions de workflow et la gestion des actions sont réservées aux officiers.
 Chaque transition de statut est journalisée (audit).
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -39,7 +40,9 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 def _get_nc_or_404(db: Session, nc_id: int) -> NonConformity:
     nc = db.query(NonConformity).filter(NonConformity.id == nc_id).first()
     if not nc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Non-conformité introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Non-conformité introuvable."
+        )
     return nc
 
 
@@ -69,9 +72,7 @@ def quality_dashboard(
     now = utcnow_naive()
     total = db.query(func.count(NonConformity.id)).scalar() or 0
     open_count = (
-        db.query(func.count(NonConformity.id))
-        .filter(NonConformity.status != "closed")
-        .scalar()
+        db.query(func.count(NonConformity.id)).filter(NonConformity.status != "closed").scalar()
         or 0
     )
     overdue = (
@@ -95,10 +96,7 @@ def quality_dashboard(
     }
     by_status = {
         st: (
-            db.query(func.count(NonConformity.id))
-            .filter(NonConformity.status == st)
-            .scalar()
-            or 0
+            db.query(func.count(NonConformity.id)).filter(NonConformity.status == st).scalar() or 0
         )
         for st in ("open", "analysis", "action", "verification", "closed")
     }

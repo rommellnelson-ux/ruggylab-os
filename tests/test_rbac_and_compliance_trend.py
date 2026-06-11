@@ -1,4 +1,5 @@
 """Tests — RBAC dossiers patient (scoping unité) + tendance de conformité + bus."""
+
 from __future__ import annotations
 
 import uuid
@@ -51,7 +52,10 @@ class TestPatientRbacScoping:
 
         tech_hema = _make_user(client, admin, unit="hematologie")
         # Liste : voit son unité + pool, pas l'autre unité
-        ids = {p["id"] for p in client.get("/api/v1/patients?limit=100", headers=tech_hema).json()["items"]}
+        ids = {
+            p["id"]
+            for p in client.get("/api/v1/patients?limit=100", headers=tech_hema).json()["items"]
+        }
         assert p_hema in ids
         assert p_pool in ids
         assert p_bio not in ids

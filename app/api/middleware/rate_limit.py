@@ -1,4 +1,5 @@
 """Rate limiting middleware for API endpoints."""
+
 from __future__ import annotations
 
 from collections.abc import Callable

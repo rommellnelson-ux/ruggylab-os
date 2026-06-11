@@ -8,6 +8,7 @@ La résolution DNS est tentée pour bloquer les noms d'hôtes qui pointent vers
 des adresses internes. En cas d'échec de résolution, l'URL est considérée
 comme non sûre (on ne peut pas prouver qu'elle est externe).
 """
+
 from __future__ import annotations
 
 import ipaddress

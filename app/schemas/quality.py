@@ -1,4 +1,5 @@
 """Schémas — Module qualité (non-conformités + CAPA), ISO 15189 §4.9/§4.10."""
+
 from __future__ import annotations
 
 import datetime as dt
@@ -14,6 +15,7 @@ ActionStatus = Literal["planned", "in_progress", "done"]
 
 
 # ── Non-conformité ──────────────────────────────────────────────────────────
+
 
 class NonConformityCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
@@ -67,6 +69,7 @@ class NonConformityRead(BaseModel):
 
 
 # ── Action corrective / préventive ──────────────────────────────────────────
+
 
 class CorrectiveActionCreate(BaseModel):
     action_type: ActionType = "corrective"

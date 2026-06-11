@@ -49,7 +49,9 @@ def deactivate_control(
     del current_user
     control = db.query(QcControl).filter(QcControl.id == control_id).first()
     if not control:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrôle QC introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Contrôle QC introuvable."
+        )
     control.is_active = False
     db.commit()
     return {"status": "deactivated"}
@@ -80,7 +82,9 @@ def add_result(
     del current_user
     control = db.query(QcControl).filter(QcControl.id == payload.control_id).first()
     if not control:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrôle QC introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Contrôle QC introuvable."
+        )
 
     # Fetch previous values (up to 9) to evaluate Westgard on up to 10 points
     prev_results = (

@@ -7,6 +7,7 @@ data_points values may be:
   - plain numeric  : {"WBC": 5.2}
   - dict with key  : {"WBC": {"value": 5.2, "status": "N"}}   (DH36 / POCT format)
 """
+
 from __future__ import annotations
 
 from sqlalchemy.orm import Session

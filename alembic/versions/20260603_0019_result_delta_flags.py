@@ -9,6 +9,7 @@ Nouvelles colonnes sur la table results :
 - delta_analytes    : JSON, dict analyte → variation observée
 - flags             : JSON, dict analyte → flag HH/H/N/L/LL
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa

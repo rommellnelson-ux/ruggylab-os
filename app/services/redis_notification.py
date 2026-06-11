@@ -7,6 +7,7 @@ WebSocket — quel que soit le worker qui la sert — reçoive le push immédiat
 Mono-processus (sans Redis) : ce module n'est pas activé, le bus in-process
 suffit. Activation depuis le lifespan de l'application.
 """
+
 from __future__ import annotations
 
 import asyncio

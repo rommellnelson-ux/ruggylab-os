@@ -47,8 +47,13 @@ def _make_sample(client, headers) -> int:
     patient_id = client.post(
         "/api/v1/patients",
         headers=headers,
-        json={"ipp_unique_id": "IPP-CR-001", "first_name": "Test", "last_name": "CR",
-              "birth_date": "1990-01-01", "sex": "M"},
+        json={
+            "ipp_unique_id": "IPP-CR-001",
+            "first_name": "Test",
+            "last_name": "CR",
+            "birth_date": "1990-01-01",
+            "sex": "M",
+        },
     ).json()["id"]
     return client.post(
         "/api/v1/samples",
@@ -58,15 +63,17 @@ def _make_sample(client, headers) -> int:
 
 
 class TestCriticalRangesApi:
-
     def test_list_requires_auth(self, client) -> None:
         assert client.get("/api/v1/critical-ranges").status_code == 401
 
     def test_create_requires_officer(self, client) -> None:
-        assert client.post(
-            "/api/v1/critical-ranges",
-            json={"analyte": "WBC", "high_critical": 30.0},
-        ).status_code == 401
+        assert (
+            client.post(
+                "/api/v1/critical-ranges",
+                json={"analyte": "WBC", "high_critical": 30.0},
+            ).status_code
+            == 401
+        )
 
     def test_create_without_any_bound_rejected(self, client) -> None:
         headers = _admin_headers(client)
@@ -115,17 +122,15 @@ class TestCriticalRangesApi:
             headers=headers,
             json={"analyte": "PLT", "low_critical": 50.0, "high_critical": 1000.0},
         ).json()
-        assert client.delete(
-            f"/api/v1/critical-ranges/{cr['id']}", headers=headers
-        ).status_code == 200
+        assert (
+            client.delete(f"/api/v1/critical-ranges/{cr['id']}", headers=headers).status_code == 200
+        )
         ids = [c["id"] for c in client.get("/api/v1/critical-ranges", headers=headers).json()]
         assert cr["id"] not in ids
 
     def test_deactivate_unknown_returns_404(self, client) -> None:
         headers = _admin_headers(client)
-        assert client.delete(
-            "/api/v1/critical-ranges/99999", headers=headers
-        ).status_code == 404
+        assert client.delete("/api/v1/critical-ranges/99999", headers=headers).status_code == 404
 
     def test_high_threshold_auto_flags_critical(self, client) -> None:
         headers = _admin_headers(client)
@@ -232,9 +237,10 @@ class TestCriticalRangesApi:
             headers=headers,
             json={"sample_id": sample_id, "data_points": {"WBC": 5.0}, "is_critical": False},
         ).json()["id"]
-        assert client.patch(
-            f"/api/v1/results/{result_id}/ack-critical", headers=headers
-        ).status_code == 400
+        assert (
+            client.patch(f"/api/v1/results/{result_id}/ack-critical", headers=headers).status_code
+            == 400
+        )
 
     def test_double_ack_returns_409(self, client) -> None:
         headers = _admin_headers(client)
@@ -250,13 +256,13 @@ class TestCriticalRangesApi:
             json={"sample_id": sample_id, "data_points": {"MCV": 40.0}, "is_critical": False},
         ).json()["id"]
         client.patch(f"/api/v1/results/{result_id}/ack-critical", headers=headers)
-        assert client.patch(
-            f"/api/v1/results/{result_id}/ack-critical", headers=headers
-        ).status_code == 409
+        assert (
+            client.patch(f"/api/v1/results/{result_id}/ack-critical", headers=headers).status_code
+            == 409
+        )
 
 
 class TestQcSummaryApi:
-
     def test_qc_summary_requires_auth(self, client) -> None:
         assert client.get("/api/v1/reports/qc-summary").status_code == 401
 

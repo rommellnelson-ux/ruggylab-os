@@ -10,6 +10,7 @@ Rules evaluated (in order of severity):
 
 Reference: Westgard JO. Basic QC Practices, 3rd ed. (2008)
 """
+
 from __future__ import annotations
 
 
@@ -34,9 +35,9 @@ def check_westgard(values: list[float], mean: float, sd: float) -> list[str]:
 
     # ── Single-value rules ───────────────────────────────────────────────────
     if abs(latest) > 3:
-        violations.append("1-3s")   # reject
+        violations.append("1-3s")  # reject
     elif abs(latest) > 2:
-        violations.append("1-2s")   # warning only (not reject by itself)
+        violations.append("1-2s")  # warning only (not reject by itself)
 
     # ── Two-point rules ──────────────────────────────────────────────────────
     if len(z) >= 2:

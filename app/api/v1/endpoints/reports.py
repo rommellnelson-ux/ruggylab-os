@@ -579,8 +579,7 @@ def compliance_summary(
         or 0
     )
     critical_total = (
-        base.with_entities(func.count(Result.id)).filter(Result.is_critical.is_(True)).scalar()
-        or 0
+        base.with_entities(func.count(Result.id)).filter(Result.is_critical.is_(True)).scalar() or 0
     )
     critical_acked = (
         base.with_entities(func.count(Result.id))
@@ -646,9 +645,7 @@ def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
 
 
 def _compliance_for_window(db: Session, start: datetime, end: datetime) -> dict:
-    base = db.query(Result).filter(
-        Result.analysis_date >= start, Result.analysis_date < end
-    )
+    base = db.query(Result).filter(Result.analysis_date >= start, Result.analysis_date < end)
     total = base.with_entities(func.count(Result.id)).scalar() or 0
     validated = (
         base.with_entities(func.count(Result.id)).filter(Result.is_validated.is_(True)).scalar()
@@ -661,8 +658,7 @@ def _compliance_for_window(db: Session, start: datetime, end: datetime) -> dict:
         or 0
     )
     crit_total = (
-        base.with_entities(func.count(Result.id)).filter(Result.is_critical.is_(True)).scalar()
-        or 0
+        base.with_entities(func.count(Result.id)).filter(Result.is_critical.is_(True)).scalar() or 0
     )
     crit_acked = (
         base.with_entities(func.count(Result.id))
@@ -774,8 +770,8 @@ def compliance_html_report(
  .meta{{color:#6b7280;font-size:13px;}}
 </style></head><body>
 <h1>Rapport de conformité — ISO 15189</h1>
-<p class="meta">Période : {summary['period_start']} → {summary['period_end']} ({days} jours) · Généré le {generated}</p>
-<p>Statut global : <span class="badge">{summary['status'].upper()}</span></p>
+<p class="meta">Période : {summary["period_start"]} → {summary["period_end"]} ({days} jours) · Généré le {generated}</p>
+<p>Statut global : <span class="badge">{summary["status"].upper()}</span></p>
 <table><tbody>{rows}</tbody></table>
 <p class="meta" style="margin-top:24px;">Document généré par RuggyLab OS — à viser par le responsable qualité.</p>
 </body></html>"""

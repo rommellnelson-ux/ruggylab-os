@@ -16,38 +16,49 @@ def _admin_headers(client) -> dict[str, str]:
 
 def _make_sample(client, headers) -> int:
     patient_id = client.post(
-        "/api/v1/patients", headers=headers,
-        json={"ipp_unique_id": f"IPP-NA-{id(client)}",
-              "first_name": "Alert", "last_name": "Test",
-              "birth_date": "1990-01-01", "sex": "M"},
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": f"IPP-NA-{id(client)}",
+            "first_name": "Alert",
+            "last_name": "Test",
+            "birth_date": "1990-01-01",
+            "sex": "M",
+        },
     ).json()["id"]
     return client.post(
-        "/api/v1/samples", headers=headers,
-        json={"barcode": f"NA-{id(client)}", "patient_id": patient_id,
-              "status": "Recu"},
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": f"NA-{id(client)}", "patient_id": patient_id, "status": "Recu"},
     ).json()["id"]
 
 
 def _make_critical_result(client, headers, barcode_suffix: str) -> int:
     """Create a critical result (via critical range auto-detection)."""
     # Ensure critical range exists for WBC
-    client.post("/api/v1/critical-ranges", headers=headers,
-                json={"analyte": "WBC", "high_critical": 30.0})
+    client.post(
+        "/api/v1/critical-ranges", headers=headers, json={"analyte": "WBC", "high_critical": 30.0}
+    )
     patient_id = client.post(
-        "/api/v1/patients", headers=headers,
-        json={"ipp_unique_id": f"IPP-NA-{barcode_suffix}",
-              "first_name": "Crit", "last_name": "Test",
-              "birth_date": "1990-01-01", "sex": "M"},
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": f"IPP-NA-{barcode_suffix}",
+            "first_name": "Crit",
+            "last_name": "Test",
+            "birth_date": "1990-01-01",
+            "sex": "M",
+        },
     ).json()["id"]
     sample_id = client.post(
-        "/api/v1/samples", headers=headers,
-        json={"barcode": f"NA-{barcode_suffix}",
-              "patient_id": patient_id, "status": "Recu"},
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": f"NA-{barcode_suffix}", "patient_id": patient_id, "status": "Recu"},
     ).json()["id"]
     return client.post(
-        "/api/v1/results", headers=headers,
-        json={"sample_id": sample_id, "data_points": {"WBC": 45.0},
-              "is_critical": False},
+        "/api/v1/results",
+        headers=headers,
+        json={"sample_id": sample_id, "data_points": {"WBC": 45.0}, "is_critical": False},
     ).json()["id"]
 
 
@@ -57,26 +68,30 @@ def _make_critical_result(client, headers, barcode_suffix: str) -> int:
 
 
 class TestNotifConfigApi:
-
     def test_list_config_requires_auth(self, client) -> None:
         assert client.get("/api/v1/critical-alerts/config").status_code == 401
 
     def test_create_config_requires_officer(self, client) -> None:
-        assert client.post(
-            "/api/v1/critical-alerts/config",
-            json={"webhook_url": "http://example.com/hook", "delay_minutes": 30},
-        ).status_code == 401
+        assert (
+            client.post(
+                "/api/v1/critical-alerts/config",
+                json={"webhook_url": "http://example.com/hook", "delay_minutes": 30},
+            ).status_code
+            == 401
+        )
 
     def test_create_config_without_channel_rejected(self, client) -> None:
         headers = _admin_headers(client)
-        resp = client.post("/api/v1/critical-alerts/config", headers=headers,
-                           json={"delay_minutes": 30})
+        resp = client.post(
+            "/api/v1/critical-alerts/config", headers=headers, json={"delay_minutes": 30}
+        )
         assert resp.status_code == 422
 
     def test_create_and_list_config(self, client) -> None:
         headers = _admin_headers(client)
         resp = client.post(
-            "/api/v1/critical-alerts/config", headers=headers,
+            "/api/v1/critical-alerts/config",
+            headers=headers,
             json={"webhook_url": "http://lab.example.com/notify", "delay_minutes": 45},
         )
         assert resp.status_code == 201, resp.text
@@ -91,21 +106,27 @@ class TestNotifConfigApi:
     def test_deactivate_config(self, client) -> None:
         headers = _admin_headers(client)
         cfg = client.post(
-            "/api/v1/critical-alerts/config", headers=headers,
+            "/api/v1/critical-alerts/config",
+            headers=headers,
             json={"webhook_url": "http://x.example.com/", "delay_minutes": 20},
         ).json()
-        assert client.delete(
-            f"/api/v1/critical-alerts/config/{cfg['id']}", headers=headers
-        ).status_code == 200
-        ids = [c["id"] for c in
-               client.get("/api/v1/critical-alerts/config", headers=headers).json()]
+        assert (
+            client.delete(
+                f"/api/v1/critical-alerts/config/{cfg['id']}", headers=headers
+            ).status_code
+            == 200
+        )
+        ids = [
+            c["id"] for c in client.get("/api/v1/critical-alerts/config", headers=headers).json()
+        ]
         assert cfg["id"] not in ids
 
     def test_deactivate_unknown_config_404(self, client) -> None:
         headers = _admin_headers(client)
-        assert client.delete(
-            "/api/v1/critical-alerts/config/99999", headers=headers
-        ).status_code == 404
+        assert (
+            client.delete("/api/v1/critical-alerts/config/99999", headers=headers).status_code
+            == 404
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -114,7 +135,6 @@ class TestNotifConfigApi:
 
 
 class TestPendingCriticalsApi:
-
     def test_pending_requires_auth(self, client) -> None:
         assert client.get("/api/v1/critical-alerts/pending").status_code == 401
 
@@ -166,7 +186,6 @@ class TestPendingCriticalsApi:
 
 
 class TestCheckAndNotifyApi:
-
     def test_check_requires_auth(self, client) -> None:
         assert client.post("/api/v1/critical-alerts/check").status_code == 401
 
@@ -184,9 +203,11 @@ class TestCheckAndNotifyApi:
     def test_check_with_bad_webhook_sends_zero(self, client) -> None:
         """Webhook inaccessible → notified=0 mais pas d'erreur 500."""
         headers = _admin_headers(client)
-        client.post("/api/v1/critical-alerts/config", headers=headers,
-                    json={"webhook_url": "http://127.0.0.1:1/unreachable",
-                          "delay_minutes": 1})
+        client.post(
+            "/api/v1/critical-alerts/config",
+            headers=headers,
+            json={"webhook_url": "http://127.0.0.1:1/unreachable", "delay_minutes": 1},
+        )
         _make_critical_result(client, headers, "CN002")
         resp = client.post("/api/v1/critical-alerts/check", headers=headers)
         assert resp.status_code == 200
@@ -200,15 +221,12 @@ class TestCheckAndNotifyApi:
 
 
 class TestQcReportApi:
-
     def test_report_requires_auth(self, client) -> None:
         assert client.get("/api/v1/reports/qc-report").status_code == 401
 
     def test_report_returns_html(self, client) -> None:
         headers = _admin_headers(client)
-        resp = client.get(
-            "/api/v1/reports/qc-report?year=2026&month=6", headers=headers
-        )
+        resp = client.get("/api/v1/reports/qc-report?year=2026&month=6", headers=headers)
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
         assert "RuggyLab OS" in resp.text
@@ -216,27 +234,28 @@ class TestQcReportApi:
 
     def test_report_empty_month_has_no_data(self, client) -> None:
         headers = _admin_headers(client)
-        resp = client.get(
-            "/api/v1/reports/qc-report?year=2025&month=1", headers=headers
-        )
+        resp = client.get("/api/v1/reports/qc-report?year=2025&month=1", headers=headers)
         assert resp.status_code == 200
         # Aucun contrôle dans cette période
 
     def test_report_with_control_and_results(self, client) -> None:
         headers = _admin_headers(client)
         ctrl = client.post(
-            "/api/v1/qc/controls", headers=headers,
+            "/api/v1/qc/controls",
+            headers=headers,
             json={"analyte": "HGB", "target_mean": 140.0, "target_sd": 5.0},
         ).json()
-        client.post("/api/v1/qc/results", headers=headers,
-                    json={"control_id": ctrl["id"], "value": 142.0,
-                          "measured_at": "2026-06-01"})
-        client.post("/api/v1/qc/results", headers=headers,
-                    json={"control_id": ctrl["id"], "value": 138.0,
-                          "measured_at": "2026-06-02"})
-        resp = client.get(
-            "/api/v1/reports/qc-report?year=2026&month=6", headers=headers
+        client.post(
+            "/api/v1/qc/results",
+            headers=headers,
+            json={"control_id": ctrl["id"], "value": 142.0, "measured_at": "2026-06-01"},
         )
+        client.post(
+            "/api/v1/qc/results",
+            headers=headers,
+            json={"control_id": ctrl["id"], "value": 138.0, "measured_at": "2026-06-02"},
+        )
+        resp = client.get("/api/v1/reports/qc-report?year=2026&month=6", headers=headers)
         assert resp.status_code == 200
         assert "HGB" in resp.text
         assert "142" in resp.text or "138" in resp.text

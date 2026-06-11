@@ -4,6 +4,7 @@ Scanne les réactifs dont la date d'expiration est dans les N prochains jours
 et envoie des notifications webhook via les NotifConfig actifs.
 Aucune dépendance externe — utilise uniquement urllib.request.
 """
+
 from __future__ import annotations
 
 import contextlib
