@@ -25,7 +25,7 @@ from app.schemas.reagent import ReagentCreate
 MAX_ROWS = 5000
 
 
-class BulkImportTooLarge(ValueError):
+class BulkImportTooLargeError(ValueError):
     """Levée quand le CSV dépasse MAX_ROWS lignes de données."""
 
 
@@ -41,7 +41,7 @@ def _parse_rows(csv_text: str) -> list[dict[str, str]]:
     reader = csv.DictReader(StringIO(csv_text))
     rows = [{(k or "").strip(): (v or "") for k, v in row.items()} for row in reader]
     if len(rows) > MAX_ROWS:
-        raise BulkImportTooLarge(
+        raise BulkImportTooLargeError(
             f"Trop de lignes ({len(rows)}). Maximum autorisé : {MAX_ROWS}."
         )
     return rows

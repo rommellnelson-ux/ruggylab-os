@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 import jwt
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
@@ -125,18 +126,14 @@ async def notifications_ws(
         await websocket.send_json(_snapshot())
         while True:
             # Attend un événement (push immédiat) OU le heartbeat (keepalive)
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(queue.get(), timeout=_WS_PUSH_INTERVAL)
-            except asyncio.TimeoutError:
-                pass  # tick heartbeat : on republie l'instantané courant
             await websocket.send_json(_snapshot())
     except WebSocketDisconnect:
         return
     except Exception:  # noqa: BLE001 — toute erreur ferme proprement la connexion
-        try:
+        with contextlib.suppress(Exception):
             await websocket.close()
-        except Exception:  # noqa: BLE001
-            pass
     finally:
         bus.unsubscribe(queue)
         remaining = _ws_connections.get(username, 1) - 1

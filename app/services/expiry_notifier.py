@@ -6,6 +6,7 @@ Aucune dépendance externe — utilise uniquement urllib.request.
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import json
 import urllib.request
@@ -75,16 +76,14 @@ def check_and_notify_expiry(db: Session, days: int = 30) -> dict:
         # Garde anti-SSRF : refuse loopback, IP privées, métadonnées cloud, etc.
         if not is_safe_external_url(cfg.webhook_url):
             continue
-        try:
-            req = urllib.request.Request(
-                cfg.webhook_url,  # noqa: S310 — URL validée par is_safe_external_url
-                data=payload_bytes,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
+        req = urllib.request.Request(  # noqa: S310
+            cfg.webhook_url,
+            data=payload_bytes,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with contextlib.suppress(Exception):
             with urllib.request.urlopen(req, timeout=5):  # noqa: S310  # nosec B310
                 pass
             notified += 1
-        except Exception:
-            pass
     return {"notified": notified, "expiring": len(expiring)}

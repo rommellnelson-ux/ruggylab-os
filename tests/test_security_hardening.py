@@ -200,7 +200,7 @@ class TestPatientAccessAudit:
         ).json()["id"]
         client.get(f"/api/v1/patients/{pid}/history", headers=hdrs)
         r = client.get(
-            f"/api/v1/audit-events?event_type=patient.history.view&entity_type=patient", headers=hdrs
+            "/api/v1/audit-events?event_type=patient.history.view&entity_type=patient", headers=hdrs
         )
         assert r.status_code == 200
         assert any(e["entity_id"] == str(pid) for e in r.json()["items"])

@@ -2,20 +2,16 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
-from app.api.v1.endpoints.billing import router as billing_router
 from app.api.v1.endpoints.auto_validation import router as auto_validation_router
+from app.api.v1.endpoints.billing import router as billing_router
 from app.api.v1.endpoints.bnpl import router as bnpl_router
 from app.api.v1.endpoints.bulk_import import router as bulk_import_router
-from app.api.v1.endpoints.notifications import router as notifications_router
-from app.api.v1.endpoints.quality import router as quality_router
-from app.api.v1.endpoints.tat import router as tat_router
 from app.api.v1.endpoints.critical_alerts import router as critical_alerts_router
 from app.api.v1.endpoints.critical_ranges import router as critical_ranges_router
 from app.api.v1.endpoints.delta_check import router as delta_check_router
 from app.api.v1.endpoints.dh36 import router as dh36_router
-from app.api.v1.endpoints.equipment_maintenance import router as equipment_maintenance_router
-from app.api.v1.endpoints.stats import router as stats_router
 from app.api.v1.endpoints.epidemiology import router as epidemiology_router
+from app.api.v1.endpoints.equipment_maintenance import router as equipment_maintenance_router
 from app.api.v1.endpoints.equipment_reagent_ratios import (
     router as equipment_reagent_ratios_router,
 )
@@ -26,20 +22,25 @@ from app.api.v1.endpoints.imaging import router as imaging_router
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.maintenance import router as maintenance_router
 from app.api.v1.endpoints.military_facilities import router as military_facilities_router
+from app.api.v1.endpoints.notifications import router as notifications_router
 from app.api.v1.endpoints.operations import router as operations_router
 from app.api.v1.endpoints.patients import router as patients_router
 from app.api.v1.endpoints.pdf_prescription import router as pdf_prescription_router
 from app.api.v1.endpoints.prescription_scanner import router as prescription_scanner_router
 from app.api.v1.endpoints.qc import router as qc_router
+from app.api.v1.endpoints.quality import router as quality_router
 from app.api.v1.endpoints.ratio_presets import router as ratio_presets_router
 from app.api.v1.endpoints.reagents import router as reagents_router
 from app.api.v1.endpoints.reference_ranges import router as reference_ranges_router
+from app.api.v1.endpoints.registre import router as registre_router
 from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.results import router as results_router
 from app.api.v1.endpoints.results_poct import router as results_poct_router
 from app.api.v1.endpoints.samples import router as samples_router
+from app.api.v1.endpoints.stats import router as stats_router
 from app.api.v1.endpoints.stock_notifications import router as stock_notifications_router
 from app.api.v1.endpoints.stock_predictor import router as stock_predictor_router
+from app.api.v1.endpoints.tat import router as tat_router
 from app.api.v1.endpoints.users import router as users_router
 
 api_router = APIRouter()
@@ -82,3 +83,4 @@ api_router.include_router(notifications_router, tags=["Notifications temps-réel
 api_router.include_router(bulk_import_router, tags=["Import en lot"])
 api_router.include_router(quality_router, tags=["Qualité NC/CAPA"])
 api_router.include_router(tat_router, tags=["Suivi TAT"])
+api_router.include_router(registre_router, tags=["Registre maître"])

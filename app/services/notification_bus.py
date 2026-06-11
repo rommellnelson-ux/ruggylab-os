@@ -78,12 +78,8 @@ def publish_alert_event(event_type: str, **fields: object) -> None:
       avec l'identifiant de ce worker pour ignorer l'écho).
     """
     event = {"type": event_type, **fields}
-    try:
+    with contextlib.suppress(Exception):
         bus.publish(event)
-    except Exception:  # noqa: BLE001 — la notification ne doit jamais casser l'appelant
-        pass
     if _redis_publisher is not None:
-        try:
+        with contextlib.suppress(Exception):
             _redis_publisher({**event, "_origin": WORKER_ID})
-        except Exception:  # noqa: BLE001
-            pass

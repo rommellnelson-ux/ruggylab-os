@@ -641,10 +641,7 @@ def compliance_summary(
 
 def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
     start = datetime(year, month, 1)
-    if month == 12:
-        end = datetime(year + 1, 1, 1)
-    else:
-        end = datetime(year, month + 1, 1)
+    end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
     return start, end
 
 

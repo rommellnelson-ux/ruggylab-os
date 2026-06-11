@@ -756,6 +756,7 @@
         <div class="nav-section">Système</div>
         <button data-view="equipments" onclick="showView('equipments')">🔬 Équipements</button>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
+        <button data-view="registre" onclick="showView('registre')">📚 Registre &amp; Import</button>
         <button data-view="quality" onclick="showView('quality')">✅ Qualité (NC/CAPA)</button>
         <button data-view="users" onclick="showView('users')">👥 Utilisateurs</button>
         <button data-view="audit" onclick="showView('audit')">🔍 Audit</button>
@@ -1668,6 +1669,45 @@
               <tbody></tbody>
             </table>
             <div id="auditPagerInfo" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
+          </div>
+        </div>
+
+        <div id="registre" class="view band hidden">
+          <div class="panel">
+            <h3>📚 Registre maître — analyse rétrospective &amp; import</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
+              Collez le registre au format CSV (1ʳᵉ ligne = en-têtes). Colonnes reconnues :
+              <code>Nom et prénoms, Date, Examens, Montant_FCFA, Part_CMU_FCFA, Type_Registre, Prescripteur, Provenance, Âge</code>.
+              Aucune donnée n'est écrite tant que vous ne confirmez pas l'import réel.
+            </p>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <input id="registreCsvFile" type="file" accept=".csv,text/csv" onchange="loadCsvIntoTextarea(this,'registreCsvText')" />
+            </div>
+            <textarea id="registreCsvText" rows="6" placeholder="Nom et prénoms,Date,Examens,Montant_FCFA,Type_Registre&#10;M. ESSOH Paul,13/03/2025,NFS ; Urée 0,13 ; Créat 77,2,7000,Hors CMU"></textarea>
+            <div class="actions" style="margin-top:8px;gap:8px;flex-wrap:wrap;">
+              <button onclick="registreAnalyse(this)">📊 Analyser</button>
+              <button class="secondary" onclick="registrePreview(this)">🔎 Prévisualiser l'import</button>
+              <button class="warn" onclick="registreImport(this)">⬆ Importer (confirmation requise)</button>
+            </div>
+          </div>
+
+          <div id="registreAnalyticsPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>Analyse rétrospective</h3>
+            <div class="grid4">
+              <div class="panel metric metric-blue"><div id="regTotal" class="value">—</div><div class="label">Dossiers</div></div>
+              <div class="panel metric metric-teal"><div id="regRevenue" class="value">—</div><div class="label">Recettes (FCFA)</div></div>
+              <div class="panel metric"><div id="regCmu" class="value">—</div><div class="label">Part CMU (FCFA)</div></div>
+              <div class="panel metric metric-rose"><div id="regMalaria" class="value">—</div><div class="label">Positivité paludisme</div></div>
+            </div>
+            <div class="grid2" style="margin-top:12px;">
+              <div class="panel"><h4 style="margin-top:0;">Top examens</h4><table id="regTopExams"><thead><tr><th>Examen</th><th>N</th></tr></thead><tbody></tbody></table></div>
+              <div class="panel"><h4 style="margin-top:0;">Volume mensuel</h4><div id="regMonthChart"></div></div>
+            </div>
+          </div>
+
+          <div id="registreReportPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>Rapport</h3>
+            <div id="registreReport" style="font-size:13px;"></div>
           </div>
         </div>
 
@@ -6002,6 +6042,129 @@ window.onload=renderLabels;
         showToast('Erreur import (droits officier requis ?)', 'error');
         log('submitBulkImport: ' + (e.message || e));
       } finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Registre maître — analyse rétrospective & import
+    // ══════════════════════════════════════════════════════════════════════
+    // Parseur CSV conforme RFC 4180 (gère les champs entre guillemets contenant
+    // des virgules — indispensable car les examens ont des décimales « 0,13 »).
+    function _parseCsv(text) {
+      const rows = [];
+      let row = [], field = '', inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { field += '"'; i++; }
+            else inQuotes = false;
+          } else field += c;
+        } else if (c === '"') inQuotes = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\r') { /* ignore */ }
+        else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+        else field += c;
+      }
+      if (field !== '' || row.length) { row.push(field); rows.push(row); }
+      return rows.filter(r => r.some(v => v.trim() !== ''));
+    }
+    function _registreRows() {
+      const text = ($('registreCsvText')?.value || '').trim();
+      if (!text) return [];
+      const grid = _parseCsv(text);
+      if (grid.length < 2) return [];
+      const headers = grid[0].map(h => h.trim());
+      return grid.slice(1).map(cells => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (cells[i] ?? '').trim(); });
+        return obj;
+      });
+    }
+    function _fmtFcfa(n) { return (n || 0).toLocaleString('fr-FR') + ' F'; }
+
+    async function registreAnalyse(btn) {
+      const rows = _registreRows();
+      if (!rows.length) { showToast('CSV vide ou en-tête manquante', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const a = await api('/api/v1/registre/analytics', { method: 'POST', headers: headers(), body: JSON.stringify({ rows }) });
+        $('registreAnalyticsPanel').style.display = '';
+        $('regTotal').textContent = a.total_dossiers;
+        $('regRevenue').textContent = _fmtFcfa(a.revenue_total_fcfa);
+        $('regCmu').textContent = _fmtFcfa(a.cmu_part_fcfa) + ` (${a.cmu_share_pct}%)`;
+        $('regMalaria').textContent = `${a.malaria_positivity_pct}% (${a.malaria_positive}/${a.malaria_tested})`;
+        setRows('regTopExams', a.top_exams.map(([name, n]) => row(`<td>${security.escapeHtml(name)}</td><td>${n}</td>`)));
+        _renderRegMonthChart(a.by_month);
+        showToast('Analyse calculée', 'success');
+      } catch (e) { showToast('Erreur analyse', 'error'); log('registreAnalyse: ' + (e.message || e)); }
+      finally { setLoading(btn, false); }
+    }
+
+    function _renderRegMonthChart(months) {
+      const div = $('regMonthChart');
+      if (!div) return;
+      if (!months || !months.length) { div.innerHTML = '<p style="color:var(--muted);">Aucune date exploitable.</p>'; return; }
+      const maxV = Math.max(...months.map(m => m.count), 1);
+      const W = 460, H = 150, padTop = 14, padBot = 26, padL = 4;
+      const cw = W - padL * 2, ch = H - padTop - padBot;
+      const bw = Math.max(4, Math.floor(cw / months.length) - 4);
+      let bars = '';
+      months.forEach((m, i) => {
+        const x = padL + i * (cw / months.length) + 2;
+        const bh = Math.max(2, Math.round((m.count / maxV) * ch));
+        const y = padTop + ch - bh;
+        bars += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="#0f766e" opacity="0.8"><title>${m.month}: ${m.count} dossiers</title></rect>` +
+          `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="8" fill="var(--muted)">${m.month.slice(2)}</text>`;
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
+    }
+
+    function _renderRegReport(rep) {
+      $('registreReportPanel').style.display = '';
+      let html = '';
+      if ('recognition_rate_pct' in rep) {
+        html += `<div class="notice">Prévisualisation : ${rep.total_rows} dossier(s), ${rep.total_exams} examen(s), ` +
+          `<strong>${rep.recognized_exams} reconnus (${rep.recognition_rate_pct}%)</strong>, ${rep.unrecognized_exams} non reconnus. ` +
+          `Montant total : ${_fmtFcfa(rep.total_amount_fcfa)}.</div>`;
+        if (rep.top_unrecognized && rep.top_unrecognized.length) {
+          html += '<p style="font-size:12px;"><strong>Examens non reconnus :</strong> ' +
+            rep.top_unrecognized.map(([n, c]) => `${security.escapeHtml(n)} (${c})`).join(', ') + '</p>';
+        }
+      } else {
+        const mode = rep.dry_run ? 'Simulation (rien écrit)' : '✅ Import réel effectué';
+        html += `<div class="notice">${mode} : ${rep.created_patients} patient(s), ${rep.created_samples} échantillon(s), ` +
+          `${rep.created_results} résultat(s). Dates de naissance estimées : ${rep.estimated_birth_dates}.</div>`;
+      }
+      if (rep.errors && rep.errors.length) {
+        html += '<div style="color:var(--rose);margin-top:6px;"><strong>Erreurs :</strong><ul style="margin:4px 0;padding-left:18px;">' +
+          rep.errors.slice(0, 30).map(e => `<li>Ligne ${e.row} : ${security.escapeHtml(e.error)}</li>`).join('') + '</ul></div>';
+      }
+      $('registreReport').innerHTML = html;
+    }
+
+    async function registrePreview(btn) {
+      const rows = _registreRows();
+      if (!rows.length) { showToast('CSV vide ou en-tête manquante', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const rep = await api('/api/v1/registre/preview', { method: 'POST', headers: headers(), body: JSON.stringify({ rows }) });
+        _renderRegReport(rep);
+        showToast('Prévisualisation prête', 'success');
+      } catch (e) { showToast('Erreur prévisualisation', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function registreImport(btn) {
+      const rows = _registreRows();
+      if (!rows.length) { showToast('CSV vide ou en-tête manquante', 'error'); return; }
+      if (!confirm(`Importer réellement ${rows.length} dossier(s) en base ? Cette action écrit des données patients.`)) return;
+      setLoading(btn, true);
+      try {
+        const rep = await api('/api/v1/registre/import', { method: 'POST', headers: headers(), body: JSON.stringify({ rows, dry_run: false, confirm: true }) });
+        _renderRegReport(rep);
+        showToast(`Import : ${rep.created_patients} patient(s) créé(s)`, 'success');
+      } catch (e) { showToast(e.message === 'Forbidden' ? 'Réservé officier/admin' : 'Erreur import', 'error'); }
+      finally { setLoading(btn, false); }
     }
 
     // ══════════════════════════════════════════════════════════════════════

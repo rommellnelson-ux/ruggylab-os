@@ -38,6 +38,9 @@ class TestNewViewsPresent:
             'id="tat"',              # vue Suivi TAT
             'id="tatByExamTable"',   # tableau TAT par examen
             'data-view="tat"',       # bouton de navigation TAT
+            'id="registre"',         # vue Registre & Import
+            'id="registreCsvText"',  # zone de saisie CSV
+            'data-view="registre"',  # bouton de navigation Registre
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',      # champ unité (création patient)
             'id="userUnit"',         # champ unité (création utilisateur)
@@ -66,6 +69,9 @@ class TestHandlerFunctionsDefined:
             # Suivi TAT
             "loadTat", "createTatTarget", "deleteTatTarget", "seedTatDefaults",
             "_renderTatByDayChart",
+            # Registre & import
+            "_parseCsv", "_registreRows", "registreAnalyse", "registrePreview",
+            "registreImport", "_renderRegMonthChart",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:
