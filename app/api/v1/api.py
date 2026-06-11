@@ -3,10 +3,11 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.auto_validation import router as auto_validation_router
-from app.api.v1.endpoints.bioref import router as bioref_router
 from app.api.v1.endpoints.billing import router as billing_router
+from app.api.v1.endpoints.bioref import router as bioref_router
 from app.api.v1.endpoints.bnpl import router as bnpl_router
 from app.api.v1.endpoints.bulk_import import router as bulk_import_router
+from app.api.v1.endpoints.code_mappings import router as code_mappings_router
 from app.api.v1.endpoints.critical_alerts import router as critical_alerts_router
 from app.api.v1.endpoints.critical_ranges import router as critical_ranges_router
 from app.api.v1.endpoints.delta_check import router as delta_check_router
@@ -86,3 +87,4 @@ api_router.include_router(quality_router, tags=["Qualité NC/CAPA"])
 api_router.include_router(tat_router, tags=["Suivi TAT"])
 api_router.include_router(registre_router, tags=["Registre maître"])
 api_router.include_router(bioref_router, tags=["Référentiel biologique"])
+api_router.include_router(code_mappings_router, tags=["Unification vocabulaires"])

@@ -43,6 +43,11 @@ class ResultRead(ResultBase):
     received_at: dt.datetime | None = None
     analysis_finished_at: dt.datetime | None = None
     bio_validated_at: dt.datetime | None = None
+    # Interprétation bioref complémentaire (unification des vocabulaires)
+    bioref_status: str | None = None
+    bioref_comment: str | None = None
+    bioref_reference_range: str | None = None
+    bioref_source: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

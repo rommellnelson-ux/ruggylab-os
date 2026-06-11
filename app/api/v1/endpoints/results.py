@@ -65,6 +65,28 @@ def get_result(
     return result
 
 
+@router.get("/{result_id}/bioref")
+def get_result_bioref(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Interprétation bioref complémentaire d'un résultat (par composant si panel).
+
+    N'affecte pas les flags ni le statut critique ; couche additive.
+    """
+    del current_user
+    from app.services.code_mapping_service import interpret_result_bioref
+
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    outcome = interpret_result_bioref(db, result)
+    if outcome is None:
+        return {"mapped": False, "exam_code": result.exam_code}
+    return {"mapped": True, **outcome}
+
+
 @router.get(
     "/{result_id}/fhir",
     response_model=FHIRDiagnosticReport,
@@ -164,6 +186,13 @@ def create_result(
         ) from exc
     # Auto-validation ISO 15189 §5.8
     try_auto_validate(result, db)
+    # Interprétation bioref complémentaire (additive, ne touche pas flags/critique)
+    try:
+        from app.services.code_mapping_service import apply_bioref_to_result
+
+        apply_bioref_to_result(db, result)
+    except Exception:  # noqa: BLE001 — ne doit jamais empêcher la création
+        pass
     db.commit()
     db.refresh(result)
     # Push temps-réel : alerte immédiate si critique ou delta dépassé

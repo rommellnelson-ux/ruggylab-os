@@ -35,7 +35,7 @@ class MLModelServer:
         """Run inference on the model."""
         if not self.is_loaded:
             return self._fallback_predict(features)
-        
+
         try:
             # result = self.model.predict(features)  # Placeholder
             # Record metrics

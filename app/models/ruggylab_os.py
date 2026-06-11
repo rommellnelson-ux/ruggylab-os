@@ -129,6 +129,13 @@ class Result(Base):
     auto_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     amendment_reason: Mapped[str | None] = mapped_column(String(500))
 
+    # ── Interprétation bioref complémentaire (unification des vocabulaires) ───
+    # Champs additifs : ne remplacent pas flags/is_critical, les complètent.
+    bioref_status: Mapped[str | None] = mapped_column(String(30))
+    bioref_comment: Mapped[str | None] = mapped_column(Text)
+    bioref_reference_range: Mapped[str | None] = mapped_column(String(120))
+    bioref_source: Mapped[str | None] = mapped_column(String(255))
+
     # ── Suivi TAT (Turnaround Time) — horodatages de phases (tous optionnels) ──
     exam_code: Mapped[str | None] = mapped_column(String(50), index=True)
     prescribed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
@@ -391,6 +398,35 @@ class TatTarget(Base):
     warn_factor: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+
+class BiologicalCodeMapping(Base):
+    """Table de correspondance canonique entre les vocabulaires biologiques.
+
+    Relie ``exam_catalog.exam_code``, ``BiologicalReferenceRange.test_code`` et
+    les ``analyte`` (data_points / ReferenceRange / CriticalRange), y compris les
+    panels (NFS, IONO…) décomposés en composants via ``component_of``.
+    """
+
+    __tablename__ = "biological_code_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    canonical_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    exam_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    test_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    analyte_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    component_of: Mapped[str | None] = mapped_column(String(50), index=True)
+    label: Mapped[str | None] = mapped_column(String(150))
+    category: Mapped[str | None] = mapped_column(String(100))
+    specimen_type: Mapped[str | None] = mapped_column(String(100))
+    unit: Mapped[str | None] = mapped_column(String(50))
+    is_panel: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False
+    )
 
 
 class BiologicalReferenceRange(Base):

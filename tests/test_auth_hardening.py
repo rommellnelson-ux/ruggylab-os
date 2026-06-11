@@ -1,15 +1,11 @@
 """Auth hardening tests: RBAC, token expiry, brute force protection."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from jose import jwt
 
-from app.api.deps import get_current_user
 from app.core.config import settings
 from app.main import app
-
 
 client = TestClient(app)
 
@@ -22,12 +18,12 @@ class TestAuthHardening:
         # Create an expired token
         payload = {
             "sub": "test@example.com",
-            "exp": datetime.now(timezone.utc) - timedelta(hours=1),
+            "exp": datetime.now(UTC) - timedelta(hours=1),
         }
         token = jwt.encode(
             payload, settings.SECRET_KEY, algorithm="HS256"
         )
-        
+
         response = client.get(
             "/api/v1/health",
             headers={"Authorization": f"Bearer {token}"},
@@ -54,19 +50,19 @@ class TestAuthHardening:
             data={"username": "admin", "password": "change_me_admin_password"},
         )
         assert login_resp.status_code == 200
-        
+
         token1 = login_resp.json()["access_token"]
-        
+
         # Decode token and check expiry
         payload1 = jwt.decode(
             token1, settings.SECRET_KEY, algorithms=["HS256"]
         )
-        exp1 = datetime.fromtimestamp(payload1["exp"], tz=timezone.utc)
-        
+        exp1 = datetime.fromtimestamp(payload1["exp"], tz=UTC)
+
         # Wait a bit, then refresh
         import time
         time.sleep(1)
-        
+
         refresh_resp = client.post(
             "/api/v1/login/refresh",
             headers={"Authorization": f"Bearer {token1}"},
@@ -76,7 +72,7 @@ class TestAuthHardening:
             payload2 = jwt.decode(
                 token2, settings.SECRET_KEY, algorithms=["HS256"]
             )
-            exp2 = datetime.fromtimestamp(payload2["exp"], tz=timezone.utc)
+            exp2 = datetime.fromtimestamp(payload2["exp"], tz=UTC)
             assert exp2 > exp1
 
     def test_rbac_admin_only_endpoint(self):
@@ -93,14 +89,14 @@ class TestAuthHardening:
                 "role": "technician",
             },
         )
-        
+
         # Login as technician
         resp = client.post(
             "/api/v1/login/access-token",
             data={"username": "user@example.com", "password": "pass123"},
         )
         user_token = resp.json()["access_token"]
-        
+
         # Try to access admin endpoint
         admin_resp = client.get(
             "/api/v1/users",

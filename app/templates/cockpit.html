@@ -1099,6 +1099,37 @@
             </div>
           </div>
 
+          <!-- Panneau unification des vocabulaires (mappings de codes) -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🔗 Unification des vocabulaires biologiques</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Relie <code>exam_code</code> (catalogue) ↔ <code>test_code</code> (référentiel) ↔
+              <code>analyte</code>, panels compris (NFS, IONO). Permet l'interprétation bioref
+              complémentaire des résultats sans modifier les flags existants.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <h4 style="margin:0 0 6px;">🧪 Tester un mapping</h4>
+                <div class="grid2">
+                  <div><label>exam_code</label><input id="mapTestExam" placeholder="ex. GLYC, NFS" /></div>
+                  <div><label>analyte (composant)</label><input id="mapTestAnalyte" placeholder="ex. HGB" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="testMapping(this)">Tester</button>
+                  <button class="secondary" onclick="seedCodeMappings(this)" style="margin-left:8px;">Charger les correspondances</button>
+                </div>
+                <div id="mapTestResult" style="margin-top:8px;"></div>
+                <div id="mapOrphans" style="margin-top:10px;font-size:12px;"></div>
+              </div>
+              <div>
+                <div class="toolbar" style="margin-bottom:6px;"><input id="mapFilter" placeholder="Filtrer (code)…" oninput="renderMappingsTable()" style="width:160px;" /></div>
+                <div style="max-height:300px;overflow-y:auto;">
+                  <table id="mappingsTable"><thead><tr><th>Canonique</th><th>exam</th><th>test</th><th>analyte</th><th>Panel</th><th></th></tr></thead><tbody></tbody></table>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Panneau alertes critiques non-acquittées -->
           <div class="panel" style="margin-top:12px;">
             <h3>🔔 Alertes critiques <span id="pendingBadge" style="display:none;" class="pill bad">!</span></h3>
@@ -2469,7 +2500,7 @@
       if (currentView === "patients") await loadPatients();
 
       if (currentView === "results") {
-        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs(), loadBioref()]);
+        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs(), loadBioref(), loadCodeMappings()]);
       }
       if (currentView === "stocks") { await loadReagents(); await loadExpiryAlerts(); }
       if (currentView === "epidemio") await loadEpidemio();
@@ -5704,6 +5735,65 @@ window.onload=renderLabels;
         if (w) { w.document.write(html); w.document.close(); }
         else showToast('Autoriser les pop-ups pour ouvrir le rapport', 'warning');
       } catch { showToast('Erreur rapport conformité', 'error'); }
+    }
+
+    // ── Unification des vocabulaires (mappings de codes) ──────────────────────
+    let _codeMappings = [];
+    async function loadCodeMappings() {
+      try {
+        _codeMappings = await api('/api/v1/code-mappings', { headers: headers(false) });
+        renderMappingsTable();
+        loadMappingOrphans();
+      } catch (e) { log('loadCodeMappings: ' + (e.message || e)); }
+    }
+    function renderMappingsTable() {
+      const f = ($('mapFilter')?.value || '').trim().toUpperCase();
+      const rows = _codeMappings.filter(m => !f || (m.canonical_code + (m.exam_code||'') + (m.test_code||'') + (m.analyte_code||'')).toUpperCase().includes(f));
+      setRows('mappingsTable', rows.map(m => row(
+        `<td><strong>${security.escapeHtml(m.canonical_code)}</strong>${m.component_of ? ` <small style="color:var(--muted);">∈${security.escapeHtml(m.component_of)}</small>` : ''}</td>` +
+        `<td>${security.escapeHtml(m.exam_code || '—')}</td>` +
+        `<td>${security.escapeHtml(m.test_code || '—')}</td>` +
+        `<td>${security.escapeHtml(m.analyte_code || '—')}</td>` +
+        `<td>${m.is_panel ? '✔' : ''}</td>` +
+        `<td><button class="ghost" style="color:var(--rose);font-size:11px;" onclick="deleteMapping(${m.id},this)">✕</button></td>`
+      )));
+    }
+    async function loadMappingOrphans() {
+      try {
+        const o = await api('/api/v1/code-mappings/orphans', { headers: headers(false) });
+        const ex = o.exam_codes_unmapped || [], te = o.test_codes_unmapped || [];
+        $('mapOrphans').innerHTML =
+          `<strong>Codes orphelins</strong> — exam (${ex.length}) : ${ex.slice(0,20).map(security.escapeHtml).join(', ') || '—'}` +
+          `<br>test (${te.length}) : ${te.slice(0,20).map(security.escapeHtml).join(', ') || '—'}`;
+      } catch {}
+    }
+    async function seedCodeMappings(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api('/api/v1/code-mappings/seed-defaults', { method: 'POST', headers: headers() });
+        showToast(`${res.created} correspondance(s) chargée(s)`, 'success');
+        await loadCodeMappings();
+      } catch (e) { showToast('Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteMapping(id, btn) {
+      setLoading(btn, true);
+      try { await api(`/api/v1/code-mappings/${id}`, { method: 'DELETE', headers: headers() }); showToast('Correspondance désactivée', 'success'); loadCodeMappings(); }
+      catch { showToast('Erreur suppression', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function testMapping(btn) {
+      const exam_code = ($('mapTestExam')?.value || '').trim().toUpperCase();
+      const analyte_code = ($('mapTestAnalyte')?.value || '').trim().toUpperCase() || null;
+      if (!exam_code) { showToast('Saisir un exam_code', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const d = await api('/api/v1/code-mappings/test', { method: 'POST', headers: headers(), body: JSON.stringify({ exam_code, analyte_code }) });
+        $('mapTestResult').innerHTML = d.matched
+          ? `<div class="notice">✅ <strong>${security.escapeHtml(exam_code)}</strong>${analyte_code ? ' / ' + security.escapeHtml(analyte_code) : ''} → canonique <strong>${security.escapeHtml(d.canonical_code || '—')}</strong>, bioref <strong>${security.escapeHtml(d.bioref_test_code || '—')}</strong>${d.is_panel ? ' (panel)' : ''}</div>`
+          : `<div class="notice" style="color:var(--rose);">Aucune correspondance pour « ${security.escapeHtml(exam_code)} »</div>`;
+      } catch (e) { showToast('Erreur test mapping', 'error'); }
+      finally { setLoading(btn, false); }
     }
 
     // ── Référentiel biologique & interprétation ───────────────────────────────

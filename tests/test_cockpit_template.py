@@ -43,6 +43,8 @@ class TestNewViewsPresent:
             'data-view="registre"',  # bouton de navigation Registre
             'id="biorefTable"',      # référentiel biologique
             'id="biorefTest"',       # sélecteur de test à interpréter
+            'id="mappingsTable"',    # unification des vocabulaires
+            'id="mapTestExam"',      # outil de test de mapping
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',      # champ unité (création patient)
             'id="userUnit"',         # champ unité (création utilisateur)
@@ -76,6 +78,9 @@ class TestHandlerFunctionsDefined:
             "registreImport", "_renderRegMonthChart",
             # Référentiel biologique
             "loadBioref", "seedBioref", "interpretBioref", "renderBiorefTable",
+            # Unification des vocabulaires
+            "loadCodeMappings", "renderMappingsTable", "seedCodeMappings",
+            "deleteMapping", "testMapping", "loadMappingOrphans",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:
