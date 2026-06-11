@@ -1,6 +1,7 @@
 from app.models.ruggylab_os import (
     AuditEvent,
     AutoValidationConfig,
+    BiologicalReferenceRange,
     CorrectiveAction,
     CriticalRange,
     DeltaCheckRule,
@@ -32,6 +33,7 @@ from app.models.ruggylab_os import (
 )
 
 __all__ = [
+    "BiologicalReferenceRange",
     "CriticalRange",
     "DeltaCheckRule",
     "Equipment",

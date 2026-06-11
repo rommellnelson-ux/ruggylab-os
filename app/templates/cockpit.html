@@ -1067,6 +1067,38 @@
             </div>
           </div>
 
+          <!-- Panneau référentiel biologique (IFCC/Tietz/OMS) -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📚 Référentiel biologique &amp; interprétation</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Valeurs de référence stratifiées par sexe/âge (IFCC/Tietz, ADA/OMS, ESC/EAS, KDIGO…).
+              Interprète une valeur : NORMAL / BAS / HAUT / CRITIQUE, avec note clinique.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Test</label><select id="biorefTest"></select></div>
+                  <div><label>Valeur (vide = qualitatif)</label><input id="biorefValue" type="number" step="any" placeholder="ex. 12.4" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Sexe</label><select id="biorefSex"><option value="">—</option><option value="M">Homme</option><option value="F">Femme</option></select></div>
+                  <div><label>Âge (ans)</label><input id="biorefAge" type="number" min="0" max="130" placeholder="ex. 35" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="interpretBioref(this)">Interpréter</button>
+                  <button class="secondary" onclick="seedBioref(this)" style="margin-left:8px;">Charger le référentiel</button>
+                </div>
+                <div id="biorefResult" style="margin-top:10px;"></div>
+              </div>
+              <div>
+                <div class="toolbar" style="margin-bottom:6px;"><input id="biorefFilter" placeholder="Filtrer (code)…" oninput="renderBiorefTable()" style="width:160px;" /></div>
+                <div style="max-height:280px;overflow-y:auto;">
+                  <table id="biorefTable"><thead><tr><th>Code</th><th>Test</th><th>Sexe</th><th>Plage</th><th>Source</th></tr></thead><tbody></tbody></table>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Panneau alertes critiques non-acquittées -->
           <div class="panel" style="margin-top:12px;">
             <h3>🔔 Alertes critiques <span id="pendingBadge" style="display:none;" class="pill bad">!</span></h3>
@@ -2437,7 +2469,7 @@
       if (currentView === "patients") await loadPatients();
 
       if (currentView === "results") {
-        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs()]);
+        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs(), loadBioref()]);
       }
       if (currentView === "stocks") { await loadReagents(); await loadExpiryAlerts(); }
       if (currentView === "epidemio") await loadEpidemio();
@@ -5672,6 +5704,84 @@ window.onload=renderLabels;
         if (w) { w.document.write(html); w.document.close(); }
         else showToast('Autoriser les pop-ups pour ouvrir le rapport', 'warning');
       } catch { showToast('Erreur rapport conformité', 'error'); }
+    }
+
+    // ── Référentiel biologique & interprétation ───────────────────────────────
+    let _biorefRanges = [];
+    async function loadBioref() {
+      try {
+        _biorefRanges = await api('/api/v1/bioref/ranges', { headers: headers(false) });
+        const sel = $('biorefTest');
+        if (sel) {
+          const codes = [];
+          const seen = new Set();
+          _biorefRanges.forEach(r => { if (!seen.has(r.test_code)) { seen.add(r.test_code); codes.push(r); } });
+          const cur = sel.value;
+          sel.innerHTML = codes.map(r => `<option value="${security.escapeHtml(r.test_code)}">${security.escapeHtml(r.test_code)} — ${security.escapeHtml(r.test_name)}</option>`).join('');
+          if (cur) sel.value = cur;
+        }
+        renderBiorefTable();
+      } catch (e) { log('loadBioref: ' + (e.message || e)); }
+    }
+    function _biorefRangeStr(r) {
+      if (r.normal_text) return r.normal_text;
+      const u = r.unit || '';
+      if (r.lower_limit != null && r.upper_limit != null) return `${r.lower_limit} - ${r.upper_limit} ${u}`.trim();
+      if (r.upper_limit != null) return `< ${r.upper_limit} ${u}`.trim();
+      if (r.lower_limit != null) return `> ${r.lower_limit} ${u}`.trim();
+      return u || '—';
+    }
+    function renderBiorefTable() {
+      const f = ($('biorefFilter')?.value || '').trim().toUpperCase();
+      const rows = _biorefRanges.filter(r => !f || r.test_code.toUpperCase().includes(f));
+      setRows('biorefTable', rows.map(r => row(
+        `<td><strong>${security.escapeHtml(r.test_code)}</strong></td>` +
+        `<td>${security.escapeHtml(r.test_name)}</td>` +
+        `<td>${security.escapeHtml(r.sex)}</td>` +
+        `<td>${security.escapeHtml(_biorefRangeStr(r))}</td>` +
+        `<td style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.source || '')}</td>`
+      )));
+    }
+    async function seedBioref(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api('/api/v1/bioref/seed-defaults', { method: 'POST', headers: headers() });
+        showToast(`${res.created} valeur(s) de référence chargée(s)`, 'success');
+        await loadBioref();
+      } catch (e) { showToast('Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    const _biorefFlagBadge = (f) => {
+      if (f === 'NORMAL') return '<span class="pill ok">NORMAL</span>';
+      if (f === 'BAS' || f === 'HAUT') return `<span class="pill" style="background:var(--amber);color:#fff;">${f}</span>`;
+      if (f && f.startsWith('CRITIQUE')) return `<span class="pill bad">${f}</span>`;
+      return `<span class="pill">${security.escapeHtml(f || '—')}</span>`;
+    };
+    async function interpretBioref(btn) {
+      const test_code = $('biorefTest')?.value;
+      if (!test_code) { showToast('Sélectionnez un test (chargez le référentiel)', 'error'); return; }
+      const vRaw = $('biorefValue').value;
+      const body = {
+        test_code,
+        value: vRaw === '' ? null : Number(vRaw),
+        sex: $('biorefSex').value || null,
+        age_years: $('biorefAge').value === '' ? null : Number($('biorefAge').value),
+      };
+      setLoading(btn, true);
+      try {
+        const d = await api('/api/v1/bioref/interpret', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        if (d.error) { $('biorefResult').innerHTML = `<div class="notice" style="color:var(--rose);">${security.escapeHtml(d.error)}</div>`; return; }
+        $('biorefResult').innerHTML =
+          `<div class="panel" style="padding:10px;">` +
+          `<div style="display:flex;justify-content:space-between;align-items:center;">` +
+            `<strong>${security.escapeHtml(d.test_name)}</strong> ${_biorefFlagBadge(d.flag)}</div>` +
+          `<div style="margin-top:6px;font-size:13px;">Résultat : <strong>${d.result ?? '—'} ${security.escapeHtml(d.unit || '')}</strong> ` +
+            `· Référence : ${security.escapeHtml(d.reference_range || '—')}</div>` +
+          (d.interpretation ? `<div style="margin-top:4px;font-size:12px;color:var(--muted);">${security.escapeHtml(d.interpretation)}</div>` : '') +
+          (d.source ? `<div style="margin-top:2px;font-size:11px;color:var(--muted);">Source : ${security.escapeHtml(d.source)}</div>` : '') +
+          `</div>`;
+      } catch (e) { showToast('Erreur interprétation', 'error'); }
+      finally { setLoading(btn, false); }
     }
 
     // ── Auto-validation ISO 15189 §5.8 ────────────────────────────────────────

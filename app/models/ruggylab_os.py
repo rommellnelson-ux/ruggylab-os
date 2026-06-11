@@ -393,6 +393,34 @@ class TatTarget(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
 
+class BiologicalReferenceRange(Base):
+    """Référentiel de valeurs biologiques de référence (IFCC/Tietz/OMS…).
+
+    Stratifié par sexe et tranche d'âge, avec bornes normales, seuils critiques,
+    texte normal pour les tests qualitatifs, interprétation clinique et source.
+    """
+
+    __tablename__ = "biological_reference_ranges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    test_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    test_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(100))
+    specimen: Mapped[str | None] = mapped_column(String(100))
+    sex: Mapped[str] = mapped_column(String(20), nullable=False, default="ALL")
+    age_min_years: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    age_max_years: Mapped[float] = mapped_column(Float, nullable=False, default=120)
+    lower_limit: Mapped[float | None] = mapped_column(Float)
+    upper_limit: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str | None] = mapped_column(String(50))
+    normal_text: Mapped[str | None] = mapped_column(String(255))
+    critical_low: Mapped[float | None] = mapped_column(Float)
+    critical_high: Mapped[float | None] = mapped_column(Float)
+    interpretation: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class CriticalRange(Base):
     """Configurable critical (panic) thresholds for analyte values."""
 
