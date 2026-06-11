@@ -35,6 +35,9 @@ class TestNewViewsPresent:
         [
             'id="quality"',          # vue qualité NC/CAPA
             'id="ncTable"',          # liste des NC
+            'id="tat"',              # vue Suivi TAT
+            'id="tatByExamTable"',   # tableau TAT par examen
+            'data-view="tat"',       # bouton de navigation TAT
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',      # champ unité (création patient)
             'id="userUnit"',         # champ unité (création utilisateur)
@@ -60,6 +63,9 @@ class TestHandlerFunctionsDefined:
             "connectNotifications", "renderNotifSnapshot", "disconnectNotifications",
             # Import en lot / dossier
             "submitBulkImport", "openDossier", "exportPatientFhir",
+            # Suivi TAT
+            "loadTat", "createTatTarget", "deleteTatTarget", "seedTatDefaults",
+            "_renderTatByDayChart",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:

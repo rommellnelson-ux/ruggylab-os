@@ -747,6 +747,7 @@
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
         <button data-view="qc" onclick="showView('qc')">📈 QC Analytique</button>
         <button data-view="stats" onclick="showView('stats')">📊 Statistiques Labo</button>
+        <button data-view="tat" onclick="showView('tat')">⏱️ Suivi TAT</button>
         <div class="nav-section">Logistique</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
         <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
@@ -1670,6 +1671,60 @@
           </div>
         </div>
 
+        <div id="tat" class="view band hidden">
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+              <h3 style="margin:0;">⏱️ Performance laboratoire — Suivi TAT</h3>
+              <div class="toolbar">
+                <label style="font-size:12px;">Période
+                  <select id="tatDays" onchange="loadTat()">
+                    <option value="7">7 j</option><option value="30" selected>30 j</option>
+                    <option value="90">90 j</option><option value="366">12 mois</option>
+                  </select>
+                </label>
+                <button class="ghost" onclick="loadTat()">↻ Actualiser</button>
+              </div>
+            </div>
+          </div>
+          <div class="grid4" style="margin-top:12px;">
+            <div class="panel metric metric-blue"><div id="tatMeasured" class="value">—</div><div class="label">Examens mesurés</div></div>
+            <div class="panel metric" id="tatOnTimePanel"><div id="tatOnTime" class="value">—</div><div class="label">% dans les délais</div></div>
+            <div class="panel metric" id="tatLatePanel"><div id="tatLate" class="value">—</div><div class="label">Examens en retard</div></div>
+            <div class="panel metric metric-rose"><div id="tatAlerts" class="value">—</div><div class="label">Alertes actives</div></div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel">
+              <h3>Délais cibles par examen</h3>
+              <div class="form">
+                <div class="grid3">
+                  <div><label>Code examen</label><input id="tatTgtCode" placeholder="ex. NFS" /></div>
+                  <div><label>Libellé</label><input id="tatTgtLabel" placeholder="ex. Numération" /></div>
+                  <div><label>Cible (min)</label><input id="tatTgtMinutes" type="number" min="1" placeholder="60" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="createTatTarget(this)">Enregistrer cible</button>
+                  <button class="secondary" onclick="seedTatDefaults(this)">Charger les cibles standards</button>
+                </div>
+              </div>
+              <table id="tatTargetsTable"><thead><tr><th>Code</th><th>Libellé</th><th>Cible</th><th>Seuil rouge</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+            <div class="panel">
+              <h3>🔔 Alertes TAT (délai dépassé)</h3>
+              <table id="tatAlertsTable"><thead><tr><th>Résultat</th><th>Examen</th><th>TAT</th><th>Cible</th><th>Statut</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel"><h3>TAT moyen par examen</h3><table id="tatByExamTable"><thead><tr><th>Examen</th><th>N</th><th>Moy. (min)</th><th>Max</th><th>% délais</th><th>Retards</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>TAT moyen par technicien</h3><table id="tatByTechTable"><thead><tr><th>Technicien</th><th>N</th><th>Moy. (min)</th><th>Max</th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel"><h3>TAT moyen par automate</h3><table id="tatByAutoTable"><thead><tr><th>Automate</th><th>N</th><th>Moy. (min)</th><th>Max</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>TAT moyen par journée</h3><div id="tatByDayChart"></div></div>
+          </div>
+        </div>
+
         <div id="quality" class="view band hidden">
           <div class="grid4">
             <div class="panel metric metric-blue"><div id="qmTotal" class="value">—</div><div class="label">NC totales</div></div>
@@ -2353,6 +2408,7 @@
       if (currentView === "qc") await loadQc();
       if (currentView === "stats") await loadStats();
       if (currentView === "quality") await loadQuality();
+      if (currentView === "tat") await loadTat();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -5946,6 +6002,129 @@ window.onload=renderLabels;
         showToast('Erreur import (droits officier requis ?)', 'error');
         log('submitBulkImport: ' + (e.message || e));
       } finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Suivi TAT — Performance laboratoire
+    // ══════════════════════════════════════════════════════════════════════
+    const _tatStatusBadge = (s) => ({
+      green: '<span class="pill ok">Dans les délais</span>',
+      orange: '<span class="pill" style="background:var(--amber);color:#fff;">Retard modéré</span>',
+      red: '<span class="pill bad">Retard important</span>',
+      unknown: '<span class="pill" style="background:var(--muted);color:#fff;">N/A</span>',
+    }[s] || s);
+
+    function _fmtTat(min) {
+      if (min === null || min === undefined) return '—';
+      if (min < 60) return `${min} min`;
+      const h = Math.floor(min / 60), m = Math.round(min % 60);
+      return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+    }
+
+    async function loadTat() {
+      const days = $('tatDays')?.value || '30';
+      try {
+        const [dash, targets, alerts] = await Promise.all([
+          api(`/api/v1/tat/dashboard?days=${days}`, { headers: headers(false) }),
+          api('/api/v1/tat/targets', { headers: headers(false) }),
+          api(`/api/v1/tat/alerts?days=${Math.min(Number(days), 90)}`, { headers: headers(false) }).catch(() => []),
+        ]);
+        $('tatMeasured').textContent = dash.total_measured;
+        $('tatOnTime').textContent = dash.on_time_pct + '%';
+        $('tatLate').textContent = dash.late_count;
+        $('tatAlerts').textContent = alerts.length;
+        const otp = $('tatOnTimePanel');
+        if (otp) { otp.classList.remove('metric-teal', 'metric-amber', 'metric-rose'); otp.classList.add(dash.on_time_pct >= 90 ? 'metric-teal' : dash.on_time_pct >= 75 ? 'metric-amber' : 'metric-rose'); }
+        const lp = $('tatLatePanel');
+        if (lp) { lp.classList.remove('metric-teal', 'metric-rose'); lp.classList.add(dash.late_count > 0 ? 'metric-rose' : 'metric-teal'); }
+
+        setRows('tatTargetsTable', targets.map(t => row(
+          `<td><strong>${security.escapeHtml(t.exam_code)}</strong></td>` +
+          `<td>${security.escapeHtml(t.label)}</td>` +
+          `<td>${_fmtTat(t.target_minutes)}</td>` +
+          `<td>${_fmtTat(Math.round(t.target_minutes * t.warn_factor))}</td>` +
+          `<td><button class="ghost" style="color:var(--rose);font-size:11px;" onclick="deleteTatTarget(${t.id},this)">Supprimer</button></td>`
+        )));
+
+        setRows('tatAlertsTable', alerts.map(a => {
+          const tr = row(
+            `<td>#${a.result_id}</td>` +
+            `<td>${security.escapeHtml(a.exam_code || '—')}</td>` +
+            `<td>${_fmtTat(a.total_minutes)}</td>` +
+            `<td>${_fmtTat(a.target_minutes)}</td>` +
+            `<td>${_tatStatusBadge(a.status)}</td>`
+          );
+          tr.classList.add(a.status === 'red' ? 'row-critical' : 'row-warning');
+          return tr;
+        }));
+
+        setRows('tatByExamTable', dash.by_exam.map(e => row(
+          `<td><strong>${security.escapeHtml(e.label || e.exam_code)}</strong></td>` +
+          `<td>${e.count}</td>` +
+          `<td>${_fmtTat(e.mean_min)}</td>` +
+          `<td>${_fmtTat(e.max_min)}</td>` +
+          `<td>${e.on_time_pct === null || e.on_time_pct === undefined ? '—' : e.on_time_pct + '%'}</td>` +
+          `<td>${e.late_count}</td>`
+        )));
+        setRows('tatByTechTable', dash.by_technician.map(t => row(
+          `<td>${security.escapeHtml(t.technician)}</td><td>${t.count}</td><td>${_fmtTat(t.mean_min)}</td><td>${_fmtTat(t.max_min)}</td>`
+        )));
+        setRows('tatByAutoTable', dash.by_automate.map(t => row(
+          `<td>${security.escapeHtml(t.automate)}</td><td>${t.count}</td><td>${_fmtTat(t.mean_min)}</td><td>${_fmtTat(t.max_min)}</td>`
+        )));
+        _renderTatByDayChart(dash.by_day);
+      } catch (e) { showToast('Erreur chargement TAT', 'error'); log('loadTat: ' + (e.message || e)); }
+    }
+
+    function _renderTatByDayChart(days) {
+      const div = $('tatByDayChart');
+      if (!div) return;
+      if (!days || !days.length) { div.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0;">Aucune donnée.</p>'; return; }
+      const maxV = Math.max(...days.map(d => d.mean_min), 1);
+      const W = 460, H = 160, padTop = 16, padBot = 28, padL = 4;
+      const chartW = W - padL * 2, chartH = H - padTop - padBot;
+      const bw = Math.max(4, Math.floor(chartW / days.length) - 4);
+      let bars = '';
+      days.forEach((d, i) => {
+        const x = padL + i * (chartW / days.length) + 2;
+        const bh = Math.max(2, Math.round((d.mean_min / maxV) * chartH));
+        const y = padTop + chartH - bh;
+        bars += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="#2563eb" opacity="0.78"><title>${d.day}: ${d.mean_min} min</title></rect>` +
+          `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="8" fill="var(--muted)">${d.day.slice(5)}</text>`;
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
+    }
+
+    async function createTatTarget(btn) {
+      const exam_code = ($('tatTgtCode')?.value || '').trim().toUpperCase();
+      const label = ($('tatTgtLabel')?.value || '').trim();
+      const target_minutes = Number($('tatTgtMinutes')?.value);
+      if (!exam_code || !label || !(target_minutes > 0)) { showToast('Champs incomplets', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        await api('/api/v1/tat/targets', { method: 'POST', headers: headers(), body: JSON.stringify({ exam_code, label, target_minutes }) });
+        showToast('Cible TAT enregistrée', 'success');
+        ['tatTgtCode', 'tatTgtLabel', 'tatTgtMinutes'].forEach(id => { if ($(id)) $(id).value = ''; });
+        loadTat();
+      } catch (e) { showToast(e.message === 'Conflict' ? 'Cible déjà définie' : 'Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function deleteTatTarget(id, btn) {
+      setLoading(btn, true);
+      try { await api(`/api/v1/tat/targets/${id}`, { method: 'DELETE', headers: headers() }); showToast('Cible supprimée', 'success'); loadTat(); }
+      catch (e) { showToast('Erreur suppression', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function seedTatDefaults(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api('/api/v1/tat/targets/seed-defaults', { method: 'POST', headers: headers() });
+        showToast(`${res.created} cible(s) standard ajoutée(s)`, 'success');
+        loadTat();
+      } catch (e) { showToast('Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
     }
 
     // ══════════════════════════════════════════════════════════════════════

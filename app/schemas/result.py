@@ -19,6 +19,7 @@ class ResultCreate(BaseModel):
     data_points: dict = Field(default_factory=dict)
     image_url: str | None = None
     is_critical: bool = False
+    exam_code: str | None = Field(default=None, max_length=50)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -35,6 +36,13 @@ class ResultRead(ResultBase):
     is_auto_validated: bool = False
     auto_validated_at: dt.datetime | None = None
     amendment_reason: str | None = None
+    # Suivi TAT
+    exam_code: str | None = None
+    registered_at: dt.datetime | None = None
+    collected_at: dt.datetime | None = None
+    received_at: dt.datetime | None = None
+    analysis_finished_at: dt.datetime | None = None
+    bio_validated_at: dt.datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

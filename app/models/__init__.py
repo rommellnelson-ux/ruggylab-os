@@ -26,6 +26,7 @@ from app.models.ruggylab_os import (
     RevokedToken,
     Sample,
     StockMovement,
+    TatTarget,
     User,
     UserRole,
 )
@@ -60,4 +61,5 @@ __all__ = [
     "ReportSignature",
     "RevokedToken",
     "StockMovement",
+    "TatTarget",
 ]

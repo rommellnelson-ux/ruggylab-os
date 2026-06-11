@@ -133,6 +133,17 @@ def create_result(
     # Reference flags: HH/H/N/L/LL per analyte
     computed_flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
     result_data["flags"] = computed_flags if computed_flags else None
+    # Suivi TAT — pré-remplissage des horodatages de phase (modifiable ensuite)
+    now = utcnow_naive()
+    analysis_dt = result_data.get("analysis_date") or now
+    result_data.setdefault("collected_at", sample.collection_date)
+    result_data.setdefault("received_at", sample.received_date)
+    # « Enregistrement » = point de départ du TAT (prélèvement par défaut)
+    result_data.setdefault("registered_at", sample.collection_date or sample.received_date or now)
+    result_data.setdefault("analysis_finished_at", analysis_dt)
+    # Le résultat est créé validé → validation biologique horodatée maintenant
+    result_data["bio_validated_at"] = now
+    result_data["tech_validated_at"] = now
     result = Result(**result_data)
     db.add(result)
     db.flush()

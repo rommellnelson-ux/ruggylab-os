@@ -8,6 +8,7 @@ from app.api.v1.endpoints.bnpl import router as bnpl_router
 from app.api.v1.endpoints.bulk_import import router as bulk_import_router
 from app.api.v1.endpoints.notifications import router as notifications_router
 from app.api.v1.endpoints.quality import router as quality_router
+from app.api.v1.endpoints.tat import router as tat_router
 from app.api.v1.endpoints.critical_alerts import router as critical_alerts_router
 from app.api.v1.endpoints.critical_ranges import router as critical_ranges_router
 from app.api.v1.endpoints.delta_check import router as delta_check_router
@@ -80,3 +81,4 @@ api_router.include_router(bnpl_router, tags=["BNPL CMU"])
 api_router.include_router(notifications_router, tags=["Notifications temps-réel"])
 api_router.include_router(bulk_import_router, tags=["Import en lot"])
 api_router.include_router(quality_router, tags=["Qualité NC/CAPA"])
+api_router.include_router(tat_router, tags=["Suivi TAT"])

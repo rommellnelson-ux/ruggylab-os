@@ -129,6 +129,18 @@ class Result(Base):
     auto_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     amendment_reason: Mapped[str | None] = mapped_column(String(500))
 
+    # ── Suivi TAT (Turnaround Time) — horodatages de phases (tous optionnels) ──
+    exam_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    prescribed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    registered_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    collected_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    received_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    analysis_started_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    analysis_finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    tech_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    bio_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    released_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")
     stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="result")
@@ -360,6 +372,25 @@ class RevokedToken(Base):
     revoked_at: Mapped[dt.datetime] = mapped_column(
         DateTime, default=utcnow_naive, nullable=False
     )
+
+
+class TatTarget(Base):
+    """Délai cible (Turnaround Time) par type d'examen biologique.
+
+    ``target_minutes`` = seuil « dans les délais » (vert). Au-delà et jusqu'à
+    ``target_minutes * warn_factor`` = retard modéré (orange) ; au-delà = retard
+    important (rouge).
+    """
+
+    __tablename__ = "tat_targets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    exam_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    warn_factor: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
 
 class CriticalRange(Base):
