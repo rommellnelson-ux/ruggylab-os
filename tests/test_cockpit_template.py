@@ -41,6 +41,8 @@ class TestNewViewsPresent:
             'id="registre"',         # vue Registre & Import
             'id="registreCsvText"',  # zone de saisie CSV
             'data-view="registre"',  # bouton de navigation Registre
+            'id="biorefTable"',      # référentiel biologique
+            'id="biorefTest"',       # sélecteur de test à interpréter
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',      # champ unité (création patient)
             'id="userUnit"',         # champ unité (création utilisateur)
@@ -72,6 +74,8 @@ class TestHandlerFunctionsDefined:
             # Registre & import
             "_parseCsv", "_registreRows", "registreAnalyse", "registrePreview",
             "registreImport", "_renderRegMonthChart",
+            # Référentiel biologique
+            "loadBioref", "seedBioref", "interpretBioref", "renderBiorefTable",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:
