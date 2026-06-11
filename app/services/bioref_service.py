@@ -80,9 +80,7 @@ def find_reference(
     def _matches(r: BiologicalReferenceRange) -> bool:
         if r.sex not in ("ALL", norm_sex):
             return False
-        if age_years is not None and not (r.age_min_years <= age_years <= r.age_max_years):
-            return False
-        return True
+        return age_years is None or (r.age_min_years <= age_years <= r.age_max_years)
 
     candidates = [r for r in rows if _matches(r)]
     if not candidates:

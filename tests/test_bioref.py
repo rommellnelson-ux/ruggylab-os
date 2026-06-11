@@ -15,11 +15,19 @@ def _auth(client) -> dict[str, str]:
 
 
 def _ref(**over) -> BiologicalReferenceRange:
-    base = dict(
-        test_code="X", test_name="X", sex="ALL", age_min_years=0, age_max_years=120,
-        lower_limit=None, upper_limit=None, unit="", normal_text=None,
-        critical_low=None, critical_high=None,
-    )
+    base = {
+        "test_code": "X",
+        "test_name": "X",
+        "sex": "ALL",
+        "age_min_years": 0,
+        "age_max_years": 120,
+        "lower_limit": None,
+        "upper_limit": None,
+        "unit": "",
+        "normal_text": None,
+        "critical_low": None,
+        "critical_high": None,
+    }
     base.update(over)
     return BiologicalReferenceRange(**base)
 
