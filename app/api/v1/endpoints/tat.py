@@ -17,6 +17,19 @@ from app.services.tat_service import (
 router = APIRouter(prefix="/tat")
 
 
+# ── Catalogue d'examens (référentiel, dérivé du registre réel) ──────────────
+
+@router.get("/catalog")
+def exam_catalog(
+    current_user: User = Depends(get_current_active_user),
+) -> list[dict]:
+    """Catalogue de référence des examens (code, libellé, catégorie, LOINC, TAT cible)."""
+    del current_user
+    from app.services.exam_catalog import EXAM_CATALOG
+
+    return EXAM_CATALOG
+
+
 # ── Cibles TAT par examen ───────────────────────────────────────────────────
 
 @router.get("/targets", response_model=list[TatTargetRead])

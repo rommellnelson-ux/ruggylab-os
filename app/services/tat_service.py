@@ -196,26 +196,23 @@ def list_tat_alerts(db: Session, days: int = 7, limit: int = 100) -> list[dict]:
     return alerts
 
 
-DEFAULT_TARGETS = [
-    {"exam_code": "NFS", "label": "Numération Formule Sanguine", "target_minutes": 60},
-    {"exam_code": "GLYC", "label": "Glycémie", "target_minutes": 30},
-    {"exam_code": "CREAT", "label": "Créatinine", "target_minutes": 120},
-    {"exam_code": "GE", "label": "Goutte épaisse", "target_minutes": 60},
-    {"exam_code": "ECBU", "label": "ECBU", "target_minutes": 72 * 60, "warn_factor": 1.0},
-]
-
-
 def seed_default_targets(db: Session) -> int:
-    """Crée les délais cibles par défaut absents. Retourne le nombre créé."""
+    """Crée les délais cibles absents à partir du catalogue d'examens réel.
+
+    Le catalogue est dérivé du registre maître du laboratoire. Retourne le
+    nombre de cibles créées (idempotent).
+    """
+    from app.services.exam_catalog import EXAM_CATALOG
+
     created = 0
-    for spec in DEFAULT_TARGETS:
-        if db.query(TatTarget).filter(TatTarget.exam_code == spec["exam_code"]).first():
+    for spec in EXAM_CATALOG:
+        if db.query(TatTarget).filter(TatTarget.exam_code == spec["code"]).first():
             continue
         db.add(
             TatTarget(
-                exam_code=spec["exam_code"],
+                exam_code=spec["code"],
                 label=spec["label"],
-                target_minutes=spec["target_minutes"],
+                target_minutes=spec["tat_minutes"],
                 warn_factor=spec.get("warn_factor", 1.5),
             )
         )
