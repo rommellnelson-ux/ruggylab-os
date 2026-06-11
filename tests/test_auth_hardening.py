@@ -1,19 +1,15 @@
 """Auth hardening tests: RBAC, token expiry, brute force protection."""
 from datetime import UTC, datetime, timedelta
 
-from fastapi.testclient import TestClient
-from jose import jwt
+import jwt
 
 from app.core.config import settings
-from app.main import app
-
-client = TestClient(app)
 
 
 class TestAuthHardening:
     """Test auth flow hardening and RBAC."""
 
-    def test_expired_token_rejected(self):
+    def test_expired_token_rejected(self, client):
         """Verify that expired tokens are rejected."""
         # Create an expired token
         payload = {
@@ -21,29 +17,29 @@ class TestAuthHardening:
             "exp": datetime.now(UTC) - timedelta(hours=1),
         }
         token = jwt.encode(
-            payload, settings.SECRET_KEY, algorithm="HS256"
+            payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM
         )
 
         response = client.get(
-            "/api/v1/health",
+            "/api/v1/users/me",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code in (401, 403)
 
-    def test_invalid_token_rejected(self):
+    def test_invalid_token_rejected(self, client):
         """Verify that tampered tokens are rejected."""
         response = client.get(
-            "/api/v1/health",
+            "/api/v1/users/me",
             headers={"Authorization": "Bearer invalid_token_xyz"},
         )
         assert response.status_code in (401, 403)
 
-    def test_missing_auth_header_blocked(self):
+    def test_missing_auth_header_blocked(self, client):
         """Verify that missing auth header blocks protected endpoints."""
-        response = client.get("/api/v1/patients")
-        assert response.status_code == 403
+        response = client.get("/api/v1/users/me")
+        assert response.status_code == 401
 
-    def test_token_refresh_updates_expiry(self):
+    def test_token_refresh_updates_expiry(self, client):
         """Verify that token refresh updates the expiry time."""
         login_resp = client.post(
             "/api/v1/login/access-token",
@@ -51,49 +47,48 @@ class TestAuthHardening:
         )
         assert login_resp.status_code == 200
 
-        token1 = login_resp.json()["access_token"]
+        payload1 = login_resp.json()
+        token1 = payload1["access_token"]
 
         # Decode token and check expiry
-        payload1 = jwt.decode(
-            token1, settings.SECRET_KEY, algorithms=["HS256"]
-        )
-        exp1 = datetime.fromtimestamp(payload1["exp"], tz=UTC)
+        payload_token1 = jwt.decode(token1, options={"verify_signature": False})
+        exp1 = datetime.fromtimestamp(payload_token1["exp"], tz=UTC)
 
         # Wait a bit, then refresh
         import time
+
         time.sleep(1)
 
         refresh_resp = client.post(
             "/api/v1/login/refresh",
-            headers={"Authorization": f"Bearer {token1}"},
+            json={"refresh_token": payload1["refresh_token"]},
         )
-        if refresh_resp.status_code == 200:
-            token2 = refresh_resp.json()["access_token"]
-            payload2 = jwt.decode(
-                token2, settings.SECRET_KEY, algorithms=["HS256"]
-            )
-            exp2 = datetime.fromtimestamp(payload2["exp"], tz=UTC)
-            assert exp2 > exp1
+        assert refresh_resp.status_code == 200, refresh_resp.text
 
-    def test_rbac_admin_only_endpoint(self):
+        token2 = refresh_resp.json()["access_token"]
+        payload_token2 = jwt.decode(token2, options={"verify_signature": False})
+        exp2 = datetime.fromtimestamp(payload_token2["exp"], tz=UTC)
+        assert exp2 > exp1
+
+    def test_rbac_admin_only_endpoint(self, client):
         """Verify RBAC: non-admin cannot access admin endpoints."""
         # Create user with limited role
-        client.post(
+        create_resp = client.post(
             "/api/v1/users",
-            headers={
-                "Authorization": f"Bearer {self._get_admin_token()}",
-            },
+            headers={"Authorization": f"Bearer {self._get_admin_token(client)}"},
             json={
-                "email": "user@example.com",
-                "password": "pass123",
+                "username": "user_example",
+                "password": "Password123!",
+                "full_name": "User Example",
                 "role": "technician",
             },
         )
+        assert create_resp.status_code == 201, create_resp.text
 
         # Login as technician
         resp = client.post(
             "/api/v1/login/access-token",
-            data={"username": "user@example.com", "password": "pass123"},
+            data={"username": "user_example", "password": "Password123!"},
         )
         user_token = resp.json()["access_token"]
 
@@ -105,10 +100,11 @@ class TestAuthHardening:
         assert admin_resp.status_code == 403
 
     @staticmethod
-    def _get_admin_token() -> str:
+    def _get_admin_token(client) -> str:
         """Helper: get admin token."""
         resp = client.post(
             "/api/v1/login/access-token",
             data={"username": "admin", "password": "change_me_admin_password"},
         )
+        assert resp.status_code == 200, resp.text
         return resp.json()["access_token"]
