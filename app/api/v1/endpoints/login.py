@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.core.security import (
 from app.db.session import get_db
 from app.models import RefreshToken, User
 from app.schemas.auth import LogoutRequest, RefreshRequest, Token
+from app.services.token_revocation import revoke_access_token
 from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/login")
@@ -98,14 +99,32 @@ def refresh_access_token(payload: RefreshRequest, db: Session = Depends(get_db))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(payload: LogoutRequest, db: Session = Depends(get_db)) -> None:
-    """Revoke a refresh token, effectively ending the session."""
-    token_hash = hash_token(payload.refresh_token)
-    db_token = (
-        db.query(RefreshToken)
-        .filter(RefreshToken.token_hash == token_hash, RefreshToken.revoked_at.is_(None))
-        .first()
-    )
-    if db_token:
-        db_token.revoked_at = utcnow_naive()
-        db.commit()
+def logout(
+    payload: LogoutRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> None:
+    """Termine la session : révoque le refresh token ET le jeton d'accès courant.
+
+    Le jeton d'accès est lu dans l'en-tête ``Authorization`` (s'il est présent)
+    et ajouté à la denylist par ``jti`` — il devient inutilisable immédiatement,
+    y compris pour les connexions WebSocket.
+    """
+    db_token = None
+    if payload.refresh_token:
+        token_hash = hash_token(payload.refresh_token)
+        db_token = (
+            db.query(RefreshToken)
+            .filter(RefreshToken.token_hash == token_hash, RefreshToken.revoked_at.is_(None))
+            .first()
+        )
+        if db_token:
+            db_token.revoked_at = utcnow_naive()
+
+    # Révocation immédiate du jeton d'accès (denylist par jti)
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        access_token = auth_header[7:].strip()
+        revoke_access_token(access_token, db, user_id=db_token.user_id if db_token else None)
+
+    db.commit()

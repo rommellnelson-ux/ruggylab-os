@@ -18,7 +18,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models import RefreshToken
+from app.models import RefreshToken, RevokedToken
 from app.utils.datetime_utils import utcnow_naive
 
 logger = logging.getLogger(__name__)
@@ -49,8 +49,19 @@ def purge_expired_tokens(db: Session, *, keep_days: int = _DEFAULT_KEEP_DAYS) ->
         .filter(RefreshToken.expires_at < cutoff)
         .delete(synchronize_session=False)
     )
+    # Purge également la denylist des jetons d'accès expirés (plus besoin de les
+    # mémoriser une fois la date d'expiration dépassée).
+    deleted_revoked = (
+        db.query(RevokedToken)
+        .filter(RevokedToken.expires_at < utcnow_naive())
+        .delete(synchronize_session=False)
+    )
     db.commit()
-    logger.info("token_cleanup: deleted %d stale refresh token(s)", deleted)
+    logger.info(
+        "token_cleanup: deleted %d stale refresh token(s), %d expired revocation(s)",
+        deleted,
+        deleted_revoked,
+    )
     return deleted
 
 

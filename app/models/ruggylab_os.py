@@ -39,6 +39,9 @@ class User(Base):
         Enum(UserRole), default=UserRole.TECHNICIAN, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Unité / service de rattachement (cloisonnement RBAC des dossiers patient).
+    # NULL = agent transversal (accès à tous les dossiers).
+    unit: Mapped[str | None] = mapped_column(String(100))
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="user")
     report_signatures: Mapped[list["ReportSignature"]] = relationship(back_populates="signed_by")
@@ -59,6 +62,10 @@ class Equipment(Base):
         back_populates="equipment",
         cascade="all, delete-orphan",
     )
+    maintenances: Mapped[list["EquipmentMaintenance"]] = relationship(
+        back_populates="equipment",
+        cascade="all, delete-orphan",
+    )
 
 
 class Patient(Base):
@@ -71,6 +78,8 @@ class Patient(Base):
     birth_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     sex: Mapped[str | None] = mapped_column(CHAR(1))
     rank: Mapped[str | None] = mapped_column(String(50))
+    # Unité / service rattaché (cloisonnement RBAC). NULL = pool partagé.
+    unit: Mapped[str | None] = mapped_column(String(100))
 
     samples: Mapped[list["Sample"]] = relationship(back_populates="patient")
 
@@ -107,6 +116,37 @@ class Result(Base):
     validator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_critical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    critical_ack_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    critical_ack_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    delta_exceeded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    delta_analytes: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
+    flags: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
+    is_auto_validated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    auto_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    amendment_reason: Mapped[str | None] = mapped_column(String(500))
+
+    # ── Interprétation bioref complémentaire (unification des vocabulaires) ───
+    # Champs additifs : ne remplacent pas flags/is_critical, les complètent.
+    bioref_status: Mapped[str | None] = mapped_column(String(30))
+    bioref_comment: Mapped[str | None] = mapped_column(Text)
+    bioref_reference_range: Mapped[str | None] = mapped_column(String(120))
+    bioref_source: Mapped[str | None] = mapped_column(String(255))
+
+    # ── Suivi TAT (Turnaround Time) — horodatages de phases (tous optionnels) ──
+    exam_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    prescribed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    registered_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    collected_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    received_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    analysis_started_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    analysis_finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    tech_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    bio_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    released_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
 
     sample: Mapped["Sample"] = relationship(back_populates="results")
     equipment: Mapped["Equipment | None"] = relationship(back_populates="results")
@@ -127,6 +167,9 @@ class Reagent(Base):
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="unit")
     current_stock: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     alert_threshold: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    lot_number: Mapped[str | None] = mapped_column(String(100))
+    expiry_date: Mapped[dt.date | None] = mapped_column(Date)
+    supplier: Mapped[str | None] = mapped_column(String(200))
     equipment_ratios: Mapped[list["EquipmentReagentRatio"]] = relationship(
         back_populates="reagent",
         cascade="all, delete-orphan",
@@ -316,6 +359,284 @@ class RefreshToken(Base):
     @property
     def is_valid(self) -> bool:
         return self.revoked_at is None and self.expires_at > utcnow_naive()
+
+
+class RevokedToken(Base):
+    """Liste de révocation des jetons d'accès (JWT) par ``jti``.
+
+    Un jeton d'accès est sans état (stateless) : pour l'invalider avant son
+    expiration (déconnexion, compromission), on enregistre son ``jti`` ici.
+    ``get_current_user`` rejette tout jeton dont le ``jti`` figure dans cette
+    table tant que ``expires_at`` n'est pas dépassé.
+    """
+
+    __tablename__ = "revoked_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    jti: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[dt.datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+
+class TatTarget(Base):
+    """Délai cible (Turnaround Time) par type d'examen biologique.
+
+    ``target_minutes`` = seuil « dans les délais » (vert). Au-delà et jusqu'à
+    ``target_minutes * warn_factor`` = retard modéré (orange) ; au-delà = retard
+    important (rouge).
+    """
+
+    __tablename__ = "tat_targets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    exam_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    warn_factor: Mapped[float] = mapped_column(Float, nullable=False, default=1.5)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+
+class BiologicalCodeMapping(Base):
+    """Table de correspondance canonique entre les vocabulaires biologiques.
+
+    Relie ``exam_catalog.exam_code``, ``BiologicalReferenceRange.test_code`` et
+    les ``analyte`` (data_points / ReferenceRange / CriticalRange), y compris les
+    panels (NFS, IONO…) décomposés en composants via ``component_of``.
+    """
+
+    __tablename__ = "biological_code_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    canonical_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    exam_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    test_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    analyte_code: Mapped[str | None] = mapped_column(String(50), index=True)
+    component_of: Mapped[str | None] = mapped_column(String(50), index=True)
+    label: Mapped[str | None] = mapped_column(String(150))
+    category: Mapped[str | None] = mapped_column(String(100))
+    specimen_type: Mapped[str | None] = mapped_column(String(100))
+    unit: Mapped[str | None] = mapped_column(String(50))
+    is_panel: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False
+    )
+
+
+class BiologicalReferenceRange(Base):
+    """Référentiel de valeurs biologiques de référence (IFCC/Tietz/OMS…).
+
+    Stratifié par sexe et tranche d'âge, avec bornes normales, seuils critiques,
+    texte normal pour les tests qualitatifs, interprétation clinique et source.
+    """
+
+    __tablename__ = "biological_reference_ranges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    test_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    test_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(100))
+    specimen: Mapped[str | None] = mapped_column(String(100))
+    sex: Mapped[str] = mapped_column(String(20), nullable=False, default="ALL")
+    age_min_years: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    age_max_years: Mapped[float] = mapped_column(Float, nullable=False, default=120)
+    lower_limit: Mapped[float | None] = mapped_column(Float)
+    upper_limit: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str | None] = mapped_column(String(50))
+    normal_text: Mapped[str | None] = mapped_column(String(255))
+    critical_low: Mapped[float | None] = mapped_column(Float)
+    critical_high: Mapped[float | None] = mapped_column(Float)
+    interpretation: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class CriticalRange(Base):
+    """Configurable critical (panic) thresholds for analyte values."""
+
+    __tablename__ = "critical_ranges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(50), nullable=False)
+    low_critical: Mapped[float | None] = mapped_column(Float)
+    high_critical: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class QcControl(Base):
+    """Control material definition for Westgard / Levey-Jennings QC."""
+
+    __tablename__ = "qc_controls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(100), nullable=False)
+    level: Mapped[str] = mapped_column(String(50), nullable=False, default="Niveau 1")
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    target_mean: Mapped[float] = mapped_column(Float, nullable=False)
+    target_sd: Mapped[float] = mapped_column(Float, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    results: Mapped[list["QcResult"]] = relationship(
+        back_populates="control",
+        cascade="all, delete-orphan",
+    )
+
+
+class QcResult(Base):
+    """Single daily QC measurement with automatic Westgard rule evaluation."""
+
+    __tablename__ = "qc_results"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    control_id: Mapped[int] = mapped_column(
+        ForeignKey("qc_controls.id"), nullable=False, index=True
+    )
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    measured_at: Mapped[dt.date] = mapped_column(Date, nullable=False, index=True)
+    operator: Mapped[str | None] = mapped_column(String(100))
+    violations: Mapped[str | None] = mapped_column(Text)  # JSON list of rule codes
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, nullable=False, default=utcnow_naive)
+
+    control: Mapped["QcControl"] = relationship(back_populates="results")
+
+
+class DeltaCheckRule(Base):
+    """Règles de delta-check patient (variation inter-résultats)."""
+
+    __tablename__ = "delta_check_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    delta_pct: Mapped[float | None] = mapped_column(Float)
+    delta_abs: Mapped[float | None] = mapped_column(Float)
+    lookback_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class ReferenceRange(Base):
+    """Plages de référence par analyte, sexe et tranche d'âge."""
+
+    __tablename__ = "reference_ranges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    analyte: Mapped[str] = mapped_column(String(50), nullable=False)
+    sex: Mapped[str] = mapped_column(String(1), nullable=False, default="*")
+    age_min_years: Mapped[float | None] = mapped_column(Float)
+    age_max_years: Mapped[float | None] = mapped_column(Float)
+    low_normal: Mapped[float | None] = mapped_column(Float)
+    high_normal: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class NotifConfig(Base):
+    """Configuration des alertes pour valeurs critiques non-acquittées."""
+
+    __tablename__ = "notif_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    webhook_url: Mapped[str | None] = mapped_column(String(500))
+    email: Mapped[str | None] = mapped_column(String(200))
+    delay_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class AutoValidationConfig(Base):
+    """Règle d'auto-validation ISO 15189 §5.8 pour les résultats normaux."""
+
+    __tablename__ = "auto_validation_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, default="Règle par défaut")
+    require_all_flags_normal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    require_no_delta: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    require_not_critical: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+
+class NonConformity(Base):
+    """Non-conformité (NC) — Système de management de la qualité ISO 15189 §4.9.
+
+    Source possible : contrôle qualité, valeur critique, maintenance, ou saisie
+    manuelle. Workflow : open → analysis → action → verification → closed.
+    """
+
+    __tablename__ = "non_conformities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    # source : qc | critical | maintenance | manual | other
+    source: Mapped[str] = mapped_column(String(30), nullable=False, default="manual")
+    # severity : minor | major | critical
+    severity: Mapped[str] = mapped_column(String(20), nullable=False, default="minor")
+    # status : open | analysis | action | verification | closed
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", index=True)
+    # Référence optionnelle à l'entité source (ex. result:42, qc_control:3)
+    linked_entity_type: Mapped[str | None] = mapped_column(String(50))
+    linked_entity_id: Mapped[str | None] = mapped_column(String(50))
+    detected_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    detected_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    due_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    closed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    root_cause: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    actions: Mapped[list["CorrectiveAction"]] = relationship(
+        back_populates="non_conformity", cascade="all, delete-orphan"
+    )
+
+
+class CorrectiveAction(Base):
+    """Action corrective ou préventive (CAPA) liée à une non-conformité — §4.10."""
+
+    __tablename__ = "corrective_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    non_conformity_id: Mapped[int] = mapped_column(
+        ForeignKey("non_conformities.id"), nullable=False, index=True
+    )
+    # action_type : corrective | preventive
+    action_type: Mapped[str] = mapped_column(String(20), nullable=False, default="corrective")
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    responsible_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    due_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    # status : planned | in_progress | done
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="planned")
+    effectiveness_checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    effectiveness_notes: Mapped[str | None] = mapped_column(Text)
+    completed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    non_conformity: Mapped["NonConformity"] = relationship(back_populates="actions")
+
+
+class EquipmentMaintenance(Base):
+    """Planification et suivi de maintenance / étalonnage des équipements."""
+
+    __tablename__ = "equipment_maintenances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipments.id"), nullable=False, index=True
+    )
+    maintenance_type: Mapped[str] = mapped_column(String(30), nullable=False, default="preventive")
+    scheduled_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    performed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    performed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    notes: Mapped[str | None] = mapped_column(Text)
+    next_due_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    is_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    equipment: Mapped["Equipment"] = relationship(back_populates="maintenances")
 
 
 class MilitaryFacility(Base):

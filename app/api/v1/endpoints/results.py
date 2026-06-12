@@ -1,16 +1,24 @@
+import contextlib
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, require_officer
 from app.db.session import get_db
-from app.models import Equipment, Result, Sample, User
+from app.models import AuditEvent, Equipment, ReportSignature, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
-from app.schemas.result import ResultCreate, ResultRead
+from app.schemas.result import ResultAmend, ResultCreate, ResultRead
+from app.services.auto_validator import try_auto_validate
+from app.services.critical_checker import check_critical
+from app.services.delta_checker import check_delta
 from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
+from app.services.reference_checker import compute_flags
+from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
 
@@ -58,6 +66,28 @@ def get_result(
     return result
 
 
+@router.get("/{result_id}/bioref")
+def get_result_bioref(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Interprétation bioref complémentaire d'un résultat (par composant si panel).
+
+    N'affecte pas les flags ni le statut critique ; couche additive.
+    """
+    del current_user
+    from app.services.code_mapping_service import interpret_result_bioref
+
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    outcome = interpret_result_bioref(db, result)
+    if outcome is None:
+        return {"mapped": False, "exam_code": result.exam_code}
+    return {"mapped": True, **outcome}
+
+
 @router.get(
     "/{result_id}/fhir",
     response_model=FHIRDiagnosticReport,
@@ -75,15 +105,7 @@ def get_result_fhir(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
-    """Return a FHIR R4 DiagnosticReport for the requested result.
-
-    The response is a self-contained FHIR document: the patient resource and
-    all CBC Observation resources are embedded as ``contained`` entries so the
-    document can be imported into any FHIR server without prior resource
-    registration.
-
-    MIME type is ``application/fhir+json`` as required by the FHIR R4 spec.
-    """
+    """Return a FHIR R4 DiagnosticReport for the requested result."""
     del current_user
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
@@ -120,6 +142,31 @@ def create_result(
     result_data = payload.model_dump(exclude_none=True)
     result_data["validator_id"] = current_user.id
     result_data["is_validated"] = True
+    # Auto-detect critical values against configured thresholds (OR with manual flag)
+    result_data["is_critical"] = payload.is_critical or check_critical(payload.data_points, db)
+    # Resolve patient for delta-check and reference flags
+    patient = sample.patient
+    patient_id = patient.id if patient else None
+    patient_sex = patient.sex if patient else None
+    patient_birth = patient.birth_date if patient else None
+    # Delta-check: detect abrupt inter-result variation
+    delta_exceeded, delta_analytes = check_delta(payload.data_points, patient_id, db)
+    result_data["delta_exceeded"] = delta_exceeded
+    result_data["delta_analytes"] = delta_analytes if delta_analytes else None
+    # Reference flags: HH/H/N/L/LL per analyte
+    computed_flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
+    result_data["flags"] = computed_flags if computed_flags else None
+    # Suivi TAT — pré-remplissage des horodatages de phase (modifiable ensuite)
+    now = utcnow_naive()
+    analysis_dt = result_data.get("analysis_date") or now
+    result_data.setdefault("collected_at", sample.collection_date)
+    result_data.setdefault("received_at", sample.received_date)
+    # « Enregistrement » = point de départ du TAT (prélèvement par défaut)
+    result_data.setdefault("registered_at", sample.collection_date or sample.received_date or now)
+    result_data.setdefault("analysis_finished_at", analysis_dt)
+    # Le résultat est créé validé → validation biologique horodatée maintenant
+    result_data["bio_validated_at"] = now
+    result_data["tech_validated_at"] = now
     result = Result(**result_data)
     db.add(result)
     db.flush()
@@ -138,6 +185,133 @@ def create_result(
                 "items": [item.__dict__ for item in exc.items],
             },
         ) from exc
+    # Auto-validation ISO 15189 §5.8
+    try_auto_validate(result, db)
+    # Interprétation bioref complémentaire (additive, ne touche pas flags/critique).
+    # Best-effort : ne doit jamais empêcher la création du résultat.
+    with contextlib.suppress(Exception):
+        from app.services.code_mapping_service import apply_bioref_to_result
+
+        apply_bioref_to_result(db, result)
+    db.commit()
+    db.refresh(result)
+    # Push temps-réel : alerte immédiate si critique ou delta dépassé
+    if result.is_critical or result.delta_exceeded:
+        from app.services.notification_bus import publish_alert_event
+
+        publish_alert_event(
+            "critical" if result.is_critical else "delta",
+            result_id=result.id,
+        )
+    return result
+
+
+@router.patch("/{result_id}/amend", response_model=ResultRead)
+def amend_result(
+    result_id: int,
+    payload: ResultAmend,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+) -> Result:
+    """Corriger les data_points d'un résultat validé (réservé officier/admin).
+
+    Recalcule automatiquement flags, delta-check et statut critique.
+    Crée une entrée d'audit avec l'état avant/après et le motif obligatoire.
+    Réinitialise l'auto-validation (le résultat corrigé doit être requalifié).
+    Si un compte-rendu a été signé, sa signature est révoquée (les données
+    signées ne correspondent plus) — intégrité ISO 15189.
+    """
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+
+    # Snapshot de l'ancien état pour l'audit
+    old_data_points = result.data_points
+    old_is_critical = result.is_critical
+
+    # Intégrité : révoquer toute signature de compte-rendu existante
+    signature_revoked = False
+    signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
+    if signature and signature.revoked_at is None:
+        signature.revoked_at = utcnow_naive()
+        signature.revocation_reason = (
+            f"Données corrigées (amend) — motif: {payload.amendment_reason}"
+        )
+        signature_revoked = True
+
+    # Mise à jour des données
+    result.data_points = payload.data_points
+    result.amendment_reason = payload.amendment_reason
+
+    # Recalcul critique
+    result.is_critical = check_critical(payload.data_points, db)
+
+    # Recalcul delta
+    patient = result.sample.patient if result.sample else None
+    patient_id = patient.id if patient else None
+    patient_sex = patient.sex if patient else None
+    patient_birth = patient.birth_date if patient else None
+    delta_exceeded, delta_analytes = check_delta(payload.data_points, patient_id, db)
+    result.delta_exceeded = delta_exceeded
+    result.delta_analytes = delta_analytes if delta_analytes else None
+
+    # Recalcul flags
+    computed_flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
+    result.flags = computed_flags if computed_flags else None
+
+    # Réinitialisation auto-validation (les données ont changé)
+    result.is_auto_validated = False
+    result.auto_validated_at = None
+
+    # Tentative d'auto-revalidation sur le résultat corrigé
+    try_auto_validate(result, db)
+
+    # Audit trail
+    audit = AuditEvent(
+        user_id=current_user.id,
+        event_type="result.amend",
+        entity_type="result",
+        entity_id=str(result_id),
+        payload=json.dumps(
+            {
+                "amendment_reason": payload.amendment_reason,
+                "old_data_points": old_data_points,
+                "new_data_points": payload.data_points,
+                "old_is_critical": old_is_critical,
+                "new_is_critical": result.is_critical,
+                "is_auto_validated": result.is_auto_validated,
+                "signature_revoked": signature_revoked,
+            }
+        ),
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(result)
+    return result
+
+
+@router.patch("/{result_id}/ack-critical", response_model=ResultRead)
+def ack_critical(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Result:
+    """Acknowledge a critical value — records operator and timestamp."""
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    if not result.is_critical:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ce résultat n'est pas marqué critique.",
+        )
+    if result.critical_ack_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Valeur critique déjà acquittée.",
+        )
+    result.critical_ack_at = utcnow_naive()
+    result.critical_ack_by_id = current_user.id
     db.commit()
     db.refresh(result)
     return result

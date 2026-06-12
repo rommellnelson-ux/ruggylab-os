@@ -19,6 +19,7 @@ class ResultCreate(BaseModel):
     data_points: dict = Field(default_factory=dict)
     image_url: str | None = None
     is_critical: bool = False
+    exam_code: str | None = Field(default=None, max_length=50)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -27,5 +28,32 @@ class ResultRead(ResultBase):
     id: int
     validator_id: int | None = None
     is_validated: bool = False
+    critical_ack_at: dt.datetime | None = None
+    critical_ack_by_id: int | None = None
+    delta_exceeded: bool = False
+    delta_analytes: dict | None = None
+    flags: dict | None = None
+    is_auto_validated: bool = False
+    auto_validated_at: dt.datetime | None = None
+    amendment_reason: str | None = None
+    # Suivi TAT
+    exam_code: str | None = None
+    registered_at: dt.datetime | None = None
+    collected_at: dt.datetime | None = None
+    received_at: dt.datetime | None = None
+    analysis_finished_at: dt.datetime | None = None
+    bio_validated_at: dt.datetime | None = None
+    # Interprétation bioref complémentaire (unification des vocabulaires)
+    bioref_status: str | None = None
+    bioref_comment: str | None = None
+    bioref_reference_range: str | None = None
+    bioref_source: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ResultAmend(BaseModel):
+    data_points: dict
+    amendment_reason: str = Field(..., min_length=5, max_length=500)
+
+    model_config = ConfigDict(extra="forbid")

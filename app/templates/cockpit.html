@@ -745,6 +745,9 @@
         <button data-view="machines" onclick="showView('machines')">🔬 DH36 &amp; POCT</button>
         <button data-view="imaging" onclick="showView('imaging')">👁 Imagerie IA</button>
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
+        <button data-view="qc" onclick="showView('qc')">📈 QC Analytique</button>
+        <button data-view="stats" onclick="showView('stats')">📊 Statistiques Labo</button>
+        <button data-view="tat" onclick="showView('tat')">⏱️ Suivi TAT</button>
         <div class="nav-section">Logistique</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
         <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
@@ -753,6 +756,8 @@
         <div class="nav-section">Système</div>
         <button data-view="equipments" onclick="showView('equipments')">🔬 Équipements</button>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
+        <button data-view="registre" onclick="showView('registre')">📚 Registre &amp; Import</button>
+        <button data-view="quality" onclick="showView('quality')">✅ Qualité (NC/CAPA)</button>
         <button data-view="users" onclick="showView('users')">👥 Utilisateurs</button>
         <button data-view="audit" onclick="showView('audit')">🔍 Audit</button>
       </nav>
@@ -774,9 +779,20 @@
         </div>
         <div class="actions" style="align-items:center;">
           <span id="topbarClock"></span>
+          <button class="ghost" id="notifBell" onclick="toggleNotifPopover()" title="Alertes temps-réel" aria-label="Alertes temps-réel" style="position:relative;">
+            🔔<span id="notifBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--rose);color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;font-weight:700;">0</span>
+            <span id="notifWsDot" title="WebSocket déconnecté" style="position:absolute;bottom:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:var(--muted);"></span>
+          </button>
           <button class="theme-toggle" onclick="toggleTheme()" title="Changer le thème" aria-label="Basculer entre mode clair et sombre">☀️</button>
           <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraîchir">↻</button>
           <button class="secondary" onclick="logout()" aria-label="Se déconnecter">⏻ Quitter</button>
+        </div>
+        <div id="notifPopover" style="display:none;position:absolute;top:60px;right:16px;width:380px;max-height:60vh;overflow-y:auto;background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);z-index:200;padding:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>🔔 Alertes temps-réel</strong>
+            <button class="ghost" style="font-size:11px;padding:2px 8px;" onclick="toggleNotifPopover()">✕</button>
+          </div>
+          <div id="notifPopoverBody" style="font-size:13px;"><p style="color:var(--muted);">Aucune alerte active.</p></div>
         </div>
       </header>
       <section class="content">
@@ -786,10 +802,18 @@
             <div class="panel metric metric-rose"><div id="mCritical" class="value">—</div><div class="label">Valeurs critiques</div></div>
             <div class="panel metric metric-teal"><div id="mMalaria" class="value">—</div><div class="label">Paludisme positif</div></div>
             <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
+            <div class="panel metric" id="mQcPanel"><div id="mQc" class="value">—</div><div class="label">Contrôles QC</div></div>
+            <div class="panel metric" id="mMntPanel"><div id="mMnt" class="value">—</div><div class="label">Maintenance ≤7j</div></div>
+            <div class="panel metric" id="mExpiryPanel"><div id="mExpiry" class="value">—</div><div class="label">⚠ Péremptions ≤30j</div></div>
+            <div class="panel metric" id="mCompliancePanel"><div id="mCompliance" class="value">—</div><div class="label">Conformité ISO 15189</div></div>
           </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
             <div class="panel"><h3>Stocks bas ⚠️</h3><table id="lowStockTable"><thead><tr><th>Réactif</th><th>Stock</th><th>Seuil</th><th>Niveau</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>📈 Contrôle Qualité Analytique <span id="qcRejectBadge" style="display:none;" class="pill bad">Rejet</span><span id="qcWarnBadge" style="display:none;" class="pill" style="background:var(--amber);">Alerte</span></h3>
+            <table id="dashQcTable"><thead><tr><th>Analyte</th><th>Niveau</th><th>Dernière valeur</th><th>Date</th><th>Violations</th><th>Statut</th></tr></thead><tbody></tbody></table>
           </div>
         </div>
 
@@ -799,7 +823,7 @@
               <div><label>IPP</label><input id="patientIpp" placeholder="IPP-..." /></div>
               <div class="grid2"><div><label>Prenom</label><input id="patientFirst" /></div><div><label>Nom</label><input id="patientLast" /></div></div>
               <div class="grid2"><div><label>Naissance</label><input id="patientBirth" type="date" /></div><div><label>Sexe</label><select id="patientSex"><option>M</option><option>F</option></select></div></div>
-              <div><label>Grade</label><input id="patientRank" /></div>
+              <div class="grid2"><div><label>Grade</label><input id="patientRank" /></div><div><label>Unité / service</label><input id="patientUnit" placeholder="ex. hematologie (vide = partagé)" /></div></div>
               <button onclick="createPatient(this)" aria-label="Créer un nouveau patient">Creer patient</button>
               <div id="patientCreated" class="notice hidden">
                 Patient enregistre
@@ -808,7 +832,50 @@
                 <button class="success" style="margin-top:10px;" onclick="useCreatedPatientForSample()">Creer ses echantillons</button>
               </div>
             </div></div>
-            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP ou nom" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Recherche patients</h3><div class="toolbar"><input id="patientQuery" placeholder="IPP, nom ou grade" /><button onclick="loadPatients()">Chercher</button></div><table id="patientsTable"><thead><tr><th>ID</th><th>IPP</th><th>Patient</th><th>Sexe</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+
+          <!-- Dossier patient complet (masqué par défaut) -->
+          <div id="patientDossier" class="panel" style="margin-top:12px;display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <h3 style="margin:0;">👤 Dossier — <span id="dossierName"></span></h3>
+              <div class="toolbar">
+                <button class="ghost" onclick="editPatientUnit()" title="Modifier l'unité de rattachement">🏷️ Unité</button>
+                <button class="secondary" onclick="exportPatientFhir()">⬇ Export FHIR Bundle</button>
+                <button class="ghost" onclick="closeDossier()">✕ Fermer</button>
+              </div>
+            </div>
+            <div class="grid4" style="margin-top:12px;">
+              <div class="panel metric metric-blue"><div id="dossierResults" class="value">—</div><div class="label">Résultats</div></div>
+              <div class="panel metric metric-rose"><div id="dossierCritical" class="value">—</div><div class="label">Critiques</div></div>
+              <div class="panel metric"><div id="dossierSamples" class="value">—</div><div class="label">Échantillons</div></div>
+              <div class="panel metric"><div id="dossierAnalytes" class="value">—</div><div class="label">Analytes suivis</div></div>
+            </div>
+            <div class="grid2" style="margin-top:12px;">
+              <div class="panel"><h4 style="margin-top:0;">📈 Tendances (sparklines)</h4><div id="dossierTrends"></div></div>
+              <div class="panel"><h4 style="margin-top:0;">🕑 Chronologie des résultats</h4>
+                <table id="dossierTimeline"><thead><tr><th>ID</th><th>Date</th><th>Échantillon</th><th>Critique</th><th>Flags</th></tr></thead><tbody></tbody></table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Import en lot de patients -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📥 Import en lot — Patients (CSV)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
+              Colonnes : <code>ipp_unique_id, first_name, last_name, birth_date, sex, rank</code>.
+              Première ligne = en-tête. Les lignes invalides sont ignorées et listées.
+            </p>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <input id="patientCsvFile" type="file" accept=".csv,text/csv" onchange="loadCsvIntoTextarea(this,'patientCsvText')" />
+              <button class="ghost" onclick="fillPatientCsvSample()">Exemple</button>
+            </div>
+            <textarea id="patientCsvText" rows="5" placeholder="ipp_unique_id,first_name,last_name,birth_date,sex,rank&#10;IPP-001,Awa,Koné,1990-05-12,F,Sergent"></textarea>
+            <div class="actions" style="margin-top:8px;align-items:center;gap:12px;">
+              <button onclick="submitBulkImport('patients', this)">Importer patients</button>
+              <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="patientCsvDryRun" /> Validation à blanc (dry-run)</label>
+            </div>
+            <div id="patientImportReport" style="margin-top:10px;font-size:13px;"></div>
           </div>
         </div>
 
@@ -855,7 +922,235 @@
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
-            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Valide</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Flags</th><th>Acquittement</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <!-- Panneau seuils critiques (panic values) -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>⚠️ Seuils critiques (panic values)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Tout résultat dont une valeur dépasse ces seuils est automatiquement marqué <strong>critique</strong>.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Analyte</label><input id="crAnalyte" placeholder="ex. WBC" /></div>
+                  <div><label>Unité</label><input id="crUnit" placeholder="ex. ×10³/μL" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Seuil bas critique</label><input id="crLow" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                  <div><label>Seuil haut critique</label><input id="crHigh" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                </div>
+                <button onclick="createCriticalRange(this)">Enregistrer seuil</button>
+              </div>
+              <table id="criticalRangesTable">
+                <thead><tr><th>Analyte</th><th>Bas critique</th><th>Haut critique</th><th>Unité</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panneau delta-check patient -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>△ Delta-Check Patient</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Détecte les variations inter-résultats anormales pour un même patient (inversions d'échantillon, dégradation rapide).
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Analyte</label><input id="dcAnalyte" placeholder="ex. HGB" /></div>
+                  <div><label>Unité</label><input id="dcUnit" placeholder="ex. g/L" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Seuil Δ absolu</label><input id="dcAbs" type="number" step="any" placeholder="ex. 30" /></div>
+                  <div><label>Seuil Δ % (1-100)</label><input id="dcPct" type="number" step="any" min="0.1" max="100" placeholder="ex. 20" /></div>
+                </div>
+                <div><label>Fenêtre (jours)</label><input id="dcLookback" type="number" value="30" min="1" max="365" /></div>
+                <button onclick="createDeltaRule(this)">Enregistrer règle</button>
+              </div>
+              <table id="deltaRulesTable">
+                <thead><tr><th>Analyte</th><th>Δ absolu</th><th>Δ %</th><th>Fenêtre</th><th>Unité</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panneau valeurs de référence -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📊 Valeurs de référence (HH/H/N/L/LL)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Génère des flags d'interprétation (HH/H/N/L/LL) sur chaque analyte selon l'âge et le sexe du patient.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid3">
+                  <div><label>Analyte</label><input id="rrAnalyte" placeholder="ex. WBC" /></div>
+                  <div><label>Sexe</label><select id="rrSex"><option value="*">Tous (*)</option><option value="M">Masculin (M)</option><option value="F">Féminin (F)</option></select></div>
+                  <div><label>Unité</label><input id="rrUnit" placeholder="ex. ×10³/μL" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Âge min (ans)</label><input id="rrAgeMin" type="number" step="any" min="0" placeholder="—" /></div>
+                  <div><label>Âge max (ans)</label><input id="rrAgeMax" type="number" step="any" min="0" placeholder="—" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Borne basse normale</label><input id="rrLow" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                  <div><label>Borne haute normale</label><input id="rrHigh" type="number" step="any" placeholder="Laisser vide si N/A" /></div>
+                </div>
+                <button onclick="createRefRange(this)">Enregistrer plage</button>
+              </div>
+              <table id="refRangesTable">
+                <thead><tr><th>Analyte</th><th>Sexe</th><th>Âge</th><th>Bas</th><th>Haut</th><th>Unité</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panneau correction / ré-analyse de résultat -->
+          <div id="amendPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>✏️ Corriger un résultat — <span id="amendResultLabel"></span></h3>
+            <input type="hidden" id="amendResultId" />
+            <div class="grid2">
+              <div class="form">
+                <div>
+                  <label>Données analytiques (JSON)</label>
+                  <textarea id="amendDataPoints" rows="6" placeholder='{"WBC":4.5,"RBC":4.2,"HGB":130}'></textarea>
+                </div>
+                <div>
+                  <label>Motif de correction (5 – 500 car.)</label>
+                  <input id="amendReason" placeholder="ex. Erreur de saisie initiale, valeur recalibrée" />
+                </div>
+                <div class="actions">
+                  <button onclick="submitAmend(this)">Enregistrer correction</button>
+                  <button class="ghost" onclick="closeAmendPanel()">Annuler</button>
+                </div>
+              </div>
+              <div>
+                <p style="font-size:12px;color:var(--muted);">
+                  La correction recalcule automatiquement les flags (HH/H/N/L/LL), le delta-check et le statut critique.<br>
+                  L'auto-validation est réinitialisée et réévaluée sur les données corrigées.<br>
+                  Un événement d'audit est créé avec l'état avant/après et le motif.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panneau auto-validation ISO 15189 §5.8 -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🤖 Auto-validation ISO 15189 §5.8</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Un résultat est auto-validé si toutes les conditions de la règle active sont satisfaites.
+              Cliquez <em>Appliquer maintenant</em> pour traiter rétroactivement les résultats existants.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div><label>Nom de la règle</label><input id="avName" value="Règle par défaut" /></div>
+                <div style="display:flex;flex-direction:column;gap:6px;margin:8px 0;">
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" id="avFlagsNormal" checked /> Tous les flags doivent être N (normaux)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" id="avNoDelta" checked /> Pas de dépassement delta-check
+                  </label>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" id="avNotCritical" checked /> Résultat non critique
+                  </label>
+                </div>
+                <div class="actions">
+                  <button onclick="createAutoValidationConfig(this)">Enregistrer règle</button>
+                  <button class="secondary" onclick="runAutoValidation(this)" style="margin-left:8px;">▶ Appliquer maintenant</button>
+                </div>
+              </div>
+              <table id="autoValidConfigTable">
+                <thead><tr><th>Règle</th><th>Flags N</th><th>Δ-check</th><th>Non critique</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Panneau référentiel biologique (IFCC/Tietz/OMS) -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📚 Référentiel biologique &amp; interprétation</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Valeurs de référence stratifiées par sexe/âge (IFCC/Tietz, ADA/OMS, ESC/EAS, KDIGO…).
+              Interprète une valeur : NORMAL / BAS / HAUT / CRITIQUE, avec note clinique.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Test</label><select id="biorefTest"></select></div>
+                  <div><label>Valeur (vide = qualitatif)</label><input id="biorefValue" type="number" step="any" placeholder="ex. 12.4" /></div>
+                </div>
+                <div class="grid2">
+                  <div><label>Sexe</label><select id="biorefSex"><option value="">—</option><option value="M">Homme</option><option value="F">Femme</option></select></div>
+                  <div><label>Âge (ans)</label><input id="biorefAge" type="number" min="0" max="130" placeholder="ex. 35" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="interpretBioref(this)">Interpréter</button>
+                  <button class="secondary" onclick="seedBioref(this)" style="margin-left:8px;">Charger le référentiel</button>
+                </div>
+                <div id="biorefResult" style="margin-top:10px;"></div>
+              </div>
+              <div>
+                <div class="toolbar" style="margin-bottom:6px;"><input id="biorefFilter" placeholder="Filtrer (code)…" oninput="renderBiorefTable()" style="width:160px;" /></div>
+                <div style="max-height:280px;overflow-y:auto;">
+                  <table id="biorefTable"><thead><tr><th>Code</th><th>Test</th><th>Sexe</th><th>Plage</th><th>Source</th></tr></thead><tbody></tbody></table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panneau unification des vocabulaires (mappings de codes) -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🔗 Unification des vocabulaires biologiques</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Relie <code>exam_code</code> (catalogue) ↔ <code>test_code</code> (référentiel) ↔
+              <code>analyte</code>, panels compris (NFS, IONO). Permet l'interprétation bioref
+              complémentaire des résultats sans modifier les flags existants.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <h4 style="margin:0 0 6px;">🧪 Tester un mapping</h4>
+                <div class="grid2">
+                  <div><label>exam_code</label><input id="mapTestExam" placeholder="ex. GLYC, NFS" /></div>
+                  <div><label>analyte (composant)</label><input id="mapTestAnalyte" placeholder="ex. HGB" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="testMapping(this)">Tester</button>
+                  <button class="secondary" onclick="seedCodeMappings(this)" style="margin-left:8px;">Charger les correspondances</button>
+                </div>
+                <div id="mapTestResult" style="margin-top:8px;"></div>
+                <div id="mapOrphans" style="margin-top:10px;font-size:12px;"></div>
+              </div>
+              <div>
+                <div class="toolbar" style="margin-bottom:6px;"><input id="mapFilter" placeholder="Filtrer (code)…" oninput="renderMappingsTable()" style="width:160px;" /></div>
+                <div style="max-height:300px;overflow-y:auto;">
+                  <table id="mappingsTable"><thead><tr><th>Canonique</th><th>exam</th><th>test</th><th>analyte</th><th>Panel</th><th></th></tr></thead><tbody></tbody></table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panneau alertes critiques non-acquittées -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🔔 Alertes critiques <span id="pendingBadge" style="display:none;" class="pill bad">!</span></h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Webhook envoyé automatiquement si un résultat critique reste non-acquitté au-delà du délai configuré.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div><label>URL Webhook</label><input id="notifWebhook" placeholder="https://hooks.example.com/…" /></div>
+                <div><label>Délai avant alerte (minutes)</label><input id="notifDelay" type="number" value="30" min="1" max="1440" /></div>
+                <button onclick="createNotifConfig(this)">Enregistrer config</button>
+                <button class="secondary" onclick="checkAndNotify(this)" style="margin-left:8px;">▶ Vérifier et notifier</button>
+              </div>
+              <div>
+                <table id="notifConfigsTable">
+                  <thead><tr><th>Webhook</th><th>Délai</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+                <div id="pendingCriticalsDiv" style="margin-top:10px;"></div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -900,13 +1195,15 @@
               <div><label>Nom</label><input id="reagentName" /></div>
               <div class="grid2"><div><label>Categorie</label><input id="reagentCategory" /></div><div><label>Unite</label><input id="reagentUnit" value="unit" /></div></div>
               <div class="grid2"><div><label>Stock</label><input id="reagentStock" type="number" step="0.001" /></div><div><label>Seuil</label><input id="reagentThreshold" type="number" step="0.001" /></div></div>
+              <div class="grid2"><div><label>N° Lot</label><input id="reagentLot" placeholder="ex. LOT-2024-001" /></div><div><label>Fournisseur</label><input id="reagentSupplier" /></div></div>
+              <div><label>Date péremption</label><input id="reagentExpiry" type="date" /></div>
               <button onclick="createReagent(this)">Creer reactif</button>
             </div></div>
             <div class="panel">
               <h3>Réactifs</h3>
               <div class="toolbar"><button class="ghost" onclick="loadReagents()">↻ Actualiser</button></div>
               <table id="reagentsTable">
-                <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
+                <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Lot</th><th>Péremption</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
                 <tbody></tbody>
               </table>
             </div>
@@ -927,6 +1224,11 @@
                   <div><label>Stock actuel</label><input id="editReagentStock" type="number" step="0.001" /></div>
                   <div><label>Seuil alerte</label><input id="editReagentThreshold" type="number" step="0.001" /></div>
                 </div>
+                <div class="grid2">
+                  <div><label>N° Lot</label><input id="editReagentLot" placeholder="ex. LOT-2024-001" /></div>
+                  <div><label>Fournisseur</label><input id="editReagentSupplier" /></div>
+                </div>
+                <div><label>Date péremption</label><input id="editReagentExpiry" type="date" /></div>
                 <div class="actions">
                   <button onclick="saveReagent(this)">Enregistrer</button>
                   <button class="ghost" onclick="closeReagentEdit()">Annuler</button>
@@ -941,6 +1243,43 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Panneau péremptions réactifs -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📅 Péremptions réactifs</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Réactifs dont la date de péremption approche ou est dépassée.
+            </p>
+            <div class="toolbar" style="margin-bottom:10px;">
+              <label style="font-size:13px;">Horizon (jours) :</label>
+              <input id="expiryDays" type="number" value="30" min="0" max="365" style="width:70px;margin-left:6px;" />
+              <button class="ghost" style="margin-left:8px;" onclick="loadExpiryAlerts()">↻ Actualiser</button>
+              <button class="warn" style="margin-left:8px;" onclick="notifyExpiryAlerts(this)">📨 Notifier</button>
+            </div>
+            <table id="expiryTable">
+              <thead><tr><th>Réactif</th><th>Lot</th><th>Péremption</th><th>Jours restants</th><th>Stock</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <!-- Import en lot de réactifs -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📥 Import en lot — Réactifs (CSV)</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
+              Colonnes : <code>name, category, unit, current_stock, alert_threshold, lot_number, expiry_date, supplier</code>.
+              Seul <code>name</code> est obligatoire. Lignes invalides ignorées et listées.
+            </p>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <input id="reagentCsvFile" type="file" accept=".csv,text/csv" onchange="loadCsvIntoTextarea(this,'reagentCsvText')" />
+              <button class="ghost" onclick="fillReagentCsvSample()">Exemple</button>
+            </div>
+            <textarea id="reagentCsvText" rows="5" placeholder="name,category,unit,current_stock,alert_threshold,lot_number,expiry_date,supplier&#10;Diluant DH36,Hématologie,L,20,5,LOT-A1,2027-01-01,Sysmex"></textarea>
+            <div class="actions" style="margin-top:8px;align-items:center;gap:12px;">
+              <button onclick="submitBulkImport('reagents', this)">Importer réactifs</button>
+              <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="reagentCsvDryRun" /> Validation à blanc (dry-run)</label>
+            </div>
+            <div id="reagentImportReport" style="margin-top:10px;font-size:13px;"></div>
           </div>
 
           <div class="panel" style="margin-top:12px;">
@@ -966,6 +1305,75 @@
                 </div>
               </div>
               <pre id="stockPredictionResult" class="result-box">Aucune prédiction lancée.</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════════════ QC Analytique (Westgard / Levey-Jennings) ══════════════════ -->
+        <div id="qc" class="view band hidden">
+          <div class="grid2">
+            <!-- Colonne gauche : création + liste des contrôles -->
+            <div>
+              <div class="panel">
+                <h3>Nouveau contrôle QC</h3>
+                <div class="form">
+                  <div class="grid2">
+                    <div><label>Analyte</label><input id="qcAnalyte" placeholder="ex. Glucose" /></div>
+                    <div><label>Niveau</label><input id="qcLevel" value="Niveau 1" /></div>
+                  </div>
+                  <div class="grid3">
+                    <div><label>Moyenne cible</label><input id="qcMean" type="number" step="any" /></div>
+                    <div><label>Écart-type (SD)</label><input id="qcSd" type="number" step="any" min="0.000001" /></div>
+                    <div><label>Unité</label><input id="qcUnit" placeholder="mmol/L" /></div>
+                  </div>
+                  <button onclick="createQcControl(this)">Créer contrôle</button>
+                </div>
+              </div>
+              <div class="panel" style="margin-top:12px;">
+                <h3>Contrôles actifs</h3>
+                <div class="toolbar"><button class="ghost" onclick="loadQc()">↻ Actualiser</button></div>
+                <table id="qcControlsTable">
+                  <thead><tr><th>Analyte</th><th>Niveau</th><th>Moyenne</th><th>SD</th><th>Unité</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Colonne droite : graphe + saisie -->
+            <div>
+              <div class="panel" id="qcChartPanel" style="display:none;">
+                <h3>📈 Levey-Jennings — <span id="qcChartTitle"></span></h3>
+                <div id="qcChartContainer" style="margin:10px 0 4px;overflow-x:auto;"></div>
+                <div id="qcResultsAlert" style="margin-top:8px;"></div>
+                <div class="form" style="margin-top:12px;">
+                  <h4 style="margin:0 0 8px;font-size:13px;">Saisir une mesure</h4>
+                  <input type="hidden" id="qcSelectedControlId" />
+                  <div class="grid3">
+                    <div><label>Valeur</label><input id="qcValue" type="number" step="any" /></div>
+                    <div><label>Date mesure</label><input id="qcDate" type="date" /></div>
+                    <div><label>Opérateur</label><input id="qcOperator" placeholder="Technicien" /></div>
+                  </div>
+                  <button onclick="addQcResult(this)">Enregistrer mesure</button>
+                </div>
+                <div style="margin-top:16px;">
+                  <table id="qcResultsTable" style="font-size:12px;">
+                    <thead><tr><th>Date</th><th>Valeur</th><th>z-score</th><th>Statut Westgard</th><th>Opérateur</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="panel" id="qcEmptyPanel">
+                <p style="color:var(--muted);text-align:center;padding:30px 20px;">← Sélectionnez un contrôle pour afficher le graphe Levey-Jennings</p>
+              </div>
+            </div>
+          </div>
+          <!-- Rapport QC mensuel -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>📄 Rapport QC Mensuel</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">Génère un document HTML imprimable (A4) avec graphes Levey-Jennings et tableau de synthèse.</p>
+            <div class="toolbar" style="gap:10px;align-items:flex-end;">
+              <div><label style="display:block;font-size:11px;margin-bottom:4px;">Année</label><input id="qcReportYear" type="number" value="2026" min="2020" max="2099" style="width:80px;" /></div>
+              <div><label style="display:block;font-size:11px;margin-bottom:4px;">Mois</label><input id="qcReportMonth" type="number" value="6" min="1" max="12" style="width:60px;" /></div>
+              <button onclick="openQcReport()">📄 Ouvrir rapport</button>
             </div>
           </div>
         </div>
@@ -1176,6 +1584,7 @@
                     <option value="admin">🔴 Administrateur</option>
                   </select>
                 </div>
+                <div><label>Unité / service (vide = accès transversal)</label><input id="userUnit" placeholder="ex. hematologie" /></div>
                 <div class="actions">
                   <button id="userSubmitBtn" onclick="submitUserForm(this)">Créer utilisateur</button>
                   <button class="ghost" id="userCancelBtn" onclick="resetUserForm()" style="display:none;">Annuler</button>
@@ -1222,6 +1631,79 @@
               </table>
             </div>
           </div>
+
+          <!-- ── Planification maintenance / étalonnage ─────────────────────── -->
+          <div class="panel" style="margin-top:12px;">
+            <h3>🔧 Maintenance &amp; Étalonnage</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
+              Planifiez les maintenances préventives, correctives et étalonnages. Les échéances ≤ 7 jours s'affichent dans le tableau de bord.
+            </p>
+            <div class="grid2">
+              <div class="form">
+                <div class="grid2">
+                  <div><label>Équipement ID</label><input id="mntEqId" type="number" min="1" placeholder="ex. 1" /></div>
+                  <div><label>Type</label><select id="mntType">
+                    <option value="preventive">Préventive</option>
+                    <option value="corrective">Corrective</option>
+                    <option value="calibration">Étalonnage</option>
+                  </select></div>
+                </div>
+                <div><label>Programmée le</label><input id="mntScheduled" type="datetime-local" /></div>
+                <div><label>Prochaine échéance</label><input id="mntNextDue" type="datetime-local" /></div>
+                <div><label>Notes</label><textarea id="mntNotes" style="min-height:60px;" placeholder="Interventions effectuées, pièces remplacées…"></textarea></div>
+                <button onclick="createMaintenance(this)">Planifier</button>
+              </div>
+              <table id="maintenanceTable">
+                <thead><tr><th>Équip.</th><th>Type</th><th>Programmée</th><th>Prochaine échéance</th><th>Statut</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Vue Statistiques de performance ─────────────────────────────── -->
+        <div id="stats" class="view band hidden">
+          <div class="toolbar" style="margin-bottom:12px;gap:10px;align-items:center;">
+            <label style="margin:0;color:var(--ink);font-size:13px;white-space:nowrap;">Période :</label>
+            <select id="statsDays" onchange="loadStats()">
+              <option value="7">7 jours</option>
+              <option value="30" selected>30 jours</option>
+              <option value="60">60 jours</option>
+              <option value="90">90 jours</option>
+            </select>
+            <button class="ghost" onclick="loadStats()">↻ Actualiser</button>
+          </div>
+          <div class="grid4">
+            <div class="panel metric metric-blue"><div id="statTotal" class="value">—</div><div class="label">Résultats (période)</div></div>
+            <div class="panel metric" id="statCritPanel"><div id="statCrit" class="value">—</div><div class="label">Taux critique</div></div>
+            <div class="panel metric" id="statQcPanel"><div id="statQc" class="value">—</div><div class="label">Violations QC</div></div>
+            <div class="panel metric" id="statMntPanel"><div id="statMnt" class="value">—</div><div class="label">Maintenance échue ≤7j</div></div>
+          </div>
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel">
+              <h3>⏱ TAT moyen par équipement (h)</h3>
+              <div id="tatChartDiv" style="overflow-x:auto;min-height:80px;"></div>
+            </div>
+            <div class="panel">
+              <h3>📅 Volumes hebdomadaires</h3>
+              <div id="weeklyChartDiv" style="overflow-x:auto;min-height:80px;"></div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>📋 Détail TAT par équipement</h3>
+            <table id="tatDetailTable">
+              <thead><tr><th>Équipement</th><th>Résultats</th><th>TAT moy. (h)</th><th>TAT min (h)</th><th>TAT max (h)</th><th>TAT p95 (h)</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <h3>📐 Tendance de conformité ISO 15189 <span id="complianceDriftBadge" style="display:none;" class="pill bad">Dérive détectée</span></h3>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <button class="ghost" onclick="loadComplianceTrend()">↻ Actualiser</button>
+              <button class="secondary" onclick="openComplianceReport()">⬇ Rapport conformité (PDF)</button>
+            </div>
+            <div id="complianceTrendChart" style="overflow-x:auto;min-height:100px;"></div>
+          </div>
         </div>
 
         <!-- ── Vue Audit (admin) ────────────────────────────────────────────── -->
@@ -1233,7 +1715,17 @@
                 <button class="ghost" onclick="loadAudit()">↻ Actualiser</button>
                 <button class="ghost" onclick="auditPage(-1)">← Précédent</button>
                 <button class="ghost" onclick="auditPage(+1)">Suivant →</button>
+                <button class="secondary" onclick="exportAuditCsv()">⬇ Export CSV</button>
               </div>
+            </div>
+            <div class="toolbar" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+              <input id="auditFilterEventType" placeholder="Type d'événement (ex. result.amend)" style="width:230px;" />
+              <input id="auditFilterEntityType" placeholder="Entité (ex. result)" style="width:150px;" />
+              <input id="auditFilterUser" placeholder="Utilisateur" style="width:130px;" />
+              <label style="font-size:12px;">Du <input id="auditFilterFrom" type="date" /></label>
+              <label style="font-size:12px;">Au <input id="auditFilterTo" type="date" /></label>
+              <button class="ghost" onclick="applyAuditFilters()">🔎 Filtrer</button>
+              <button class="ghost" onclick="resetAuditFilters()">✕ Réinitialiser</button>
             </div>
             <table id="auditTable">
               <thead><tr><th>#</th><th>Date</th><th>Utilisateur</th><th>Événement</th><th>Entité</th><th>ID entité</th></tr></thead>
@@ -1241,6 +1733,136 @@
             </table>
             <div id="auditPagerInfo" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
           </div>
+        </div>
+
+        <div id="registre" class="view band hidden">
+          <div class="panel">
+            <h3>📚 Registre maître — analyse rétrospective &amp; import</h3>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
+              Collez le registre au format CSV (1ʳᵉ ligne = en-têtes). Colonnes reconnues :
+              <code>Nom et prénoms, Date, Examens, Montant_FCFA, Part_CMU_FCFA, Type_Registre, Prescripteur, Provenance, Âge</code>.
+              Aucune donnée n'est écrite tant que vous ne confirmez pas l'import réel.
+            </p>
+            <div class="toolbar" style="margin-bottom:8px;">
+              <input id="registreCsvFile" type="file" accept=".csv,text/csv" onchange="loadCsvIntoTextarea(this,'registreCsvText')" />
+            </div>
+            <textarea id="registreCsvText" rows="6" placeholder="Nom et prénoms,Date,Examens,Montant_FCFA,Type_Registre&#10;M. ESSOH Paul,13/03/2025,NFS ; Urée 0,13 ; Créat 77,2,7000,Hors CMU"></textarea>
+            <div class="actions" style="margin-top:8px;gap:8px;flex-wrap:wrap;">
+              <button onclick="registreAnalyse(this)">📊 Analyser</button>
+              <button class="secondary" onclick="registrePreview(this)">🔎 Prévisualiser l'import</button>
+              <button class="warn" onclick="registreImport(this)">⬆ Importer (confirmation requise)</button>
+            </div>
+          </div>
+
+          <div id="registreAnalyticsPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>Analyse rétrospective</h3>
+            <div class="grid4">
+              <div class="panel metric metric-blue"><div id="regTotal" class="value">—</div><div class="label">Dossiers</div></div>
+              <div class="panel metric metric-teal"><div id="regRevenue" class="value">—</div><div class="label">Recettes (FCFA)</div></div>
+              <div class="panel metric"><div id="regCmu" class="value">—</div><div class="label">Part CMU (FCFA)</div></div>
+              <div class="panel metric metric-rose"><div id="regMalaria" class="value">—</div><div class="label">Positivité paludisme</div></div>
+            </div>
+            <div class="grid2" style="margin-top:12px;">
+              <div class="panel"><h4 style="margin-top:0;">Top examens</h4><table id="regTopExams"><thead><tr><th>Examen</th><th>N</th></tr></thead><tbody></tbody></table></div>
+              <div class="panel"><h4 style="margin-top:0;">Volume mensuel</h4><div id="regMonthChart"></div></div>
+            </div>
+          </div>
+
+          <div id="registreReportPanel" class="panel" style="margin-top:12px;display:none;">
+            <h3>Rapport</h3>
+            <div id="registreReport" style="font-size:13px;"></div>
+          </div>
+        </div>
+
+        <div id="tat" class="view band hidden">
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+              <h3 style="margin:0;">⏱️ Performance laboratoire — Suivi TAT</h3>
+              <div class="toolbar">
+                <label style="font-size:12px;">Période
+                  <select id="tatDays" onchange="loadTat()">
+                    <option value="7">7 j</option><option value="30" selected>30 j</option>
+                    <option value="90">90 j</option><option value="366">12 mois</option>
+                  </select>
+                </label>
+                <button class="ghost" onclick="loadTat()">↻ Actualiser</button>
+              </div>
+            </div>
+          </div>
+          <div class="grid4" style="margin-top:12px;">
+            <div class="panel metric metric-blue"><div id="tatMeasured" class="value">—</div><div class="label">Examens mesurés</div></div>
+            <div class="panel metric" id="tatOnTimePanel"><div id="tatOnTime" class="value">—</div><div class="label">% dans les délais</div></div>
+            <div class="panel metric" id="tatLatePanel"><div id="tatLate" class="value">—</div><div class="label">Examens en retard</div></div>
+            <div class="panel metric metric-rose"><div id="tatAlerts" class="value">—</div><div class="label">Alertes actives</div></div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel">
+              <h3>Délais cibles par examen</h3>
+              <div class="form">
+                <div class="grid3">
+                  <div><label>Code examen</label><input id="tatTgtCode" placeholder="ex. NFS" /></div>
+                  <div><label>Libellé</label><input id="tatTgtLabel" placeholder="ex. Numération" /></div>
+                  <div><label>Cible (min)</label><input id="tatTgtMinutes" type="number" min="1" placeholder="60" /></div>
+                </div>
+                <div class="actions">
+                  <button onclick="createTatTarget(this)">Enregistrer cible</button>
+                  <button class="secondary" onclick="seedTatDefaults(this)">Charger les cibles standards</button>
+                </div>
+              </div>
+              <table id="tatTargetsTable"><thead><tr><th>Code</th><th>Libellé</th><th>Cible</th><th>Seuil rouge</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+            <div class="panel">
+              <h3>🔔 Alertes TAT (délai dépassé)</h3>
+              <table id="tatAlertsTable"><thead><tr><th>Résultat</th><th>Examen</th><th>TAT</th><th>Cible</th><th>Statut</th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel"><h3>TAT moyen par examen</h3><table id="tatByExamTable"><thead><tr><th>Examen</th><th>N</th><th>Moy. (min)</th><th>Max</th><th>% délais</th><th>Retards</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>TAT moyen par technicien</h3><table id="tatByTechTable"><thead><tr><th>Technicien</th><th>N</th><th>Moy. (min)</th><th>Max</th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel"><h3>TAT moyen par automate</h3><table id="tatByAutoTable"><thead><tr><th>Automate</th><th>N</th><th>Moy. (min)</th><th>Max</th></tr></thead><tbody></tbody></table></div>
+            <div class="panel"><h3>TAT moyen par journée</h3><div id="tatByDayChart"></div></div>
+          </div>
+        </div>
+
+        <div id="quality" class="view band hidden">
+          <div class="grid4">
+            <div class="panel metric metric-blue"><div id="qmTotal" class="value">—</div><div class="label">NC totales</div></div>
+            <div class="panel metric" id="qmOpenPanel"><div id="qmOpen" class="value">—</div><div class="label">NC ouvertes</div></div>
+            <div class="panel metric" id="qmOverduePanel"><div id="qmOverdue" class="value">—</div><div class="label">En retard</div></div>
+            <div class="panel metric metric-rose"><div id="qmCritical" class="value">—</div><div class="label">Critiques ouvertes</div></div>
+          </div>
+          <div class="grid2" style="margin-top:12px;">
+            <div class="panel">
+              <h3>Déclarer une non-conformité</h3>
+              <div class="form">
+                <div><label>Titre</label><input id="ncTitle" placeholder="ex. Dérive QC niveau 2 sur DH36" /></div>
+                <div><label>Description</label><textarea id="ncDesc" rows="3"></textarea></div>
+                <div class="grid3">
+                  <div><label>Source</label><select id="ncSource"><option value="qc">QC</option><option value="critical">Valeur critique</option><option value="maintenance">Maintenance</option><option value="manual" selected>Manuel</option><option value="other">Autre</option></select></div>
+                  <div><label>Sévérité</label><select id="ncSeverity"><option value="minor">Mineure</option><option value="major" selected>Majeure</option><option value="critical">Critique</option></select></div>
+                  <div><label>Échéance</label><input id="ncDue" type="date" /></div>
+                </div>
+                <button onclick="createNonConformity(this)">Déclarer NC</button>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Non-conformités <button class="ghost" style="float:right;font-size:12px;" onclick="loadQuality()">↻</button></h3>
+              <div class="toolbar" style="margin-bottom:8px;">
+                <select id="ncFilterStatus" onchange="loadQuality()">
+                  <option value="">Tous statuts</option>
+                  <option value="open">Ouverte</option><option value="analysis">Analyse</option>
+                  <option value="action">Action</option><option value="verification">Vérification</option>
+                  <option value="closed">Clôturée</option>
+                </select>
+              </div>
+              <table id="ncTable"><thead><tr><th>#</th><th>Titre</th><th>Sév.</th><th>Statut</th><th>Échéance</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+          <div id="ncDetail" class="panel" style="margin-top:12px;display:none;"></div>
         </div>
 
         <div class="band" id="logPanel">
@@ -1810,7 +2432,23 @@
         await boot();
       }, 'login');
     }
-    function logout() { storage.removeItem("ruggylab_token"); token = ""; $("appView").classList.add("hidden"); $("loginView").classList.remove("hidden"); }
+    async function logout() {
+      disconnectNotifications();
+      // Révocation serveur du jeton d'accès (denylist) — best-effort.
+      try {
+        if (token) {
+          await fetch(normalizeApiPath("/api/v1/login/logout"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({}),
+          });
+        }
+      } catch {}
+      storage.removeItem("ruggylab_token");
+      token = "";
+      $("appView").classList.add("hidden");
+      $("loginView").classList.remove("hidden");
+    }
     async function boot() {
       if (!token) return;
       try {
@@ -1826,6 +2464,7 @@
         const sn = $('sideUserName'); if (sn) sn.textContent = me.full_name || me.username;
         const sr = $('sideUserRole'); if (sr) sr.textContent = me.role || 'Utilisateur';
         startClock();
+        connectNotifications();
         updateTubeGuide();
         renderResultTemplate();
         if ($('stockDrugLines') && $('stockDrugLines').children.length === 0) {
@@ -1860,20 +2499,30 @@
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
       if (currentView === "patients") await loadPatients();
 
-      if (currentView === "results") await loadResults();
-      if (currentView === "stocks") await loadReagents();
+      if (currentView === "results") {
+        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs(), loadBioref(), loadCodeMappings()]);
+      }
+      if (currentView === "stocks") { await loadReagents(); await loadExpiryAlerts(); }
       if (currentView === "epidemio") await loadEpidemio();
       if (currentView === "users") await loadUsers();
       if (currentView === "samples") { await loadSamples(); setTimeout(() => $('barcodeScanner')?.focus(), 150); }
-      if (currentView === "equipments") await loadEquipments();
+      if (currentView === "equipments") await Promise.all([loadEquipments(), loadMaintenances()]);
       if (currentView === "audit") await loadAudit();
+      if (currentView === "qc") await loadQc();
+      if (currentView === "stats") await loadStats();
+      if (currentView === "quality") await loadQuality();
+      if (currentView === "tat") await loadTat();
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
       try {
-        const [epi, stock] = await Promise.all([
+        const [epi, stock, qc, perf, expiry, compliance] = await Promise.all([
           api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
-          api("/api/v1/reports/stock-dashboard", { headers: headers(false) })
+          api("/api/v1/reports/stock-dashboard", { headers: headers(false) }),
+          api("/api/v1/reports/qc-summary", { headers: headers(false) }),
+          api("/api/v1/stats/summary?days=30", { headers: headers(false) }).catch(() => null),
+          api("/api/v1/reagents/expiring?days=30", { headers: headers(false) }).catch(() => null),
+          api("/api/v1/reports/compliance-summary?days=30", { headers: headers(false) }).catch(() => null),
         ]);
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
@@ -1885,6 +2534,41 @@
           mLSP.classList.remove("metric-amber", "metric-teal");
           mLSP.classList.add(lowStockCount > 0 ? "metric-amber" : "metric-teal");
         }
+        // QC metric panel
+        const mQcEl = $("mQc");
+        const mQcPanel = $("mQcPanel");
+        if (mQcEl && mQcPanel) {
+          const total = qc.controls.length;
+          const rejects = qc.reject_count;
+          const warns = qc.warn_count;
+          mQcEl.textContent = total > 0 ? (rejects > 0 ? rejects + " ⛔" : warns > 0 ? warns + " ⚠" : total + " ✓") : "—";
+          mQcPanel.classList.remove("metric-rose", "metric-amber", "metric-teal");
+          mQcPanel.classList.add(rejects > 0 ? "metric-rose" : warns > 0 ? "metric-amber" : "metric-teal");
+        }
+        // QC reject/warn badges
+        const rb = $("qcRejectBadge"); const wb = $("qcWarnBadge");
+        if (rb) rb.style.display = qc.reject_count > 0 ? "" : "none";
+        if (wb) wb.style.display = (qc.warn_count > 0 && qc.reject_count === 0) ? "" : "none";
+        // QC summary table
+        const _statusBadge = (s) => {
+          if (s === "reject") return '<span class="pill bad">Rejet</span>';
+          if (s === "warn")   return '<span class="pill" style="background:var(--amber);color:#fff;">Alerte 1-2s</span>';
+          if (s === "ok")     return '<span class="pill ok">OK</span>';
+          return '<span class="pill" style="background:var(--muted);color:#fff;">Aucune donnée</span>';
+        };
+        setRows("dashQcTable", qc.controls.map(c => {
+          const tr = row(
+            `<td><strong>${security.escapeHtml(c.analyte)}</strong></td>` +
+            `<td>${security.escapeHtml(c.level)}</td>` +
+            `<td style="font-variant-numeric:tabular-nums;">${c.last_value !== null ? c.last_value : '—'} <small style="color:var(--muted);">${security.escapeHtml(c.unit || '')}</small></td>` +
+            `<td>${c.last_date || '—'}</td>` +
+            `<td><small style="color:var(--rose);">${(c.violations || []).join(', ') || '—'}</small></td>` +
+            `<td>${_statusBadge(c.status)}</td>`
+          );
+          if (c.status === "reject") tr.classList.add("row-critical");
+          else if (c.status === "warn") tr.classList.add("row-warning");
+          return tr;
+        }));
         setRows("markerTable", epi.marker_breakdown.map((m) => row(`<td>${m.marker}</td><td>${m.low}</td><td>${m.normal}</td><td>${m.high}</td><td>${m.critical}</td>`)));
         setRows("lowStockTable", stock.low_stock_reagents.map(r => {
           const pct = r.alert_threshold > 0 ? Math.round((r.current_stock / r.alert_threshold) * 100) : 0;
@@ -1904,6 +2588,39 @@
           else if (r.current_stock <= r.alert_threshold)              tr.classList.add('row-warning');
           return tr;
         }));
+        // Maintenance due metric
+        if (perf && $('mMnt')) {
+          const mntCount = perf.maintenance_due_count || 0;
+          $('mMnt').textContent = mntCount;
+          const mMntP = $('mMntPanel');
+          if (mMntP) {
+            mMntP.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+            mMntP.classList.add(mntCount > 0 ? 'metric-amber' : 'metric-teal');
+          }
+        }
+        // Expiry metric
+        if (expiry !== null && $('mExpiry')) {
+          const expiryCount = Array.isArray(expiry) ? expiry.length : 0;
+          $('mExpiry').textContent = expiryCount;
+          const mExpiryP = $('mExpiryPanel');
+          if (mExpiryP) {
+            mExpiryP.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+            const expiredCount = Array.isArray(expiry) ? expiry.filter(r => r.is_expired).length : 0;
+            mExpiryP.classList.add(expiredCount > 0 ? 'metric-rose' : expiryCount > 0 ? 'metric-amber' : 'metric-teal');
+          }
+        }
+        // Compliance metric (ISO 15189)
+        if (compliance && $('mCompliance')) {
+          $('mCompliance').textContent = (compliance.validation_rate_pct ?? 0) + '%';
+          const mCompP = $('mCompliancePanel');
+          if (mCompP) {
+            mCompP.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+            mCompP.classList.add(compliance.status === 'compliant' ? 'metric-teal' : 'metric-amber');
+          }
+          $('mCompliance').title = compliance.status === 'compliant'
+            ? 'Conforme — validation ≥99 %, critiques acquittés'
+            : `Attention — ${compliance.pending_criticals} critique(s) en attente`;
+        }
         showToast("Tableau de bord actualisé", "success");
       } catch (e) {
         showToast("Erreur lors du chargement du dashboard", "error");
@@ -1922,11 +2639,14 @@
           `<td><code>${security.escapeHtml(p.ipp_unique_id)}</code></td>` +
           `<td>${security.escapeHtml(p.first_name + ' ' + p.last_name)}</td>` +
           `<td>${p.sex || ''}</td>` +
-          `<td><button class="ghost" title="Imprimer étiquettes tubes" onclick='printPatientLabels(${JSON.stringify(p)})'>🏷️ Étiquettes</button></td>`
+          `<td style="white-space:nowrap;">` +
+            `<button class="ghost" title="Dossier complet" onclick="openDossier(${p.id})">📂 Dossier</button> ` +
+            `<button class="ghost" title="Imprimer étiquettes tubes" onclick='printPatientLabels(${JSON.stringify(p)})'>🏷️</button>` +
+          `</td>`
         ));
         setRows("patientsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
     }
@@ -1960,8 +2680,9 @@
           first_name: $("patientFirst").value, 
           last_name: $("patientLast").value, 
           birth_date: $("patientBirth").value, 
-          sex: $("patientSex").value, 
-          rank: $("patientRank").value || null 
+          sex: $("patientSex").value,
+          rank: $("patientRank").value || null,
+          unit: ($("patientUnit")?.value || "").trim() || null
         };
         
         const created = await perfMonitor.measureAsync('createPatient', () =>
@@ -1975,7 +2696,7 @@
         showToast(`Patient ${created.first_name} ${created.last_name} créé avec succès`, "success");
         
         // Clear form
-        ["patientIpp", "patientFirst", "patientLast", "patientBirth", "patientRank"].forEach(id => {
+        ["patientIpp", "patientFirst", "patientLast", "patientBirth", "patientRank", "patientUnit"].forEach(id => {
           const field = $(id);
           field.value = "";
           field.classList.remove('success-input', 'error-input');
@@ -2077,21 +2798,74 @@
         await loadSamples();
       }, 'createSample').finally(() => setLoading(btn, false));
     }
+    // Flag colors: HH→dark red, H→rose, N→green, L→blue, LL→dark blue
+    const _flagStyle = { HH: 'background:#7f1d1d;color:white', H: 'background:#be123c;color:white', N: 'background:#16a34a;color:white', L: 'background:#1d4ed8;color:white', LL: 'background:#1e1b4b;color:white' };
+    function _flagBadge(analyte, flag) {
+      const s = _flagStyle[flag] || 'background:#6b7280;color:white';
+      return '<span class="pill" style="' + s + ';margin:1px;font-size:10px;" title="' + security.escapeHtml(analyte) + '">' + security.escapeHtml(analyte) + ':' + flag + '</span>';
+    }
     async function loadResults() {
       const tbody = $("resultsTable").querySelector("tbody");
       loadingStates.showSkeleton(tbody, 5);
-      
+
       try {
         const data = await api("/api/v1/results", { headers: headers(false) });
         const rows = data.items.map((r) => {
-          const tr = row(`<td>${r.id}</td><td>${r.sample_id}</td><td>${r.is_critical ? '<span class="pill bad">Oui</span>' : 'Non'}</td><td>${r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non'}</td><td><button class="ghost" onclick="selectResult(${r.id})">Utiliser</button></td>`);
-          if (r.is_critical) tr.classList.add('row-critical');
+          // Critical cell (includes delta badge)
+          let critCell = r.is_critical ? '<span class="pill bad">⛔</span>' : '<span style="color:var(--muted)">—</span>';
+          if (r.delta_exceeded) critCell += ' <span class="pill" style="background:#b45309;color:white;font-size:10px;" title="Delta-check dépassé">△ Delta</span>';
+
+          // Flags cell
+          const flagsHtml = r.flags && Object.keys(r.flags).length > 0
+            ? Object.entries(r.flags).map(([a, f]) => _flagBadge(a, f)).join('')
+            : '<span style="color:var(--muted);font-size:11px;">—</span>';
+
+          // Ack cell
+          let ackCell;
+          if (!r.is_critical) {
+            ackCell = '<td style="color:var(--muted);font-size:11px;">—</td>';
+          } else if (r.critical_ack_at) {
+            const ts = new Date(r.critical_ack_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+            ackCell = '<td><span class="pill ok" title="Acquitté le ' + ts + '">✅ ' + ts + '</span></td>';
+          } else {
+            ackCell = '<td><button class="ghost" style="font-size:11px;padding:2px 8px;color:var(--rose);border-color:var(--rose);" onclick="ackCritical(' + r.id + ', this)">Acquitter</button></td>';
+          }
+          const autoCell = r.is_auto_validated
+            ? '<span class="pill ok" title="Auto-validé ISO 15189 §5.8">🤖 Auto</span>'
+            : '<span style="color:var(--muted);font-size:11px;">—</span>';
+          const tr = row(
+            '<td>' + r.id + '</td>' +
+            '<td>' + r.sample_id + '</td>' +
+            '<td>' + critCell + '</td>' +
+            '<td style="white-space:nowrap;">' + flagsHtml + '</td>' +
+            ackCell +
+            '<td>' + (r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non') + '</td>' +
+            '<td>' + autoCell + '</td>' +
+            '<td style="white-space:nowrap;">' +
+              '<button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button> ' +
+              '<button class="ghost" style="font-size:11px;padding:2px 8px;" onclick=\'openAmendPanel(' + r.id + ',' + JSON.stringify(r.data_points || {}) + ')\'>✏️</button>' +
+            '</td>'
+          );
+          if (r.is_critical && !r.critical_ack_at) tr.classList.add('row-critical');
+          else if (r.is_critical && r.critical_ack_at) tr.classList.add('row-warning');
+          else if (r.delta_exceeded) tr.classList.add('row-warning');
           return tr;
         });
         setRows("resultsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
+      }
+    }
+    async function ackCritical(resultId, btn) {
+      if (btn) { btn.disabled = true; btn.textContent = "…"; }
+      try {
+        await api("/api/v1/results/" + resultId + "/ack-critical", { method: "PATCH", headers: headers() });
+        showToast("Valeur critique acquittée", "success");
+        await loadResults();
+      } catch (e) {
+        showToast("Erreur lors de l'acquittement", "error");
+        if (btn) { btn.disabled = false; btn.textContent = "Acquitter"; }
       }
     }
     function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }
@@ -2213,22 +2987,480 @@
         setLoading(btn, false);
       }
     }
+    // ══════════════════════════════════════════════════════════════
+    //  Seuils critiques (panic values)
+    // ══════════════════════════════════════════════════════════════
+    async function loadCriticalRanges() {
+      const data = await api('/api/v1/critical-ranges', { headers: headers(false) });
+      setRows('criticalRangesTable', data.map(function(cr) {
+        return row(
+          '<td><strong>' + security.escapeHtml(cr.analyte) + '</strong></td>' +
+          '<td style="color:#be123c;">' + (cr.low_critical !== null ? cr.low_critical : '<span style="color:var(--muted);">—</span>') + '</td>' +
+          '<td style="color:#be123c;">' + (cr.high_critical !== null ? cr.high_critical : '<span style="color:var(--muted);">—</span>') + '</td>' +
+          '<td style="color:var(--muted);font-size:11px;">' + security.escapeHtml(cr.unit || '—') + '</td>' +
+          '<td><button class="ghost" style="color:#be123c;font-size:11px;" onclick="deleteCriticalRange(' + cr.id + ')">✕</button></td>'
+        );
+      }));
+    }
+
+    async function createCriticalRange(btn) {
+      setLoading(btn, true);
+      try {
+        const analyte = $('crAnalyte').value.trim();
+        const lowVal  = $('crLow').value.trim();
+        const highVal = $('crHigh').value.trim();
+        if (!analyte) throw new Error('Analyte obligatoire');
+        if (!lowVal && !highVal) throw new Error('Au moins un seuil (bas ou haut) requis');
+        await api('/api/v1/critical-ranges', {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({
+            analyte: analyte,
+            unit:  $('crUnit').value.trim(),
+            low_critical:  lowVal  !== '' ? Number(lowVal)  : null,
+            high_critical: highVal !== '' ? Number(highVal) : null,
+          })
+        });
+        showToast('Seuil critique enregistré', 'success');
+        ['crAnalyte','crUnit','crLow','crHigh'].forEach(function(id){ $(id).value = ''; });
+        await loadCriticalRanges();
+      } catch(e) {
+        showToast(e.message || 'Erreur', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function deleteCriticalRange(id) {
+      if (!confirm('Désactiver ce seuil critique ?')) return;
+      try {
+        await api('/api/v1/critical-ranges/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Seuil désactivé', 'success');
+        await loadCriticalRanges();
+      } catch(e) {
+        showToast(e.message || 'Erreur', 'error');
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Delta-check rules
+    // ══════════════════════════════════════════════════════════════
+    async function loadDeltaRules() {
+      try {
+        const data = await api('/api/v1/delta-check-rules', { headers: headers(false) });
+        setRows('deltaRulesTable', data.map(function(r) {
+          return row(
+            '<td><strong>' + security.escapeHtml(r.analyte) + '</strong></td>' +
+            '<td style="text-align:center;">' + (r.delta_abs !== null && r.delta_abs !== undefined ? r.delta_abs : '—') + '</td>' +
+            '<td style="text-align:center;">' + (r.delta_pct !== null && r.delta_pct !== undefined ? r.delta_pct + ' %' : '—') + '</td>' +
+            '<td style="text-align:center;">' + r.lookback_days + ' j</td>' +
+            '<td style="color:var(--muted);">' + security.escapeHtml(r.unit || '—') + '</td>' +
+            '<td><button class="ghost" style="font-size:11px;color:#b45309;" onclick="deleteDeltaRule(' + r.id + ')">✕</button></td>'
+          );
+        }));
+      } catch(e) { /* ignore */ }
+    }
+    async function createDeltaRule(btn) {
+      setLoading(btn, true);
+      try {
+        const body = { analyte: $('dcAnalyte').value.trim(), unit: $('dcUnit').value.trim(), lookback_days: Number($('dcLookback').value) || 30 };
+        if ($('dcAbs').value) body.delta_abs = Number($('dcAbs').value);
+        if ($('dcPct').value) body.delta_pct = Number($('dcPct').value);
+        await api('/api/v1/delta-check-rules', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Règle delta-check enregistrée', 'success');
+        ['dcAnalyte','dcUnit','dcAbs','dcPct'].forEach(function(id){ $(id).value = ''; });
+        $('dcLookback').value = '30';
+        await loadDeltaRules();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteDeltaRule(id) {
+      if (!confirm('Désactiver cette règle delta-check ?')) return;
+      try {
+        await api('/api/v1/delta-check-rules/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Règle désactivée', 'success');
+        await loadDeltaRules();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Valeurs de référence (HH/H/N/L/LL)
+    // ══════════════════════════════════════════════════════════════
+    async function loadRefRanges() {
+      try {
+        const data = await api('/api/v1/reference-ranges', { headers: headers(false) });
+        setRows('refRangesTable', data.map(function(r) {
+          const age = (r.age_min_years !== null && r.age_min_years !== undefined) || (r.age_max_years !== null && r.age_max_years !== undefined)
+            ? (r.age_min_years !== null && r.age_min_years !== undefined ? r.age_min_years : '0') + '–' + (r.age_max_years !== null && r.age_max_years !== undefined ? r.age_max_years : '∞') + ' ans'
+            : '—';
+          return row(
+            '<td><strong>' + security.escapeHtml(r.analyte) + '</strong></td>' +
+            '<td style="text-align:center;">' + r.sex + '</td>' +
+            '<td style="text-align:center;font-size:11px;">' + age + '</td>' +
+            '<td style="text-align:center;color:#1d4ed8;">' + (r.low_normal !== null && r.low_normal !== undefined ? r.low_normal : '—') + '</td>' +
+            '<td style="text-align:center;color:#be123c;">' + (r.high_normal !== null && r.high_normal !== undefined ? r.high_normal : '—') + '</td>' +
+            '<td style="color:var(--muted);">' + security.escapeHtml(r.unit || '—') + '</td>' +
+            '<td><button class="ghost" style="font-size:11px;" onclick="deleteRefRange(' + r.id + ')">✕</button></td>'
+          );
+        }));
+      } catch(e) { /* ignore */ }
+    }
+    async function createRefRange(btn) {
+      setLoading(btn, true);
+      try {
+        const body = { analyte: $('rrAnalyte').value.trim(), sex: $('rrSex').value, unit: $('rrUnit').value.trim() };
+        if ($('rrLow').value) body.low_normal = Number($('rrLow').value);
+        if ($('rrHigh').value) body.high_normal = Number($('rrHigh').value);
+        if ($('rrAgeMin').value) body.age_min_years = Number($('rrAgeMin').value);
+        if ($('rrAgeMax').value) body.age_max_years = Number($('rrAgeMax').value);
+        await api('/api/v1/reference-ranges', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Plage de référence enregistrée', 'success');
+        ['rrAnalyte','rrUnit','rrLow','rrHigh','rrAgeMin','rrAgeMax'].forEach(function(id){ $(id).value = ''; });
+        $('rrSex').value = '*';
+        await loadRefRanges();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteRefRange(id) {
+      if (!confirm('Désactiver cette plage de référence ?')) return;
+      try {
+        await api('/api/v1/reference-ranges/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Plage désactivée', 'success');
+        await loadRefRanges();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Alertes critiques — config + pending + notification
+    // ══════════════════════════════════════════════════════════════
+    async function loadNotifConfigs() {
+      try {
+        const data = await api('/api/v1/critical-alerts/config', { headers: headers(false) });
+        setRows('notifConfigsTable', data.map(function(c) {
+          return row(
+            '<td style="font-size:11px;word-break:break-all;">' + security.escapeHtml(c.webhook_url || c.email || '—') + '</td>' +
+            '<td style="text-align:center;">' + c.delay_minutes + ' min</td>' +
+            '<td><button class="ghost" style="font-size:11px;color:#be123c;" onclick="deleteNotifConfig(' + c.id + ')">✕</button></td>'
+          );
+        }));
+      } catch(e) { /* ignore */ }
+    }
+    async function createNotifConfig(btn) {
+      setLoading(btn, true);
+      try {
+        const body = { delay_minutes: Number($('notifDelay').value) || 30 };
+        if ($('notifWebhook').value) body.webhook_url = $('notifWebhook').value.trim();
+        await api('/api/v1/critical-alerts/config', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Configuration de notification enregistrée', 'success');
+        $('notifWebhook').value = '';
+        await loadNotifConfigs();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteNotifConfig(id) {
+      if (!confirm('Désactiver cette configuration ?')) return;
+      try {
+        await api('/api/v1/critical-alerts/config/' + id, { method: 'DELETE', headers: headers() });
+        showToast('Configuration désactivée', 'success');
+        await loadNotifConfigs();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+    }
+    async function loadPendingCriticals() {
+      try {
+        const data = await api('/api/v1/critical-alerts/pending', { headers: headers(false) });
+        const badge = $('pendingBadge');
+        if (badge) { badge.style.display = data.length > 0 ? '' : 'none'; badge.textContent = data.length; }
+        const div = $('pendingCriticalsDiv');
+        if (!div) return;
+        if (data.length === 0) { div.innerHTML = '<p style="color:var(--muted);font-size:12px;">Aucun résultat critique en attente.</p>'; return; }
+        div.innerHTML = '<table style="font-size:11px;width:100%;"><thead><tr><th>Résultat</th><th>Échantillon</th><th>Écoulé</th><th>Statut</th></tr></thead><tbody>' +
+          data.map(function(p) {
+            const rowBg = p.overdue ? '#fee2e2' : '#fef3c7';
+            return '<tr style="background:' + rowBg + ';"><td>' + p.result_id + '</td><td>' + p.sample_id + '</td><td>' + p.elapsed_minutes + ' min</td><td>' +
+              (p.overdue ? '<span class="pill bad">En retard</span>' : '<span style="color:#ca8a04;">En attente</span>') + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      } catch(e) { /* ignore */ }
+    }
+    async function checkAndNotify(btn) {
+      setLoading(btn, true);
+      try {
+        const result = await api('/api/v1/critical-alerts/check', { method: 'POST', headers: headers() });
+        showToast('Vérification : ' + result.notified + ' notifiés, ' + result.pending + ' en attente', result.pending > 0 ? 'error' : 'success');
+        await loadPendingCriticals();
+      } catch(e) { showToast(e.message || 'Erreur', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Rapport QC mensuel
+    // ══════════════════════════════════════════════════════════════
+    function openQcReport() {
+      const year = $('qcReportYear') ? $('qcReportYear').value || new Date().getFullYear() : new Date().getFullYear();
+      const month = $('qcReportMonth') ? $('qcReportMonth').value || (new Date().getMonth() + 1) : (new Date().getMonth() + 1);
+      const authHeader = headers(false);
+      const tok = authHeader['Authorization'] ? authHeader['Authorization'].replace('Bearer ', '') : '';
+      // Fetch the report HTML and open it in a new tab
+      fetch('/api/v1/reports/qc-report?year=' + year + '&month=' + month, { headers: authHeader })
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          const w = window.open('', '_blank');
+          if (w) { w.document.write(html); w.document.close(); }
+          else { showToast('Autorisez les popups pour ouvrir le rapport', 'error'); }
+        })
+        .catch(function() { showToast('Erreur lors du chargement du rapport QC', 'error'); });
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  QC Analytique — Westgard / Levey-Jennings
+    // ══════════════════════════════════════════════════════════════
+    let _qcSelectedControl = null;
+
+    function _ljSvg(control, results) {
+      const N = results.length;
+      const mean = control.target_mean;
+      const sd   = control.target_sd;
+      const W = 640, H = 220;
+      const P = { top: 14, right: 38, bottom: 38, left: 58 };
+      const w = W - P.left - P.right;
+      const h = H - P.top - P.bottom;
+      const yMin = mean - 3.6 * sd;
+      const yMax = mean + 3.6 * sd;
+      const yPx = v => P.top + h * (1 - (v - yMin) / (yMax - yMin));
+      const xPx = i => N <= 1 ? P.left + w / 2 : P.left + (i / (N - 1)) * w;
+      const REJECT_RULES = ['1-3s','2-2s','R-4s','4-1s','10x'];
+
+      let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-height:220px;display:block;font-family:Arial,Helvetica,sans-serif;">';
+
+      // background bands
+      svg += '<rect x="' + P.left + '" y="' + yPx(mean+3*sd) + '" width="' + w + '" height="' + (yPx(mean-3*sd)-yPx(mean+3*sd)) + '" fill="#fef2f2"/>';
+      svg += '<rect x="' + P.left + '" y="' + yPx(mean+2*sd) + '" width="' + w + '" height="' + (yPx(mean-2*sd)-yPx(mean+2*sd)) + '" fill="#fffbeb"/>';
+      svg += '<rect x="' + P.left + '" y="' + yPx(mean+sd)   + '" width="' + w + '" height="' + (yPx(mean-sd)  -yPx(mean+sd))   + '" fill="#f0fdf4"/>';
+
+      // horizontal rules
+      [
+        { v: mean+3*sd, c:'#dc2626', d:'5,3', l:'+3s' },
+        { v: mean+2*sd, c:'#f59e0b', d:'4,3', l:'+2s' },
+        { v: mean+sd,   c:'#86efac', d:'2,3', l:'+1s' },
+        { v: mean,      c:'#16a34a', d:'',    l:'x̅'  },
+        { v: mean-sd,   c:'#86efac', d:'2,3', l:'-1s' },
+        { v: mean-2*sd, c:'#f59e0b', d:'4,3', l:'-2s' },
+        { v: mean-3*sd, c:'#dc2626', d:'5,3', l:'-3s' },
+      ].forEach(function(r) {
+        var y = yPx(r.v);
+        var da = r.d ? ' stroke-dasharray="' + r.d + '"' : '';
+        svg += '<line x1="' + P.left + '" y1="' + y + '" x2="' + (P.left+w) + '" y2="' + y + '" stroke="' + r.c + '" stroke-width="1"' + da + '/>';
+        svg += '<text x="' + (P.left-4) + '" y="' + (y+4) + '" text-anchor="end" font-size="9" fill="#6b7280">' + r.v.toFixed(1) + '</text>';
+        svg += '<text x="' + (P.left+w+4) + '" y="' + (y+4) + '" font-size="9" fill="#6b7280">' + r.l + '</text>';
+      });
+
+      // connecting line
+      if (N > 1) {
+        var path = 'M ' + xPx(0) + ' ' + yPx(results[0].value);
+        for (var i = 1; i < N; i++) path += ' L ' + xPx(i) + ' ' + yPx(results[i].value);
+        svg += '<path d="' + path + '" fill="none" stroke="#94a3b8" stroke-width="1.5"/>';
+      }
+
+      // points + x-axis labels
+      var step = N <= 12 ? 1 : Math.ceil(N / 12);
+      results.forEach(function(r, i) {
+        var x = xPx(i), y = yPx(r.value);
+        var v = r.violations || [];
+        var col = v.some(function(x){return REJECT_RULES.includes(x);}) ? '#dc2626'
+                : v.includes('1-2s') ? '#f59e0b' : '#16a34a';
+        svg += '<circle cx="' + x + '" cy="' + y + '" r="5" fill="' + col + '" stroke="white" stroke-width="1.5"><title>' + r.measured_at + (v.length ? ' ⚠ ' + v.join(', ') : ' ✓') + '</title></circle>';
+        if (i % step === 0) {
+          var lbl = r.measured_at ? r.measured_at.slice(5) : '';
+          svg += '<text x="' + x + '" y="' + (H-P.bottom+14) + '" text-anchor="middle" font-size="9" fill="#6b7280" transform="rotate(-40,' + x + ',' + (H-P.bottom+14) + ')">' + lbl + '</text>';
+        }
+      });
+
+      svg += '<rect x="' + P.left + '" y="' + P.top + '" width="' + w + '" height="' + h + '" fill="none" stroke="#e2e8f0" stroke-width="1"/>';
+      svg += '</svg>';
+      return svg;
+    }
+
+    async function loadQc() {
+      const controls = await api('/api/v1/qc/controls', { headers: headers(false) });
+      setRows('qcControlsTable', controls.map(function(c) {
+        var active = _qcSelectedControl && _qcSelectedControl.id === c.id;
+        var tr = row(
+          '<td><strong>' + security.escapeHtml(c.analyte) + '</strong></td>' +
+          '<td>' + security.escapeHtml(c.level) + '</td>' +
+          '<td>' + c.target_mean + '</td>' +
+          '<td>' + c.target_sd + '</td>' +
+          '<td style="color:var(--muted);">' + security.escapeHtml(c.unit || '—') + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            '<button class="ghost" onclick=\'selectQcControl(' + JSON.stringify(c) + ')\'>📈 Graphe</button> ' +
+            '<button class="ghost" style="color:#be123c;font-size:11px;" onclick="deleteQcControl(' + c.id + ')">✕</button>' +
+          '</td>'
+        );
+        if (active) tr.style.background = 'var(--teal-50, #f0fdfa)';
+        return tr;
+      }));
+    }
+
+    async function selectQcControl(control, scroll) {
+      _qcSelectedControl = control;
+      $('qcSelectedControlId').value = control.id;
+      $('qcChartTitle').textContent = control.analyte + ' — ' + control.level + ' (' + (control.unit || '') + ')';
+      $('qcDate').value = new Date().toISOString().slice(0, 10);
+      $('qcChartPanel').style.display = '';
+      $('qcEmptyPanel').style.display = 'none';
+
+      const results = await api('/api/v1/qc/controls/' + control.id + '/results', { headers: headers(false) });
+      $('qcChartContainer').innerHTML = results.length
+        ? _ljSvg(control, results)
+        : '<p style="color:var(--muted);font-size:13px;text-align:center;">Aucune mesure encore enregistrée.</p>';
+
+      // Alert banner for last result
+      const last = results[results.length - 1];
+      const alertDiv = $('qcResultsAlert');
+      const REJECT_RULES = ['1-3s','2-2s','R-4s','4-1s','10x'];
+      if (last && last.violations && last.violations.length > 0) {
+        const v = last.violations;
+        const isReject = v.some(function(x){return REJECT_RULES.includes(x);});
+        alertDiv.innerHTML = isReject
+          ? '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:8px 12px;border-radius:4px;font-size:13px;">⛔ <strong>Rejet Westgard</strong> — règle(s) ' + v.join(', ') + ' violée(s) sur la dernière mesure.</div>'
+          : '<div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:8px 12px;border-radius:4px;font-size:13px;">⚠️ <strong>Avertissement 1-2s</strong> — surveiller la dérive analytique.</div>';
+      } else {
+        alertDiv.innerHTML = '';
+      }
+
+      // Results table (most recent first)
+      setRows('qcResultsTable', [...results].reverse().map(function(r) {
+        const z = ((r.value - control.target_mean) / control.target_sd).toFixed(2);
+        const v = r.violations || [];
+        const isReject = v.some(function(x){return REJECT_RULES.includes(x);});
+        const badge = isReject
+          ? '<span style="color:#be123c;font-weight:600;">⛔ ' + v.join(' ') + '</span>'
+          : v.includes('1-2s')
+            ? '<span style="color:#b45309;">⚠️ 1-2s</span>'
+            : '<span style="color:#16a34a;">✅ OK</span>';
+        return row(
+          '<td>' + r.measured_at + '</td>' +
+          '<td><strong>' + r.value + '</strong></td>' +
+          '<td style="font-family:monospace;color:' + (Math.abs(Number(z)) > 2 ? '#b45309' : 'inherit') + ';">' + z + '</td>' +
+          '<td>' + badge + '</td>' +
+          '<td style="color:var(--muted);">' + security.escapeHtml(r.operator || '—') + '</td>'
+        );
+      }));
+
+      if (scroll !== false) $('qcChartPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      await loadQc();
+    }
+
+    async function createQcControl(btn) {
+      setLoading(btn, true);
+      try {
+        const analyte = $('qcAnalyte').value.trim();
+        const sd = Number($('qcSd').value);
+        if (!analyte) throw new Error('Analyte obligatoire');
+        if (!sd || sd <= 0) throw new Error('SD doit être > 0');
+        await api('/api/v1/qc/controls', {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({
+            analyte: analyte,
+            level:   $('qcLevel').value.trim() || 'Niveau 1',
+            unit:    $('qcUnit').value.trim(),
+            target_mean: Number($('qcMean').value),
+            target_sd:   sd,
+          })
+        });
+        showToast('Contrôle QC créé', 'success');
+        ['qcAnalyte','qcMean','qcSd','qcUnit'].forEach(function(id){ $(id).value = ''; });
+        $('qcLevel').value = 'Niveau 1';
+        await loadQc();
+      } catch(e) {
+        showToast(e.message || 'Erreur création contrôle', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function addQcResult(btn) {
+      setLoading(btn, true);
+      try {
+        const id = Number($('qcSelectedControlId').value);
+        const value = $('qcValue').value;
+        const date  = $('qcDate').value;
+        if (!id)    throw new Error('Aucun contrôle sélectionné');
+        if (value === '') throw new Error('Valeur obligatoire');
+        if (!date)  throw new Error('Date obligatoire');
+        const result = await api('/api/v1/qc/results', {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({
+            control_id: id,
+            value: Number(value),
+            measured_at: date,
+            operator: $('qcOperator').value.trim() || null,
+          })
+        });
+        $('qcValue').value = '';
+        const v = result.violations || [];
+        const REJECT_RULES = ['1-3s','2-2s','R-4s','4-1s','10x'];
+        const isReject = v.some(function(x){return REJECT_RULES.includes(x);});
+        if (isReject)         showToast('⛔ Rejet Westgard : ' + v.join(', '), 'error');
+        else if (v.includes('1-2s')) showToast('⚠️ Avertissement 1-2s — surveiller la dérive', 'warn');
+        else                  showToast('Mesure QC enregistrée ✅', 'success');
+        if (_qcSelectedControl) await selectQcControl(_qcSelectedControl, false);
+      } catch(e) {
+        showToast(e.message || 'Erreur saisie mesure', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function deleteQcControl(id) {
+      if (!confirm('Désactiver ce contrôle QC ? Les mesures existantes sont conservées.')) return;
+      try {
+        await api('/api/v1/qc/controls/' + id, { method: 'DELETE', headers: headers() });
+        if (_qcSelectedControl && _qcSelectedControl.id === id) {
+          _qcSelectedControl = null;
+          $('qcChartPanel').style.display = 'none';
+          $('qcEmptyPanel').style.display = '';
+        }
+        showToast('Contrôle désactivé', 'success');
+        await loadQc();
+      } catch(e) {
+        showToast(e.message || 'Erreur désactivation', 'error');
+      }
+    }
+
+    // ── Fin QC ───────────────────────────────────────────────────────────────
+
+    function _expiryDays(dateStr) {
+      if (!dateStr) return null;
+      const d = new Date(dateStr + 'T00:00:00');
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      return Math.round((d - now) / 86400000);
+    }
+    function _expiryBadge(dateStr) {
+      if (!dateStr) return '<span style="color:var(--muted);font-size:11px;">—</span>';
+      const d = new Date(dateStr + 'T00:00:00');
+      const days = _expiryDays(dateStr);
+      const fmt = d.toLocaleDateString('fr-FR');
+      if (days < 0)   return '<span style="color:#be123c;font-weight:600;font-size:12px;">⚠️ Périmé</span>';
+      if (days <= 30) return '<span style="color:#b45309;font-size:12px;">⏳ ' + fmt + ' <small>(' + days + 'j)</small></span>';
+      return '<span style="font-size:12px;">' + fmt + '</span>';
+    }
     async function loadReagents() {
       const data = await api("/api/v1/reagents", { headers: headers(false) });
       setRows("reagentsTable", data.items.map((r) => {
         const isLow = r.alert_threshold > 0 && r.current_stock <= r.alert_threshold;
+        const ed = _expiryDays(r.expiry_date);
         const tr = row(
           `<td>${r.id}</td>` +
           `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
           `<td>${security.escapeHtml(r.category || '—')}</td>` +
+          `<td style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.lot_number || '—')}</td>` +
+          `<td>${_expiryBadge(r.expiry_date)}</td>` +
           `<td>${r.current_stock} <span style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.unit || '')}</span></td>` +
           `<td>${r.alert_threshold}</td>` +
           `<td style="white-space:nowrap;">` +
             `<button class="ghost" onclick='editReagent(${JSON.stringify(r)})'>Éditer</button>` +
           `</td>`
         );
-        if (r.current_stock === 0)              tr.classList.add('row-critical');
-        else if (isLow)                         tr.classList.add('row-warning');
+        if (r.current_stock === 0 || (ed !== null && ed < 0)) tr.classList.add('row-critical');
+        else if (isLow || (ed !== null && ed <= 30))          tr.classList.add('row-warning');
         return tr;
       }));
     }
@@ -2256,12 +3488,15 @@
           throw new Error('Veuillez corriger les erreurs dans le formulaire');
         }
         
-        const body = { 
-          name: security.sanitize($("reagentName").value), 
-          category: security.sanitize($("reagentCategory").value) || null, 
-          unit: security.sanitize($("reagentUnit").value), 
-          current_stock: Number(security.sanitizeNumber($("reagentStock").value)), 
-          alert_threshold: Number(security.sanitizeNumber($("reagentThreshold").value)) 
+        const body = {
+          name: security.sanitize($("reagentName").value),
+          category: security.sanitize($("reagentCategory").value) || null,
+          unit: security.sanitize($("reagentUnit").value),
+          current_stock: Number(security.sanitizeNumber($("reagentStock").value)),
+          alert_threshold: Number(security.sanitizeNumber($("reagentThreshold").value)),
+          lot_number: security.sanitize($("reagentLot").value) || null,
+          supplier: security.sanitize($("reagentSupplier").value) || null,
+          expiry_date: $("reagentExpiry").value || null,
         };
         
         await perfMonitor.measureAsync('createReagent', () =>
@@ -2271,7 +3506,7 @@
         showToast("Réactif créé avec succès", "success");
         
         // Clear form
-        ["reagentName", "reagentCategory", "reagentStock", "reagentThreshold"].forEach(id => {
+        ["reagentName", "reagentCategory", "reagentStock", "reagentThreshold", "reagentLot", "reagentSupplier", "reagentExpiry"].forEach(id => {
           const field = $(id);
           field.value = "";
           field.classList.remove('success-input', 'error-input');
@@ -2291,6 +3526,9 @@
       $('editReagentUnit').value = r.unit || 'unit';
       $('editReagentStock').value = r.current_stock;
       $('editReagentThreshold').value = r.alert_threshold;
+      $('editReagentLot').value = r.lot_number || '';
+      $('editReagentSupplier').value = r.supplier || '';
+      $('editReagentExpiry').value = r.expiry_date || '';
       $('restockQty').value = '';
       const panel = $('reagentEditPanel');
       panel.style.display = '';
@@ -2311,6 +3549,9 @@
           unit: $('editReagentUnit').value.trim() || 'unit',
           current_stock: Number($('editReagentStock').value),
           alert_threshold: Number($('editReagentThreshold').value),
+          lot_number: $('editReagentLot').value.trim() || null,
+          supplier: $('editReagentSupplier').value.trim() || null,
+          expiry_date: $('editReagentExpiry').value || null,
         };
         if (!payload.name) throw new Error('Nom obligatoire');
         await api(`/api/v1/reagents/${id}`, {
@@ -2339,6 +3580,9 @@
           unit: $('editReagentUnit').value.trim() || 'unit',
           current_stock: newStock,
           alert_threshold: Number($('editReagentThreshold').value),
+          lot_number: $('editReagentLot').value.trim() || null,
+          supplier: $('editReagentSupplier').value.trim() || null,
+          expiry_date: $('editReagentExpiry').value || null,
         };
         await api(`/api/v1/reagents/${id}`, {
           method: 'PUT', headers: headers(), body: JSON.stringify(payload),
@@ -3851,12 +5095,46 @@
     let _auditSkip = 0;
     const _auditLimit = 50;
 
+    function _auditFilterQuery() {
+      const p = new URLSearchParams();
+      const et = $('auditFilterEventType')?.value.trim();
+      const en = $('auditFilterEntityType')?.value.trim();
+      const us = $('auditFilterUser')?.value.trim();
+      const df = $('auditFilterFrom')?.value;
+      const dt2 = $('auditFilterTo')?.value;
+      if (et) p.set('event_type', et);
+      if (en) p.set('entity_type', en);
+      if (us) p.set('username', us);
+      if (df) p.set('date_from', df);
+      if (dt2) p.set('date_to', dt2);
+      return p.toString();
+    }
+    function applyAuditFilters() { _auditSkip = 0; loadAudit(); }
+    function resetAuditFilters() {
+      ['auditFilterEventType','auditFilterEntityType','auditFilterUser','auditFilterFrom','auditFilterTo']
+        .forEach(id => { if ($(id)) $(id).value = ''; });
+      _auditSkip = 0; loadAudit();
+    }
+    async function exportAuditCsv() {
+      try {
+        const fq = _auditFilterQuery();
+        const resp = await fetch(normalizeApiPath('/api/v1/audit-events/export.csv' + (fq ? '?' + fq : '')), { headers: headers(false) });
+        if (!resp.ok) { showToast('Export refusé (droits admin requis)', 'error'); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'audit-export.csv'; a.click();
+        URL.revokeObjectURL(url);
+        showToast('Export CSV téléchargé', 'success');
+      } catch { showToast('Erreur export CSV', 'error'); }
+    }
     async function loadAudit() {
       const tbody = $('auditTable')?.querySelector('tbody');
       if (!tbody) return;
       loadingStates.showSkeleton(tbody, 5);
       try {
-        const data = await api(`/api/v1/audit-events?skip=${_auditSkip}&limit=${_auditLimit}`, { headers: headers(false) });
+        const fq = _auditFilterQuery();
+        const data = await api(`/api/v1/audit-events?skip=${_auditSkip}&limit=${_auditLimit}${fq ? '&' + fq : ''}`, { headers: headers(false) });
         const fmt = d => d ? new Date(d).toLocaleString('fr-FR') : '—';
         const typeLabel = {
           'user.create':    '👤 Création user',
@@ -3864,6 +5142,7 @@
           'reagent.create': '🧪 Nouveau réactif',
           'reagent.update': '✏️ Modif. réactif',
           'reagent.delete': '🗑️ Suppression réactif',
+          'result.amend':   '✏️ Correction résultat',
         };
         setRows('auditTable', (data.items || []).map(e => row(
           `<td>${e.id}</td>` +
@@ -3961,6 +5240,7 @@
           const payload = {
             full_name: $('userFullName').value.trim() || null,
             role: $('userRole').value,
+            unit: ($('userUnit')?.value || '').trim() || null,
           };
           const pw = $('userPassword').value;
           if (pw) {
@@ -3983,6 +5263,7 @@
             password,
             full_name: $('userFullName').value.trim() || null,
             role: $('userRole').value,
+            unit: ($('userUnit')?.value || '').trim() || null,
           };
           const created = await api('/api/v1/users', {
             method: 'POST', headers: headers(), body: JSON.stringify(payload),
@@ -4258,6 +5539,1142 @@ window.onload=renderLabels;
      *  labelData est déjà enrichi (patient, ipp, sex, dob) depuis loadSamples() ou scanBarcode(). */
     function printSampleLabel(labelData) {
       printTubeLabels([labelData]);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Maintenance équipements
+    // ══════════════════════════════════════════════════════════════
+    async function loadMaintenances() {
+      const tbody = $('maintenanceTable')?.querySelector('tbody');
+      if (!tbody) return;
+      loadingStates.showSkeleton(tbody, 4);
+      try {
+        const data = await api('/api/v1/equipment-maintenance?limit=50', { headers: headers(false) });
+        const fmt = d => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+        const typeLabel = { preventive: '🔧 Préventive', corrective: '🚨 Corrective', calibration: '📐 Étalonnage' };
+        const now = Date.now();
+        const sevenDays = 7 * 86400 * 1000;
+        setRows('maintenanceTable', data.map(m => {
+          const isDue = m.next_due_at && !m.is_completed && (new Date(m.next_due_at).getTime() - now) <= sevenDays;
+          const isOverdue = m.next_due_at && !m.is_completed && new Date(m.next_due_at) < new Date();
+          const dueCell = m.next_due_at
+            ? (isOverdue ? `<span class="pill bad">${fmt(m.next_due_at)} ⚠</span>`
+               : isDue ? `<span class="pill warn">${fmt(m.next_due_at)}</span>`
+               : fmt(m.next_due_at))
+            : '—';
+          const tr = row(
+            `<td><strong>${m.equipment_id}</strong></td>` +
+            `<td>${typeLabel[m.maintenance_type] || security.escapeHtml(m.maintenance_type)}</td>` +
+            `<td>${fmt(m.scheduled_at)}</td>` +
+            `<td>${dueCell}</td>` +
+            `<td>${m.is_completed ? '<span class="pill ok">✓ Terminée</span>' : '<span class="pill">En attente</span>'}</td>` +
+            `<td class="actions" style="white-space:nowrap;">` +
+              (!m.is_completed ? `<button class="success" style="font-size:11px;padding:3px 8px;" onclick="completeMaintenance(${m.id},this)" title="Marquer terminée">✓</button> ` : '') +
+              `<button class="danger" style="font-size:11px;padding:3px 8px;" onclick="deleteMaintenance(${m.id},this)" title="Supprimer">✕</button>` +
+            `</td>`
+          );
+          if (isOverdue) tr.classList.add('row-critical');
+          else if (isDue) tr.classList.add('row-warning');
+          if (m.is_completed) tr.style.opacity = '0.55';
+          return tr;
+        }));
+      } catch {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur chargement maintenance</td></tr>';
+      }
+    }
+
+    async function createMaintenance(btn) {
+      setLoading(btn, true);
+      try {
+        const eqId = parseInt($('mntEqId')?.value || '0');
+        if (!eqId) throw new Error("L'identifiant équipement est requis");
+        const payload = {
+          equipment_id: eqId,
+          maintenance_type: $('mntType')?.value || 'preventive',
+          scheduled_at: $('mntScheduled')?.value ? new Date($('mntScheduled').value).toISOString() : null,
+          next_due_at: $('mntNextDue')?.value ? new Date($('mntNextDue').value).toISOString() : null,
+          notes: $('mntNotes')?.value?.trim() || null,
+        };
+        await api('/api/v1/equipment-maintenance', { method: 'POST', headers: headers(), body: JSON.stringify(payload) });
+        showToast('Maintenance planifiée avec succès', 'success');
+        ['mntEqId', 'mntScheduled', 'mntNextDue', 'mntNotes'].forEach(id => { if ($(id)) $(id).value = ''; });
+        await loadMaintenances();
+      } catch (e) {
+        showToast(e.message || 'Erreur création maintenance', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function completeMaintenance(id, btn) {
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/equipment-maintenance/${id}/complete`, { method: 'PATCH', headers: headers() });
+        showToast('Maintenance marquée comme terminée', 'success');
+        await loadMaintenances();
+      } catch (e) {
+        showToast(e.message || 'Erreur', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    async function deleteMaintenance(id, btn) {
+      if (!confirm('Supprimer cette entrée de maintenance ?')) return;
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/equipment-maintenance/${id}`, { method: 'DELETE', headers: headers() });
+        showToast('Maintenance supprimée', 'success');
+        await loadMaintenances();
+      } catch (e) {
+        showToast(e.message || 'Erreur', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  Statistiques de performance laboratoire
+    // ══════════════════════════════════════════════════════════════
+    async function loadStats() {
+      const days = $('statsDays')?.value || 30;
+      try {
+        const data = await api(`/api/v1/stats/summary?days=${days}`, { headers: headers(false) });
+
+        $('statTotal').textContent = data.total_results ?? '—';
+
+        // Taux critique
+        const critPct = data.critical_rate_pct ?? 0;
+        if ($('statCrit')) $('statCrit').textContent = critPct + ' %';
+        const cp = $('statCritPanel');
+        if (cp) {
+          cp.classList.remove('metric-rose', 'metric-amber', 'metric-teal');
+          cp.classList.add(critPct > 10 ? 'metric-rose' : critPct > 3 ? 'metric-amber' : 'metric-teal');
+        }
+
+        // Violations QC
+        const qcPct = data.qc_violation_rate_pct ?? 0;
+        if ($('statQc')) $('statQc').textContent = qcPct + ' %';
+        const qp = $('statQcPanel');
+        if (qp) {
+          qp.classList.remove('metric-rose', 'metric-amber', 'metric-teal');
+          qp.classList.add(qcPct > 10 ? 'metric-rose' : qcPct > 0 ? 'metric-amber' : 'metric-teal');
+        }
+
+        // Maintenance due
+        const mnt = data.maintenance_due_count ?? 0;
+        if ($('statMnt')) $('statMnt').textContent = mnt;
+        const mp = $('statMntPanel');
+        if (mp) {
+          mp.classList.remove('metric-amber', 'metric-teal', 'metric-rose');
+          mp.classList.add(mnt > 0 ? 'metric-amber' : 'metric-teal');
+        }
+
+        // Graphes
+        _renderTatChart(data.tat_by_equipment || []);
+        _renderWeeklyChart(data.weekly_volumes || []);
+
+        // Tableau détail TAT
+        setRows('tatDetailTable', (data.tat_by_equipment || []).map(d => row(
+          `<td><strong>${security.escapeHtml(d.equipment)}</strong></td>` +
+          `<td>${d.count}</td>` +
+          `<td style="font-variant-numeric:tabular-nums;">${d.mean_h}</td>` +
+          `<td>${d.min_h}</td>` +
+          `<td>${d.max_h}</td>` +
+          `<td>${d.p95_h}</td>`
+        )));
+
+        await loadComplianceTrend();
+      } catch (e) {
+        showToast('Erreur chargement statistiques', 'error');
+        log('loadStats: ' + (e.message || e));
+      }
+    }
+
+    async function loadComplianceTrend() {
+      try {
+        const data = await api('/api/v1/reports/compliance-trend?months=12', { headers: headers(false) });
+        const badge = $('complianceDriftBadge');
+        if (badge) badge.style.display = data.has_drift ? '' : 'none';
+        _renderComplianceTrend(data.series || []);
+      } catch (e) { log('loadComplianceTrend: ' + (e.message || e)); }
+    }
+    function _renderComplianceTrend(series) {
+      const div = $('complianceTrendChart');
+      if (!div) return;
+      if (!series.length) { div.innerHTML = '<p style="color:var(--muted);">Aucune donnée.</p>'; return; }
+      const W = 720, H = 160, padL = 36, padR = 10, padTop = 12, padBot = 28;
+      const chartW = W - padL - padR, chartH = H - padTop - padBot;
+      const step = series.length > 1 ? chartW / (series.length - 1) : 0;
+      const yFor = v => padTop + chartH - (v / 100) * chartH;
+      const pts = series.map((s, i) => `${(padL + i * step).toFixed(1)},${yFor(s.validation_rate_pct).toFixed(1)}`).join(' ');
+      const dots = series.map((s, i) => {
+        const x = padL + i * step, y = yFor(s.validation_rate_pct);
+        const color = s.drift ? '#be123c' : '#0f766e';
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${color}"><title>${s.month}: ${s.validation_rate_pct}%</title></circle>`;
+      }).join('');
+      const labels = series.map((s, i) => {
+        if (series.length > 8 && i % 2 !== 0) return '';
+        const x = padL + i * step;
+        return `<text x="${x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="9" fill="var(--muted)">${s.month.slice(2)}</text>`;
+      }).join('');
+      const grid = [0, 50, 99, 100].map(v =>
+        `<line x1="${padL}" y1="${yFor(v).toFixed(1)}" x2="${W - padR}" y2="${yFor(v).toFixed(1)}" stroke="#e5e7eb" stroke-width="1"/>` +
+        `<text x="2" y="${(yFor(v) + 3).toFixed(1)}" font-size="9" fill="var(--muted)">${v}</text>`
+      ).join('');
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">${grid}` +
+        `<polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="2"/>${dots}${labels}</svg>` +
+        `<p style="font-size:11px;color:var(--muted);margin:4px 0 0;">Taux de validation mensuel (%) · points rouges = sous le seuil de conformité</p>`;
+    }
+    async function openComplianceReport() {
+      try {
+        const resp = await fetch(normalizeApiPath('/api/v1/reports/compliance-report?days=30'), { headers: headers(false) });
+        if (!resp.ok) { showToast('Rapport indisponible', 'error'); return; }
+        const html = await resp.text();
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(html); w.document.close(); }
+        else showToast('Autoriser les pop-ups pour ouvrir le rapport', 'warning');
+      } catch { showToast('Erreur rapport conformité', 'error'); }
+    }
+
+    // ── Unification des vocabulaires (mappings de codes) ──────────────────────
+    let _codeMappings = [];
+    async function loadCodeMappings() {
+      try {
+        _codeMappings = await api('/api/v1/code-mappings', { headers: headers(false) });
+        renderMappingsTable();
+        loadMappingOrphans();
+      } catch (e) { log('loadCodeMappings: ' + (e.message || e)); }
+    }
+    function renderMappingsTable() {
+      const f = ($('mapFilter')?.value || '').trim().toUpperCase();
+      const rows = _codeMappings.filter(m => !f || (m.canonical_code + (m.exam_code||'') + (m.test_code||'') + (m.analyte_code||'')).toUpperCase().includes(f));
+      setRows('mappingsTable', rows.map(m => row(
+        `<td><strong>${security.escapeHtml(m.canonical_code)}</strong>${m.component_of ? ` <small style="color:var(--muted);">∈${security.escapeHtml(m.component_of)}</small>` : ''}</td>` +
+        `<td>${security.escapeHtml(m.exam_code || '—')}</td>` +
+        `<td>${security.escapeHtml(m.test_code || '—')}</td>` +
+        `<td>${security.escapeHtml(m.analyte_code || '—')}</td>` +
+        `<td>${m.is_panel ? '✔' : ''}</td>` +
+        `<td><button class="ghost" style="color:var(--rose);font-size:11px;" onclick="deleteMapping(${m.id},this)">✕</button></td>`
+      )));
+    }
+    async function loadMappingOrphans() {
+      try {
+        const o = await api('/api/v1/code-mappings/orphans', { headers: headers(false) });
+        const ex = o.exam_codes_unmapped || [], te = o.test_codes_unmapped || [];
+        $('mapOrphans').innerHTML =
+          `<strong>Codes orphelins</strong> — exam (${ex.length}) : ${ex.slice(0,20).map(security.escapeHtml).join(', ') || '—'}` +
+          `<br>test (${te.length}) : ${te.slice(0,20).map(security.escapeHtml).join(', ') || '—'}`;
+      } catch {}
+    }
+    async function seedCodeMappings(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api('/api/v1/code-mappings/seed-defaults', { method: 'POST', headers: headers() });
+        showToast(`${res.created} correspondance(s) chargée(s)`, 'success');
+        await loadCodeMappings();
+      } catch (e) { showToast('Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteMapping(id, btn) {
+      setLoading(btn, true);
+      try { await api(`/api/v1/code-mappings/${id}`, { method: 'DELETE', headers: headers() }); showToast('Correspondance désactivée', 'success'); loadCodeMappings(); }
+      catch { showToast('Erreur suppression', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    async function testMapping(btn) {
+      const exam_code = ($('mapTestExam')?.value || '').trim().toUpperCase();
+      const analyte_code = ($('mapTestAnalyte')?.value || '').trim().toUpperCase() || null;
+      if (!exam_code) { showToast('Saisir un exam_code', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const d = await api('/api/v1/code-mappings/test', { method: 'POST', headers: headers(), body: JSON.stringify({ exam_code, analyte_code }) });
+        $('mapTestResult').innerHTML = d.matched
+          ? `<div class="notice">✅ <strong>${security.escapeHtml(exam_code)}</strong>${analyte_code ? ' / ' + security.escapeHtml(analyte_code) : ''} → canonique <strong>${security.escapeHtml(d.canonical_code || '—')}</strong>, bioref <strong>${security.escapeHtml(d.bioref_test_code || '—')}</strong>${d.is_panel ? ' (panel)' : ''}</div>`
+          : `<div class="notice" style="color:var(--rose);">Aucune correspondance pour « ${security.escapeHtml(exam_code)} »</div>`;
+      } catch (e) { showToast('Erreur test mapping', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ── Référentiel biologique & interprétation ───────────────────────────────
+    let _biorefRanges = [];
+    async function loadBioref() {
+      try {
+        _biorefRanges = await api('/api/v1/bioref/ranges', { headers: headers(false) });
+        const sel = $('biorefTest');
+        if (sel) {
+          const codes = [];
+          const seen = new Set();
+          _biorefRanges.forEach(r => { if (!seen.has(r.test_code)) { seen.add(r.test_code); codes.push(r); } });
+          const cur = sel.value;
+          sel.innerHTML = codes.map(r => `<option value="${security.escapeHtml(r.test_code)}">${security.escapeHtml(r.test_code)} — ${security.escapeHtml(r.test_name)}</option>`).join('');
+          if (cur) sel.value = cur;
+        }
+        renderBiorefTable();
+      } catch (e) { log('loadBioref: ' + (e.message || e)); }
+    }
+    function _biorefRangeStr(r) {
+      if (r.normal_text) return r.normal_text;
+      const u = r.unit || '';
+      if (r.lower_limit != null && r.upper_limit != null) return `${r.lower_limit} - ${r.upper_limit} ${u}`.trim();
+      if (r.upper_limit != null) return `< ${r.upper_limit} ${u}`.trim();
+      if (r.lower_limit != null) return `> ${r.lower_limit} ${u}`.trim();
+      return u || '—';
+    }
+    function renderBiorefTable() {
+      const f = ($('biorefFilter')?.value || '').trim().toUpperCase();
+      const rows = _biorefRanges.filter(r => !f || r.test_code.toUpperCase().includes(f));
+      setRows('biorefTable', rows.map(r => row(
+        `<td><strong>${security.escapeHtml(r.test_code)}</strong></td>` +
+        `<td>${security.escapeHtml(r.test_name)}</td>` +
+        `<td>${security.escapeHtml(r.sex)}</td>` +
+        `<td>${security.escapeHtml(_biorefRangeStr(r))}</td>` +
+        `<td style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.source || '')}</td>`
+      )));
+    }
+    async function seedBioref(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api('/api/v1/bioref/seed-defaults', { method: 'POST', headers: headers() });
+        showToast(`${res.created} valeur(s) de référence chargée(s)`, 'success');
+        await loadBioref();
+      } catch (e) { showToast('Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+    const _biorefFlagBadge = (f) => {
+      if (f === 'NORMAL') return '<span class="pill ok">NORMAL</span>';
+      if (f === 'BAS' || f === 'HAUT') return `<span class="pill" style="background:var(--amber);color:#fff;">${f}</span>`;
+      if (f && f.startsWith('CRITIQUE')) return `<span class="pill bad">${f}</span>`;
+      return `<span class="pill">${security.escapeHtml(f || '—')}</span>`;
+    };
+    async function interpretBioref(btn) {
+      const test_code = $('biorefTest')?.value;
+      if (!test_code) { showToast('Sélectionnez un test (chargez le référentiel)', 'error'); return; }
+      const vRaw = $('biorefValue').value;
+      const body = {
+        test_code,
+        value: vRaw === '' ? null : Number(vRaw),
+        sex: $('biorefSex').value || null,
+        age_years: $('biorefAge').value === '' ? null : Number($('biorefAge').value),
+      };
+      setLoading(btn, true);
+      try {
+        const d = await api('/api/v1/bioref/interpret', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        if (d.error) { $('biorefResult').innerHTML = `<div class="notice" style="color:var(--rose);">${security.escapeHtml(d.error)}</div>`; return; }
+        $('biorefResult').innerHTML =
+          `<div class="panel" style="padding:10px;">` +
+          `<div style="display:flex;justify-content:space-between;align-items:center;">` +
+            `<strong>${security.escapeHtml(d.test_name)}</strong> ${_biorefFlagBadge(d.flag)}</div>` +
+          `<div style="margin-top:6px;font-size:13px;">Résultat : <strong>${d.result ?? '—'} ${security.escapeHtml(d.unit || '')}</strong> ` +
+            `· Référence : ${security.escapeHtml(d.reference_range || '—')}</div>` +
+          (d.interpretation ? `<div style="margin-top:4px;font-size:12px;color:var(--muted);">${security.escapeHtml(d.interpretation)}</div>` : '') +
+          (d.source ? `<div style="margin-top:2px;font-size:11px;color:var(--muted);">Source : ${security.escapeHtml(d.source)}</div>` : '') +
+          `</div>`;
+      } catch (e) { showToast('Erreur interprétation', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ── Auto-validation ISO 15189 §5.8 ────────────────────────────────────────
+    async function loadAutoValidationConfigs() {
+      try {
+        const data = await api("/api/v1/auto-validation/config", { headers: headers(false) });
+        setRows("autoValidConfigTable", data.map(c => row(
+          `<td><strong>${security.escapeHtml(c.name)}</strong></td>` +
+          `<td>${c.require_all_flags_normal ? '✅' : '—'}</td>` +
+          `<td>${c.require_no_delta ? '✅' : '—'}</td>` +
+          `<td>${c.require_not_critical ? '✅' : '—'}</td>` +
+          `<td><button class="ghost" style="color:var(--rose);font-size:11px;" onclick="deleteAutoValidationConfig(${c.id}, this)">Supprimer</button></td>`
+        )));
+      } catch (e) { log('loadAutoValidationConfigs: ' + (e.message || e)); }
+    }
+    async function createAutoValidationConfig(btn) {
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/auto-validation/config", {
+          method: "POST", headers: headers(),
+          body: JSON.stringify({
+            name: $('avName').value || 'Règle par défaut',
+            require_all_flags_normal: $('avFlagsNormal').checked,
+            require_no_delta: $('avNoDelta').checked,
+            require_not_critical: $('avNotCritical').checked,
+          }),
+        });
+        showToast("Règle d'auto-validation créée", "success");
+        await loadAutoValidationConfigs();
+      } catch (e) { showToast("Erreur création règle", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function deleteAutoValidationConfig(id, btn) {
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/auto-validation/config/" + id, { method: "DELETE", headers: headers() });
+        showToast("Règle désactivée", "success");
+        await loadAutoValidationConfigs();
+      } catch (e) { showToast("Erreur suppression règle", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function runAutoValidation(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api("/api/v1/auto-validation/run", { method: "POST", headers: headers() });
+        showToast(`Auto-validation : ${res.auto_validated}/${res.processed} résultat(s) validé(s)`, "success");
+        await loadResults();
+      } catch (e) { showToast("Erreur auto-validation", "error"); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ── Correction / ré-analyse résultat ─────────────────────────────────────
+    function openAmendPanel(resultId, dataPoints) {
+      $('amendResultId').value = resultId;
+      $('amendResultLabel').textContent = 'Résultat #' + resultId;
+      $('amendDataPoints').value = JSON.stringify(dataPoints, null, 2);
+      $('amendReason').value = '';
+      const panel = $('amendPanel');
+      if (panel) { panel.style.display = ''; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
+    function closeAmendPanel() {
+      const panel = $('amendPanel');
+      if (panel) panel.style.display = 'none';
+    }
+    async function submitAmend(btn) {
+      const resultId = $('amendResultId').value;
+      const rawJson = $('amendDataPoints').value;
+      const reason = ($('amendReason').value || '').trim();
+      if (!resultId) { showToast("Aucun résultat sélectionné", "error"); return; }
+      if (reason.length < 5) { showToast("Motif trop court (min 5 car.)", "error"); return; }
+      let dataPoints;
+      try { dataPoints = JSON.parse(rawJson); } catch { showToast("JSON invalide dans les données analytiques", "error"); return; }
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/results/" + resultId + "/amend", {
+          method: "PATCH", headers: headers(),
+          body: JSON.stringify({ data_points: dataPoints, amendment_reason: reason }),
+        });
+        showToast("Résultat corrigé avec succès", "success");
+        closeAmendPanel();
+        await loadResults();
+      } catch (e) {
+        showToast((e.detail || e.message || "Erreur correction"), "error");
+      } finally { setLoading(btn, false); }
+    }
+
+    // ── Péremptions réactifs ───────────────────────────────────────────────────
+    async function loadExpiryAlerts() {
+      const days = parseInt($('expiryDays')?.value || '30', 10);
+      try {
+        const data = await api(`/api/v1/reagents/expiring?days=${days}`, { headers: headers(false) });
+        setRows("expiryTable", data.map(r => {
+          const daysLeft = r.days_remaining;
+          let badge;
+          if (r.is_expired) badge = '<span class="pill bad">Expiré</span>';
+          else if (daysLeft <= 7) badge = `<span class="pill bad">${daysLeft}j</span>`;
+          else if (daysLeft <= 30) badge = `<span class="pill" style="background:var(--amber);color:#fff;">${daysLeft}j</span>`;
+          else badge = `<span class="pill ok">${daysLeft}j</span>`;
+          const tr = row(
+            `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
+            `<td><code>${security.escapeHtml(r.lot_number || '—')}</code></td>` +
+            `<td>${r.expiry_date || '—'}</td>` +
+            `<td>${badge}</td>` +
+            `<td style="font-variant-numeric:tabular-nums;">${r.current_stock} <small style="color:var(--muted);">${security.escapeHtml(r.unit || '')}</small></td>`
+          );
+          if (r.is_expired) tr.classList.add('row-critical');
+          else if (daysLeft <= 7) tr.classList.add('row-warning');
+          return tr;
+        }));
+      } catch (e) { showToast("Erreur chargement péremptions", "error"); log('loadExpiryAlerts: ' + (e.message || e)); }
+    }
+    async function notifyExpiryAlerts(btn) {
+      const days = parseInt($('expiryDays')?.value || '30', 10);
+      setLoading(btn, true);
+      try {
+        const res = await api(`/api/v1/critical-alerts/expiry-check?days=${days}`, { method: "POST", headers: headers() });
+        showToast(`Notifications envoyées : ${res.notified} webhook(s), ${res.expiring} réactif(s) concerné(s)`, "success");
+      } catch (e) { showToast("Erreur envoi notifications péremption", "error"); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Feature 2 — Dossier patient complet (timeline + sparklines + FHIR)
+    // ══════════════════════════════════════════════════════════════════════
+    let _dossierPatientId = null;
+    function closeDossier() {
+      const d = $('patientDossier');
+      if (d) d.style.display = 'none';
+      _dossierPatientId = null;
+    }
+    async function openDossier(patientId) {
+      _dossierPatientId = patientId;
+      try {
+        const h = await api(`/api/v1/patients/${patientId}/history`, { headers: headers(false) });
+        const p = h.patient || {};
+        $('dossierName').textContent = `${p.first_name || ''} ${p.last_name || ''} — ${p.ipp_unique_id || ''}`;
+        $('dossierResults').textContent = h.result_count ?? 0;
+        $('dossierCritical').textContent = h.critical_count ?? 0;
+        $('dossierSamples').textContent = h.sample_count ?? 0;
+        const trends = h.trends || {};
+        const analyteKeys = Object.keys(trends);
+        $('dossierAnalytes').textContent = analyteKeys.length;
+
+        // Sparklines
+        const trendDiv = $('dossierTrends');
+        if (trendDiv) {
+          if (!analyteKeys.length) {
+            trendDiv.innerHTML = '<p style="color:var(--muted);">Aucune donnée numérique.</p>';
+          } else {
+            trendDiv.innerHTML = analyteKeys.slice(0, 12).map(a => {
+              const series = trends[a].map(pt => pt.value);
+              const last = series[series.length - 1];
+              return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">` +
+                `<span style="width:80px;font-size:12px;font-weight:600;">${security.escapeHtml(a)}</span>` +
+                _renderSparkline(series) +
+                `<span style="font-size:12px;color:var(--muted);">${last} <small>(n=${series.length})</small></span>` +
+                `</div>`;
+            }).join('');
+          }
+        }
+
+        // Timeline
+        setRows('dossierTimeline', (h.timeline || []).map(t => {
+          const flagsTxt = t.flags && Object.keys(t.flags).length
+            ? Object.entries(t.flags).map(([k, v]) => `${k}:${v}`).join(' ')
+            : '—';
+          const crit = t.is_critical ? '<span class="pill bad">⛔</span>' : (t.delta_exceeded ? '<span class="pill" style="background:var(--amber);color:#fff;">△</span>' : '—');
+          const tr = row(
+            `<td>${t.result_id}</td>` +
+            `<td style="white-space:nowrap;">${t.analysis_date ? new Date(t.analysis_date).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}) : '—'}</td>` +
+            `<td><code>${security.escapeHtml(t.sample_barcode || '')}</code></td>` +
+            `<td>${crit}</td>` +
+            `<td style="font-size:11px;">${security.escapeHtml(flagsTxt)}</td>`
+          );
+          if (t.is_critical) tr.classList.add('row-critical');
+          return tr;
+        }));
+
+        const dossier = $('patientDossier');
+        if (dossier) { dossier.style.display = ''; dossier.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      } catch (e) {
+        showToast('Erreur chargement dossier', 'error');
+        log('openDossier: ' + (e.message || e));
+      }
+    }
+    function _renderSparkline(values) {
+      if (!values.length) return '<svg width="120" height="28"></svg>';
+      const W = 120, H = 28, pad = 2;
+      const min = Math.min(...values), max = Math.max(...values);
+      const span = (max - min) || 1;
+      const step = values.length > 1 ? (W - 2 * pad) / (values.length - 1) : 0;
+      const pts = values.map((v, i) => {
+        const x = pad + i * step;
+        const y = H - pad - ((v - min) / span) * (H - 2 * pad);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+      const lastX = pad + (values.length - 1) * step;
+      const lastY = H - pad - ((values[values.length - 1] - min) / span) * (H - 2 * pad);
+      return `<svg width="${W}" height="${H}" style="overflow:visible;">` +
+        `<polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/>` +
+        `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="#be123c"/>` +
+        `</svg>`;
+    }
+    async function editPatientUnit() {
+      if (!_dossierPatientId) return;
+      const value = prompt("Unité / service de rattachement (laisser vide = pool partagé) :");
+      if (value === null) return;  // annulé
+      const unit = value.trim() || null;
+      try {
+        await api(`/api/v1/patients/${_dossierPatientId}`, {
+          method: "PATCH", headers: headers(), body: JSON.stringify({ unit }),
+        });
+        showToast("Unité du patient mise à jour", "success");
+        loadPatients();
+      } catch (e) {
+        showToast(e.message === "Forbidden" ? "Réservé officier/admin" : "Erreur mise à jour", "error");
+      }
+    }
+    async function exportPatientFhir() {
+      if (!_dossierPatientId) return;
+      try {
+        const resp = await fetch(normalizeApiPath(`/api/v1/patients/${_dossierPatientId}/fhir-bundle`), { headers: headers(false) });
+        if (!resp.ok) { showToast('Export FHIR refusé', 'error'); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `patient-${_dossierPatientId}-fhir-bundle.json`; a.click();
+        URL.revokeObjectURL(url);
+        showToast('Bundle FHIR téléchargé', 'success');
+      } catch { showToast('Erreur export FHIR', 'error'); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Feature 3 — Notifications temps-réel (WebSocket + fallback polling)
+    // ══════════════════════════════════════════════════════════════════════
+    let _notifWs = null;
+    let _notifPollTimer = null;
+    let _lastCriticalCount = 0;
+    let _notifPopoverOpen = false;
+
+    function toggleNotifPopover() {
+      _notifPopoverOpen = !_notifPopoverOpen;
+      const pop = $('notifPopover');
+      if (pop) pop.style.display = _notifPopoverOpen ? 'block' : 'none';
+    }
+    function _setNotifWsDot(connected) {
+      const dot = $('notifWsDot');
+      if (!dot) return;
+      dot.style.background = connected ? 'var(--teal, #0f766e)' : 'var(--muted)';
+      dot.title = connected ? 'WebSocket connecté' : 'WebSocket déconnecté (polling)';
+    }
+    function renderNotifSnapshot(snap) {
+      if (!snap) return;
+      const total = snap.total || 0;
+      const badge = $('notifBadge');
+      if (badge) {
+        badge.textContent = total;
+        badge.style.display = total > 0 ? '' : 'none';
+      }
+      // Toast si nouvelle valeur critique apparaît
+      const critCount = (snap.counts && snap.counts.criticals) || 0;
+      if (critCount > _lastCriticalCount) {
+        showToast(`🔴 ${critCount} valeur(s) critique(s) non acquittée(s)`, 'error', 6000);
+      }
+      _lastCriticalCount = critCount;
+
+      const body = $('notifPopoverBody');
+      if (!body) return;
+      if (total === 0) { body.innerHTML = '<p style="color:var(--muted);">Aucune alerte active. ✅</p>'; return; }
+      const c = snap.counts || {};
+      let html = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">';
+      if (c.criticals) html += `<span class="pill bad">⛔ ${c.criticals} critiques</span>`;
+      if (c.deltas) html += `<span class="pill" style="background:var(--amber);color:#fff;">△ ${c.deltas} delta</span>`;
+      if (c.expiring) html += `<span class="pill" style="background:#b45309;color:#fff;">📅 ${c.expiring} péremptions</span>`;
+      if (c.qc_rejects) html += `<span class="pill bad">📈 ${c.qc_rejects} QC rejet</span>`;
+      html += '</div>';
+      if ((snap.criticals || []).length) {
+        html += '<strong style="font-size:12px;">Valeurs critiques :</strong><ul style="margin:4px 0 8px;padding-left:18px;">';
+        snap.criticals.slice(0, 6).forEach(x => {
+          html += `<li>Résultat #${x.result_id} (échantillon ${x.sample_id}) — ${x.elapsed_minutes} min${x.overdue ? ' <span class="pill bad" style="font-size:9px;">retard</span>' : ''}</li>`;
+        });
+        html += '</ul>';
+      }
+      if ((snap.expiring || []).length) {
+        html += '<strong style="font-size:12px;">Péremptions proches :</strong><ul style="margin:4px 0 8px;padding-left:18px;">';
+        snap.expiring.slice(0, 6).forEach(x => {
+          html += `<li>${security.escapeHtml(x.name)} — ${x.is_expired ? 'expiré' : x.days_remaining + 'j'}</li>`;
+        });
+        html += '</ul>';
+      }
+      body.innerHTML = html;
+    }
+    function connectNotifications() {
+      if (!token) return;
+      // Tente WebSocket d'abord. Le jeton transite par le sous-protocole
+      // (et non l'URL) pour éviter de le journaliser côté serveur/proxy.
+      try {
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${proto}://${location.host}${API_PREFIX}/notifications/ws`, ['bearer', token]);
+        _notifWs = ws;
+        ws.onopen = () => { _setNotifWsDot(true); if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; } };
+        ws.onmessage = (ev) => { try { renderNotifSnapshot(JSON.parse(ev.data)); } catch {} };
+        ws.onclose = () => { _setNotifWsDot(false); _notifWs = null; startNotifPolling(); };
+        ws.onerror = () => { try { ws.close(); } catch {} };
+      } catch {
+        startNotifPolling();
+      }
+    }
+    function startNotifPolling() {
+      if (_notifPollTimer) return;
+      const poll = async () => {
+        if (!token) return;
+        try { renderNotifSnapshot(await api('/api/v1/notifications/feed', { headers: headers(false) })); } catch {}
+      };
+      poll();
+      _notifPollTimer = setInterval(poll, 30000);
+    }
+    function disconnectNotifications() {
+      if (_notifWs) { try { _notifWs.close(); } catch {} _notifWs = null; }
+      if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Feature 4 — Import en lot CSV
+    // ══════════════════════════════════════════════════════════════════════
+    function loadCsvIntoTextarea(input, textareaId) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { const ta = $(textareaId); if (ta) ta.value = reader.result; };
+      reader.readAsText(file);
+    }
+    function fillPatientCsvSample() {
+      $('patientCsvText').value =
+        'ipp_unique_id,first_name,last_name,birth_date,sex,rank\n' +
+        'IPP-IMP-001,Awa,Koné,1990-05-12,F,Sergent\n' +
+        'IPP-IMP-002,Yao,Brou,1985-11-03,M,Caporal';
+    }
+    function fillReagentCsvSample() {
+      $('reagentCsvText').value =
+        'name,category,unit,current_stock,alert_threshold,lot_number,expiry_date,supplier\n' +
+        'Diluant DH36 (import),Hématologie,L,20,5,LOT-IMP-A1,2027-01-01,Sysmex\n' +
+        'Lyse WBC (import),Hématologie,mL,500,100,LOT-IMP-B2,2026-09-30,Sysmex';
+    }
+    async function submitBulkImport(kind, btn) {
+      const taId = kind === 'patients' ? 'patientCsvText' : 'reagentCsvText';
+      const reportId = kind === 'patients' ? 'patientImportReport' : 'reagentImportReport';
+      const dryRunId = kind === 'patients' ? 'patientCsvDryRun' : 'reagentCsvDryRun';
+      const csv = ($(taId)?.value || '').trim();
+      const dryRun = !!$(dryRunId)?.checked;
+      if (!csv) { showToast('CSV vide', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const res = await api(`/api/v1/bulk-import/${kind}`, {
+          method: 'POST', headers: headers(), body: JSON.stringify({ csv, dry_run: dryRun }),
+        });
+        const verb = res.dry_run ? 'validable(s) (dry-run, rien enregistré)' : 'créé(s)';
+        let html = `<div class="notice">✅ ${res.created} ${verb} sur ${res.total} ligne(s).</div>`;
+        if (res.errors && res.errors.length) {
+          html += '<div style="margin-top:6px;color:var(--rose);"><strong>Erreurs :</strong><ul style="margin:4px 0;padding-left:18px;">';
+          res.errors.slice(0, 30).forEach(e => { html += `<li>Ligne ${e.row} : ${security.escapeHtml(e.error)}</li>`; });
+          html += '</ul></div>';
+        }
+        $(reportId).innerHTML = html;
+        showToast(`${res.created} ${kind === 'patients' ? 'patient(s)' : 'réactif(s)'} ${res.dry_run ? 'validé(s) à blanc' : 'importé(s)'}`, 'success');
+        if (!res.dry_run) { if (kind === 'patients') loadPatients(); else { loadReagents(); loadExpiryAlerts(); } }
+      } catch (e) {
+        showToast('Erreur import (droits officier requis ?)', 'error');
+        log('submitBulkImport: ' + (e.message || e));
+      } finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Registre maître — analyse rétrospective & import
+    // ══════════════════════════════════════════════════════════════════════
+    // Parseur CSV conforme RFC 4180 (gère les champs entre guillemets contenant
+    // des virgules — indispensable car les examens ont des décimales « 0,13 »).
+    function _parseCsv(text) {
+      const rows = [];
+      let row = [], field = '', inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { field += '"'; i++; }
+            else inQuotes = false;
+          } else field += c;
+        } else if (c === '"') inQuotes = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\r') { /* ignore */ }
+        else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+        else field += c;
+      }
+      if (field !== '' || row.length) { row.push(field); rows.push(row); }
+      return rows.filter(r => r.some(v => v.trim() !== ''));
+    }
+    function _registreRows() {
+      const text = ($('registreCsvText')?.value || '').trim();
+      if (!text) return [];
+      const grid = _parseCsv(text);
+      if (grid.length < 2) return [];
+      const headers = grid[0].map(h => h.trim());
+      return grid.slice(1).map(cells => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (cells[i] ?? '').trim(); });
+        return obj;
+      });
+    }
+    function _fmtFcfa(n) { return (n || 0).toLocaleString('fr-FR') + ' F'; }
+
+    async function registreAnalyse(btn) {
+      const rows = _registreRows();
+      if (!rows.length) { showToast('CSV vide ou en-tête manquante', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const a = await api('/api/v1/registre/analytics', { method: 'POST', headers: headers(), body: JSON.stringify({ rows }) });
+        $('registreAnalyticsPanel').style.display = '';
+        $('regTotal').textContent = a.total_dossiers;
+        $('regRevenue').textContent = _fmtFcfa(a.revenue_total_fcfa);
+        $('regCmu').textContent = _fmtFcfa(a.cmu_part_fcfa) + ` (${a.cmu_share_pct}%)`;
+        $('regMalaria').textContent = `${a.malaria_positivity_pct}% (${a.malaria_positive}/${a.malaria_tested})`;
+        setRows('regTopExams', a.top_exams.map(([name, n]) => row(`<td>${security.escapeHtml(name)}</td><td>${n}</td>`)));
+        _renderRegMonthChart(a.by_month);
+        showToast('Analyse calculée', 'success');
+      } catch (e) { showToast('Erreur analyse', 'error'); log('registreAnalyse: ' + (e.message || e)); }
+      finally { setLoading(btn, false); }
+    }
+
+    function _renderRegMonthChart(months) {
+      const div = $('regMonthChart');
+      if (!div) return;
+      if (!months || !months.length) { div.innerHTML = '<p style="color:var(--muted);">Aucune date exploitable.</p>'; return; }
+      const maxV = Math.max(...months.map(m => m.count), 1);
+      const W = 460, H = 150, padTop = 14, padBot = 26, padL = 4;
+      const cw = W - padL * 2, ch = H - padTop - padBot;
+      const bw = Math.max(4, Math.floor(cw / months.length) - 4);
+      let bars = '';
+      months.forEach((m, i) => {
+        const x = padL + i * (cw / months.length) + 2;
+        const bh = Math.max(2, Math.round((m.count / maxV) * ch));
+        const y = padTop + ch - bh;
+        bars += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="#0f766e" opacity="0.8"><title>${m.month}: ${m.count} dossiers</title></rect>` +
+          `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="8" fill="var(--muted)">${m.month.slice(2)}</text>`;
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
+    }
+
+    function _renderRegReport(rep) {
+      $('registreReportPanel').style.display = '';
+      let html = '';
+      if ('recognition_rate_pct' in rep) {
+        html += `<div class="notice">Prévisualisation : ${rep.total_rows} dossier(s), ${rep.total_exams} examen(s), ` +
+          `<strong>${rep.recognized_exams} reconnus (${rep.recognition_rate_pct}%)</strong>, ${rep.unrecognized_exams} non reconnus. ` +
+          `Montant total : ${_fmtFcfa(rep.total_amount_fcfa)}.</div>`;
+        if (rep.top_unrecognized && rep.top_unrecognized.length) {
+          html += '<p style="font-size:12px;"><strong>Examens non reconnus :</strong> ' +
+            rep.top_unrecognized.map(([n, c]) => `${security.escapeHtml(n)} (${c})`).join(', ') + '</p>';
+        }
+      } else {
+        const mode = rep.dry_run ? 'Simulation (rien écrit)' : '✅ Import réel effectué';
+        html += `<div class="notice">${mode} : ${rep.created_patients} patient(s), ${rep.created_samples} échantillon(s), ` +
+          `${rep.created_results} résultat(s). Dates de naissance estimées : ${rep.estimated_birth_dates}.</div>`;
+      }
+      if (rep.errors && rep.errors.length) {
+        html += '<div style="color:var(--rose);margin-top:6px;"><strong>Erreurs :</strong><ul style="margin:4px 0;padding-left:18px;">' +
+          rep.errors.slice(0, 30).map(e => `<li>Ligne ${e.row} : ${security.escapeHtml(e.error)}</li>`).join('') + '</ul></div>';
+      }
+      $('registreReport').innerHTML = html;
+    }
+
+    async function registrePreview(btn) {
+      const rows = _registreRows();
+      if (!rows.length) { showToast('CSV vide ou en-tête manquante', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const rep = await api('/api/v1/registre/preview', { method: 'POST', headers: headers(), body: JSON.stringify({ rows }) });
+        _renderRegReport(rep);
+        showToast('Prévisualisation prête', 'success');
+      } catch (e) { showToast('Erreur prévisualisation', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function registreImport(btn) {
+      const rows = _registreRows();
+      if (!rows.length) { showToast('CSV vide ou en-tête manquante', 'error'); return; }
+      if (!confirm(`Importer réellement ${rows.length} dossier(s) en base ? Cette action écrit des données patients.`)) return;
+      setLoading(btn, true);
+      try {
+        const rep = await api('/api/v1/registre/import', { method: 'POST', headers: headers(), body: JSON.stringify({ rows, dry_run: false, confirm: true }) });
+        _renderRegReport(rep);
+        showToast(`Import : ${rep.created_patients} patient(s) créé(s)`, 'success');
+      } catch (e) { showToast(e.message === 'Forbidden' ? 'Réservé officier/admin' : 'Erreur import', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Suivi TAT — Performance laboratoire
+    // ══════════════════════════════════════════════════════════════════════
+    const _tatStatusBadge = (s) => ({
+      green: '<span class="pill ok">Dans les délais</span>',
+      orange: '<span class="pill" style="background:var(--amber);color:#fff;">Retard modéré</span>',
+      red: '<span class="pill bad">Retard important</span>',
+      unknown: '<span class="pill" style="background:var(--muted);color:#fff;">N/A</span>',
+    }[s] || s);
+
+    function _fmtTat(min) {
+      if (min === null || min === undefined) return '—';
+      if (min < 60) return `${min} min`;
+      const h = Math.floor(min / 60), m = Math.round(min % 60);
+      return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+    }
+
+    async function loadTat() {
+      const days = $('tatDays')?.value || '30';
+      try {
+        const [dash, targets, alerts] = await Promise.all([
+          api(`/api/v1/tat/dashboard?days=${days}`, { headers: headers(false) }),
+          api('/api/v1/tat/targets', { headers: headers(false) }),
+          api(`/api/v1/tat/alerts?days=${Math.min(Number(days), 90)}`, { headers: headers(false) }).catch(() => []),
+        ]);
+        $('tatMeasured').textContent = dash.total_measured;
+        $('tatOnTime').textContent = dash.on_time_pct + '%';
+        $('tatLate').textContent = dash.late_count;
+        $('tatAlerts').textContent = alerts.length;
+        const otp = $('tatOnTimePanel');
+        if (otp) { otp.classList.remove('metric-teal', 'metric-amber', 'metric-rose'); otp.classList.add(dash.on_time_pct >= 90 ? 'metric-teal' : dash.on_time_pct >= 75 ? 'metric-amber' : 'metric-rose'); }
+        const lp = $('tatLatePanel');
+        if (lp) { lp.classList.remove('metric-teal', 'metric-rose'); lp.classList.add(dash.late_count > 0 ? 'metric-rose' : 'metric-teal'); }
+
+        setRows('tatTargetsTable', targets.map(t => row(
+          `<td><strong>${security.escapeHtml(t.exam_code)}</strong></td>` +
+          `<td>${security.escapeHtml(t.label)}</td>` +
+          `<td>${_fmtTat(t.target_minutes)}</td>` +
+          `<td>${_fmtTat(Math.round(t.target_minutes * t.warn_factor))}</td>` +
+          `<td><button class="ghost" style="color:var(--rose);font-size:11px;" onclick="deleteTatTarget(${t.id},this)">Supprimer</button></td>`
+        )));
+
+        setRows('tatAlertsTable', alerts.map(a => {
+          const tr = row(
+            `<td>#${a.result_id}</td>` +
+            `<td>${security.escapeHtml(a.exam_code || '—')}</td>` +
+            `<td>${_fmtTat(a.total_minutes)}</td>` +
+            `<td>${_fmtTat(a.target_minutes)}</td>` +
+            `<td>${_tatStatusBadge(a.status)}</td>`
+          );
+          tr.classList.add(a.status === 'red' ? 'row-critical' : 'row-warning');
+          return tr;
+        }));
+
+        setRows('tatByExamTable', dash.by_exam.map(e => row(
+          `<td><strong>${security.escapeHtml(e.label || e.exam_code)}</strong></td>` +
+          `<td>${e.count}</td>` +
+          `<td>${_fmtTat(e.mean_min)}</td>` +
+          `<td>${_fmtTat(e.max_min)}</td>` +
+          `<td>${e.on_time_pct === null || e.on_time_pct === undefined ? '—' : e.on_time_pct + '%'}</td>` +
+          `<td>${e.late_count}</td>`
+        )));
+        setRows('tatByTechTable', dash.by_technician.map(t => row(
+          `<td>${security.escapeHtml(t.technician)}</td><td>${t.count}</td><td>${_fmtTat(t.mean_min)}</td><td>${_fmtTat(t.max_min)}</td>`
+        )));
+        setRows('tatByAutoTable', dash.by_automate.map(t => row(
+          `<td>${security.escapeHtml(t.automate)}</td><td>${t.count}</td><td>${_fmtTat(t.mean_min)}</td><td>${_fmtTat(t.max_min)}</td>`
+        )));
+        _renderTatByDayChart(dash.by_day);
+      } catch (e) { showToast('Erreur chargement TAT', 'error'); log('loadTat: ' + (e.message || e)); }
+    }
+
+    function _renderTatByDayChart(days) {
+      const div = $('tatByDayChart');
+      if (!div) return;
+      if (!days || !days.length) { div.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0;">Aucune donnée.</p>'; return; }
+      const maxV = Math.max(...days.map(d => d.mean_min), 1);
+      const W = 460, H = 160, padTop = 16, padBot = 28, padL = 4;
+      const chartW = W - padL * 2, chartH = H - padTop - padBot;
+      const bw = Math.max(4, Math.floor(chartW / days.length) - 4);
+      let bars = '';
+      days.forEach((d, i) => {
+        const x = padL + i * (chartW / days.length) + 2;
+        const bh = Math.max(2, Math.round((d.mean_min / maxV) * chartH));
+        const y = padTop + chartH - bh;
+        bars += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="#2563eb" opacity="0.78"><title>${d.day}: ${d.mean_min} min</title></rect>` +
+          `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="8" fill="var(--muted)">${d.day.slice(5)}</text>`;
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
+    }
+
+    async function createTatTarget(btn) {
+      const exam_code = ($('tatTgtCode')?.value || '').trim().toUpperCase();
+      const label = ($('tatTgtLabel')?.value || '').trim();
+      const target_minutes = Number($('tatTgtMinutes')?.value);
+      if (!exam_code || !label || !(target_minutes > 0)) { showToast('Champs incomplets', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        await api('/api/v1/tat/targets', { method: 'POST', headers: headers(), body: JSON.stringify({ exam_code, label, target_minutes }) });
+        showToast('Cible TAT enregistrée', 'success');
+        ['tatTgtCode', 'tatTgtLabel', 'tatTgtMinutes'].forEach(id => { if ($(id)) $(id).value = ''; });
+        loadTat();
+      } catch (e) { showToast(e.message === 'Conflict' ? 'Cible déjà définie' : 'Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function deleteTatTarget(id, btn) {
+      setLoading(btn, true);
+      try { await api(`/api/v1/tat/targets/${id}`, { method: 'DELETE', headers: headers() }); showToast('Cible supprimée', 'success'); loadTat(); }
+      catch (e) { showToast('Erreur suppression', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function seedTatDefaults(btn) {
+      setLoading(btn, true);
+      try {
+        const res = await api('/api/v1/tat/targets/seed-defaults', { method: 'POST', headers: headers() });
+        showToast(`${res.created} cible(s) standard ajoutée(s)`, 'success');
+        loadTat();
+      } catch (e) { showToast('Erreur (officier requis ?)', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Module qualité — NC / CAPA
+    // ══════════════════════════════════════════════════════════════════════
+    const _ncSeverityBadge = (s) => ({
+      minor: '<span class="pill">Mineure</span>',
+      major: '<span class="pill" style="background:var(--amber);color:#fff;">Majeure</span>',
+      critical: '<span class="pill bad">Critique</span>',
+    }[s] || s);
+    const _ncStatusLabel = { open: 'Ouverte', analysis: 'Analyse', action: 'Action', verification: 'Vérification', closed: 'Clôturée' };
+    const _ncNextStatuses = {
+      open: ['analysis', 'closed'], analysis: ['action', 'open', 'closed'],
+      action: ['verification', 'analysis', 'closed'], verification: ['closed', 'action'], closed: [],
+    };
+
+    async function loadQuality() {
+      try {
+        const [dash, list] = await Promise.all([
+          api('/api/v1/quality/dashboard', { headers: headers(false) }),
+          api(`/api/v1/quality/non-conformities${$('ncFilterStatus')?.value ? '?status=' + $('ncFilterStatus').value : ''}`, { headers: headers(false) }),
+        ]);
+        $('qmTotal').textContent = dash.total;
+        $('qmOpen').textContent = dash.open_count;
+        $('qmOverdue').textContent = dash.overdue_count;
+        $('qmCritical').textContent = dash.by_severity.critical || 0;
+        const op = $('qmOverduePanel');
+        if (op) { op.classList.remove('metric-rose', 'metric-teal'); op.classList.add(dash.overdue_count > 0 ? 'metric-rose' : 'metric-teal'); }
+        setRows('ncTable', list.map(nc => {
+          const due = nc.due_date ? new Date(nc.due_date).toLocaleDateString('fr-FR') : '—';
+          const tr = row(
+            `<td>${nc.id}</td>` +
+            `<td>${security.escapeHtml(nc.title)}</td>` +
+            `<td>${_ncSeverityBadge(nc.severity)}</td>` +
+            `<td><span class="pill">${_ncStatusLabel[nc.status] || nc.status}</span></td>` +
+            `<td>${due}</td>` +
+            `<td><button class="ghost" onclick="openNcDetail(${nc.id})">Ouvrir</button></td>`
+          );
+          if (nc.severity === 'critical' && nc.status !== 'closed') tr.classList.add('row-critical');
+          return tr;
+        }));
+      } catch (e) { showToast('Erreur chargement qualité', 'error'); log('loadQuality: ' + (e.message || e)); }
+    }
+
+    async function createNonConformity(btn) {
+      const title = ($('ncTitle')?.value || '').trim();
+      if (title.length < 3) { showToast('Titre trop court', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        const body = {
+          title, description: $('ncDesc').value || null,
+          source: $('ncSource').value, severity: $('ncSeverity').value,
+        };
+        if ($('ncDue').value) body.due_date = $('ncDue').value + 'T00:00:00';
+        await api('/api/v1/quality/non-conformities', { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+        showToast('Non-conformité déclarée', 'success');
+        ['ncTitle', 'ncDesc', 'ncDue'].forEach(id => { if ($(id)) $(id).value = ''; });
+        loadQuality();
+      } catch (e) { showToast('Erreur déclaration NC', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function openNcDetail(ncId) {
+      try {
+        const nc = await api(`/api/v1/quality/non-conformities/${ncId}`, { headers: headers(false) });
+        const transitions = (_ncNextStatuses[nc.status] || []).map(s =>
+          `<button class="ghost" style="font-size:12px;" onclick="transitionNc(${nc.id},'${s}')">→ ${_ncStatusLabel[s]}</button>`
+        ).join(' ');
+        const actions = (nc.actions || []).map(a =>
+          `<li>[${a.action_type === 'preventive' ? 'préventive' : 'corrective'}] ${security.escapeHtml(a.description)} — <strong>${a.status}</strong>` +
+          (a.status !== 'done' ? ` <button class="ghost" style="font-size:11px;" onclick="completeAction(${a.id})">✓ Terminer</button>` : ' ✓') + `</li>`
+        ).join('') || '<li style="color:var(--muted);">Aucune action.</li>';
+        $('ncDetail').style.display = '';
+        $('ncDetail').innerHTML =
+          `<div style="display:flex;justify-content:space-between;align-items:center;">` +
+            `<h3 style="margin:0;">NC #${nc.id} — ${security.escapeHtml(nc.title)}</h3>` +
+            `<button class="ghost" onclick="$('ncDetail').style.display='none'">✕</button></div>` +
+          `<p>${_ncSeverityBadge(nc.severity)} · Statut : <strong>${_ncStatusLabel[nc.status]}</strong> · Source : ${nc.source}</p>` +
+          (nc.description ? `<p>${security.escapeHtml(nc.description)}</p>` : '') +
+          (nc.root_cause ? `<p><strong>Cause racine :</strong> ${security.escapeHtml(nc.root_cause)}</p>` : '') +
+          `<div style="margin:8px 0;"><strong>Transitions :</strong> ${transitions || '<em>terminal</em>'}</div>` +
+          `<div style="margin:8px 0;"><strong>Actions correctives/préventives :</strong><ul>${actions}</ul></div>` +
+          `<div class="form" style="max-width:480px;"><div><label>Nouvelle action</label><input id="ncActionDesc" placeholder="Description de l'action" /></div>` +
+          `<div class="grid2"><div><label>Type</label><select id="ncActionType"><option value="corrective">Corrective</option><option value="preventive">Préventive</option></select></div>` +
+          `<div style="display:flex;align-items:flex-end;"><button onclick="addNcAction(${nc.id},this)">Ajouter action</button></div></div></div>`;
+        $('ncDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (e) { showToast('Erreur chargement NC', 'error'); }
+    }
+
+    async function transitionNc(ncId, target) {
+      let root_cause = null;
+      if (target === 'analysis' || target === 'closed') {
+        root_cause = prompt('Cause racine / commentaire (optionnel) :') || null;
+      }
+      try {
+        await api(`/api/v1/quality/non-conformities/${ncId}/transition`, {
+          method: 'POST', headers: headers(), body: JSON.stringify({ status: target, root_cause }),
+        });
+        showToast('Statut mis à jour', 'success');
+        await openNcDetail(ncId); loadQuality();
+      } catch (e) { showToast(e.message || 'Transition refusée', 'error'); }
+    }
+
+    async function addNcAction(ncId, btn) {
+      const desc = ($('ncActionDesc')?.value || '').trim();
+      if (desc.length < 3) { showToast('Description trop courte', 'error'); return; }
+      setLoading(btn, true);
+      try {
+        await api(`/api/v1/quality/non-conformities/${ncId}/actions`, {
+          method: 'POST', headers: headers(),
+          body: JSON.stringify({ description: desc, action_type: $('ncActionType').value }),
+        });
+        showToast('Action ajoutée', 'success');
+        await openNcDetail(ncId);
+      } catch (e) { showToast('Erreur ajout action', 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function completeAction(actionId) {
+      try {
+        await api(`/api/v1/quality/actions/${actionId}`, {
+          method: 'PATCH', headers: headers(),
+          body: JSON.stringify({ status: 'done', effectiveness_checked: true }),
+        });
+        showToast('Action terminée', 'success');
+        loadQuality();
+        const open = $('ncDetail'); if (open && open.style.display !== 'none') {
+          const m = open.innerHTML.match(/NC #(\d+)/); if (m) openNcDetail(Number(m[1]));
+        }
+      } catch (e) { showToast('Erreur', 'error'); }
+    }
+
+    function _renderTatChart(tatData) {
+      const div = $('tatChartDiv');
+      if (!div) return;
+      if (!tatData.length) {
+        div.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0;">Aucune donnée TAT sur la période</p>';
+        return;
+      }
+      const maxTat = Math.max(...tatData.map(d => d.mean_h), 1);
+      const barH = 26;
+      const gap = 7;
+      const labelW = 130;
+      const totalW = 480;
+      const barAreaW = totalW - labelW - 40;
+      const svgH = tatData.length * (barH + gap) + 16;
+      let bars = '';
+      tatData.forEach((d, i) => {
+        const y = i * (barH + gap) + 8;
+        const bw = Math.max(2, Math.round((d.mean_h / maxTat) * barAreaW));
+        const color = d.mean_h > 48 ? '#be123c' : d.mean_h > 24 ? '#b45309' : '#0f766e';
+        bars +=
+          `<text x="${labelW - 8}" y="${y + barH / 2 + 4}" text-anchor="end" font-size="11" fill="currentColor"` +
+          ` style="font-family:var(--font);">${security.escapeHtml(d.equipment)}</text>` +
+          `<rect x="${labelW}" y="${y}" width="${bw}" height="${barH}" rx="4" fill="${color}" opacity="0.82"/>` +
+          `<text x="${labelW + bw + 6}" y="${y + barH / 2 + 4}" font-size="11" fill="currentColor"` +
+          ` style="font-family:var(--font);">${d.mean_h}h <tspan fill="var(--muted)" font-size="10">(n=${d.count})</tspan></text>`;
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${totalW} ${svgH}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
+    }
+
+    function _renderWeeklyChart(weeks) {
+      const div = $('weeklyChartDiv');
+      if (!div) return;
+      if (!weeks.length) {
+        div.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px 0;">Aucune donnée hebdomadaire</p>';
+        return;
+      }
+      const maxV = Math.max(...weeks.map(w => w.count), 1);
+      const W = 460; const H = 150;
+      const padL = 4; const padR = 4; const padTop = 16; const padBot = 24;
+      const chartW = W - padL - padR;
+      const chartH = H - padTop - padBot;
+      const bw = Math.floor(chartW / weeks.length) - 4;
+      let bars = '';
+      weeks.forEach((w, i) => {
+        const x = padL + i * (chartW / weeks.length) + 2;
+        const bh = Math.max(2, Math.round((w.count / maxV) * chartH));
+        const y = padTop + chartH - bh;
+        const color = '#2563eb';
+        bars +=
+          `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="${color}" opacity="0.76"/>` +
+          `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="9" fill="var(--muted)"` +
+          ` style="font-family:var(--font);">${security.escapeHtml(w.label)}</text>` +
+          (w.count > 0 ? `<text x="${x + bw / 2}" y="${y - 3}" text-anchor="middle" font-size="9" fill="currentColor">${w.count}</text>` : '');
+      });
+      div.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="overflow:visible;display:block;">${bars}</svg>`;
     }
 
     // ── Password toggle ────────────────────────────────────────────────────────

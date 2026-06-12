@@ -128,7 +128,9 @@ class ONMCIClient:
         Retourne None si erreur réseau (pour déclencher le fallback HMAC local).
         Retourne un ONMCIVerificationResult si l'API répond (valide ou non).
         """
-        assert self.api_url is not None  # garanti par l'appelant
+        if self.api_url is None:
+            return None
+
         params = urllib.parse.urlencode({"token": token, "prescriber": prescriber_id})
         url = f"{self.api_url.rstrip('/')}/verify?{params}"
 

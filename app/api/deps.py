@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import User, UserRole
+from app.services.token_revocation import is_access_token_revoked
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_PREFIX}/login/access-token",
@@ -42,6 +43,10 @@ def get_current_user(
             raise credentials_exception
     except InvalidTokenError as exc:
         raise credentials_exception from exc
+
+    # Denylist : jeton d'accès révoqué (déconnexion, compromission) → refus
+    if is_access_token_revoked(payload.get("jti"), db):
+        raise credentials_exception
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
