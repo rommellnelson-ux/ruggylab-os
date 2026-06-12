@@ -106,7 +106,7 @@ def compute_tat_dashboard(db: Session, days: int = 30) -> dict:
 
     for r in results:
         total = _minutes_between(r.registered_at, r.bio_validated_at)
-        if total is None:
+        if total is None or r.bio_validated_at is None:
             continue
         measured += 1
         target = targets.get(r.exam_code) if r.exam_code else None

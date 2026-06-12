@@ -16,7 +16,7 @@ from app.services.registre_parser import parse_exam_cell
 _DATE_FORMATS = ("%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y", "%Y-%m-%d")
 
 
-def _parse_date(value) -> dt.date | None:
+def _parse_date(value: object) -> dt.date | None:
     if isinstance(value, (dt.date, dt.datetime)):
         return value.date() if isinstance(value, dt.datetime) else value
     if not value or not isinstance(value, str):

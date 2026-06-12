@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Callable
+from typing import Any
 
 from app.services.notification_bus import inject_remote_event, set_redis_publisher
 
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 NOTIF_CHANNEL = "ruggylab:notifications"
 
 
-def make_redis_publisher(loop: asyncio.AbstractEventLoop, client) -> callable:
+def make_redis_publisher(loop: asyncio.AbstractEventLoop, client: Any) -> Callable[[dict], None]:
     """Construit une fonction sync qui publie un événement sur Redis.
 
     Sûre à appeler depuis un thread de requête : planifie la coroutine de
@@ -41,7 +43,7 @@ def make_redis_publisher(loop: asyncio.AbstractEventLoop, client) -> callable:
     return _publish
 
 
-async def redis_subscriber_loop(client) -> None:
+async def redis_subscriber_loop(client: Any) -> None:
     """Boucle d'abonnement : réinjecte localement les événements distants.
 
     Conçue pour tourner comme tâche de fond dans le lifespan FastAPI.
@@ -68,7 +70,7 @@ async def redis_subscriber_loop(client) -> None:
             await pubsub.unsubscribe(NOTIF_CHANNEL)
 
 
-def enable_redis_fanout(loop: asyncio.AbstractEventLoop, client) -> None:
+def enable_redis_fanout(loop: asyncio.AbstractEventLoop, client: Any) -> None:
     """Active le publisher Redis sur le bus de notifications."""
     set_redis_publisher(make_redis_publisher(loop, client))
 

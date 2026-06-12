@@ -33,6 +33,8 @@ def get_expiring_reagents(db: Session, days: int = 30) -> list[dict]:
     today = dt.date.today()
     result = []
     for r in reagents:
+        if r.expiry_date is None:  # garanti par le filtre, mais explicite pour le typage
+            continue
         days_remaining = (r.expiry_date - today).days
         result.append(
             {
@@ -74,11 +76,12 @@ def check_and_notify_expiry(db: Session, days: int = 30) -> dict:
         }
     ).encode()
     for cfg in configs:
+        url = cfg.webhook_url
         # Garde anti-SSRF : refuse loopback, IP privées, métadonnées cloud, etc.
-        if not is_safe_external_url(cfg.webhook_url):
+        if not url or not is_safe_external_url(url):
             continue
         req = urllib.request.Request(  # noqa: S310
-            cfg.webhook_url,
+            url,
             data=payload_bytes,
             headers={"Content-Type": "application/json"},
             method="POST",

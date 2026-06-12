@@ -1,6 +1,7 @@
 import csv
 import datetime as dt
 from io import StringIO
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/audit-events")
 
 
 def _apply_filters(
-    query,
+    query: Any,
     *,
     event_type: str | None,
     entity_type: str | None,
@@ -25,7 +26,7 @@ def _apply_filters(
     date_from: dt.date | None,
     date_to: dt.date | None,
     db: Session,
-):
+) -> Any:
     """Applique les filtres optionnels communs (liste + export)."""
     if event_type:
         query = query.filter(AuditEvent.event_type == event_type)

@@ -63,4 +63,4 @@ def is_safe_external_url(url: str | None) -> bool:
         return False
     if not infos:
         return False
-    return all(_ip_is_safe(info[4][0]) for info in infos)
+    return all(_ip_is_safe(str(info[4][0])) for info in infos)

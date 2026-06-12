@@ -11,6 +11,8 @@ L'accès hors périmètre est refusé (403) et journalisé par l'appelant.
 
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import or_
 
 from app.models import Patient, User, UserRole
@@ -29,7 +31,7 @@ def can_access_patient(user: User, patient: Patient) -> bool:
     return patient.unit is None or patient.unit == user.unit
 
 
-def apply_patient_scope(query, user: User):
+def apply_patient_scope(query: Any, user: User) -> Any:
     """Restreint une requête ``Patient`` au périmètre autorisé pour ``user``."""
     if _is_unrestricted(user):
         return query

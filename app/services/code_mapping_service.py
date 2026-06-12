@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
-from app.models import BiologicalCodeMapping, BiologicalReferenceRange
+from app.models import BiologicalCodeMapping, BiologicalReferenceRange, Result
 from app.services.bioref_service import (
     find_reference,
     format_reference_range,
@@ -23,7 +23,7 @@ from app.services.code_mapping_data import CODE_MAPPING_SEED
 # ── Résolveurs ──────────────────────────────────────────────────────────────
 
 
-def _active(db: Session):
+def _active(db: Session) -> Query[BiologicalCodeMapping]:
     return db.query(BiologicalCodeMapping).filter(BiologicalCodeMapping.is_active.is_(True))
 
 
@@ -90,7 +90,9 @@ def get_canonical_code(
     return None
 
 
-def _find_bioref(db: Session, test_code: str | None, sex, age) -> BiologicalReferenceRange | None:
+def _find_bioref(
+    db: Session, test_code: str | None, sex: str | None, age: float | None
+) -> BiologicalReferenceRange | None:
     """Trouve la valeur de référence, avec pont sexe (URIC→URIC_H/F, RBC→RBC_H/F)."""
     if not test_code:
         return None
@@ -132,7 +134,7 @@ def get_bioref_code_for_result(
 # ── Extraction de valeur + interprétation ───────────────────────────────────
 
 
-def _to_number(raw) -> float | None:
+def _to_number(raw: object) -> float | None:
     if isinstance(raw, bool):
         return None
     if isinstance(raw, (int, float)):
@@ -156,7 +158,7 @@ def _find_value(data_points: dict, keys: list[str | None]) -> float | None:
     return None
 
 
-def _patient_context(result) -> tuple[str | None, float | None]:
+def _patient_context(result: Result) -> tuple[str | None, float | None]:
     patient = result.sample.patient if result.sample else None
     if not patient:
         return None, None
@@ -172,7 +174,13 @@ def _patient_context(result) -> tuple[str | None, float | None]:
     return sex, age
 
 
-def _interpret_one(db, test_code, value, sex, age) -> dict | None:
+def _interpret_one(
+    db: Session,
+    test_code: str | None,
+    value: float | None,
+    sex: str | None,
+    age: float | None,
+) -> dict | None:
     ref = _find_bioref(db, test_code, sex, age)
     if ref is None:
         return None
@@ -187,7 +195,7 @@ def _interpret_one(db, test_code, value, sex, age) -> dict | None:
     }
 
 
-def interpret_result_bioref(db: Session, result) -> dict | None:
+def interpret_result_bioref(db: Session, result: Result) -> dict | None:
     """Interprétation bioref complémentaire d'un résultat.
 
     - Panel : interprétation composant par composant (Hb, Ht, WBC, … / Na, K, …).
@@ -233,7 +241,7 @@ def interpret_result_bioref(db: Session, result) -> dict | None:
     }
 
 
-def apply_bioref_to_result(db: Session, result) -> bool:
+def apply_bioref_to_result(db: Session, result: Result) -> bool:
     """Renseigne les colonnes bioref_* du résultat (test simple uniquement).
 
     Pour un panel, les colonnes plates restent nulles (le détail par composant

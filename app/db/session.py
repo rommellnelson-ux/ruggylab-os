@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from typing import Any
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -13,7 +14,7 @@ def _create_engine(database_url: str) -> Engine:
     if database_url.startswith("sqlite"):
 
         @event.listens_for(engine, "connect")
-        def _set_sqlite_pragmas(dbapi_conn, _rec):  # noqa: ANN001
+        def _set_sqlite_pragmas(dbapi_conn: Any, _rec: Any) -> None:
             dbapi_conn.execute("PRAGMA journal_mode=WAL")
             dbapi_conn.execute("PRAGMA synchronous=NORMAL")
 

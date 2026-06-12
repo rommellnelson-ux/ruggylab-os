@@ -71,12 +71,12 @@ def compute_flags(
         value = _extract_numeric(raw)
         if value is None:
             continue
-        rr = range_map.get(key.upper())
-        if rr is None:
+        ref = range_map.get(key.upper())
+        if ref is None:
             continue
 
-        lo = rr.low_normal
-        hi = rr.high_normal
+        lo = ref.low_normal
+        hi = ref.high_normal
 
         if lo is not None and value < lo * _LL_FACTOR:
             flags[key.upper()] = "LL"

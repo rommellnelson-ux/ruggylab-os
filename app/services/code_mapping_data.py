@@ -9,17 +9,17 @@ from __future__ import annotations
 
 
 def _m(
-    canonical,
-    exam=None,
-    test=None,
-    analyte=None,
-    component_of=None,
-    label=None,
-    category=None,
-    specimen=None,
-    unit=None,
-    is_panel=False,
-    priority=100,
+    canonical: str,
+    exam: str | None = None,
+    test: str | None = None,
+    analyte: str | None = None,
+    component_of: str | None = None,
+    label: str | None = None,
+    category: str | None = None,
+    specimen: str | None = None,
+    unit: str | None = None,
+    is_panel: bool = False,
+    priority: int = 100,
 ) -> dict:
     return {
         "canonical_code": canonical,

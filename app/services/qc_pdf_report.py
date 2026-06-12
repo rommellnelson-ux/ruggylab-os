@@ -114,9 +114,9 @@ def _lj_svg(values: list[float], mean: float, sd: float, dates: list[str]) -> st
         parts.append(f'<polyline points="{pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/>')
 
     # Data points
-    for i, (z, v) in enumerate(zip(z_scores, values, strict=True)):
-        col = "#dc2626" if abs(z) > 3 else "#ea580c" if abs(z) > 2 else "#2563eb"
-        x, y = px(i), py(z)
+    for i, (zscore, v) in enumerate(zip(z_scores, values, strict=True)):
+        col = "#dc2626" if abs(zscore) > 3 else "#ea580c" if abs(zscore) > 2 else "#2563eb"
+        x, y = px(i), py(zscore)
         tooltip = f"{dates[i]}: {v:.3f}"
         parts.append(
             f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" fill="{col}" '

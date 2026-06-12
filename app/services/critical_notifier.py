@@ -36,7 +36,7 @@ def _send_webhook(url: str, payload: dict) -> bool:
     )
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310  # nosec B310
-            return resp.status < 400
+            return bool(resp.status < 400)
     except Exception:  # noqa: BLE001
         return False
 
