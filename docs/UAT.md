@@ -19,9 +19,20 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 Cockpit : http://127.0.0.1:8000/app · Doc API : http://127.0.0.1:8000/docs
 
-## 2. Amorcer les référentiels (compte admin)
+## 2. Amorcer les référentiels + jeu de démonstration (recommandé)
 
-Se connecter (`admin` / mot de passe ci-dessus), récupérer le jeton, puis :
+Le plus simple — un seul script charge les référentiels **et** un jeu de données
+fictif (12 dossiers importés depuis un registre synthétique + 4 résultats riches
+avec valeurs critiques, paludisme positif et horodatages TAT) :
+
+```bash
+python -m scripts.seed_demo
+```
+
+Résultat attendu : ~16 patients, ~33 résultats, 65 valeurs de référence, 23 cibles
+TAT, 31 correspondances de codes — les testeurs ont de la matière dès la connexion.
+
+Alternative manuelle (référentiels seuls, sans données patient), via l'API admin :
 
 | Référentiel | Endpoint |
 |---|---|
