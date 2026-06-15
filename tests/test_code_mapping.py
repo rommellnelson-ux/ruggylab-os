@@ -173,9 +173,23 @@ class TestResultBiorefInterpretation:
         hdrs = _auth(client)
         _seed_all(client, hdrs)
         r = _make_result(client, hdrs, exam_code="GE", data={"WBC": 5.0})
-        # GE (qualitatif) → MAL_GE → texte normal "Négatif"
+        # GE sans valeur qualitative → MAL_GE → texte normal "Négatif"
         assert r["bioref_status"] == "Négatif"
         assert r["bioref_source"]
+
+    def test_ge_positive_qualitative(self, client):
+        hdrs = _auth(client)
+        _seed_all(client, hdrs)
+        # Goutte épaisse positive → statut anormal (normal = Négatif)
+        r = _make_result(client, hdrs, exam_code="GE", data={"MAL_GE": "positive"})
+        assert r["bioref_status"] == "POSITIF (anormal)"
+        assert "paludisme" in (r["bioref_comment"] or "").lower()
+
+    def test_ge_negative_qualitative(self, client):
+        hdrs = _auth(client)
+        _seed_all(client, hdrs)
+        r = _make_result(client, hdrs, exam_code="GE", data={"MAL_GE": "négative"})
+        assert r["bioref_status"] == "NÉGATIF"
 
     def test_glyc_numeric_critique(self, client):
         hdrs = _auth(client)

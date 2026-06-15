@@ -158,6 +158,42 @@ def _find_value(data_points: dict, keys: list[str | None]) -> float | None:
     return None
 
 
+def _qual_token(raw: object) -> str | None:
+    """Détecte un résultat qualitatif positif/négatif depuis une chaîne."""
+    if isinstance(raw, dict):
+        raw = raw.get("value")
+    if not isinstance(raw, str):
+        return None
+    low = raw.strip().lower()
+    if not low:
+        return None
+    if "posit" in low or low in ("+", "++", "+++", "réactif", "reactif"):
+        return "positive"
+    if "négat" in low or "negat" in low or low in ("-", "absent", "nég", "neg"):
+        return "negative"
+    return None
+
+
+def _find_qualitative(data_points: dict, keys: list[str | None]) -> str | None:
+    for k in keys:
+        if k and k in data_points:
+            tok = _qual_token(data_points[k])
+            if tok is not None:
+                return tok
+    return None
+
+
+def _qualitative_status(qual: str, ref: BiologicalReferenceRange) -> str:
+    """Statut d'un test qualitatif vs son texte normal (souvent « Négatif »)."""
+    normal_is_negative = (
+        "égati" in (ref.normal_text or "").lower() or "egati" in (ref.normal_text or "").lower()
+    )
+    if qual == "positive":
+        return "POSITIF (anormal)" if normal_is_negative else "POSITIF"
+    # négatif
+    return "NÉGATIF" if normal_is_negative else "NÉGATIF (anormal)"
+
+
 def _patient_context(result: Result) -> tuple[str | None, float | None]:
     patient = result.sample.patient if result.sample else None
     if not patient:
@@ -180,11 +216,17 @@ def _interpret_one(
     value: float | None,
     sex: str | None,
     age: float | None,
+    qualitative: str | None = None,
 ) -> dict | None:
     ref = _find_bioref(db, test_code, sex, age)
     if ref is None:
         return None
-    flag = interpret_value(value, ref)
+    # Valeur numérique → bornes ; sinon résultat qualitatif positif/négatif ;
+    # sinon repli sur le texte normal de la référence.
+    if value is None and qualitative is not None:
+        flag = _qualitative_status(qualitative, ref)
+    else:
+        flag = interpret_value(value, ref)
     return {
         "test_code": ref.test_code,
         "value": value,
@@ -213,10 +255,12 @@ def interpret_result_bioref(db: Session, result: Result) -> dict | None:
     if mapping.is_panel:
         components: list[dict] = []
         for comp in get_components(db, mapping.canonical_code):
-            value = _find_value(dp, [comp.analyte_code, comp.test_code, comp.canonical_code])
-            if value is None:
+            comp_keys = [comp.analyte_code, comp.test_code, comp.canonical_code]
+            value = _find_value(dp, comp_keys)
+            qual = _find_qualitative(dp, comp_keys) if value is None else None
+            if value is None and qual is None:
                 continue
-            interp = _interpret_one(db, comp.test_code, value, sex, age)
+            interp = _interpret_one(db, comp.test_code, value, sex, age, qual)
             if interp:
                 interp["component"] = comp.label or comp.canonical_code
                 interp["canonical_code"] = comp.canonical_code
@@ -228,11 +272,16 @@ def interpret_result_bioref(db: Session, result: Result) -> dict | None:
             "primary": None,
         }
 
-    # Test simple : valeur numérique si présente, sinon qualitatif (None)
-    value = _find_value(
-        dp, [mapping.analyte_code, mapping.exam_code, mapping.test_code, mapping.canonical_code]
-    )
-    interp = _interpret_one(db, mapping.test_code, value, sex, age)
+    # Test simple : valeur numérique si présente, sinon résultat qualitatif
+    simple_keys = [
+        mapping.analyte_code,
+        mapping.exam_code,
+        mapping.test_code,
+        mapping.canonical_code,
+    ]
+    value = _find_value(dp, simple_keys)
+    qual = _find_qualitative(dp, simple_keys) if value is None else None
+    interp = _interpret_one(db, mapping.test_code, value, sex, age, qual)
     return {
         "is_panel": False,
         "canonical_code": mapping.canonical_code,
