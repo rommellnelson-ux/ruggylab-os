@@ -50,6 +50,8 @@ class TestNewViewsPresent:
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
             'data-view="quality"',  # bouton de navigation qualité
+            'class="login-banner"',  # bannière visuelle de connexion
+            "/static/branding/RuggyLab_OS.jpg",  # image de marque login
         ],
     )
     def test_marker_present(self, html: str, marker: str) -> None:
@@ -121,3 +123,17 @@ class TestRealtimeAuthHardening:
 
     def test_logout_revokes_server_side(self, html: str) -> None:
         assert "/api/v1/login/logout" in html
+
+
+class TestKeyboardShortcuts:
+    def test_browser_reserved_shortcuts_are_not_overridden(self, html: str) -> None:
+        assert "'Ctrl+T':" not in html
+        assert "'Ctrl+L':" not in html
+        assert "'Ctrl+R':" not in html
+        assert "'Ctrl+S':" not in html
+        assert "'Ctrl+N':" not in html
+        assert "browserReservedCtrlKeys" in html
+
+    def test_app_shortcuts_use_ctrl_alt_combo(self, html: str) -> None:
+        assert "'Ctrl+Alt+T': () => toggleTheme()" in html
+        assert "<kbd>Ctrl+Alt+T</kbd> - Changer thème" in html

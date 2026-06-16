@@ -337,9 +337,56 @@
       display: grid;
       place-items: center;
       padding: 24px;
+      background: #061426;
     }
-    .login .panel { width: min(420px, 100%); box-shadow: var(--shadow); }
+    .login-shell {
+      width: min(1180px, 100%);
+      min-height: min(720px, calc(100vh - 48px));
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(340px, 420px);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.34);
+      background: rgba(255,255,255,0.96);
+    }
+    .login-banner {
+      position: relative;
+      min-height: 100%;
+      background: #061426;
+      overflow: hidden;
+    }
+    .login-banner img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      object-position: center;
+    }
+    .login-banner::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, rgba(6,20,38,0.08), rgba(6,20,38,0.38));
+      pointer-events: none;
+    }
+    .login-card {
+      width: 100%;
+      display: grid;
+      align-content: center;
+      padding: 34px;
+      background: rgba(255,255,255,0.96);
+    }
+    .login .panel { box-shadow: none; }
     @media (max-width: 980px) {
+      .login-shell {
+        min-height: 0;
+        grid-template-columns: 1fr;
+      }
+      .login-banner {
+        min-height: 230px;
+        max-height: 36vh;
+      }
       .shell { grid-template-columns: 1fr; }
       .side { 
         position: fixed; 
@@ -397,6 +444,9 @@
     }
     
     @media (max-width: 480px) {
+      .login { padding: 12px; }
+      .login-card { padding: 20px; }
+      .login-banner { min-height: 170px; }
       .content { padding: 12px; }
       .panel { padding: 10px; }
       .band { padding: 10px; }
@@ -827,29 +877,34 @@
 <body>
   <div id="toastContainer" class="toast-container"></div>
   <div id="loginView" class="login">
-    <section class="panel" style="width:min(400px,100%);">
-      <div class="login-logo">🧪</div>
-      <h2 class="login-title">RuggyLab OS</h2>
-      <p class="login-sub">Centre de Santé de la Garde Républicaine<br>Connexion sécurisée au cockpit</p>
-      <hr class="login-divider" />
-      <div class="form">
-        <div>
-          <label for="username">Identifiant</label>
-          <input id="username" value="admin" autocomplete="username" required aria-describedby="loginError"
-                 onkeydown="if(event.key==='Enter')$('password').focus()" />
-        </div>
-        <div>
-          <label for="password">Mot de passe</label>
-          <div class="pw-wrap">
-            <input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError"
-                   onkeydown="if(event.key==='Enter')login()" />
-            <button class="pw-toggle" type="button" id="pwToggleBtn" onclick="togglePw()" aria-label="Afficher/masquer le mot de passe">👁</button>
-          </div>
-        </div>
-        <button onclick="login()" style="margin-top:4px;">Connexion</button>
-        <div id="loginError" class="status" role="alert" aria-live="polite" style="text-align:center;color:var(--rose);font-size:13px;min-height:18px;"></div>
+    <div class="login-shell">
+      <div class="login-banner">
+        <img src="/static/branding/RuggyLab_OS.jpg" alt="RuggyLab OS - plateforme de gestion de laboratoire" />
       </div>
-    </section>
+      <section class="login-card">
+        <div class="login-logo">🧪</div>
+        <h2 class="login-title">RuggyLab OS</h2>
+        <p class="login-sub">Centre de Santé de la Garde Républicaine<br>Connexion sécurisée au cockpit</p>
+        <hr class="login-divider" />
+        <div class="form">
+          <div>
+            <label for="username">Identifiant</label>
+            <input id="username" value="admin" autocomplete="username" required aria-describedby="loginError"
+                   onkeydown="if(event.key==='Enter')$('password').focus()" />
+          </div>
+          <div>
+            <label for="password">Mot de passe</label>
+            <div class="pw-wrap">
+              <input id="password" type="password" autocomplete="current-password" required aria-describedby="loginError"
+                     onkeydown="if(event.key==='Enter')login()" />
+              <button class="pw-toggle" type="button" id="pwToggleBtn" onclick="togglePw()" aria-label="Afficher/masquer le mot de passe">👁</button>
+            </div>
+          </div>
+          <button onclick="login()" style="margin-top:4px;">Connexion</button>
+          <div id="loginError" class="status" role="alert" aria-live="polite" style="text-align:center;color:var(--rose);font-size:13px;min-height:18px;"></div>
+        </div>
+      </section>
+    </div>
   </div>
 
   <div id="appView" class="shell hidden">
@@ -2304,26 +2359,27 @@
     
     // Keyboard shortcuts and accessibility improvements
     const keyboard = {
+      browserReservedCtrlKeys: new Set(['l', 'r', 's', 't', 'n', 'w', 'p', 'o', 'f', 'd']),
       shortcuts: {
-        'Ctrl+K': () => {
+        'Ctrl+Alt+K': () => {
           const query = $("patientQuery");
           if (query) {
             query.focus();
             showView('patients');
           }
         },
-        'Ctrl+N': () => {
+        'Ctrl+Alt+N': () => {
           showView('patients');
           setTimeout(() => $("patientIpp")?.focus(), 100);
         },
-        'Ctrl+S': () => {
+        'Ctrl+Alt+S': () => {
           showView('samples');
           setTimeout(() => $("sampleBarcode")?.focus(), 100);
         },
-        'Ctrl+R': () => refreshCurrent(),
-        'Ctrl+D': () => showView('dashboard'),
-        'Ctrl+L': () => logout(),
-        'Ctrl+T': () => toggleTheme(),
+        'Ctrl+Alt+R': () => refreshCurrent(),
+        'Ctrl+Alt+D': () => showView('dashboard'),
+        'Ctrl+Alt+Q': () => logout(),
+        'Ctrl+Alt+T': () => toggleTheme(),
         'Escape': () => {
           document.querySelector('.side.open')?.classList.remove('open');
           document.querySelector('.sidebar-overlay.show')?.classList.remove('show');
@@ -2343,12 +2399,17 @@
             }
             return;
           }
+
+          const browserKey = String(e.key || '').toLowerCase();
+          if ((e.ctrlKey || e.metaKey) && !e.altKey && keyboard.browserReservedCtrlKeys.has(browserKey)) {
+            return;
+          }
           
           const key = [];
           if (e.ctrlKey) key.push('Ctrl');
           if (e.altKey) key.push('Alt');
           if (e.shiftKey) key.push('Shift');
-          key.push(e.key);
+          key.push(e.key.length === 1 ? e.key.toUpperCase() : e.key);
           
           const shortcut = key.join('+');
           if (keyboard.shortcuts[shortcut]) {
@@ -2394,13 +2455,13 @@
         content.innerHTML = `
           <h3>Raccourcis clavier</h3>
           <div style="display: grid; gap: 8px; margin: 16px 0;">
-            <div><kbd>Ctrl+K</kbd> - Recherche patients</div>
-            <div><kbd>Ctrl+N</kbd> - Nouveau patient</div>
-            <div><kbd>Ctrl+S</kbd> - Nouvel échantillon</div>
-            <div><kbd>Ctrl+R</kbd> - Rafraîchir</div>
-            <div><kbd>Ctrl+D</kbd> - Tableau de bord</div>
-            <div><kbd>Ctrl+L</kbd> - Déconnexion</div>
-            <div><kbd>Ctrl+T</kbd> - Changer thème</div>
+            <div><kbd>Ctrl+Alt+K</kbd> - Recherche patients</div>
+            <div><kbd>Ctrl+Alt+N</kbd> - Nouveau patient</div>
+            <div><kbd>Ctrl+Alt+S</kbd> - Nouvel échantillon</div>
+            <div><kbd>Ctrl+Alt+R</kbd> - Rafraîchir</div>
+            <div><kbd>Ctrl+Alt+D</kbd> - Tableau de bord</div>
+            <div><kbd>Ctrl+Alt+Q</kbd> - Déconnexion</div>
+            <div><kbd>Ctrl+Alt+T</kbd> - Changer thème</div>
             <div><kbd>Échap</kbd> - Fermer menu/fenêtre</div>
             <div><kbd>F1</kbd> - Aide</div>
           </div>
