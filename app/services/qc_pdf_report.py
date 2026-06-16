@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import QcControl, QcResult
 from app.schemas.qc import QC_REJECT_RULES
+from app.utils.datetime_utils import utcnow_naive
 
 _MONTH_NAMES = [
     "",
@@ -154,7 +155,7 @@ def _status_badge(status: str) -> str:
 
 def build_qc_html_report(year: int, month: int, db: Session) -> str:
     """Génère un rapport QC HTML imprimable pour le mois donné."""
-    generated_at = dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    generated_at = utcnow_naive().strftime("%Y-%m-%d %H:%M UTC")
     month_name = _MONTH_NAMES[month]
 
     from_date = dt.date(year, month, 1)

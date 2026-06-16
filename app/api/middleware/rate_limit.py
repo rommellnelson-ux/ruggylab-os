@@ -8,6 +8,8 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
+from app.utils.datetime_utils import utcnow_naive
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Basic in-memory rate limiter: 100 requests per user per minute."""
@@ -20,7 +22,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Identify user by token or IP
         user_id = self._get_user_id(request)
-        now = datetime.utcnow()
+        now = utcnow_naive()
         cutoff = now - timedelta(minutes=1)
 
         if user_id not in self._requests:

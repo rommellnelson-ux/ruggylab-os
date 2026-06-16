@@ -26,14 +26,44 @@ const env = Object.fromEntries(
 
 const outDir = path.join(root, "artifacts", "ui-check");
 fs.mkdirSync(outDir, { recursive: true });
+const baseUrl = process.env.UI_CHECK_BASE_URL || "http://127.0.0.1:8000";
 
 async function login(page) {
-  await page.goto("http://127.0.0.1:8010/app", { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/app`, { waitUntil: "domcontentloaded" });
   await page.fill("#username", env.FIRST_SUPERUSER || "admin");
   await page.fill("#password", env.FIRST_SUPERUSER_PASSWORD || "");
   await page.click('button:has-text("Connexion")');
   await page.waitForSelector("#appView:not(.hidden)", { timeout: 15000 });
   await page.waitForTimeout(500);
+}
+
+async function layoutMetrics(page) {
+  return page.evaluate(() => {
+    const side = document.querySelector(".side")?.getBoundingClientRect();
+    const main = document.querySelector(".main")?.getBoundingClientRect();
+    const overlay = document.querySelector(".sidebar-overlay")?.getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      scrollX: window.scrollX,
+      scrollWidth: document.documentElement.scrollWidth,
+      overlayDisplay: getComputedStyle(document.querySelector(".sidebar-overlay")).display,
+      side: side
+        ? { left: Math.round(side.left), right: Math.round(side.right), width: Math.round(side.width) }
+        : null,
+      main: main
+        ? { left: Math.round(main.left), right: Math.round(main.right), width: Math.round(main.width) }
+        : null,
+      overlay: overlay
+        ? { left: Math.round(overlay.left), right: Math.round(overlay.right), width: Math.round(overlay.width) }
+        : null,
+    };
+  });
+}
+
+function assertLayout(condition, message, details) {
+  if (!condition) {
+    throw new Error(`${message}: ${JSON.stringify(details)}`);
+  }
 }
 
 async function visibleOverflow(page) {
@@ -88,14 +118,24 @@ async function visibleOverflow(page) {
   await login(desktop);
   await desktop.screenshot({ path: path.join(outDir, "desktop-dashboard.png"), fullPage: true });
   results.desktopOverflow = await visibleOverflow(desktop);
+  results.desktopLayout = await layoutMetrics(desktop);
+  assertLayout(results.desktopLayout.scrollWidth <= results.desktopLayout.viewportWidth, "Desktop horizontal overflow", results.desktopLayout);
+  assertLayout(results.desktopLayout.overlayDisplay === "none", "Desktop overlay participates in layout", results.desktopLayout);
+  assertLayout(results.desktopLayout.side?.left === 0, "Desktop sidebar is not anchored left", results.desktopLayout);
+  assertLayout(results.desktopLayout.main?.left === results.desktopLayout.side?.right, "Desktop main/sidebar alignment mismatch", results.desktopLayout);
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await login(mobile);
   await mobile.screenshot({ path: path.join(outDir, "mobile-dashboard-closed.png"), fullPage: true });
+  results.mobileClosedLayout = await layoutMetrics(mobile);
+  assertLayout(results.mobileClosedLayout.scrollWidth <= results.mobileClosedLayout.viewportWidth, "Mobile closed horizontal overflow", results.mobileClosedLayout);
+  assertLayout((results.mobileClosedLayout.side?.right || 0) <= 1, "Mobile sidebar should start closed", results.mobileClosedLayout);
   await mobile.click(".sidebar-toggle");
   await mobile.waitForTimeout(300);
   await mobile.screenshot({ path: path.join(outDir, "mobile-dashboard-menu.png"), fullPage: true });
   results.mobileOpenOverflow = await visibleOverflow(mobile);
+  results.mobileOpenLayout = await layoutMetrics(mobile);
+  assertLayout(results.mobileOpenLayout.side?.left === 0, "Mobile sidebar is not anchored left when open", results.mobileOpenLayout);
   await mobile.click('button[data-view="stocks"]');
   await mobile.waitForTimeout(700);
   await mobile.screenshot({ path: path.join(outDir, "mobile-stocks.png"), fullPage: true });

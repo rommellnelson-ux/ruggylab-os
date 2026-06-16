@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models import Result, Sample
 from app.models.ruggylab_os import DeltaCheckRule
 from app.services.critical_checker import _extract_numeric
+from app.utils.datetime_utils import utcnow_naive
 
 
 def _get_previous_results(
@@ -21,7 +22,7 @@ def _get_previous_results(
     db: Session,
 ) -> list[Result]:
     """Retourne les résultats récents pour un patient, du plus récent au plus ancien."""
-    cutoff = dt.datetime.utcnow() - dt.timedelta(days=max_lookback)
+    cutoff = utcnow_naive() - dt.timedelta(days=max_lookback)
     return (
         db.query(Result)
         .join(Sample, Result.sample_id == Sample.id)
@@ -68,7 +69,7 @@ def check_delta(
 
     for analyte in relevant:
         rule = rule_map[analyte]
-        rule_cutoff = dt.datetime.utcnow() - dt.timedelta(days=rule.lookback_days)
+        rule_cutoff = utcnow_naive() - dt.timedelta(days=rule.lookback_days)
 
         # Valeur actuelle
         current_value: float | None = None

@@ -7,6 +7,10 @@ import datetime as dt
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
+def _utcnow_naive() -> dt.datetime:
+    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
+
+
 def _auth(client) -> dict[str, str]:
     token = client.post(
         "/api/v1/login/access-token",
@@ -34,7 +38,7 @@ class TestEquipmentMaintenanceCRUD:
     def test_create_preventive(self, client):
         hdrs = _auth(client)
         eq_id = _create_equipment(client, hdrs)
-        next_due = (dt.datetime.utcnow() + dt.timedelta(days=5)).isoformat()
+        next_due = (_utcnow_naive() + dt.timedelta(days=5)).isoformat()
         r = client.post(
             "/api/v1/equipment-maintenance",
             json={
@@ -166,7 +170,7 @@ class TestDueMaintenances:
     def test_due_within_7_days_appears(self, client):
         hdrs = _auth(client)
         eq_id = _create_equipment(client, hdrs)
-        next_due = (dt.datetime.utcnow() + dt.timedelta(days=3)).isoformat()
+        next_due = (_utcnow_naive() + dt.timedelta(days=3)).isoformat()
         client.post(
             "/api/v1/equipment-maintenance",
             json={
@@ -183,7 +187,7 @@ class TestDueMaintenances:
     def test_far_future_not_in_due(self, client):
         hdrs = _auth(client)
         eq_id = _create_equipment(client, hdrs)
-        far = (dt.datetime.utcnow() + dt.timedelta(days=60)).isoformat()
+        far = (_utcnow_naive() + dt.timedelta(days=60)).isoformat()
         client.post(
             "/api/v1/equipment-maintenance",
             json={
@@ -213,7 +217,7 @@ class TestDueMaintenances:
     def test_completed_not_in_due(self, client):
         hdrs = _auth(client)
         eq_id = _create_equipment(client, hdrs)
-        next_due = (dt.datetime.utcnow() + dt.timedelta(days=1)).isoformat()
+        next_due = (_utcnow_naive() + dt.timedelta(days=1)).isoformat()
         r = client.post(
             "/api/v1/equipment-maintenance",
             json={
@@ -279,7 +283,7 @@ class TestLabStats:
     def test_maintenance_due_counted_in_stats(self, client):
         hdrs = _auth(client)
         eq_id = _create_equipment(client, hdrs)
-        next_due = (dt.datetime.utcnow() + dt.timedelta(days=2)).isoformat()
+        next_due = (_utcnow_naive() + dt.timedelta(days=2)).isoformat()
         client.post(
             "/api/v1/equipment-maintenance",
             json={

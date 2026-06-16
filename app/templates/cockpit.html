@@ -32,8 +32,16 @@
       --shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
     }
     * { box-sizing: border-box; }
+    html {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
     body {
       margin: 0;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
       color: var(--ink);
       font-family: var(--font);
       background: var(--band);
@@ -73,7 +81,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .toast-container {
-      position: fixed; top: 20px; right: 20px;
+      position: fixed; top: 76px; right: 20px;
       z-index: 1000;
       display: flex; flex-direction: column; gap: 8px;
     }
@@ -100,6 +108,7 @@
       z-index: 100; width: 50px; height: 50px;
       border-radius: 50%; font-size: 20px;
     }
+    .sidebar-overlay { display: none; }
     .theme-toggle {
       background: transparent;
       border: 1px solid var(--line);
@@ -126,15 +135,24 @@
     table { width: 100%; min-width: min(520px, 100%); border-collapse: collapse; font-size: 13px; }
     th, td { border-bottom: 1px solid var(--line); padding: 9px 7px; text-align: left; vertical-align: top; }
     th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-    .shell { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0, 1fr); }
+    .shell {
+      width: 100%;
+      max-width: 100vw;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      overflow-x: hidden;
+    }
     .side {
       background: var(--nav);
       color: #e8f0f7;
       padding: 18px 14px;
       position: sticky;
       top: 0;
+      left: 0;
       height: 100vh;
       width: 260px;
+      min-width: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
     }
@@ -153,7 +171,7 @@
       background: rgba(255,255,255,0.10);
       border-color: rgba(255,255,255,0.16);
     }
-    .main { min-width: 0; overflow: hidden; }
+    .main { width: 100%; min-width: 0; overflow: hidden; }
     .topbar {
       display: flex;
       align-items: center;
@@ -199,6 +217,80 @@
     .pill { display: inline-block; padding: 3px 7px; border-radius: 999px; background: #e7effa; color: #1d4ed8; font-size: 12px; }
     .pill.bad { background: #ffe4e6; color: #be123c; }
     .pill.ok { background: #dcfce7; color: #166534; }
+    .priority-board {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .priority-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .priority-header h3 { margin: 0; }
+    .priority-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+      gap: 10px;
+    }
+    .priority-card {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--teal);
+      border-radius: 8px;
+      padding: 12px;
+      background: rgba(255,255,255,0.64);
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+    .priority-card.critical { border-left-color: var(--rose); }
+    .priority-card.warning { border-left-color: var(--amber); }
+    .priority-card.ok { border-left-color: var(--ok); }
+    .priority-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .priority-count {
+      min-width: 28px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      text-align: center;
+      color: #fff;
+      background: var(--teal);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .priority-card.critical .priority-count { background: var(--rose); }
+    .priority-card.warning .priority-count { background: var(--amber); }
+    .priority-copy {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      min-height: 34px;
+    }
+    .priority-action {
+      justify-self: start;
+      min-height: 32px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+    .ops-strip {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .ops-strip button {
+      min-height: 32px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
     .log {
       white-space: pre-wrap;
       overflow: auto;
@@ -251,6 +343,8 @@
       .shell { grid-template-columns: 1fr; }
       .side { 
         position: fixed; 
+        top: 0;
+        left: 0;
         height: 100vh;
         width: min(84vw, 320px);
         z-index: 60;
@@ -325,6 +419,38 @@
         min-width: 0;
         padding: 8px 10px;
         font-size: 13px;
+      }
+      .compact-mobile-table,
+      .compact-mobile-table thead,
+      .compact-mobile-table tbody,
+      .compact-mobile-table tr,
+      .compact-mobile-table th,
+      .compact-mobile-table td {
+        display: block;
+        width: 100%;
+      }
+      .compact-mobile-table thead { display: none; }
+      .compact-mobile-table tr {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 8px;
+        background: rgba(255,255,255,0.56);
+      }
+      .compact-mobile-table td {
+        border-bottom: 0;
+        padding: 5px 0;
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 8px;
+        align-items: start;
+      }
+      .compact-mobile-table td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
       }
     }
     
@@ -807,6 +933,23 @@
             <div class="panel metric" id="mExpiryPanel"><div id="mExpiry" class="value">—</div><div class="label">⚠ Péremptions ≤30j</div></div>
             <div class="panel metric" id="mCompliancePanel"><div id="mCompliance" class="value">—</div><div class="label">Conformité ISO 15189</div></div>
           </div>
+          <div class="panel priority-board" aria-label="Priorités agent">
+            <div class="priority-header">
+              <h3>Priorités agent</h3>
+              <div class="ops-strip" aria-label="Actions rapides">
+                <button class="ghost" onclick="showView('samples')">Scanner échantillon</button>
+                <button class="ghost" onclick="showView('results')">Valider résultats</button>
+                <button class="ghost" onclick="showView('stocks')">Réapprovisionner</button>
+                <button class="ghost" onclick="showView('qc')">Contrôle QC</button>
+              </div>
+            </div>
+            <div id="agentPriorities" class="priority-grid">
+              <div class="priority-card ok">
+                <div class="priority-title">Chargement des priorités <span class="priority-count">—</span></div>
+                <div class="priority-copy">Les alertes opérationnelles apparaîtront ici après synchronisation.</div>
+              </div>
+            </div>
+          </div>
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>Anomalies NFS</h3><table id="markerTable"><thead><tr><th>Marqueur</th><th>Bas</th><th>Normal</th><th>Haut</th><th>Critique</th></tr></thead><tbody></tbody></table></div>
             <div class="panel"><h3>Stocks bas ⚠️</h3><table id="lowStockTable"><thead><tr><th>Réactif</th><th>Stock</th><th>Seuil</th><th>Niveau</th><th></th></tr></thead><tbody></tbody></table></div>
@@ -1202,7 +1345,7 @@
             <div class="panel">
               <h3>Réactifs</h3>
               <div class="toolbar"><button class="ghost" onclick="loadReagents()">↻ Actualiser</button></div>
-              <table id="reagentsTable">
+              <table id="reagentsTable" class="compact-mobile-table">
                 <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Lot</th><th>Péremption</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
                 <tbody></tbody>
               </table>
@@ -2295,6 +2438,11 @@
       document.querySelector(".side").classList.toggle("open");
       document.querySelector(".sidebar-overlay")?.classList.toggle("show");
     }
+    function closeSidebar() {
+      document.querySelector(".side.open")?.classList.remove("open");
+      document.querySelector(".sidebar-overlay.show")?.classList.remove("show");
+      if (window.scrollX !== 0) window.scrollTo(0, window.scrollY);
+    }
     
     // Button loading state
     function setLoading(btn, loading) {
@@ -2371,6 +2519,87 @@
       } else {
         rows.forEach((r) => body.appendChild(r));
       }
+    }
+    function renderAgentPriorities({ epi, stock, qc, perf, expiry, compliance }) {
+      const container = $("agentPriorities");
+      if (!container) return;
+
+      const lowStockCount = stock?.low_stock_reagents?.length || 0;
+      const rejectCount = qc?.reject_count || 0;
+      const warnCount = qc?.warn_count || 0;
+      const maintenanceCount = perf?.maintenance_due_count || 0;
+      const expiryItems = Array.isArray(expiry) ? expiry : [];
+      const expiredCount = expiryItems.filter((item) => item.is_expired).length;
+      const expiryCount = expiryItems.length;
+      const pendingCriticals = compliance?.pending_criticals ?? epi?.critical_results ?? 0;
+
+      const priorities = [
+        {
+          title: "Valeurs critiques",
+          count: pendingCriticals,
+          level: pendingCriticals > 0 ? "critical" : "ok",
+          copy: pendingCriticals > 0
+            ? "Résultats critiques à vérifier et acquitter sans délai."
+            : "Aucune valeur critique en attente connue.",
+          action: "Ouvrir résultats",
+          view: "results",
+        },
+        {
+          title: "Stocks bas",
+          count: lowStockCount,
+          level: lowStockCount > 0 ? "warning" : "ok",
+          copy: lowStockCount > 0
+            ? "Réactifs sous seuil: préparer le réapprovisionnement."
+            : "Aucun réactif sous seuil d'alerte.",
+          action: "Voir stocks",
+          view: "stocks",
+        },
+        {
+          title: "QC analytique",
+          count: rejectCount || warnCount,
+          level: rejectCount > 0 ? "critical" : warnCount > 0 ? "warning" : "ok",
+          copy: rejectCount > 0
+            ? "Contrôle en rejet: bloquer la validation concernée."
+            : warnCount > 0
+              ? "Contrôle en alerte: surveiller la série en cours."
+              : "Contrôles chargés sans rejet actif.",
+          action: "Ouvrir QC",
+          view: "qc",
+        },
+        {
+          title: "Maintenance",
+          count: maintenanceCount,
+          level: maintenanceCount > 0 ? "warning" : "ok",
+          copy: maintenanceCount > 0
+            ? "Échéances proches: planifier l'intervention équipement."
+            : "Aucune maintenance due sous 7 jours.",
+          action: "Équipements",
+          view: "equipments",
+        },
+        {
+          title: "Péremptions",
+          count: expiryCount,
+          level: expiredCount > 0 ? "critical" : expiryCount > 0 ? "warning" : "ok",
+          copy: expiredCount > 0
+            ? "Lot expiré détecté: retirer du circuit."
+            : expiryCount > 0
+              ? "Lots à contrôler avant utilisation."
+              : "Aucune péremption proche signalée.",
+          action: "Voir réactifs",
+          view: "stocks",
+        },
+      ];
+
+      container.innerHTML = priorities.map((item) => `
+        <div class="priority-card ${item.level}">
+          <div class="priority-title">
+            <span>${security.escapeHtml(item.title)}</span>
+            <span class="priority-count">${security.escapeHtml(String(item.count))}</span>
+          </div>
+          <div class="priority-copy">${security.escapeHtml(item.copy)}</div>
+          <button class="ghost priority-action" onclick="showView('${item.view}')">${security.escapeHtml(item.action)}</button>
+        </div>
+      `).join("");
     }
     function stamp() {
       const d = new Date();
@@ -2456,6 +2685,7 @@
         $("userStatus").textContent = `${me.full_name || me.username} - ${me.role}`;
         $("loginView").classList.add("hidden");
         $("appView").classList.remove("hidden");
+        closeSidebar();
         // Sidebar user footer
         const initials = (me.full_name || me.username || '?')
           .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -2491,8 +2721,7 @@
       view.classList.remove("hidden");
       document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
       $("viewTitle").textContent = navButton.textContent;
-      document.querySelector(".side.open")?.classList.remove("open");
-      document.querySelector(".sidebar-overlay.show")?.classList.remove("show");
+      closeSidebar();
       refreshCurrent();
     }
     async function refreshCurrent() {
@@ -2524,6 +2753,7 @@
           api("/api/v1/reagents/expiring?days=30", { headers: headers(false) }).catch(() => null),
           api("/api/v1/reports/compliance-summary?days=30", { headers: headers(false) }).catch(() => null),
         ]);
+        renderAgentPriorities({ epi, stock, qc, perf, expiry, compliance });
         $("mResults").textContent = epi.total_results;
         $("mCritical").textContent = epi.critical_results;
         $("mMalaria").textContent = epi.malaria_positive;
@@ -3448,14 +3678,14 @@
         const isLow = r.alert_threshold > 0 && r.current_stock <= r.alert_threshold;
         const ed = _expiryDays(r.expiry_date);
         const tr = row(
-          `<td>${r.id}</td>` +
-          `<td><strong>${security.escapeHtml(r.name)}</strong></td>` +
-          `<td>${security.escapeHtml(r.category || '—')}</td>` +
-          `<td style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.lot_number || '—')}</td>` +
-          `<td>${_expiryBadge(r.expiry_date)}</td>` +
-          `<td>${r.current_stock} <span style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.unit || '')}</span></td>` +
-          `<td>${r.alert_threshold}</td>` +
-          `<td style="white-space:nowrap;">` +
+          `<td data-label="ID">${r.id}</td>` +
+          `<td data-label="Nom"><strong>${security.escapeHtml(r.name)}</strong></td>` +
+          `<td data-label="Catégorie">${security.escapeHtml(r.category || '—')}</td>` +
+          `<td data-label="Lot" style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.lot_number || '—')}</td>` +
+          `<td data-label="Péremption">${_expiryBadge(r.expiry_date)}</td>` +
+          `<td data-label="Stock">${r.current_stock} <span style="font-size:11px;color:var(--muted);">${security.escapeHtml(r.unit || '')}</span></td>` +
+          `<td data-label="Seuil">${r.alert_threshold}</td>` +
+          `<td data-label="Action" style="white-space:nowrap;">` +
             `<button class="ghost" onclick='editReagent(${JSON.stringify(r)})'>Éditer</button>` +
           `</td>`
         );
@@ -6709,6 +6939,7 @@ window.onload=renderLabels;
 
     // Initialiser le moteur IA au chargement de la page
     document.addEventListener('DOMContentLoaded', () => {
+      closeSidebar();
       // Initialiser l'IA après un court délai pour éviter de bloquer le chargement
       setTimeout(() => {
         ruggyAI.init().catch(error => {
@@ -6716,6 +6947,10 @@ window.onload=renderLabels;
           showToast('Initialisation IA échouée - Certaines fonctionnalités limitées', 'warning');
         });
       }, 2000);
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 980) closeSidebar();
     });
   </script>
 </body>
