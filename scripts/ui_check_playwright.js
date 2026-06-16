@@ -66,10 +66,9 @@ function assertLayout(condition, message, details) {
   }
 }
 
-async function visibleOverflow(page) {
+async function horizontalOverflow(page) {
   return page.evaluate(() => {
     const vw = window.innerWidth;
-    const vh = window.innerHeight;
     return Array.from(document.querySelectorAll("body *"))
       .map((el) => {
         const rect = el.getBoundingClientRect();
@@ -86,8 +85,7 @@ async function visibleOverflow(page) {
         }
         const overRight = rect.right - vw;
         const overLeft = -rect.left;
-        const overBottom = rect.bottom - vh;
-        if (overRight > 2 || overLeft > 2 || overBottom > 2000) {
+        if (overRight > 2 || overLeft > 2) {
           return {
             tag: el.tagName,
             id: el.id || "",
@@ -117,9 +115,10 @@ async function visibleOverflow(page) {
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await login(desktop);
   await desktop.screenshot({ path: path.join(outDir, "desktop-dashboard.png"), fullPage: true });
-  results.desktopOverflow = await visibleOverflow(desktop);
+  results.desktopOverflow = await horizontalOverflow(desktop);
   results.desktopLayout = await layoutMetrics(desktop);
   assertLayout(results.desktopLayout.scrollWidth <= results.desktopLayout.viewportWidth, "Desktop horizontal overflow", results.desktopLayout);
+  assertLayout(results.desktopOverflow.length === 0, "Desktop visible horizontal overflow", results.desktopOverflow);
   assertLayout(results.desktopLayout.overlayDisplay === "none", "Desktop overlay participates in layout", results.desktopLayout);
   assertLayout(results.desktopLayout.side?.left === 0, "Desktop sidebar is not anchored left", results.desktopLayout);
   assertLayout(results.desktopLayout.main?.left === results.desktopLayout.side?.right, "Desktop main/sidebar alignment mismatch", results.desktopLayout);
@@ -133,13 +132,15 @@ async function visibleOverflow(page) {
   await mobile.click(".sidebar-toggle");
   await mobile.waitForTimeout(300);
   await mobile.screenshot({ path: path.join(outDir, "mobile-dashboard-menu.png"), fullPage: true });
-  results.mobileOpenOverflow = await visibleOverflow(mobile);
+  results.mobileOpenOverflow = await horizontalOverflow(mobile);
   results.mobileOpenLayout = await layoutMetrics(mobile);
   assertLayout(results.mobileOpenLayout.side?.left === 0, "Mobile sidebar is not anchored left when open", results.mobileOpenLayout);
+  assertLayout(results.mobileOpenOverflow.length === 0, "Mobile menu visible horizontal overflow", results.mobileOpenOverflow);
   await mobile.click('button[data-view="stocks"]');
   await mobile.waitForTimeout(700);
   await mobile.screenshot({ path: path.join(outDir, "mobile-stocks.png"), fullPage: true });
-  results.mobileStocksOverflow = await visibleOverflow(mobile);
+  results.mobileStocksOverflow = await horizontalOverflow(mobile);
+  assertLayout(results.mobileStocksOverflow.length === 0, "Mobile stocks visible horizontal overflow", results.mobileStocksOverflow);
 
   await browser.close();
   fs.writeFileSync(path.join(outDir, "ui-check.json"), JSON.stringify(results, null, 2));
