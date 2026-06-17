@@ -124,6 +124,29 @@ class TestRealtimeAuthHardening:
     def test_logout_revokes_server_side(self, html: str) -> None:
         assert "/api/v1/login/logout" in html
 
+    def test_notification_state_is_available_during_early_logout(self, html: str) -> None:
+        assert "var _notifWs = null;" in html
+        assert "var _notifPollTimer = null;" in html
+
+    def test_dashboard_critical_metric_uses_pending_alerts(self, html: str) -> None:
+        assert "Critiques à acquitter" in html
+        assert 'api("/api/v1/critical-alerts/pending"' in html
+        assert "$(\"mCritical\").textContent = pendingCriticalCount;" in html
+
+
+class TestStaticJavascriptAssets:
+    def test_malaria_dataset_collector_uses_valid_apostrophe_escaping(self) -> None:
+        asset = (
+            Path(__file__).resolve().parents[1]
+            / "app"
+            / "static"
+            / "ai"
+            / "malaria_dataset_collector.js"
+        )
+        js = asset.read_text(encoding="utf-8")
+        assert "Pas assez d\\\\'échantillons" not in js
+        assert "Pas assez d'échantillons annotés pour l'entraînement" in js
+
 
 class TestKeyboardShortcuts:
     def test_browser_reserved_shortcuts_are_not_overridden(self, html: str) -> None:

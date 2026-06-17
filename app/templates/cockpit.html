@@ -84,6 +84,8 @@
       position: fixed; top: 76px; right: 20px;
       z-index: 1000;
       display: flex; flex-direction: column; gap: 8px;
+      width: min(360px, calc(100vw - 40px));
+      max-width: calc(100vw - 40px);
     }
     .toast {
       background: var(--panel);
@@ -94,12 +96,14 @@
       display: flex; align-items: center; gap: 10px;
       animation: slideIn 0.3s ease;
       min-width: 280px;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
     .toast.success { border-left: 4px solid var(--ok); }
     .toast.error { border-left: 4px solid var(--rose); }
     .toast.warning { border-left: 4px solid var(--amber); }
     @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
+      from { transform: translateX(16px); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
     }
     .sidebar-toggle {
@@ -436,6 +440,8 @@
         right: 12px;
         bottom: 86px;
         left: 12px;
+        width: auto;
+        max-width: none;
       }
       .toast {
         min-width: 0;
@@ -980,7 +986,7 @@
         <div id="dashboard" class="view band">
           <div class="grid4">
             <div class="panel metric metric-blue"><div id="mResults" class="value">—</div><div class="label">Résultats · 30 jours</div></div>
-            <div class="panel metric metric-rose"><div id="mCritical" class="value">—</div><div class="label">Valeurs critiques</div></div>
+            <div class="panel metric metric-rose" id="mCriticalPanel"><div id="mCritical" class="value">—</div><div class="label">Critiques à acquitter</div></div>
             <div class="panel metric metric-teal"><div id="mMalaria" class="value">—</div><div class="label">Paludisme positif</div></div>
             <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
             <div class="panel metric" id="mQcPanel"><div id="mQc" class="value">—</div><div class="label">Contrôles QC</div></div>
@@ -2581,7 +2587,7 @@
         rows.forEach((r) => body.appendChild(r));
       }
     }
-    function renderAgentPriorities({ epi, stock, qc, perf, expiry, compliance }) {
+    function renderAgentPriorities({ epi, stock, qc, perf, expiry, compliance, pendingCriticals }) {
       const container = $("agentPriorities");
       if (!container) return;
 
@@ -2592,14 +2598,16 @@
       const expiryItems = Array.isArray(expiry) ? expiry : [];
       const expiredCount = expiryItems.filter((item) => item.is_expired).length;
       const expiryCount = expiryItems.length;
-      const pendingCriticals = compliance?.pending_criticals ?? epi?.critical_results ?? 0;
+      const pendingCriticalCount = Array.isArray(pendingCriticals)
+        ? pendingCriticals.length
+        : compliance?.pending_criticals ?? epi?.critical_results ?? 0;
 
       const priorities = [
         {
           title: "Valeurs critiques",
-          count: pendingCriticals,
-          level: pendingCriticals > 0 ? "critical" : "ok",
-          copy: pendingCriticals > 0
+          count: pendingCriticalCount,
+          level: pendingCriticalCount > 0 ? "critical" : "ok",
+          copy: pendingCriticalCount > 0
             ? "Résultats critiques à vérifier et acquitter sans délai."
             : "Aucune valeur critique en attente connue.",
           action: "Ouvrir résultats",
@@ -2806,17 +2814,26 @@
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
       try {
-        const [epi, stock, qc, perf, expiry, compliance] = await Promise.all([
+        const [epi, stock, qc, perf, expiry, compliance, pendingCriticals] = await Promise.all([
           api("/api/v1/reports/epidemiology-summary?days=30", { headers: headers(false) }),
           api("/api/v1/reports/stock-dashboard", { headers: headers(false) }),
           api("/api/v1/reports/qc-summary", { headers: headers(false) }),
           api("/api/v1/stats/summary?days=30", { headers: headers(false) }).catch(() => null),
           api("/api/v1/reagents/expiring?days=30", { headers: headers(false) }).catch(() => null),
           api("/api/v1/reports/compliance-summary?days=30", { headers: headers(false) }).catch(() => null),
+          api("/api/v1/critical-alerts/pending", { headers: headers(false) }).catch(() => []),
         ]);
-        renderAgentPriorities({ epi, stock, qc, perf, expiry, compliance });
+        const pendingCriticalCount = Array.isArray(pendingCriticals)
+          ? pendingCriticals.length
+          : compliance?.pending_criticals ?? epi.critical_results;
+        renderAgentPriorities({ epi, stock, qc, perf, expiry, compliance, pendingCriticals });
         $("mResults").textContent = epi.total_results;
-        $("mCritical").textContent = epi.critical_results;
+        $("mCritical").textContent = pendingCriticalCount;
+        const mCriticalPanel = $("mCriticalPanel");
+        if (mCriticalPanel) {
+          mCriticalPanel.classList.remove("metric-rose", "metric-teal");
+          mCriticalPanel.classList.add(pendingCriticalCount > 0 ? "metric-rose" : "metric-teal");
+        }
         $("mMalaria").textContent = epi.malaria_positive;
         const lowStockCount = stock.low_stock_reagents.length;
         $("mLowStock").textContent = lowStockCount;
@@ -6398,10 +6415,10 @@ window.onload=renderLabels;
     // ══════════════════════════════════════════════════════════════════════
     //  Feature 3 — Notifications temps-réel (WebSocket + fallback polling)
     // ══════════════════════════════════════════════════════════════════════
-    let _notifWs = null;
-    let _notifPollTimer = null;
-    let _lastCriticalCount = 0;
-    let _notifPopoverOpen = false;
+    var _notifWs = null;
+    var _notifPollTimer = null;
+    var _lastCriticalCount = 0;
+    var _notifPopoverOpen = false;
 
     function toggleNotifPopover() {
       _notifPopoverOpen = !_notifPopoverOpen;

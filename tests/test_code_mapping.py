@@ -163,6 +163,8 @@ class TestMappingResolution:
         assert "exam_codes_unmapped" in o and "test_codes_unmapped" in o
         # GLYC est mappé → absent des orphelins
         assert "GLYC" not in o["exam_codes_unmapped"]
+        assert o["exam_codes_unmapped"] == []
+        assert o["test_codes_unmapped"] == []
 
 
 # ── Branchement sur le cycle de vie du résultat ─────────────────────────────

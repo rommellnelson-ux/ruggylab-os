@@ -287,7 +287,7 @@ class MalariaDatasetCollector {
     );
 
     if (annotatedSamples.length < 10) {
-      throw new Error('Pas assez d\\'échantillons annotés pour l\\'entraînement');
+      throw new Error("Pas assez d'échantillons annotés pour l'entraînement");
     }
 
     const trainingData = this.dataManager.prepareTrainingData(

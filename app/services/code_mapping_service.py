@@ -311,20 +311,31 @@ def apply_bioref_to_result(db: Session, result: Result) -> bool:
 
 
 def seed_mappings(db: Session) -> int:
-    """Insère les correspondances absentes (idempotent). Retourne le nombre créé."""
+    """Insère ou complète les correspondances par défaut.
+
+    Retourne le nombre de lignes créées. Les lignes existantes sont aussi
+    synchronisées pour éviter qu'une base initialisée avec un ancien seed garde
+    des champs ``exam_code``/``test_code`` manquants.
+    """
     created = 0
     for spec in CODE_MAPPING_SEED:
-        exists = (
+        mapping = (
             db.query(BiologicalCodeMapping)
-            .filter(BiologicalCodeMapping.canonical_code == spec["canonical_code"])
+            .filter(
+                BiologicalCodeMapping.canonical_code == spec["canonical_code"],
+                BiologicalCodeMapping.component_of == spec.get("component_of"),
+            )
             .first()
         )
-        if exists:
+        if mapping:
+            for field, value in spec.items():
+                if value is not None and getattr(mapping, field) != value:
+                    setattr(mapping, field, value)
+            mapping.is_active = True
             continue
         db.add(BiologicalCodeMapping(**spec))
         created += 1
-    if created:
-        db.commit()
+    db.commit()
     return created
 
 
