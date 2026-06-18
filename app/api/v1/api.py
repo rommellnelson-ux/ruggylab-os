@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.deps import forbid_accountant
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.auto_validation import router as auto_validation_router
@@ -46,6 +47,10 @@ from app.api.v1.endpoints.tat import router as tat_router
 from app.api.v1.endpoints.users import router as users_router
 
 api_router = APIRouter()
+
+# Cloisonnement : le comptable (gestion/facturation) n'accède à aucune donnée
+# clinique. Appliqué aux routes exposant des dossiers patients ou des résultats.
+_no_accountant = [Depends(forbid_accountant)]
 api_router.include_router(health_router, tags=["health"])
 api_router.include_router(admin_ui_router, tags=["admin-ui"])
 api_router.include_router(login_router, tags=["auth"])
@@ -54,22 +59,24 @@ api_router.include_router(reagents_router, tags=["reagents"])
 api_router.include_router(equipment_reagent_ratios_router, tags=["equipment-reagent-ratios"])
 api_router.include_router(ratio_presets_router, tags=["ratio-presets"])
 api_router.include_router(audit_events_router, tags=["audit-events"])
-api_router.include_router(patients_router, tags=["patients"])
+api_router.include_router(patients_router, tags=["patients"], dependencies=_no_accountant)
 api_router.include_router(qc_router, tags=["QC Analytique"])
 api_router.include_router(critical_ranges_router, tags=["Critical Ranges"])
 api_router.include_router(delta_check_router, tags=["Delta-Check"])
 api_router.include_router(reference_ranges_router, tags=["Reference Ranges"])
-api_router.include_router(critical_alerts_router, tags=["Critical Alerts"])
+api_router.include_router(
+    critical_alerts_router, tags=["Critical Alerts"], dependencies=_no_accountant
+)
 api_router.include_router(equipments_router, tags=["equipments"])
 api_router.include_router(equipment_maintenance_router, tags=["Equipment Maintenance"])
 api_router.include_router(stats_router, tags=["Lab Stats"])
-api_router.include_router(samples_router, tags=["samples"])
-api_router.include_router(results_router, tags=["results"])
+api_router.include_router(samples_router, tags=["samples"], dependencies=_no_accountant)
+api_router.include_router(results_router, tags=["results"], dependencies=_no_accountant)
 api_router.include_router(auto_validation_router, tags=["Auto-Validation"])
-api_router.include_router(results_poct_router, tags=["poct"])
+api_router.include_router(results_poct_router, tags=["poct"], dependencies=_no_accountant)
 api_router.include_router(military_facilities_router, tags=["military-facilities"])
-api_router.include_router(dh36_router, tags=["dh36"])
-api_router.include_router(imaging_router, tags=["imaging"])
+api_router.include_router(dh36_router, tags=["dh36"], dependencies=_no_accountant)
+api_router.include_router(imaging_router, tags=["imaging"], dependencies=_no_accountant)
 api_router.include_router(operations_router, tags=["operations"])
 api_router.include_router(reports_router, tags=["reports"])
 api_router.include_router(maintenance_router, tags=["maintenance"])
@@ -79,12 +86,12 @@ api_router.include_router(stock_notifications_router, tags=["Stock Predictor CMU
 api_router.include_router(prescription_scanner_router, tags=["Prescription Scanner CMU"])
 api_router.include_router(pdf_prescription_router, tags=["Prescription Scanner CMU"])
 api_router.include_router(fhir_pharmacy_router, tags=["FHIR R4 Pharmacy"])
-api_router.include_router(epidemiology_router, tags=["Epidemiology"])
+api_router.include_router(epidemiology_router, tags=["Epidemiology"], dependencies=_no_accountant)
 api_router.include_router(bnpl_router, tags=["BNPL CMU"])
 api_router.include_router(notifications_router, tags=["Notifications temps-réel"])
-api_router.include_router(bulk_import_router, tags=["Import en lot"])
+api_router.include_router(bulk_import_router, tags=["Import en lot"], dependencies=_no_accountant)
 api_router.include_router(quality_router, tags=["Qualité NC/CAPA"])
 api_router.include_router(tat_router, tags=["Suivi TAT"])
-api_router.include_router(registre_router, tags=["Registre maître"])
+api_router.include_router(registre_router, tags=["Registre maître"], dependencies=_no_accountant)
 api_router.include_router(bioref_router, tags=["Référentiel biologique"])
 api_router.include_router(code_mappings_router, tags=["Unification vocabulaires"])

@@ -95,6 +95,7 @@ class TestNewViewsPresent:
             "/api/v1/samples/by-barcode/",  # résolution échantillon par code-barres
             'addEventListener("hashchange"',  # routage par hash (lien profond)
             'const target = "#/" + name',  # synchronisation URL ↔ vue
+            "accountant: [",  # navigation cloisonnée du rôle comptable
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
             'data-view="quality"',  # bouton de navigation qualité

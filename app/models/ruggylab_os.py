@@ -26,6 +26,7 @@ class UserRole(enum.StrEnum):
     TECHNICIAN = "technician"
     OFFICER = "officer"
     ADMIN = "admin"
+    ACCOUNTANT = "accountant"  # comptable / gestion : facturation & paiements, sans clinique
 
 
 class User(Base):

@@ -89,3 +89,18 @@ def require_admin(current_user: User = Depends(get_current_active_user)) -> User
             detail="Acces reserve aux administrateurs.",
         )
     return current_user
+
+
+def forbid_accountant(current_user: User = Depends(get_current_active_user)) -> User:
+    """Interdit l'accès aux données cliniques au profil comptable (gestion).
+
+    Séparation des tâches : le comptable est cantonné à la facturation et aux
+    paiements ; il n'a aucun accès aux dossiers patients ni aux résultats, même
+    par appel direct de l'API (le masquage de menu ne suffit pas côté sécurité).
+    """
+    if current_user.role == UserRole.ACCOUNTANT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès clinique réservé au personnel de laboratoire.",
+        )
+    return current_user

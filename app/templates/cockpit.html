@@ -3320,7 +3320,10 @@
     // ── Saisie « labo réel » : sélection patient par IPP/nom, échantillon par code-barres ──
     const ROLE_HIDDEN_VIEWS = {
       technician: ["users", "audit", "bnpl", "pharmacy", "prescription", "ai_training", "registre", "equipments"],
-      officer: ["users", "audit", "ai_training"],
+      officer: ["users", "audit", "ai_training", "bnpl"],  // finance déléguée au comptable
+      // Comptable : uniquement facturation/paiements + activité agrégée (dashboard, stats).
+      // Aucun accès clinique (renforcé côté backend par forbid_accountant).
+      accountant: ["patients", "samples", "results", "epidemio", "machines", "imaging", "reports", "qc", "tat", "pharmacy", "prescription", "stocks", "equipments", "ai_training", "registre", "quality", "users", "audit"],
       admin: [],
     };
     function applyRoleNavigation(role) {
