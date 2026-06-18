@@ -153,6 +153,54 @@ def test_results_pagination_and_filters(client) -> None:
     assert data["items"][0]["is_critical"] is True
 
 
+def test_result_detail_includes_patient_sample_and_bioref(client) -> None:
+    headers = _auth_headers(client)
+
+    patient_response = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-DETAIL-001",
+            "first_name": "Detail",
+            "last_name": "Patient",
+            "birth_date": "1991-02-03",
+            "sex": "F",
+            "rank": "Capitaine",
+        },
+    )
+    assert patient_response.status_code == 201, patient_response.text
+    patient = patient_response.json()
+
+    sample_response = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "DETAIL-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    )
+    assert sample_response.status_code == 201, sample_response.text
+    sample = sample_response.json()
+
+    result_response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"WBC": 5.2},
+            "is_critical": False,
+            "exam_code": "NFS",
+        },
+    )
+    assert result_response.status_code == 201, result_response.text
+    result = result_response.json()
+
+    detail_response = client.get(f"/api/v1/results/{result['id']}/detail", headers=headers)
+    assert detail_response.status_code == 200, detail_response.text
+    detail = detail_response.json()
+    assert detail["result"]["id"] == result["id"]
+    assert detail["sample"]["barcode"] == "DETAIL-SAMPLE-001"
+    assert detail["patient"]["ipp_unique_id"] == "IPP-DETAIL-001"
+    assert detail["bioref"]["exam_code"] == "NFS"
+
+
 def test_create_user_requires_admin_token(client) -> None:
     response = client.post(
         "/api/v1/users",

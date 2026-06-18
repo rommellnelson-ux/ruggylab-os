@@ -60,6 +60,8 @@ class TestNewViewsPresent:
             'data-view="quality"',  # bouton de navigation qualité
             'class="login-banner"',  # bannière visuelle de connexion
             "/static/branding/RuggyLab_OS.jpg",  # image de marque login
+            "/static/ai/malaria_dataset_collector.js?v=",  # évite les anciens assets en cache
+            "/api/v1/results/' + resultId + '/detail",  # détail résultat enrichi côté API
         ],
     )
     def test_marker_present(self, html: str, marker: str) -> None:

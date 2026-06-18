@@ -2,6 +2,9 @@ import datetime as dt
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.patient import PatientRead
+from app.schemas.sample import SampleRead
+
 
 class ResultBase(BaseModel):
     sample_id: int
@@ -50,6 +53,13 @@ class ResultRead(ResultBase):
     bioref_source: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ResultDetailRead(BaseModel):
+    result: ResultRead
+    sample: SampleRead | None = None
+    patient: PatientRead | None = None
+    bioref: dict | None = None
 
 
 class ResultAmend(BaseModel):

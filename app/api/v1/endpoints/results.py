@@ -11,7 +11,7 @@ from app.db.session import get_db
 from app.models import AuditEvent, Equipment, ReportSignature, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
-from app.schemas.result import ResultAmend, ResultCreate, ResultRead
+from app.schemas.result import ResultAmend, ResultCreate, ResultDetailRead, ResultRead
 from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
@@ -86,6 +86,35 @@ def get_result_bioref(
     if outcome is None:
         return {"mapped": False, "exam_code": result.exam_code}
     return {"mapped": True, **outcome}
+
+
+@router.get("/{result_id}/detail", response_model=ResultDetailRead)
+def get_result_detail(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ResultDetailRead:
+    """Détail cockpit d'un résultat avec contexte patient, échantillon et bioref."""
+    del current_user
+    from app.services.code_mapping_service import interpret_result_bioref
+
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+
+    bioref_outcome = interpret_result_bioref(db, result)
+    bioref = (
+        {"mapped": False, "exam_code": result.exam_code}
+        if bioref_outcome is None
+        else {"mapped": True, **bioref_outcome}
+    )
+    sample = result.sample
+    return ResultDetailRead(
+        result=ResultRead.model_validate(result),
+        sample=sample,
+        patient=sample.patient if sample else None,
+        bioref=bioref,
+    )
 
 
 @router.get(

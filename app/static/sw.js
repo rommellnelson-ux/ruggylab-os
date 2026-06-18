@@ -1,7 +1,7 @@
 // Service Worker for RuggyLab OS - Offline functionality
-const CACHE_NAME = 'ruggylab-os-v1';
-const STATIC_CACHE = 'ruggylab-static-v1';
-const API_CACHE = 'ruggylab-api-v1';
+const CACHE_NAME = 'ruggylab-os-v2';
+const STATIC_CACHE = 'ruggylab-static-v2';
+const API_CACHE = 'ruggylab-api-v2';
 
 // Static assets to cache
 const STATIC_ASSETS = [
