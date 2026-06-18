@@ -46,6 +46,9 @@ class TestNewViewsPresent:
             'id="biorefTest"',  # sélecteur de test à interpréter
             'id="mappingsTable"',  # unification des vocabulaires
             'id="mapTestExam"',  # outil de test de mapping
+            'id="resultsKpiPending"',  # KPI critiques à acquitter
+            'data-result-filter="pending"',  # filtre résultats critiques non acquittés
+            "function renderResultsTable",  # rendu filtré de la liste résultats
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)

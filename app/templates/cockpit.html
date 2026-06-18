@@ -284,6 +284,58 @@
       padding: 6px 10px;
       font-size: 12px;
     }
+    .result-command-bar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .result-kpi {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.62);
+      min-height: 76px;
+    }
+    .result-kpi strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    .result-kpi span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .result-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .result-filter-bar button.active {
+      color: #fff;
+      background: var(--nav);
+      border-color: var(--nav);
+    }
+    .result-analytes {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      max-width: 300px;
+    }
+    .result-analytes .muted {
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .result-staleness {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
     .ops-strip {
       display: flex;
       gap: 8px;
@@ -425,6 +477,7 @@
       .topbar { padding: 12px 16px; }
       .metric .value { font-size: 24px; }
       .metric { min-height: 80px; }
+      .result-command-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .toolbar { gap: 6px; }
       table { min-width: 460px; }
       button { 
@@ -460,6 +513,7 @@
       .metric .value { font-size: 20px; }
       .metric .label { font-size: 11px; }
       .metric { min-height: 70px; }
+      .result-command-bar { grid-template-columns: 1fr; }
       table { min-width: 100%; font-size: 11px; }
       th, td { padding: 8px 5px; }
       h2 { font-size: 18px; }
@@ -1117,6 +1171,12 @@
         </div>
 
         <div id="results" class="view band hidden">
+          <div class="result-command-bar" aria-label="Synthèse résultats">
+            <div class="result-kpi"><strong id="resultsKpiPending">—</strong><span>Critiques à acquitter</span></div>
+            <div class="result-kpi"><strong id="resultsKpiCritical">—</strong><span>Critiques chargées</span></div>
+            <div class="result-kpi"><strong id="resultsKpiUnvalidated">—</strong><span>Non validés</span></div>
+            <div class="result-kpi"><strong id="resultsKpiLoaded">—</strong><span>Résultats affichables</span></div>
+          </div>
           <div class="grid2">
             <div class="panel"><h3>Nouveau resultat</h3><div class="form">
               <div><label>Sample ID</label><input id="resultSampleId" type="number" /></div>
@@ -1126,7 +1186,23 @@
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
-            <div class="panel"><h3>Derniers resultats</h3><table id="resultsTable"><thead><tr><th>ID</th><th>Sample</th><th>Critique</th><th>Flags</th><th>Acquittement</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table></div>
+            <div class="panel">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div>
+                  <h3 style="margin-bottom:4px;">Derniers resultats</h3>
+                  <div id="resultsListHint" style="font-size:12px;color:var(--muted);">Chargement…</div>
+                </div>
+                <button class="ghost" onclick="loadResults()">↻ Actualiser</button>
+              </div>
+              <div class="result-filter-bar" aria-label="Filtres résultats">
+                <button class="ghost active" data-result-filter="all" onclick="setResultFilter('all', this)">Tous</button>
+                <button class="ghost" data-result-filter="pending" onclick="setResultFilter('pending', this)">Critiques à acquitter</button>
+                <button class="ghost" data-result-filter="critical" onclick="setResultFilter('critical', this)">Critiques</button>
+                <button class="ghost" data-result-filter="unvalidated" onclick="setResultFilter('unvalidated', this)">Non validés</button>
+                <button class="ghost" data-result-filter="auto" onclick="setResultFilter('auto', this)">Auto §5.8</button>
+              </div>
+              <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Sample</th><th>Analyse</th><th>Critique</th><th>Flags</th><th>Acquittement</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
           </div>
           <!-- Panneau seuils critiques (panic values) -->
           <div class="panel" style="margin-top:12px;">
@@ -3112,56 +3188,130 @@
       const s = _flagStyle[flag] || 'background:#6b7280;color:white';
       return '<span class="pill" style="' + s + ';margin:1px;font-size:10px;" title="' + security.escapeHtml(analyte) + '">' + security.escapeHtml(analyte) + ':' + flag + '</span>';
     }
+    let _resultsCache = [];
+    let _resultFilter = "all";
+    function _resultValuePreview(value) {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        if (value.label) return String(value.label);
+        if (value.value !== undefined) return String(value.value) + (value.unit ? " " + value.unit : "");
+        return "objet";
+      }
+      if (value === null || value === undefined || value === "") return "—";
+      return String(value);
+    }
+    function _resultAnalyteBadges(r) {
+      const dataPoints = r.data_points || {};
+      const entries = Object.entries(dataPoints)
+        .filter(([key]) => !["manual_entry_by", "entry_timestamp", "calibration", "overall_flags"].includes(key))
+        .slice(0, 4);
+      if (entries.length === 0) return '<span class="muted">Aucune donnée analytique</span>';
+      return entries.map(([key, value]) => {
+        const valueText = _resultValuePreview(value);
+        const isCritical = Boolean(value && typeof value === "object" && value.is_critical);
+        const status = value && typeof value === "object" && value.status ? String(value.status) : "";
+        const style = isCritical
+          ? "background:var(--rose);color:#fff;"
+          : status && status !== "N"
+            ? "background:var(--amber);color:#fff;"
+            : "background:rgba(100,116,134,.14);color:var(--ink);";
+        return `<span class="pill" style="${style};font-size:10px;" title="${security.escapeHtml(key)}">${security.escapeHtml(key)} ${security.escapeHtml(valueText)}</span>`;
+      }).join("");
+    }
+    function _resultElapsedLabel(r) {
+      if (!r.analysis_date) return "";
+      const minutes = Math.max(0, Math.floor((Date.now() - new Date(r.analysis_date).getTime()) / 60000));
+      if (!Number.isFinite(minutes)) return "";
+      if (minutes < 60) return `${minutes} min`;
+      if (minutes < 1440) return `${Math.floor(minutes / 60)} h`;
+      return `${Math.floor(minutes / 1440)} j`;
+    }
+    function _resultMatchesFilter(r) {
+      if (_resultFilter === "pending") return r.is_critical && !r.critical_ack_at;
+      if (_resultFilter === "critical") return r.is_critical;
+      if (_resultFilter === "unvalidated") return !r.is_validated;
+      if (_resultFilter === "auto") return r.is_auto_validated;
+      return true;
+    }
+    function _updateResultFilterButtons() {
+      document.querySelectorAll("[data-result-filter]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.resultFilter === _resultFilter);
+      });
+    }
+    function setResultFilter(filter, btn = null) {
+      _resultFilter = filter;
+      if (btn) btn.classList.add("active");
+      _updateResultFilterButtons();
+      renderResultsTable();
+    }
+    function renderResultsTable() {
+      const rowsData = _resultsCache.filter(_resultMatchesFilter);
+      const pendingCount = _resultsCache.filter((r) => r.is_critical && !r.critical_ack_at).length;
+      const criticalCount = _resultsCache.filter((r) => r.is_critical).length;
+      const unvalidatedCount = _resultsCache.filter((r) => !r.is_validated).length;
+      if ($("resultsKpiPending")) $("resultsKpiPending").textContent = pendingCount;
+      if ($("resultsKpiCritical")) $("resultsKpiCritical").textContent = criticalCount;
+      if ($("resultsKpiUnvalidated")) $("resultsKpiUnvalidated").textContent = unvalidatedCount;
+      if ($("resultsKpiLoaded")) $("resultsKpiLoaded").textContent = rowsData.length + "/" + _resultsCache.length;
+      if ($("resultsListHint")) {
+        $("resultsListHint").textContent = pendingCount > 0
+          ? `${pendingCount} critique(s) non acquittée(s) sur ${_resultsCache.length} résultat(s) chargés.`
+          : `${_resultsCache.length} résultat(s) chargés, aucune critique en attente.`;
+      }
+      const rows = rowsData.map((r) => {
+        let critCell = r.is_critical ? '<span class="pill bad">⛔ Critique</span>' : '<span style="color:var(--muted)">—</span>';
+        if (r.delta_exceeded) critCell += ' <span class="pill" style="background:#b45309;color:white;font-size:10px;" title="Delta-check dépassé">△ Delta</span>';
+
+        const flagsHtml = r.flags && Object.keys(r.flags).length > 0
+          ? Object.entries(r.flags).map(([a, f]) => _flagBadge(a, f)).join('')
+          : '<span style="color:var(--muted);font-size:11px;">—</span>';
+
+        let ackCell;
+        if (!r.is_critical) {
+          ackCell = '<td style="color:var(--muted);font-size:11px;">—</td>';
+        } else if (r.critical_ack_at) {
+          const ts = new Date(r.critical_ack_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+          ackCell = '<td><span class="pill ok" title="Acquitté le ' + ts + '">✅ ' + ts + '</span></td>';
+        } else {
+          const elapsed = _resultElapsedLabel(r);
+          ackCell = '<td><button class="danger" style="font-size:11px;padding:4px 9px;min-height:30px;" onclick="ackCritical(' + r.id + ', this)">Acquitter</button>' +
+            (elapsed ? '<div class="result-staleness">depuis ' + security.escapeHtml(elapsed) + '</div>' : '') +
+            '</td>';
+        }
+        const autoCell = r.is_auto_validated
+          ? '<span class="pill ok" title="Auto-validé ISO 15189 §5.8">🤖 Auto</span>'
+          : '<span style="color:var(--muted);font-size:11px;">—</span>';
+        const exam = r.exam_code ? '<div class="result-staleness">exam ' + security.escapeHtml(r.exam_code) + '</div>' : '';
+        const tr = row(
+          '<td><strong>#' + r.id + '</strong></td>' +
+          '<td>' + r.sample_id + '</td>' +
+          '<td><div class="result-analytes">' + _resultAnalyteBadges(r) + '</div>' + exam + '</td>' +
+          '<td>' + critCell + '</td>' +
+          '<td style="white-space:nowrap;">' + flagsHtml + '</td>' +
+          ackCell +
+          '<td>' + (r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non') + '</td>' +
+          '<td>' + autoCell + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            '<button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button> ' +
+            '<button class="ghost" style="font-size:11px;padding:2px 8px;" onclick=\'openAmendPanel(' + r.id + ',' + JSON.stringify(r.data_points || {}) + ')\'>✏️</button>' +
+          '</td>'
+        );
+        if (r.is_critical && !r.critical_ack_at) tr.classList.add('row-critical');
+        else if (r.is_critical && r.critical_ack_at) tr.classList.add('row-warning');
+        else if (r.delta_exceeded) tr.classList.add('row-warning');
+        return tr;
+      });
+      setRows("resultsTable", rows);
+    }
     async function loadResults() {
       const tbody = $("resultsTable").querySelector("tbody");
       loadingStates.showSkeleton(tbody, 5);
 
       try {
-        const data = await api("/api/v1/results", { headers: headers(false) });
-        const rows = data.items.map((r) => {
-          // Critical cell (includes delta badge)
-          let critCell = r.is_critical ? '<span class="pill bad">⛔</span>' : '<span style="color:var(--muted)">—</span>';
-          if (r.delta_exceeded) critCell += ' <span class="pill" style="background:#b45309;color:white;font-size:10px;" title="Delta-check dépassé">△ Delta</span>';
-
-          // Flags cell
-          const flagsHtml = r.flags && Object.keys(r.flags).length > 0
-            ? Object.entries(r.flags).map(([a, f]) => _flagBadge(a, f)).join('')
-            : '<span style="color:var(--muted);font-size:11px;">—</span>';
-
-          // Ack cell
-          let ackCell;
-          if (!r.is_critical) {
-            ackCell = '<td style="color:var(--muted);font-size:11px;">—</td>';
-          } else if (r.critical_ack_at) {
-            const ts = new Date(r.critical_ack_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
-            ackCell = '<td><span class="pill ok" title="Acquitté le ' + ts + '">✅ ' + ts + '</span></td>';
-          } else {
-            ackCell = '<td><button class="ghost" style="font-size:11px;padding:2px 8px;color:var(--rose);border-color:var(--rose);" onclick="ackCritical(' + r.id + ', this)">Acquitter</button></td>';
-          }
-          const autoCell = r.is_auto_validated
-            ? '<span class="pill ok" title="Auto-validé ISO 15189 §5.8">🤖 Auto</span>'
-            : '<span style="color:var(--muted);font-size:11px;">—</span>';
-          const tr = row(
-            '<td>' + r.id + '</td>' +
-            '<td>' + r.sample_id + '</td>' +
-            '<td>' + critCell + '</td>' +
-            '<td style="white-space:nowrap;">' + flagsHtml + '</td>' +
-            ackCell +
-            '<td>' + (r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non') + '</td>' +
-            '<td>' + autoCell + '</td>' +
-            '<td style="white-space:nowrap;">' +
-              '<button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button> ' +
-              '<button class="ghost" style="font-size:11px;padding:2px 8px;" onclick=\'openAmendPanel(' + r.id + ',' + JSON.stringify(r.data_points || {}) + ')\'>✏️</button>' +
-            '</td>'
-          );
-          if (r.is_critical && !r.critical_ack_at) tr.classList.add('row-critical');
-          else if (r.is_critical && r.critical_ack_at) tr.classList.add('row-warning');
-          else if (r.delta_exceeded) tr.classList.add('row-warning');
-          return tr;
-        });
-        setRows("resultsTable", rows);
+        const data = await api("/api/v1/results?limit=100", { headers: headers(false) });
+        _resultsCache = data.items || [];
+        renderResultsTable();
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
     }
@@ -3171,6 +3321,8 @@
         await api("/api/v1/results/" + resultId + "/ack-critical", { method: "PATCH", headers: headers() });
         showToast("Valeur critique acquittée", "success");
         await loadResults();
+        await loadPendingCriticals();
+        await loadDashboard();
       } catch (e) {
         showToast("Erreur lors de l'acquittement", "error");
         if (btn) { btn.disabled = false; btn.textContent = "Acquitter"; }
