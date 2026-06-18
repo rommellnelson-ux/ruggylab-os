@@ -1,3 +1,6 @@
+from datetime import UTC, datetime, timedelta
+
+
 def _login(client, username: str, password: str) -> str:
     response = client.post(
         "/api/v1/login/access-token",
@@ -337,6 +340,7 @@ def test_critical_compliance_report_and_export(client) -> None:
         headers=headers,
         json={
             "sample_id": sample["id"],
+            "analysis_date": (datetime.now(UTC) - timedelta(minutes=45)).isoformat(),
             "data_points": {"CRP": 320},
             "is_critical": True,
             "exam_code": "CRP",
@@ -349,26 +353,36 @@ def test_critical_compliance_report_and_export(client) -> None:
     )
     assert ack_response.status_code == 200, ack_response.text
 
-    report_response = client.get("/api/v1/reports/critical-compliance?days=30", headers=headers)
+    report_response = client.get(
+        "/api/v1/reports/critical-compliance?days=30&target_minutes=30",
+        headers=headers,
+    )
     assert report_response.status_code == 200, report_response.text
     report = report_response.json()
     assert report["critical_total"] >= 2
     assert report["critical_handled"] >= 1
     assert report["critical_pending"] >= 1
+    assert report["target_minutes"] == 30
+    assert report["critical_late"] >= 1
+    assert "on_time_rate_pct" in report
 
     rows_by_id = {row["result_id"]: row for row in report["rows"]}
     assert rows_by_id[handled_result["id"]]["status"] == "pris_en_charge"
+    assert rows_by_id[handled_result["id"]]["ack_by"] == "RuggyLab Administrator"
     assert rows_by_id[handled_result["id"]]["sample_barcode"] == "CRIT-COMP-SAMPLE-001"
     assert rows_by_id[handled_result["id"]]["patient_ipp"] == "IPP-CRIT-COMP-001"
     assert rows_by_id[pending_result["id"]]["status"] == "en_attente"
+    assert rows_by_id[pending_result["id"]]["compliance_status"] == "hors_delai"
 
     csv_response = client.get(
-        "/api/v1/reports/critical-compliance/export.csv?days=30",
+        "/api/v1/reports/critical-compliance/export.csv?days=30&target_minutes=30",
         headers=headers,
     )
     assert csv_response.status_code == 200, csv_response.text
     assert "text/csv" in csv_response.headers["content-type"]
-    assert "result_id,analysis_date,critical_ack_at" in csv_response.text
+    assert "result_id,analysis_date,critical_ack_at,ack_delay_minutes" in csv_response.text
+    assert "compliance_status" in csv_response.text
+    assert "RuggyLab Administrator" in csv_response.text
     assert "CRIT-COMP-SAMPLE-001" in csv_response.text
 
 

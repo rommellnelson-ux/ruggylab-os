@@ -1786,6 +1786,7 @@
                   <option value="30" selected>30 jours</option>
                   <option value="90">90 jours</option>
                 </select>
+                <input id="criticalComplianceTarget" type="number" min="1" max="1440" value="30" onchange="loadCriticalCompliance()" title="Délai cible en minutes" style="width:88px;" />
                 <button class="ghost" onclick="loadCriticalCompliance()">↻ Actualiser</button>
                 <button class="secondary" onclick="exportCriticalComplianceCsv()">Exporter CSV</button>
               </div>
@@ -1793,11 +1794,11 @@
             <div class="grid4" style="margin-top:12px;">
               <div class="panel metric"><div id="critCompTotal" class="value">—</div><div class="label">Critiques</div></div>
               <div class="panel metric metric-teal"><div id="critCompHandled" class="value">—</div><div class="label">Prises en charge</div></div>
-              <div class="panel metric metric-amber"><div id="critCompPending" class="value">—</div><div class="label">En attente</div></div>
+              <div class="panel metric metric-rose"><div id="critCompLate" class="value">—</div><div class="label">Hors délai</div></div>
               <div class="panel metric"><div id="critCompDelay" class="value">—</div><div class="label">Délai moyen</div></div>
             </div>
             <table id="criticalComplianceTable" class="compact-mobile-table" style="margin-top:12px;">
-              <thead><tr><th>Résultat</th><th>Patient</th><th>Échantillon</th><th>Analyse</th><th>Prise en charge</th><th>Délai</th></tr></thead>
+              <thead><tr><th>Résultat</th><th>Patient</th><th>Échantillon</th><th>Analyse</th><th>Prise en charge</th><th>Agent</th><th>Conformité</th><th>Délai</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -3594,6 +3595,10 @@
       const ids = criticalRows.map((r) => r.id);
       if (ids.length === 0) {
         showToast("Aucune valeur critique affichée à prendre en charge", "error");
+        return;
+      }
+      if (_resultFilter === "all" && !_resultSearch && ids.length > 5) {
+        showToast("Affinez la liste avant une prise en charge groupée de plus de 5 valeurs critiques", "error");
         return;
       }
       const patients = new Set();
@@ -6761,30 +6766,39 @@ window.onload=renderLabels;
     }
     async function loadCriticalCompliance() {
       const days = $("criticalComplianceDays")?.value || "30";
+      const target = $("criticalComplianceTarget")?.value || "30";
       const hint = $("criticalComplianceHint");
       if (hint) hint.textContent = "Chargement du rapport valeurs critiques…";
       try {
-        const data = await api('/api/v1/reports/critical-compliance?days=' + encodeURIComponent(days), { headers: headers(false) });
+        const params = '?days=' + encodeURIComponent(days) + '&target_minutes=' + encodeURIComponent(target);
+        const data = await api('/api/v1/reports/critical-compliance' + params, { headers: headers(false) });
         if ($("critCompTotal")) $("critCompTotal").textContent = data.critical_total ?? 0;
         if ($("critCompHandled")) $("critCompHandled").textContent = (data.ack_rate_pct ?? 0) + "%";
-        if ($("critCompPending")) $("critCompPending").textContent = data.critical_pending ?? 0;
+        if ($("critCompLate")) $("critCompLate").textContent = data.critical_late ?? 0;
         if ($("critCompDelay")) $("critCompDelay").textContent = _formatCriticalDelay(data.avg_ack_delay_minutes);
         if (hint) {
-          hint.textContent = (data.critical_pending || 0) > 0
-            ? `${data.critical_pending} valeur(s) critique(s) encore en attente sur ${data.period_days} jour(s).`
-            : `Toutes les valeurs critiques de la période sont prises en charge.`;
+          hint.textContent = (data.critical_late || 0) > 0
+            ? `${data.critical_late} valeur(s) critique(s) hors délai cible (${data.target_minutes} min), dont ${data.critical_pending || 0} en attente.`
+            : `Toutes les valeurs critiques de la période sont dans le délai cible (${data.target_minutes} min).`;
         }
         const rows = (data.rows || []).map((item) => {
           const status = item.status === "pris_en_charge"
             ? '<span class="pill ok">Prise en charge</span>'
             : '<span class="pill bad">En attente</span>';
+          const compliance = item.compliance_status === "dans_delai"
+            ? '<span class="pill ok">Dans délai</span>'
+            : item.compliance_status === "hors_delai"
+              ? '<span class="pill bad">Hors délai</span>'
+              : '<span style="color:var(--muted);font-size:11px;">Non mesurable</span>';
           return row(
             '<td><strong>#' + security.escapeHtml(item.result_id) + '</strong></td>' +
             '<td>' + security.escapeHtml(item.patient_name || "—") + '<div class="result-staleness">' + security.escapeHtml(item.patient_ipp || "IPP non renseigné") + '</div></td>' +
             '<td>' + security.escapeHtml(item.sample_barcode || "—") + '</td>' +
             '<td>' + security.escapeHtml(item.exam_code || "—") + '<div class="result-staleness">' + security.escapeHtml(_formatResultDate(item.analysis_date)) + '</div></td>' +
             '<td>' + status + (item.critical_ack_at ? '<div class="result-staleness">' + security.escapeHtml(_formatResultDate(item.critical_ack_at)) + '</div>' : '') + '</td>' +
-            '<td>' + security.escapeHtml(_formatCriticalDelay(item.ack_delay_minutes)) + '</td>'
+            '<td>' + security.escapeHtml(item.ack_by || "—") + '</td>' +
+            '<td>' + compliance + '</td>' +
+            '<td>' + security.escapeHtml(_formatCriticalDelay(item.ack_delay_minutes ?? item.elapsed_minutes)) + '</td>'
           );
         });
         setRows("criticalComplianceTable", rows);
@@ -6796,8 +6810,10 @@ window.onload=renderLabels;
     }
     async function exportCriticalComplianceCsv() {
       const days = $("criticalComplianceDays")?.value || "30";
+      const target = $("criticalComplianceTarget")?.value || "30";
       try {
-        const resp = await fetch(normalizeApiPath('/api/v1/reports/critical-compliance/export.csv?days=' + encodeURIComponent(days)), { headers: headers(false) });
+        const params = '?days=' + encodeURIComponent(days) + '&target_minutes=' + encodeURIComponent(target);
+        const resp = await fetch(normalizeApiPath('/api/v1/reports/critical-compliance/export.csv' + params), { headers: headers(false) });
         if (!resp.ok) { showToast("Export valeurs critiques indisponible", "error"); return; }
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);

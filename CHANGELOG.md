@@ -6,6 +6,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 ## [Non publié]
 
 ### Ajouté
+- **Workflow valeurs critiques** : prise en charge depuis la liste résultats,
+  audit clinique ouvrable depuis une ligne, confirmation groupée avec contexte
+  patient/échantillon, rapport conformité avec seuil cible, indicateur hors
+  délai, agent de prise en charge et export CSV.
 - **Unification des vocabulaires biologiques** : table de correspondance
   canonique `biological_code_mappings` reliant `exam_code` ↔ `test_code` ↔
   `analyte` (panels NFS/IONO inclus) et interprétation bioref complémentaire
