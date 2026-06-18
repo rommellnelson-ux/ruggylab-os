@@ -78,6 +78,7 @@ const baseUrl = process.env.UAT_BASE_URL || "http://127.0.0.1:8000";
       return response.json();
     };
     const suffix = String(Date.now()).slice(-8);
+    const unit = `UAT-Qualite-${suffix}`;
     const patient = await request("/api/v1/patients", {
       method: "POST",
       body: JSON.stringify({
@@ -87,6 +88,7 @@ const baseUrl = process.env.UAT_BASE_URL || "http://127.0.0.1:8000";
         birth_date: "1986-02-03",
         sex: "F",
         rank: "Test",
+        unit,
       }),
     });
     const sample = await request("/api/v1/samples", {
@@ -114,7 +116,7 @@ const baseUrl = process.env.UAT_BASE_URL || "http://127.0.0.1:8000";
       }),
     });
     await request(`/api/v1/results/${handled.id}/ack-critical`, { method: "PATCH" });
-    return { handledId: handled.id, pendingId: pending.id, barcode: sample.barcode, patientIpp: patient.ipp_unique_id };
+    return { handledId: handled.id, pendingId: pending.id, barcode: sample.barcode, patientIpp: patient.ipp_unique_id, unit };
   });
 
   await page.evaluate(() => window.showView("results"));
@@ -122,8 +124,12 @@ const baseUrl = process.env.UAT_BASE_URL || "http://127.0.0.1:8000";
   await page.fill("#resultSearch", setup.barcode);
   await page.waitForTimeout(400);
   await page.evaluate((handledId) => {
-    const buttons = Array.from(document.querySelectorAll("#resultsTable tbody tr button"));
-    const auditButton = buttons.find((button) => button.textContent.includes("Audit"));
+    const row = Array.from(document.querySelectorAll("#resultsTable tbody tr")).find((item) =>
+      item.textContent.includes(`#${handledId}`),
+    );
+    const auditButton = Array.from(row?.querySelectorAll("button") || []).find((button) =>
+      button.textContent.includes("Audit"),
+    );
     if (!auditButton) throw new Error(`Bouton Audit introuvable pour résultat ${handledId}`);
     auditButton.click();
   }, setup.handledId);
@@ -133,6 +139,8 @@ const baseUrl = process.env.UAT_BASE_URL || "http://127.0.0.1:8000";
 
   await page.evaluate(() => window.showView("reports"));
   await page.fill("#criticalComplianceTarget", "30");
+  await page.fill("#criticalComplianceExam", "CRP");
+  await page.fill("#criticalComplianceUnit", setup.unit);
   await page.evaluate(() => window.loadCriticalCompliance());
   await page.waitForFunction(() => document.querySelector("#criticalComplianceTable tbody tr"), null, { timeout: 15000 });
 
@@ -151,10 +159,12 @@ const baseUrl = process.env.UAT_BASE_URL || "http://127.0.0.1:8000";
       late: text("#critCompLate"),
       hint: text("#criticalComplianceHint"),
       table: text("#criticalComplianceTable"),
-      hasHandledRow: text("#criticalComplianceTable").includes(String(setupArg.handledId)),
-      hasPendingRow: text("#criticalComplianceTable").includes(String(setupArg.pendingId)),
+      hasHandledRow: text("#criticalComplianceTable").includes(`#${setupArg.handledId}`),
+      hasPendingRow: text("#criticalComplianceTable").includes(`#${setupArg.pendingId}`),
       hasAgent: text("#criticalComplianceTable").includes("RuggyLab Administrator"),
       hasLate: text("#criticalComplianceTable").includes("Hors délai"),
+      hasFilteredOutHandledIonogram: !text("#criticalComplianceTable").includes(`#${setupArg.handledId}`),
+      summary: text("#criticalComplianceSummary"),
       horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     };
   }, setup);
@@ -162,7 +172,7 @@ const baseUrl = process.env.UAT_BASE_URL || "http://127.0.0.1:8000";
   await page.screenshot({ path: path.join(outDir, "critical-workflow-uat.png"), fullPage: true });
   await browser.close();
 
-  if (!result.audit.includes("result.critical_ack") || !result.hasHandledRow || !result.hasPendingRow || !result.hasAgent || !result.hasLate || result.horizontalOverflow) {
+  if (!result.audit.includes("result.critical_ack") || !result.hasPendingRow || !result.hasFilteredOutHandledIonogram || !result.hasLate || !result.summary.includes("Synthèse qualité") || result.horizontalOverflow) {
     fail("UAT valeurs critiques incomplète", { setup, result, logs: logs.slice(-8) });
   }
 

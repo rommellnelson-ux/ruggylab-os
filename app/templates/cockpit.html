@@ -1787,6 +1787,8 @@
                   <option value="90">90 jours</option>
                 </select>
                 <input id="criticalComplianceTarget" type="number" min="1" max="1440" value="30" onchange="loadCriticalCompliance()" title="Délai cible en minutes" style="width:88px;" />
+                <input id="criticalComplianceExam" placeholder="Examen" oninput="debouncedCriticalComplianceLoad()" style="width:112px;" />
+                <input id="criticalComplianceUnit" placeholder="Unité" oninput="debouncedCriticalComplianceLoad()" style="width:112px;" />
                 <button class="ghost" onclick="loadCriticalCompliance()">↻ Actualiser</button>
                 <button class="secondary" onclick="exportCriticalComplianceCsv()">Exporter CSV</button>
               </div>
@@ -1797,6 +1799,7 @@
               <div class="panel metric metric-rose"><div id="critCompLate" class="value">—</div><div class="label">Hors délai</div></div>
               <div class="panel metric"><div id="critCompDelay" class="value">—</div><div class="label">Délai moyen</div></div>
             </div>
+            <div id="criticalComplianceSummary" class="notice" style="margin-top:12px;font-size:12px;">Synthèse qualité indisponible.</div>
             <table id="criticalComplianceTable" class="compact-mobile-table" style="margin-top:12px;">
               <thead><tr><th>Résultat</th><th>Patient</th><th>Échantillon</th><th>Analyse</th><th>Prise en charge</th><th>Agent</th><th>Conformité</th><th>Délai</th></tr></thead>
               <tbody></tbody>
@@ -6767,10 +6770,14 @@ window.onload=renderLabels;
     async function loadCriticalCompliance() {
       const days = $("criticalComplianceDays")?.value || "30";
       const target = $("criticalComplianceTarget")?.value || "30";
+      const exam = ($("criticalComplianceExam")?.value || "").trim();
+      const unit = ($("criticalComplianceUnit")?.value || "").trim();
       const hint = $("criticalComplianceHint");
       if (hint) hint.textContent = "Chargement du rapport valeurs critiques…";
       try {
-        const params = '?days=' + encodeURIComponent(days) + '&target_minutes=' + encodeURIComponent(target);
+        let params = '?days=' + encodeURIComponent(days) + '&target_minutes=' + encodeURIComponent(target);
+        if (exam) params += '&exam_code=' + encodeURIComponent(exam);
+        if (unit) params += '&unit=' + encodeURIComponent(unit);
         const data = await api('/api/v1/reports/critical-compliance' + params, { headers: headers(false) });
         if ($("critCompTotal")) $("critCompTotal").textContent = data.critical_total ?? 0;
         if ($("critCompHandled")) $("critCompHandled").textContent = (data.ack_rate_pct ?? 0) + "%";
@@ -6780,6 +6787,19 @@ window.onload=renderLabels;
           hint.textContent = (data.critical_late || 0) > 0
             ? `${data.critical_late} valeur(s) critique(s) hors délai cible (${data.target_minutes} min), dont ${data.critical_pending || 0} en attente.`
             : `Toutes les valeurs critiques de la période sont dans le délai cible (${data.target_minutes} min).`;
+        }
+        const summary = data.summary || {};
+        const topExams = (summary.top_exams || []).slice(0, 3).map((item) =>
+          `${item.label}: ${item.late}/${item.total} hors délai`
+        ).join(" · ") || "Aucun examen à signaler";
+        const byUnit = (summary.by_unit || []).slice(0, 3).map((item) =>
+          `${item.label}: ${item.pending} attente(s)`
+        ).join(" · ") || "Aucune unité à signaler";
+        if ($("criticalComplianceSummary")) {
+          $("criticalComplianceSummary").innerHTML =
+            '<strong>Synthèse qualité.</strong> ' + security.escapeHtml(summary.message || "Aucune donnée.") +
+            '<br><span style="color:var(--muted);">Examens: ' + security.escapeHtml(topExams) +
+            ' · Unités: ' + security.escapeHtml(byUnit) + '</span>';
         }
         const rows = (data.rows || []).map((item) => {
           const status = item.status === "pris_en_charge"
@@ -6804,15 +6824,25 @@ window.onload=renderLabels;
         setRows("criticalComplianceTable", rows);
       } catch (e) {
         if (hint) hint.textContent = "Rapport valeurs critiques indisponible.";
+        if ($("criticalComplianceSummary")) $("criticalComplianceSummary").textContent = "Synthèse qualité indisponible.";
         setRows("criticalComplianceTable", []);
         log('loadCriticalCompliance: ' + (e.message || e));
       }
     }
+    let _criticalComplianceTimer = null;
+    function debouncedCriticalComplianceLoad() {
+      clearTimeout(_criticalComplianceTimer);
+      _criticalComplianceTimer = setTimeout(loadCriticalCompliance, 350);
+    }
     async function exportCriticalComplianceCsv() {
       const days = $("criticalComplianceDays")?.value || "30";
       const target = $("criticalComplianceTarget")?.value || "30";
+      const exam = ($("criticalComplianceExam")?.value || "").trim();
+      const unit = ($("criticalComplianceUnit")?.value || "").trim();
       try {
-        const params = '?days=' + encodeURIComponent(days) + '&target_minutes=' + encodeURIComponent(target);
+        let params = '?days=' + encodeURIComponent(days) + '&target_minutes=' + encodeURIComponent(target);
+        if (exam) params += '&exam_code=' + encodeURIComponent(exam);
+        if (unit) params += '&unit=' + encodeURIComponent(unit);
         const resp = await fetch(normalizeApiPath('/api/v1/reports/critical-compliance/export.csv' + params), { headers: headers(false) });
         if (!resp.ok) { showToast("Export valeurs critiques indisponible", "error"); return; }
         const blob = await resp.blob();

@@ -790,17 +790,22 @@ def _critical_compliance_rows(
     start_date: datetime,
     end_date: datetime,
     target_minutes: int = DEFAULT_CRITICAL_ACK_TARGET_MINUTES,
+    exam_code: str | None = None,
+    unit: str | None = None,
 ) -> list[dict]:
-    results = (
-        db.query(Result)
-        .filter(
-            Result.is_critical.is_(True),
-            Result.analysis_date >= start_date,
-            Result.analysis_date <= end_date,
-        )
-        .order_by(Result.analysis_date.desc(), Result.id.desc())
-        .all()
+    query = db.query(Result).filter(
+        Result.is_critical.is_(True),
+        Result.analysis_date >= start_date,
+        Result.analysis_date <= end_date,
     )
+    if exam_code:
+        query = query.filter(func.upper(Result.exam_code) == exam_code.upper())
+    if unit:
+        query = query.join(Sample, Sample.id == Result.sample_id).join(
+            Patient, Patient.id == Sample.patient_id
+        )
+        query = query.filter(func.upper(Patient.unit) == unit.upper())
+    results = query.order_by(Result.analysis_date.desc(), Result.id.desc()).all()
     user_ids = {result.critical_ack_by_id for result in results if result.critical_ack_by_id}
     users = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
     user_by_id = {user.id: user for user in users}
@@ -845,6 +850,7 @@ def _critical_compliance_rows(
                 "sample_barcode": sample.barcode if sample else None,
                 "patient_ipp": patient.ipp_unique_id if patient else None,
                 "patient_name": f"{patient.first_name} {patient.last_name}" if patient else None,
+                "unit": patient.unit if patient else None,
                 "exam_code": result.exam_code,
                 "ack_by_id": ack_user.id if ack_user else None,
                 "ack_by": ack_user.full_name or ack_user.username if ack_user else None,
@@ -853,18 +859,40 @@ def _critical_compliance_rows(
     return rows
 
 
+def _critical_compliance_breakdown(rows: list[dict], field: str) -> list[dict]:
+    counters: dict[str, dict[str, int]] = {}
+    for row in rows:
+        key = str(row.get(field) or "Non renseigné")
+        entry = counters.setdefault(key, {"total": 0, "late": 0, "pending": 0})
+        entry["total"] += 1
+        if row["compliance_status"] == "hors_delai":
+            entry["late"] += 1
+        if row["status"] == "en_attente":
+            entry["pending"] += 1
+    return [
+        {"label": key, **value}
+        for key, value in sorted(
+            counters.items(),
+            key=lambda item: (item[1]["late"], item[1]["pending"], item[1]["total"], item[0]),
+            reverse=True,
+        )
+    ][:8]
+
+
 @router.get("/critical-compliance")
 def critical_compliance_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
     days: int = Query(default=30, ge=1, le=366),
     target_minutes: int = Query(default=DEFAULT_CRITICAL_ACK_TARGET_MINUTES, ge=1, le=1440),
+    exam_code: str | None = Query(default=None, min_length=1, max_length=50),
+    unit: str | None = Query(default=None, min_length=1, max_length=100),
 ) -> dict:
     """Rapport conformité des valeurs critiques : attente, délai, taux de prise en charge."""
     del current_user
     end_date = datetime.now(UTC).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    rows = _critical_compliance_rows(db, start_date, end_date, target_minutes)
+    rows = _critical_compliance_rows(db, start_date, end_date, target_minutes, exam_code, unit)
     handled = [row for row in rows if row["critical_ack_at"]]
     pending = [row for row in rows if not row["critical_ack_at"]]
     late = [row for row in rows if row["compliance_status"] == "hors_delai"]
@@ -879,6 +907,7 @@ def critical_compliance_report(
         "period_start": start_date.date().isoformat(),
         "period_end": end_date.date().isoformat(),
         "target_minutes": target_minutes,
+        "filters": {"exam_code": exam_code, "unit": unit},
         "critical_total": len(rows),
         "critical_handled": len(handled),
         "critical_pending": len(pending),
@@ -888,6 +917,14 @@ def critical_compliance_report(
         "on_time_rate_pct": round((len(on_time) / len(rows)) * 100, 1) if rows else 0.0,
         "avg_ack_delay_minutes": round(sum(delays) / len(delays), 1) if delays else None,
         "max_ack_delay_minutes": max(delays) if delays else None,
+        "summary": {
+            "message": (
+                f"{len(late)} valeur(s) critique(s) hors délai cible sur {len(rows)} "
+                f"sur {days} jour(s), seuil {target_minutes} min."
+            ),
+            "top_exams": _critical_compliance_breakdown(rows, "exam_code"),
+            "by_unit": _critical_compliance_breakdown(rows, "unit"),
+        },
         "rows": rows,
     }
 
@@ -898,12 +935,14 @@ def critical_compliance_export_csv(
     current_user: User = Depends(get_current_active_user),
     days: int = Query(default=30, ge=1, le=366),
     target_minutes: int = Query(default=DEFAULT_CRITICAL_ACK_TARGET_MINUTES, ge=1, le=1440),
+    exam_code: str | None = Query(default=None, min_length=1, max_length=50),
+    unit: str | None = Query(default=None, min_length=1, max_length=100),
 ) -> Response:
     """Export CSV du rapport conformité des valeurs critiques."""
     del current_user
     end_date = datetime.now(UTC).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    rows = _critical_compliance_rows(db, start_date, end_date, target_minutes)
+    rows = _critical_compliance_rows(db, start_date, end_date, target_minutes, exam_code, unit)
     output = StringIO()
     writer = csv.writer(output)
     columns = [
@@ -919,6 +958,7 @@ def critical_compliance_export_csv(
         "sample_barcode",
         "patient_ipp",
         "patient_name",
+        "unit",
         "exam_code",
     ]
     writer.writerow(columns)

@@ -325,6 +325,11 @@ def test_critical_compliance_report_and_export(client) -> None:
         headers=headers,
         json={"barcode": "CRIT-COMP-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
     ).json()
+    client.patch(
+        f"/api/v1/patients/{patient['id']}",
+        headers=headers,
+        json={"unit": "Urgences"},
+    )
     handled_result = client.post(
         "/api/v1/results",
         headers=headers,
@@ -363,16 +368,30 @@ def test_critical_compliance_report_and_export(client) -> None:
     assert report["critical_handled"] >= 1
     assert report["critical_pending"] >= 1
     assert report["target_minutes"] == 30
+    assert report["filters"] == {"exam_code": None, "unit": None}
     assert report["critical_late"] >= 1
     assert "on_time_rate_pct" in report
+    assert report["summary"]["top_exams"]
+    assert any(item["label"] == "CRP" for item in report["summary"]["top_exams"])
+    assert any(item["label"] == "Urgences" for item in report["summary"]["by_unit"])
 
     rows_by_id = {row["result_id"]: row for row in report["rows"]}
     assert rows_by_id[handled_result["id"]]["status"] == "pris_en_charge"
     assert rows_by_id[handled_result["id"]]["ack_by"] == "RuggyLab Administrator"
     assert rows_by_id[handled_result["id"]]["sample_barcode"] == "CRIT-COMP-SAMPLE-001"
     assert rows_by_id[handled_result["id"]]["patient_ipp"] == "IPP-CRIT-COMP-001"
+    assert rows_by_id[handled_result["id"]]["unit"] == "Urgences"
     assert rows_by_id[pending_result["id"]]["status"] == "en_attente"
     assert rows_by_id[pending_result["id"]]["compliance_status"] == "hors_delai"
+
+    filtered_response = client.get(
+        "/api/v1/reports/critical-compliance?days=30&target_minutes=30&exam_code=CRP&unit=Urgences",
+        headers=headers,
+    )
+    assert filtered_response.status_code == 200, filtered_response.text
+    filtered = filtered_response.json()
+    assert filtered["filters"] == {"exam_code": "CRP", "unit": "Urgences"}
+    assert {row["result_id"] for row in filtered["rows"]} == {pending_result["id"]}
 
     csv_response = client.get(
         "/api/v1/reports/critical-compliance/export.csv?days=30&target_minutes=30",
@@ -383,7 +402,85 @@ def test_critical_compliance_report_and_export(client) -> None:
     assert "result_id,analysis_date,critical_ack_at,ack_delay_minutes" in csv_response.text
     assert "compliance_status" in csv_response.text
     assert "RuggyLab Administrator" in csv_response.text
+    assert "Urgences" in csv_response.text
     assert "CRIT-COMP-SAMPLE-001" in csv_response.text
+
+
+def test_critical_workflow_multi_role_permissions(client) -> None:
+    admin_headers = _auth_headers(client)
+
+    tech_user = client.post(
+        "/api/v1/users",
+        headers=admin_headers,
+        json={
+            "username": "crit_tech",
+            "password": "TechPass123!",
+            "role": "technician",
+            "full_name": "Technicien Critique",
+        },
+    )
+    assert tech_user.status_code == 201, tech_user.text
+    tech_headers = _auth_headers(client, "crit_tech", "TechPass123!")
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=admin_headers,
+        json={
+            "ipp_unique_id": "IPP-CRIT-ROLE-001",
+            "first_name": "Role",
+            "last_name": "Critique",
+            "birth_date": "1984-05-06",
+            "sex": "F",
+            "rank": "Commandant",
+            "unit": "Biochimie",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=admin_headers,
+        json={"barcode": "CRIT-ROLE-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    critical = client.post(
+        "/api/v1/results",
+        headers=admin_headers,
+        json={
+            "sample_id": sample["id"],
+            "analysis_date": (datetime.now(UTC) - timedelta(minutes=35)).isoformat(),
+            "data_points": {"K": 7.1},
+            "is_critical": True,
+            "exam_code": "IONO",
+        },
+    ).json()
+
+    report_as_tech = client.get(
+        "/api/v1/reports/critical-compliance?days=30&unit=Biochimie",
+        headers=tech_headers,
+    )
+    assert report_as_tech.status_code == 200, report_as_tech.text
+    assert report_as_tech.json()["critical_pending"] >= 1
+
+    ack_as_tech = client.patch(
+        f"/api/v1/results/{critical['id']}/ack-critical",
+        headers=tech_headers,
+    )
+    assert ack_as_tech.status_code == 200, ack_as_tech.text
+
+    report_after_ack = client.get(
+        "/api/v1/reports/critical-compliance?days=30&unit=Biochimie",
+        headers=tech_headers,
+    ).json()
+    row = next(row for row in report_after_ack["rows"] if row["result_id"] == critical["id"])
+    assert row["ack_by"] == "Technicien Critique"
+    assert row["status"] == "pris_en_charge"
+
+    audit_as_tech = client.get("/api/v1/audit-events", headers=tech_headers)
+    assert audit_as_tech.status_code == 403
+    audit_as_admin = client.get(
+        "/api/v1/audit-events?event_type=result.critical_ack",
+        headers=admin_headers,
+    )
+    assert audit_as_admin.status_code == 200
+    assert any(event["entity_id"] == str(critical["id"]) for event in audit_as_admin.json()["items"])
 
 
 def test_result_history_returns_comparable_patient_results(client) -> None:

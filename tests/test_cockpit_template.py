@@ -74,13 +74,18 @@ class TestNewViewsPresent:
             "Prendre en charge",  # libellé agent pour le suivi critique
             'id="criticalComplianceTable"',  # rapport valeurs critiques
             'id="criticalComplianceTarget"',  # seuil cible qualité
+            'id="criticalComplianceExam"',  # filtre examen
+            'id="criticalComplianceUnit"',  # filtre unité
+            'id="criticalComplianceSummary"',  # synthèse comité qualité
             'id="critCompLate"',  # KPI hors délai
             "function loadCriticalCompliance",  # chargement conformité critiques
+            "function debouncedCriticalComplianceLoad",  # filtres rapport critiques
             "function exportCriticalComplianceCsv",  # export conformité critiques
             "/api/v1/reports/critical-compliance' + params",  # API rapport critiques
             "/api/v1/reports/critical-compliance/export.csv' + params",  # CSV rapport critiques
             "Dans délai",  # statut qualité valeurs critiques
             "Hors délai",  # statut qualité valeurs critiques
+            "Synthèse qualité",  # résumé qualité médicale
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
