@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_active_user, require_officer
 from app.db.session import get_db
@@ -123,8 +123,9 @@ def list_results_cockpit(
     limit: int = Query(100, ge=1, le=200),
 ) -> list[ResultCockpitItem]:
     """Liste enrichie pour le cockpit : résultat + échantillon + patient."""
-    # Cloisonnement RBAC : restreindre aux patients du périmètre de l'utilisateur
-    query = apply_result_patient_scope(db.query(Result), current_user)
+    # Cloisonnement RBAC + eager-load échantillon/patient (évite le N+1)
+    base = db.query(Result).options(joinedload(Result.sample).joinedload(Sample.patient))
+    query = apply_result_patient_scope(base, current_user)
     results = query.order_by(Result.id.desc()).limit(limit).all()
     return [
         ResultCockpitItem(
@@ -251,6 +252,7 @@ def get_result_history(
     query = (
         db.query(Result)
         .join(Sample, Result.sample_id == Sample.id)
+        .options(joinedload(Result.sample))  # eager-load pour _sample_read (évite le N+1)
         .filter(Sample.patient_id == patient_id, Result.id != result.id)
     )
     if result.exam_code:

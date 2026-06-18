@@ -14,6 +14,7 @@ Données entièrement fictives. À exécuter sur une instance de TEST :
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 
 from app.db.session import SessionLocal
 from app.models import Patient, Result, Sample, User
@@ -156,8 +157,9 @@ def _admin(db) -> User:
 
 
 def _make_rich_result(db, user, name, sex, exam_code, data_points, tat_kind) -> None:
+    uid = uuid.uuid4().hex[:8]  # identifiant unique (évite toute collision IPP/barcode)
     patient = Patient(
-        ipp_unique_id=f"DEMO-{exam_code}-{utcnow_naive().strftime('%H%M%S%f')}",
+        ipp_unique_id=f"DEMO-{exam_code}-{uid}",
         first_name="Démo",
         last_name=name,
         birth_date=dt.date(1985, 6, 15),
@@ -168,7 +170,7 @@ def _make_rich_result(db, user, name, sex, exam_code, data_points, tat_kind) -> 
     now = utcnow_naive()
     registered = now - dt.timedelta(minutes=(200 if tat_kind == "late" else 35))
     sample = Sample(
-        barcode=f"DEMO-S-{exam_code}-{now.strftime('%H%M%S%f')}",
+        barcode=f"DEMO-S-{exam_code}-{uid}",
         patient_id=patient.id,
         collection_date=registered,
         received_date=registered + dt.timedelta(minutes=5),
