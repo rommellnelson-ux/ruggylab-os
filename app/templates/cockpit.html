@@ -1252,6 +1252,15 @@
                 <button class="ghost" data-result-filter="unvalidated" onclick="setResultFilter('unvalidated', this)">Non validés</button>
                 <button class="ghost" data-result-filter="auto" onclick="setResultFilter('auto', this)">Auto §5.8</button>
                 <input id="resultSearch" style="max-width:260px;" placeholder="Rechercher patient, IPP, code-barres…" oninput="setResultSearch(this.value)" />
+                <select id="resultSort" onchange="setResultSort(this.value)" aria-label="Trier les résultats">
+                  <option value="date_desc">Plus récents</option>
+                  <option value="critical_first">Critiques d’abord</option>
+                  <option value="patient_asc">Patient A-Z</option>
+                  <option value="sample_asc">Code-barres A-Z</option>
+                  <option value="validated_first">Validés d’abord</option>
+                </select>
+                <button class="ghost" onclick="exportDisplayedResultsCsv()">Exporter CSV</button>
+                <button class="ghost" onclick="printDisplayedResults()">PDF</button>
               </div>
               <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Échantillon</th><th>Analyse</th><th>Critique</th><th>Alertes</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
             </div>
@@ -3289,6 +3298,8 @@
     let _resultsCache = [];
     let _resultFilter = "all";
     let _resultSearch = "";
+    let _resultSort = "date_desc";
+    let _resultsViewCache = [];
     let _resultSampleById = {};
     let _resultPatientById = {};
     let _selectedResultDetail = null;
@@ -3372,8 +3383,40 @@
       _resultSearch = String(value || "").trim().toLowerCase();
       renderResultsTable();
     }
+    function setResultSort(value) {
+      _resultSort = value || "date_desc";
+      renderResultsTable();
+    }
+    function _resultPatientName(r) {
+      const patient = _resultContext(r).patient;
+      return patient ? [patient.first_name, patient.last_name].filter(Boolean).join(" ") : "";
+    }
+    function _resultSampleLabel(r) {
+      return _resultContext(r).sample?.barcode || ("#" + r.sample_id);
+    }
+    function _sortResults(rows) {
+      const sorted = [...rows];
+      sorted.sort((a, b) => {
+        if (_resultSort === "critical_first") {
+          const ac = Number(Boolean(a.is_critical && !a.critical_ack_at));
+          const bc = Number(Boolean(b.is_critical && !b.critical_ack_at));
+          if (bc !== ac) return bc - ac;
+        } else if (_resultSort === "patient_asc") {
+          return _resultPatientName(a).localeCompare(_resultPatientName(b), "fr");
+        } else if (_resultSort === "sample_asc") {
+          return _resultSampleLabel(a).localeCompare(_resultSampleLabel(b), "fr");
+        } else if (_resultSort === "validated_first") {
+          const av = Number(Boolean(a.is_validated));
+          const bv = Number(Boolean(b.is_validated));
+          if (bv !== av) return bv - av;
+        }
+        return new Date(b.analysis_date || 0).getTime() - new Date(a.analysis_date || 0).getTime();
+      });
+      return sorted;
+    }
     function renderResultsTable() {
-      const rowsData = _resultsCache.filter(_resultMatchesFilter).filter(_resultMatchesSearch);
+      const rowsData = _sortResults(_resultsCache.filter(_resultMatchesFilter).filter(_resultMatchesSearch));
+      _resultsViewCache = rowsData;
       const pendingCount = _resultsCache.filter((r) => r.is_critical && !r.critical_ack_at).length;
       const criticalCount = _resultsCache.filter((r) => r.is_critical).length;
       const unvalidatedCount = _resultsCache.filter((r) => !r.is_validated).length;
@@ -3444,21 +3487,73 @@
       loadingStates.showSkeleton(tbody, 5);
 
       try {
-        const [data, samplesData, patientsData] = await Promise.all([
-          api("/api/v1/results?limit=100", { headers: headers(false) }),
-          api("/api/v1/samples", { headers: headers(false) }).catch(() => ({ items: [] })),
-          api("/api/v1/patients?limit=100", { headers: headers(false) }).catch(() => ({ items: [] })),
-        ]);
-        _resultsCache = _listItems(data);
+        const data = await api("/api/v1/results/cockpit?limit=100", { headers: headers(false) });
+        const items = _listItems(data);
+        _resultsCache = items.map((item) => item.result || item);
         _resultSampleById = {};
-        _listItems(samplesData).forEach((sample) => { _resultSampleById[sample.id] = sample; });
         _resultPatientById = {};
-        _listItems(patientsData).forEach((patient) => { _resultPatientById[patient.id] = patient; });
+        items.forEach((item) => {
+          if (item.sample) _resultSampleById[item.sample.id] = item.sample;
+          if (item.patient) _resultPatientById[item.patient.id] = item.patient;
+        });
         renderResultsTable();
       } catch (error) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
         throw error;
       }
+    }
+    function _csvCell(value) {
+      const text = String(value ?? "");
+      return '"' + text.replace(/"/g, '""') + '"';
+    }
+    function _resultExportRows() {
+      return _resultsViewCache.map((r) => {
+        const { sample, patient } = _resultContext(r);
+        return {
+          id: r.id,
+          patient: patient ? [patient.first_name, patient.last_name].filter(Boolean).join(" ") : "",
+          ipp: patient?.ipp_unique_id || "",
+          barcode: sample?.barcode || "",
+          exam: r.exam_code || "",
+          analysis_date: r.analysis_date || "",
+          critical: r.is_critical ? "oui" : "non",
+          handled: r.critical_ack_at ? "oui" : "non",
+          validated: r.is_validated ? "oui" : "non",
+          auto_validated: r.is_auto_validated ? "oui" : "non",
+          analytes: _resultPrimaryValues(r.data_points || {}, 12).join("; "),
+        };
+      });
+    }
+    function exportDisplayedResultsCsv() {
+      const rows = _resultExportRows();
+      if (rows.length === 0) { showToast("Aucun résultat affiché à exporter", "error"); return; }
+      const headersCsv = ["id", "patient", "ipp", "barcode", "exam", "analysis_date", "critical", "handled", "validated", "auto_validated", "analytes"];
+      const csv = "\ufeff" + headersCsv.join(",") + "\n" + rows.map((row) => headersCsv.map((key) => _csvCell(row[key])).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ruggylab-resultats-affiches.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Export CSV généré", "success");
+    }
+    function printDisplayedResults() {
+      const rows = _resultExportRows();
+      if (rows.length === 0) { showToast("Aucun résultat affiché à imprimer", "error"); return; }
+      const body = rows.map((row) => '<tr>' +
+        '<td>#' + security.escapeHtml(row.id) + '</td>' +
+        '<td>' + security.escapeHtml(row.patient || "—") + '<br><small>' + security.escapeHtml(row.ipp || "—") + '</small></td>' +
+        '<td>' + security.escapeHtml(row.barcode || "—") + '</td>' +
+        '<td>' + security.escapeHtml(row.exam || "—") + '</td>' +
+        '<td>' + security.escapeHtml(_formatResultDate(row.analysis_date)) + '</td>' +
+        '<td>' + security.escapeHtml(row.critical) + '</td>' +
+        '<td>' + security.escapeHtml(row.analytes || "—") + '</td>' +
+        '</tr>').join("");
+      const win = window.open("", "_blank");
+      if (!win) { showToast("Autorisez les popups pour générer le PDF", "error"); return; }
+      win.document.write('<!doctype html><html><head><title>Résultats RuggyLab</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111827}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d1d5db;padding:7px;text-align:left;vertical-align:top}th{background:#eef2f7}h1{font-size:20px;margin:0 0 4px}.meta{color:#64748b;margin-bottom:16px}</style></head><body><h1>Résultats affichés</h1><div class="meta">RuggyLab OS · ' + security.escapeHtml(new Date().toLocaleString("fr-FR")) + '</div><table><thead><tr><th>ID</th><th>Patient</th><th>Échantillon</th><th>Examen</th><th>Date</th><th>Critique</th><th>Valeurs</th></tr></thead><tbody>' + body + '</tbody></table><script>window.print();<\\/script></body></html>');
+      win.document.close();
     }
     async function ackCritical(resultId, btn) {
       if (btn) { btn.disabled = true; btn.textContent = "…"; }

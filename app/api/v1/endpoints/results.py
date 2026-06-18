@@ -13,6 +13,7 @@ from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import (
     ResultAmend,
+    ResultCockpitItem,
     ResultCreate,
     ResultDetailRead,
     ResultHistoryItem,
@@ -78,6 +79,25 @@ def list_results(
         items=[ResultRead.model_validate(r) for r in items],
         meta=PaginationMeta.from_counts(total=total, skip=skip, limit=limit),
     )
+
+
+@router.get("/cockpit", response_model=list[ResultCockpitItem])
+def list_results_cockpit(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    limit: int = Query(100, ge=1, le=200),
+) -> list[ResultCockpitItem]:
+    """Liste enrichie pour le cockpit : résultat + échantillon + patient."""
+    del current_user
+    results = db.query(Result).order_by(Result.id.desc()).limit(limit).all()
+    return [
+        ResultCockpitItem(
+            result=ResultRead.model_validate(result),
+            sample=result.sample,
+            patient=result.sample.patient if result.sample else None,
+        )
+        for result in results
+    ]
 
 
 @router.get("/{result_id}", response_model=ResultRead)

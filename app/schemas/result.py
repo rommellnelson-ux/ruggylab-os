@@ -62,6 +62,12 @@ class ResultDetailRead(BaseModel):
     bioref: dict | None = None
 
 
+class ResultCockpitItem(BaseModel):
+    result: ResultRead
+    sample: SampleRead | None = None
+    patient: PatientRead | None = None
+
+
 class ResultHistoryItem(BaseModel):
     result: ResultRead
     sample: SampleRead | None = None

@@ -201,6 +201,53 @@ def test_result_detail_includes_patient_sample_and_bioref(client) -> None:
     assert detail["bioref"]["exam_code"] == "NFS"
 
 
+def test_results_cockpit_returns_enriched_rows(client) -> None:
+    headers = _auth_headers(client)
+
+    patient_response = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-COCKPIT-001",
+            "first_name": "Cockpit",
+            "last_name": "Patient",
+            "birth_date": "1992-01-02",
+            "sex": "F",
+            "rank": "Major",
+        },
+    )
+    assert patient_response.status_code == 201, patient_response.text
+    patient = patient_response.json()
+
+    sample_response = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "COCKPIT-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    )
+    assert sample_response.status_code == 201, sample_response.text
+    sample = sample_response.json()
+
+    result_response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"CRP": 7.5},
+            "is_critical": False,
+            "exam_code": "CRP",
+        },
+    )
+    assert result_response.status_code == 201, result_response.text
+    result = result_response.json()
+
+    response = client.get("/api/v1/results/cockpit?limit=20", headers=headers)
+    assert response.status_code == 200, response.text
+    items = response.json()
+    row = next(item for item in items if item["result"]["id"] == result["id"])
+    assert row["sample"]["barcode"] == "COCKPIT-SAMPLE-001"
+    assert row["patient"]["ipp_unique_id"] == "IPP-COCKPIT-001"
+
+
 def test_result_history_returns_comparable_patient_results(client) -> None:
     headers = _auth_headers(client)
 
