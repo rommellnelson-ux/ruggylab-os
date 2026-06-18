@@ -2248,6 +2248,34 @@
         </div>
 
         <div id="quality" class="view band hidden">
+          <div class="panel" style="margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+              <div>
+                <h3 style="margin:0;">Dashboard Qualité laboratoire</h3>
+                <div id="qualityCockpitSummary" style="font-size:12px;color:var(--muted);margin-top:4px;">Chargement…</div>
+              </div>
+              <div class="actions">
+                <select id="qualityCockpitDays" onchange="loadQuality()">
+                  <option value="7">7 jours</option>
+                  <option value="30" selected>30 jours</option>
+                  <option value="90">90 jours</option>
+                </select>
+                <button class="ghost" onclick="showView('reports')">Valeurs critiques</button>
+                <button class="ghost" onclick="showView('tat')">TAT</button>
+                <button class="ghost" onclick="showView('qc')">QC</button>
+              </div>
+            </div>
+            <div class="grid4" style="margin-top:12px;">
+              <div class="panel metric metric-rose"><div id="qualityCriticalLate" class="value">—</div><div class="label">Critiques hors délai</div></div>
+              <div class="panel metric metric-amber"><div id="qualityTatLate" class="value">—</div><div class="label">TAT en retard</div></div>
+              <div class="panel metric" id="qualityQcPanel"><div id="qualityQcReject" class="value">—</div><div class="label">QC rejet</div></div>
+              <div class="panel metric" id="qualityNcRiskPanel"><div id="qualityNcRisk" class="value">—</div><div class="label">NC ouvertes</div></div>
+            </div>
+            <table id="qualityRiskTable" class="compact-mobile-table" style="margin-top:12px;">
+              <thead><tr><th>Domaine</th><th>Signal</th><th>Action</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
           <div class="grid4">
             <div class="panel metric metric-blue"><div id="qmTotal" class="value">—</div><div class="label">NC totales</div></div>
             <div class="panel metric" id="qmOpenPanel"><div id="qmOpen" class="value">—</div><div class="label">NC ouvertes</div></div>
@@ -7627,14 +7655,19 @@ window.onload=renderLabels;
 
     async function loadQuality() {
       try {
-        const [dash, list] = await Promise.all([
+        const days = $('qualityCockpitDays')?.value || '30';
+        const [dash, list, critical, tat, qc] = await Promise.all([
           api('/api/v1/quality/dashboard', { headers: headers(false) }),
           api(`/api/v1/quality/non-conformities${$('ncFilterStatus')?.value ? '?status=' + $('ncFilterStatus').value : ''}`, { headers: headers(false) }),
+          api(`/api/v1/reports/critical-compliance?days=${encodeURIComponent(days)}&target_minutes=30`, { headers: headers(false) }).catch(() => null),
+          api(`/api/v1/tat/dashboard?days=${encodeURIComponent(days)}`, { headers: headers(false) }).catch(() => null),
+          api('/api/v1/reports/qc-summary', { headers: headers(false) }).catch(() => null),
         ]);
         $('qmTotal').textContent = dash.total;
         $('qmOpen').textContent = dash.open_count;
         $('qmOverdue').textContent = dash.overdue_count;
         $('qmCritical').textContent = dash.by_severity.critical || 0;
+        _renderQualityCockpit({ dash, critical, tat, qc, days });
         const op = $('qmOverduePanel');
         if (op) { op.classList.remove('metric-rose', 'metric-teal'); op.classList.add(dash.overdue_count > 0 ? 'metric-rose' : 'metric-teal'); }
         setRows('ncTable', list.map(nc => {
@@ -7651,6 +7684,40 @@ window.onload=renderLabels;
           return tr;
         }));
       } catch (e) { showToast('Erreur chargement qualité', 'error'); log('loadQuality: ' + (e.message || e)); }
+    }
+
+    function _renderQualityCockpit({ dash, critical, tat, qc, days }) {
+      const criticalLate = critical?.critical_late ?? 0;
+      const criticalPending = critical?.critical_pending ?? 0;
+      const tatLate = tat?.late_count ?? 0;
+      const qcReject = qc?.reject_count ?? 0;
+      const ncOpen = dash?.open_count ?? 0;
+      if ($('qualityCriticalLate')) $('qualityCriticalLate').textContent = criticalLate;
+      if ($('qualityTatLate')) $('qualityTatLate').textContent = tatLate;
+      if ($('qualityQcReject')) $('qualityQcReject').textContent = qcReject;
+      if ($('qualityNcRisk')) $('qualityNcRisk').textContent = ncOpen;
+      const qcPanel = $('qualityQcPanel');
+      if (qcPanel) { qcPanel.classList.remove('metric-rose', 'metric-teal', 'metric-amber'); qcPanel.classList.add(qcReject > 0 ? 'metric-rose' : (qc?.warn_count || 0) > 0 ? 'metric-amber' : 'metric-teal'); }
+      const ncPanel = $('qualityNcRiskPanel');
+      if (ncPanel) { ncPanel.classList.remove('metric-rose', 'metric-teal', 'metric-amber'); ncPanel.classList.add((dash?.overdue_count || 0) > 0 ? 'metric-rose' : ncOpen > 0 ? 'metric-amber' : 'metric-teal'); }
+      if ($('qualityCockpitSummary')) {
+        $('qualityCockpitSummary').textContent = `${criticalLate} critique(s) hors délai, ${tatLate} TAT en retard, ${qcReject} rejet(s) QC et ${ncOpen} NC ouverte(s) sur ${days} jour(s).`;
+      }
+      const rows = [
+        { domain: 'Valeurs critiques', signal: `${criticalLate} hors délai · ${criticalPending} en attente`, action: 'Ouvrir rapport', view: 'reports', severe: criticalLate > 0 },
+        { domain: 'TAT', signal: `${tatLate} examen(s) en retard`, action: 'Suivre TAT', view: 'tat', severe: tatLate > 0 },
+        { domain: 'QC analytique', signal: `${qcReject} rejet(s) · ${qc?.warn_count || 0} alerte(s)`, action: 'Ouvrir QC', view: 'qc', severe: qcReject > 0 },
+        { domain: 'NC/CAPA', signal: `${ncOpen} ouverte(s) · ${dash?.overdue_count || 0} en retard`, action: 'Voir NC', view: 'quality', severe: (dash?.overdue_count || 0) > 0 },
+      ].map((item) => {
+        const tr = row(
+          `<td><strong>${security.escapeHtml(item.domain)}</strong></td>` +
+          `<td>${security.escapeHtml(item.signal)}</td>` +
+          `<td><button class="ghost" onclick="showView('${item.view}')">${security.escapeHtml(item.action)}</button></td>`
+        );
+        if (item.severe) tr.classList.add('row-warning');
+        return tr;
+      });
+      setRows('qualityRiskTable', rows);
     }
 
     async function createNonConformity(btn) {

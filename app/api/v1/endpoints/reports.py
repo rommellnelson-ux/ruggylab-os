@@ -823,10 +823,10 @@ def _critical_compliance_rows(
             )
         elif result.analysis_date:
             elapsed_minutes = round((end_date - result.analysis_date).total_seconds() / 60, 1)
-        delay_for_compliance = ack_delay_minutes if ack_delay_minutes is not None else elapsed_minutes
-        within_target = (
-            delay_for_compliance is not None and delay_for_compliance <= target_minutes
+        delay_for_compliance = (
+            ack_delay_minutes if ack_delay_minutes is not None else elapsed_minutes
         )
+        within_target = delay_for_compliance is not None and delay_for_compliance <= target_minutes
         compliance_status = (
             "dans_delai"
             if within_target
@@ -898,9 +898,7 @@ def critical_compliance_report(
     late = [row for row in rows if row["compliance_status"] == "hors_delai"]
     on_time = [row for row in rows if row["compliance_status"] == "dans_delai"]
     delays = [
-        float(row["ack_delay_minutes"])
-        for row in handled
-        if row["ack_delay_minutes"] is not None
+        float(row["ack_delay_minutes"]) for row in handled if row["ack_delay_minutes"] is not None
     ]
     return {
         "period_days": days,

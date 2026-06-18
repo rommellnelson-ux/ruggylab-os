@@ -11,6 +11,8 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
   patient/échantillon, rapport conformité avec seuil cible, indicateur hors
   délai, agent de prise en charge, filtres examen/unité, synthèse qualité et
   export CSV.
+- **Dashboard Qualité laboratoire** : vue consolidée valeurs critiques, TAT,
+  QC analytique et NC/CAPA pour prioriser les actions qualité.
 - **Unification des vocabulaires biologiques** : table de correspondance
   canonique `biological_code_mappings` reliant `exam_code` ↔ `test_code` ↔
   `analyte` (panels NFS/IONO inclus) et interprétation bioref complémentaire

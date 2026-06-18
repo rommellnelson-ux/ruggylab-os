@@ -480,7 +480,9 @@ def test_critical_workflow_multi_role_permissions(client) -> None:
         headers=admin_headers,
     )
     assert audit_as_admin.status_code == 200
-    assert any(event["entity_id"] == str(critical["id"]) for event in audit_as_admin.json()["items"])
+    assert any(
+        event["entity_id"] == str(critical["id"]) for event in audit_as_admin.json()["items"]
+    )
 
 
 def test_result_history_returns_comparable_patient_results(client) -> None:

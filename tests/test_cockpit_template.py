@@ -78,6 +78,9 @@ class TestNewViewsPresent:
             'id="criticalComplianceUnit"',  # filtre unité
             'id="criticalComplianceSummary"',  # synthèse comité qualité
             'id="critCompLate"',  # KPI hors délai
+            'id="qualityCockpitSummary"',  # dashboard qualité consolidé
+            'id="qualityRiskTable"',  # priorités qualité
+            "function _renderQualityCockpit",  # rendu cockpit qualité
             "function loadCriticalCompliance",  # chargement conformité critiques
             "function debouncedCriticalComplianceLoad",  # filtres rapport critiques
             "function exportCriticalComplianceCsv",  # export conformité critiques
@@ -174,7 +177,7 @@ class TestRealtimeAuthHardening:
     def test_dashboard_critical_metric_uses_pending_alerts(self, html: str) -> None:
         assert "Critiques à prendre en charge" in html
         assert 'api("/api/v1/critical-alerts/pending"' in html
-        assert "$(\"mCritical\").textContent = pendingCriticalCount;" in html
+        assert '$("mCritical").textContent = pendingCriticalCount;' in html
 
 
 class TestStaticJavascriptAssets:
