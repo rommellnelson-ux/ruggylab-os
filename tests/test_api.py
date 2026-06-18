@@ -248,6 +248,60 @@ def test_results_cockpit_returns_enriched_rows(client) -> None:
     assert row["patient"]["ipp_unique_id"] == "IPP-COCKPIT-001"
 
 
+def test_ack_critical_batch_and_clinical_audit(client) -> None:
+    headers = _auth_headers(client)
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-BATCH-001",
+            "first_name": "Batch",
+            "last_name": "Critical",
+            "birth_date": "1988-03-04",
+            "sex": "M",
+            "rank": "Sergent",
+        },
+    ).json()
+    first_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BATCH-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    second_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BATCH-SAMPLE-002", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    critical = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={"sample_id": first_sample["id"], "data_points": {"K": 7.2}, "is_critical": True},
+    ).json()
+    normal = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={"sample_id": second_sample["id"], "data_points": {"K": 4.2}, "is_critical": False},
+    ).json()
+
+    response = client.patch(
+        "/api/v1/results/ack-critical-batch",
+        headers=headers,
+        json={"result_ids": [critical["id"], normal["id"], 999999]},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["acknowledged"] == [critical["id"]]
+    assert payload["skipped"][str(normal["id"])] == "non critique"
+    assert payload["skipped"]["999999"] == "introuvable"
+
+    detail = client.get(f"/api/v1/results/{critical['id']}", headers=headers).json()
+    assert detail["critical_ack_at"] is not None
+    audit_response = client.get(f"/api/v1/results/{critical['id']}/clinical-audit", headers=headers)
+    assert audit_response.status_code == 200, audit_response.text
+    assert any(event["event_type"] == "result.critical_ack" for event in audit_response.json())
+
+
 def test_result_history_returns_comparable_patient_results(client) -> None:
     headers = _auth_headers(client)
 

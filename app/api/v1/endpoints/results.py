@@ -12,7 +12,10 @@ from app.models import AuditEvent, Equipment, ReportSignature, Result, Sample, U
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
 from app.schemas.result import (
+    CriticalAckBatchRequest,
+    CriticalAckBatchResponse,
     ResultAmend,
+    ResultClinicalAuditEvent,
     ResultCockpitItem,
     ResultCreate,
     ResultDetailRead,
@@ -20,6 +23,7 @@ from app.schemas.result import (
     ResultHistoryRead,
     ResultRead,
 )
+from app.services.audit import log_audit_event
 from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
@@ -98,6 +102,47 @@ def list_results_cockpit(
         )
         for result in results
     ]
+
+
+@router.patch("/ack-critical-batch", response_model=CriticalAckBatchResponse)
+def ack_critical_batch(
+    payload: CriticalAckBatchRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> CriticalAckBatchResponse:
+    """Prendre en charge plusieurs valeurs critiques affichées dans le cockpit."""
+    acknowledged: list[int] = []
+    skipped: dict[int, str] = {}
+    unique_ids = list(dict.fromkeys(payload.result_ids))
+    results = db.query(Result).filter(Result.id.in_(unique_ids)).all()
+    result_by_id = {result.id: result for result in results}
+    now = utcnow_naive()
+
+    for result_id in unique_ids:
+        result = result_by_id.get(result_id)
+        if result is None:
+            skipped[result_id] = "introuvable"
+            continue
+        if not result.is_critical:
+            skipped[result_id] = "non critique"
+            continue
+        if result.critical_ack_at is not None:
+            skipped[result_id] = "déjà pris en charge"
+            continue
+        result.critical_ack_at = now
+        result.critical_ack_by_id = current_user.id
+        acknowledged.append(result.id)
+        log_audit_event(
+            db,
+            user=current_user,
+            event_type="result.critical_ack",
+            entity_type="result",
+            entity_id=str(result.id),
+            payload={"source": "batch"},
+        )
+
+    db.commit()
+    return CriticalAckBatchResponse(acknowledged=acknowledged, skipped=skipped)
 
 
 @router.get("/{result_id}", response_model=ResultRead)
@@ -221,6 +266,37 @@ def get_result_history(
         exam_code=result.exam_code,
         items=items,
     )
+
+
+@router.get("/{result_id}/clinical-audit", response_model=list[ResultClinicalAuditEvent])
+def get_result_clinical_audit(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    limit: int = Query(20, ge=1, le=100),
+) -> list[ResultClinicalAuditEvent]:
+    """Timeline clinique/audit liée à un résultat."""
+    del current_user
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    events = (
+        db.query(AuditEvent)
+        .filter(AuditEvent.entity_type == "result", AuditEvent.entity_id == str(result_id))
+        .order_by(AuditEvent.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        ResultClinicalAuditEvent(
+            id=event.id,
+            created_at=event.created_at,
+            event_type=event.event_type,
+            username=event.user.username if event.user else None,
+            payload=event.payload,
+        )
+        for event in events
+    ]
 
 
 @router.get(
@@ -447,6 +523,14 @@ def ack_critical(
         )
     result.critical_ack_at = utcnow_naive()
     result.critical_ack_by_id = current_user.id
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="result.critical_ack",
+        entity_type="result",
+        entity_id=str(result.id),
+        payload={"source": "single"},
+    )
     db.commit()
     db.refresh(result)
     return result

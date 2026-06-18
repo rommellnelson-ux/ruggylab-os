@@ -68,6 +68,23 @@ class ResultCockpitItem(BaseModel):
     patient: PatientRead | None = None
 
 
+class CriticalAckBatchRequest(BaseModel):
+    result_ids: list[int] = Field(..., min_length=1, max_length=100)
+
+
+class CriticalAckBatchResponse(BaseModel):
+    acknowledged: list[int] = Field(default_factory=list)
+    skipped: dict[int, str] = Field(default_factory=dict)
+
+
+class ResultClinicalAuditEvent(BaseModel):
+    id: int
+    created_at: dt.datetime
+    event_type: str
+    username: str | None = None
+    payload: str | None = None
+
+
 class ResultHistoryItem(BaseModel):
     result: ResultRead
     sample: SampleRead | None = None

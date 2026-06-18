@@ -56,13 +56,17 @@ class TestNewViewsPresent:
             "function _resultContext",  # enrichissement patient/échantillon
             "function exportDisplayedResultsCsv",  # export opérationnel CSV
             "function printDisplayedResults",  # export imprimable/PDF
+            "function ackDisplayedCriticals",  # prise en charge groupée
             "/api/v1/results/cockpit?limit=100",  # liste résultats enrichie côté API
+            "/api/v1/results/ack-critical-batch",  # action groupée critiques
             'id="resultDetailPanel"',  # panneau détail résultat
             'id="resultDetailPatient"',  # contexte patient dans le détail
             'id="resultDetailBarcode"',  # contexte échantillon dans le détail
             'id="resultDetailClinicalSummary"',  # synthèse médicale copiable
             'id="resultDetailHistory"',  # antériorités comparables
+            'id="resultDetailAudit"',  # timeline clinique/audit
             "function openResultDetail",  # ouverture détail depuis une ligne
+            "function _renderResultClinicalAudit",  # rendu timeline clinique
             "function copyResultClinicalSummary",  # copie de synthèse clinique
             "Prendre en charge",  # libellé agent pour le suivi critique
             'id="complianceTrendChart"',  # courbe de tendance conformité

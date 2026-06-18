@@ -1261,6 +1261,7 @@
                 </select>
                 <button class="ghost" onclick="exportDisplayedResultsCsv()">Exporter CSV</button>
                 <button class="ghost" onclick="printDisplayedResults()">PDF</button>
+                <button class="danger" onclick="ackDisplayedCriticals(this)">Prendre en charge affichés</button>
               </div>
               <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Échantillon</th><th>Analyse</th><th>Critique</th><th>Alertes</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
             </div>
@@ -1305,6 +1306,10 @@
             <div style="margin-top:12px;">
               <h4 style="margin:0 0 8px;">Antériorités comparables</h4>
               <div id="resultDetailHistory"></div>
+            </div>
+            <div style="margin-top:12px;">
+              <h4 style="margin:0 0 8px;">Timeline clinique</h4>
+              <div id="resultDetailAudit"></div>
             </div>
           </div>
           <!-- Panneau seuils critiques (panic values) -->
@@ -3555,6 +3560,32 @@
       win.document.write('<!doctype html><html><head><title>Résultats RuggyLab</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111827}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d1d5db;padding:7px;text-align:left;vertical-align:top}th{background:#eef2f7}h1{font-size:20px;margin:0 0 4px}.meta{color:#64748b;margin-bottom:16px}</style></head><body><h1>Résultats affichés</h1><div class="meta">RuggyLab OS · ' + security.escapeHtml(new Date().toLocaleString("fr-FR")) + '</div><table><thead><tr><th>ID</th><th>Patient</th><th>Échantillon</th><th>Examen</th><th>Date</th><th>Critique</th><th>Valeurs</th></tr></thead><tbody>' + body + '</tbody></table><script>window.print();<\\/script></body></html>');
       win.document.close();
     }
+    async function ackDisplayedCriticals(btn) {
+      const ids = _resultsViewCache
+        .filter((r) => r.is_critical && !r.critical_ack_at)
+        .map((r) => r.id);
+      if (ids.length === 0) {
+        showToast("Aucune valeur critique affichée à prendre en charge", "error");
+        return;
+      }
+      if (!confirm("Prendre en charge " + ids.length + " valeur(s) critique(s) affichée(s) ?")) return;
+      if (btn) { btn.disabled = true; btn.textContent = "…"; }
+      try {
+        const response = await api("/api/v1/results/ack-critical-batch", {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify({ result_ids: ids }),
+        });
+        showToast((response.acknowledged || []).length + " valeur(s) critique(s) prise(s) en charge", "success");
+        await loadResults();
+        await loadPendingCriticals();
+        await loadDashboard();
+      } catch {
+        showToast("Erreur lors de la prise en charge groupée", "error");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Prendre en charge affichés"; }
+      }
+    }
     async function ackCritical(resultId, btn) {
       if (btn) { btn.disabled = true; btn.textContent = "…"; }
       try {
@@ -3676,6 +3707,18 @@
             '</tr>';
         }).join("") + '</tbody></table>';
     }
+    function _renderResultClinicalAudit(events) {
+      if (!events || events.length === 0) {
+        return '<div class="empty-state">Aucune trace clinique liée à ce résultat.</div>';
+      }
+      return '<table class="compact-mobile-table"><thead><tr><th>Date</th><th>Action</th><th>Agent</th><th>Détail</th></tr></thead><tbody>' +
+        events.map((event) => '<tr>' +
+          '<td>' + security.escapeHtml(_formatResultDate(event.created_at)) + '</td>' +
+          '<td>' + security.escapeHtml(event.event_type || '—') + '</td>' +
+          '<td>' + security.escapeHtml(event.username || '—') + '</td>' +
+          '<td><code style="font-size:11px;">' + security.escapeHtml(event.payload || '—') + '</code></td>' +
+          '</tr>').join("") + '</tbody></table>';
+    }
     function _patientDisplayName(patient) {
       if (!patient) return "—";
       const name = [patient.first_name, patient.last_name].filter(Boolean).join(" ").trim();
@@ -3706,10 +3749,12 @@
         }
         let history = { items: [] };
         try { history = await api('/api/v1/results/' + resultId + '/history?limit=5', { headers: headers(false) }); } catch {}
+        let clinicalAudit = [];
+        try { clinicalAudit = await api('/api/v1/results/' + resultId + '/clinical-audit?limit=20', { headers: headers(false) }); } catch {}
         const context = detail
           ? { sample: detail.sample || null, patient: detail.patient || null }
           : await _loadResultContext(result);
-        _selectedResultDetail = { result, bioref, history, sample: context.sample, patient: context.patient };
+        _selectedResultDetail = { result, bioref, history, clinicalAudit, sample: context.sample, patient: context.patient };
         $('resultDetailTitle').textContent = '#' + result.id;
         $('resultDetailPatient').textContent = _patientDisplayName(context.patient);
         $('resultDetailIpp').textContent = context.patient?.ipp_unique_id || (context.sample?.patient_id ? 'Patient #' + context.sample.patient_id : '—');
@@ -3728,6 +3773,7 @@
         $('resultDetailBioref').innerHTML = _renderBiorefDetail(bioref);
         $('resultDetailClinicalSummary').textContent = _resultClinicalSummary(result, context, bioref, history);
         $('resultDetailHistory').innerHTML = _renderResultHistory(history);
+        $('resultDetailAudit').innerHTML = _renderResultClinicalAudit(clinicalAudit);
         $('resultDetailTrace').innerHTML =
           'Analyse: <strong>' + security.escapeHtml(_formatResultDate(result.analysis_date)) + '</strong>' +
           ' · Bio-validation: <strong>' + security.escapeHtml(_formatResultDate(result.bio_validated_at)) + '</strong>' +
