@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.models import AuditEvent, Equipment, ReportSignature, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
+from app.schemas.patient import PatientRead
 from app.schemas.result import (
     CriticalAckBatchRequest,
     CriticalAckBatchResponse,
@@ -23,6 +24,7 @@ from app.schemas.result import (
     ResultHistoryRead,
     ResultRead,
 )
+from app.schemas.sample import SampleRead
 from app.services.audit import log_audit_event
 from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
@@ -53,6 +55,16 @@ def _numeric_data_point(raw: object) -> float | None:
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return float(value)
     return None
+
+
+def _sample_read(sample: Sample | None) -> SampleRead | None:
+    return SampleRead.model_validate(sample) if sample is not None else None
+
+
+def _patient_read(sample: Sample | None) -> PatientRead | None:
+    if sample is None or sample.patient is None:
+        return None
+    return PatientRead.model_validate(sample.patient)
 
 
 @router.get("", response_model=ResultListResponse)
@@ -97,8 +109,8 @@ def list_results_cockpit(
     return [
         ResultCockpitItem(
             result=ResultRead.model_validate(result),
-            sample=result.sample,
-            patient=result.sample.patient if result.sample else None,
+            sample=_sample_read(result.sample),
+            patient=_patient_read(result.sample),
         )
         for result in results
     ]
@@ -203,8 +215,8 @@ def get_result_detail(
     sample = result.sample
     return ResultDetailRead(
         result=ResultRead.model_validate(result),
-        sample=sample,
-        patient=sample.patient if sample else None,
+        sample=_sample_read(sample),
+        patient=_patient_read(sample),
         bioref=bioref,
     )
 
@@ -252,7 +264,7 @@ def get_result_history(
         items.append(
             ResultHistoryItem(
                 result=ResultRead.model_validate(previous),
-                sample=previous.sample,
+                sample=_sample_read(previous.sample),
                 shared_analytes=shared_analytes,
                 delta_from_current=deltas,
             )

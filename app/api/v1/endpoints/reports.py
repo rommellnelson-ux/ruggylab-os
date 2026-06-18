@@ -813,7 +813,11 @@ def _critical_compliance_rows(
     for result in results:
         sample = result.sample
         patient = sample.patient if sample else None
-        ack_user = user_by_id.get(result.critical_ack_by_id)
+        ack_user = (
+            user_by_id.get(result.critical_ack_by_id)
+            if result.critical_ack_by_id is not None
+            else None
+        )
         ack_delay_minutes = None
         elapsed_minutes = None
         if result.critical_ack_at and result.analysis_date:
