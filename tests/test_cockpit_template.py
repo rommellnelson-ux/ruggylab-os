@@ -49,6 +49,9 @@ class TestNewViewsPresent:
             'id="resultsKpiPending"',  # KPI critiques à acquitter
             'data-result-filter="pending"',  # filtre résultats critiques non acquittés
             "function renderResultsTable",  # rendu filtré de la liste résultats
+            'id="resultDetailPanel"',  # panneau détail résultat
+            "function openResultDetail",  # ouverture détail depuis une ligne
+            "Prendre en charge",  # libellé agent pour l'acquittement critique
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
@@ -132,7 +135,7 @@ class TestRealtimeAuthHardening:
         assert "var _notifPollTimer = null;" in html
 
     def test_dashboard_critical_metric_uses_pending_alerts(self, html: str) -> None:
-        assert "Critiques à acquitter" in html
+        assert "Critiques à prendre en charge" in html
         assert 'api("/api/v1/critical-alerts/pending"' in html
         assert "$(\"mCritical\").textContent = pendingCriticalCount;" in html
 

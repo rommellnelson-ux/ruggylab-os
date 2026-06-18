@@ -336,6 +336,53 @@
       font-size: 11px;
       white-space: nowrap;
     }
+    .result-detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.35fr);
+      gap: 12px;
+    }
+    .result-detail-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+    .result-detail-chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: rgba(255,255,255,0.58);
+      min-height: 62px;
+    }
+    .result-detail-chip span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .result-detail-chip strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+    .result-detail-values {
+      display: grid;
+      gap: 8px;
+    }
+    .result-value-row {
+      display: grid;
+      grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.2fr) auto;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.52);
+    }
+    .result-value-row code {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
     .ops-strip {
       display: flex;
       gap: 8px;
@@ -478,6 +525,8 @@
       .metric .value { font-size: 24px; }
       .metric { min-height: 80px; }
       .result-command-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .result-detail-grid { grid-template-columns: 1fr; }
+      .result-detail-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .toolbar { gap: 6px; }
       table { min-width: 460px; }
       button { 
@@ -514,6 +563,8 @@
       .metric .label { font-size: 11px; }
       .metric { min-height: 70px; }
       .result-command-bar { grid-template-columns: 1fr; }
+      .result-detail-strip { grid-template-columns: 1fr; }
+      .result-value-row { grid-template-columns: 1fr; }
       table { min-width: 100%; font-size: 11px; }
       th, td { padding: 8px 5px; }
       h2 { font-size: 18px; }
@@ -1040,7 +1091,7 @@
         <div id="dashboard" class="view band">
           <div class="grid4">
             <div class="panel metric metric-blue"><div id="mResults" class="value">—</div><div class="label">Résultats · 30 jours</div></div>
-            <div class="panel metric metric-rose" id="mCriticalPanel"><div id="mCritical" class="value">—</div><div class="label">Critiques à acquitter</div></div>
+            <div class="panel metric metric-rose" id="mCriticalPanel"><div id="mCritical" class="value">—</div><div class="label">Critiques à prendre en charge</div></div>
             <div class="panel metric metric-teal"><div id="mMalaria" class="value">—</div><div class="label">Paludisme positif</div></div>
             <div class="panel metric" id="mLowStockPanel"><div id="mLowStock" class="value">—</div><div class="label">Réactifs en rupture</div></div>
             <div class="panel metric" id="mQcPanel"><div id="mQc" class="value">—</div><div class="label">Contrôles QC</div></div>
@@ -1172,7 +1223,7 @@
 
         <div id="results" class="view band hidden">
           <div class="result-command-bar" aria-label="Synthèse résultats">
-            <div class="result-kpi"><strong id="resultsKpiPending">—</strong><span>Critiques à acquitter</span></div>
+            <div class="result-kpi"><strong id="resultsKpiPending">—</strong><span>Critiques à prendre en charge</span></div>
             <div class="result-kpi"><strong id="resultsKpiCritical">—</strong><span>Critiques chargées</span></div>
             <div class="result-kpi"><strong id="resultsKpiUnvalidated">—</strong><span>Non validés</span></div>
             <div class="result-kpi"><strong id="resultsKpiLoaded">—</strong><span>Résultats affichables</span></div>
@@ -1196,12 +1247,45 @@
               </div>
               <div class="result-filter-bar" aria-label="Filtres résultats">
                 <button class="ghost active" data-result-filter="all" onclick="setResultFilter('all', this)">Tous</button>
-                <button class="ghost" data-result-filter="pending" onclick="setResultFilter('pending', this)">Critiques à acquitter</button>
+                <button class="ghost" data-result-filter="pending" onclick="setResultFilter('pending', this)">À prendre en charge</button>
                 <button class="ghost" data-result-filter="critical" onclick="setResultFilter('critical', this)">Critiques</button>
                 <button class="ghost" data-result-filter="unvalidated" onclick="setResultFilter('unvalidated', this)">Non validés</button>
                 <button class="ghost" data-result-filter="auto" onclick="setResultFilter('auto', this)">Auto §5.8</button>
               </div>
-              <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Sample</th><th>Analyse</th><th>Critique</th><th>Flags</th><th>Acquittement</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
+              <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Sample</th><th>Analyse</th><th>Critique</th><th>Flags</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
+            </div>
+          </div>
+          <div id="resultDetailPanel" class="panel" style="margin-top:12px;display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+              <div>
+                <h3 style="margin:0;">Détail résultat <span id="resultDetailTitle"></span></h3>
+                <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">
+                  “Prendre en charge” signifie confirmer qu’une valeur critique a été vue et traitée par un agent.
+                </p>
+              </div>
+              <div class="actions">
+                <button id="resultDetailAckBtn" class="danger" onclick="ackCriticalFromDetail(this)">Prendre en charge</button>
+                <button class="ghost" onclick="useDetailedResult()">Rapport</button>
+                <button class="ghost" onclick="openDetailedResultFhir()">FHIR</button>
+                <button class="ghost" onclick="closeResultDetail()">✕ Fermer</button>
+              </div>
+            </div>
+            <div class="result-detail-strip">
+              <div class="result-detail-chip"><span>Échantillon</span><strong id="resultDetailSample">—</strong></div>
+              <div class="result-detail-chip"><span>Examen</span><strong id="resultDetailExam">—</strong></div>
+              <div class="result-detail-chip"><span>Critique</span><strong id="resultDetailCritical">—</strong></div>
+              <div class="result-detail-chip"><span>Validation</span><strong id="resultDetailValidation">—</strong></div>
+            </div>
+            <div class="result-detail-grid">
+              <div>
+                <h4 style="margin:0 0 8px;">Valeurs analytiques</h4>
+                <div id="resultDetailValues" class="result-detail-values"></div>
+              </div>
+              <div>
+                <h4 style="margin:0 0 8px;">Interprétation et traçabilité</h4>
+                <div id="resultDetailBioref"></div>
+                <div id="resultDetailTrace" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+              </div>
             </div>
           </div>
           <!-- Panneau seuils critiques (panic values) -->
@@ -2684,7 +2768,7 @@
           count: pendingCriticalCount,
           level: pendingCriticalCount > 0 ? "critical" : "ok",
           copy: pendingCriticalCount > 0
-            ? "Résultats critiques à vérifier et acquitter sans délai."
+            ? "Résultats critiques à vérifier et prendre en charge sans délai."
             : "Aucune valeur critique en attente connue.",
           action: "Ouvrir résultats",
           view: "results",
@@ -3190,6 +3274,7 @@
     }
     let _resultsCache = [];
     let _resultFilter = "all";
+    let _selectedResultDetail = null;
     function _resultValuePreview(value) {
       if (value && typeof value === "object" && !Array.isArray(value)) {
         if (value.label) return String(value.label);
@@ -3254,7 +3339,7 @@
       if ($("resultsKpiLoaded")) $("resultsKpiLoaded").textContent = rowsData.length + "/" + _resultsCache.length;
       if ($("resultsListHint")) {
         $("resultsListHint").textContent = pendingCount > 0
-          ? `${pendingCount} critique(s) non acquittée(s) sur ${_resultsCache.length} résultat(s) chargés.`
+          ? `${pendingCount} critique(s) à prendre en charge sur ${_resultsCache.length} résultat(s) chargés.`
           : `${_resultsCache.length} résultat(s) chargés, aucune critique en attente.`;
       }
       const rows = rowsData.map((r) => {
@@ -3273,7 +3358,7 @@
           ackCell = '<td><span class="pill ok" title="Acquitté le ' + ts + '">✅ ' + ts + '</span></td>';
         } else {
           const elapsed = _resultElapsedLabel(r);
-          ackCell = '<td><button class="danger" style="font-size:11px;padding:4px 9px;min-height:30px;" onclick="ackCritical(' + r.id + ', this)">Acquitter</button>' +
+          ackCell = '<td><button class="danger" style="font-size:11px;padding:4px 9px;min-height:30px;" title="Confirmer que la valeur critique est prise en charge" onclick="ackCritical(' + r.id + ', this)">Prendre en charge</button>' +
             (elapsed ? '<div class="result-staleness">depuis ' + security.escapeHtml(elapsed) + '</div>' : '') +
             '</td>';
         }
@@ -3291,6 +3376,7 @@
           '<td>' + (r.is_validated ? '<span class="pill ok">Oui</span>' : 'Non') + '</td>' +
           '<td>' + autoCell + '</td>' +
           '<td style="white-space:nowrap;">' +
+            '<button class="ghost" onclick="openResultDetail(' + r.id + ')">Détail</button> ' +
             '<button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button> ' +
             '<button class="ghost" style="font-size:11px;padding:2px 8px;" onclick=\'openAmendPanel(' + r.id + ',' + JSON.stringify(r.data_points || {}) + ')\'>✏️</button>' +
           '</td>'
@@ -3319,16 +3405,128 @@
       if (btn) { btn.disabled = true; btn.textContent = "…"; }
       try {
         await api("/api/v1/results/" + resultId + "/ack-critical", { method: "PATCH", headers: headers() });
-        showToast("Valeur critique acquittée", "success");
+        showToast("Valeur critique prise en charge", "success");
         await loadResults();
         await loadPendingCriticals();
         await loadDashboard();
       } catch (e) {
-        showToast("Erreur lors de l'acquittement", "error");
-        if (btn) { btn.disabled = false; btn.textContent = "Acquitter"; }
+        showToast("Erreur lors de la prise en charge", "error");
+        if (btn) { btn.disabled = false; btn.textContent = "Prendre en charge"; }
       }
     }
     function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }
+    function _resultStatusBadge(label, ok = false) {
+      return ok ? '<span class="pill ok">' + security.escapeHtml(label) + '</span>' : '<span class="pill bad">' + security.escapeHtml(label) + '</span>';
+    }
+    function _formatResultDate(value) {
+      if (!value) return "—";
+      try { return new Date(value).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }); }
+      catch { return "—"; }
+    }
+    function _resultValueDetailRows(dataPoints) {
+      const entries = Object.entries(dataPoints || {})
+        .filter(([key]) => !["manual_entry_by", "entry_timestamp", "calibration", "overall_flags"].includes(key));
+      if (entries.length === 0) return '<div class="empty-state">Aucune donnée analytique.</div>';
+      return entries.map(([key, raw]) => {
+        const valueText = _resultValuePreview(raw);
+        const status = raw && typeof raw === "object" && raw.status ? String(raw.status) : "";
+        const isCritical = Boolean(raw && typeof raw === "object" && raw.is_critical);
+        const unit = "";
+        const badge = isCritical
+          ? '<span class="pill bad">Critique</span>'
+          : status && status !== "N"
+            ? '<span class="pill" style="background:var(--amber);color:#fff;">' + security.escapeHtml(status) + '</span>'
+            : '<span class="pill ok">OK</span>';
+        return '<div class="result-value-row">' +
+          '<strong>' + security.escapeHtml(key) + '</strong>' +
+          '<code>' + security.escapeHtml(valueText + unit) + '</code>' +
+          badge +
+          '</div>';
+      }).join("");
+    }
+    function _renderBiorefDetail(outcome) {
+      if (!outcome || outcome.mapped === false) {
+        return '<div class="notice">Aucune interprétation bioref disponible pour ce résultat.</div>';
+      }
+      const components = outcome.components || [];
+      if (components.length === 0) {
+        return '<div class="notice">Référentiel trouvé, mais aucune valeur interprétable dans les données.</div>';
+      }
+      return '<div class="result-detail-values">' + components.map((c) => {
+        const status = c.bioref_status || "—";
+        const isBad = /CRITIQUE|BAS|HAUT|POSITIF/.test(status);
+        return '<div class="result-value-row">' +
+          '<strong>' + security.escapeHtml(c.component || c.canonical_code || c.test_code || "Test") + '</strong>' +
+          '<span>' + security.escapeHtml(c.bioref_reference_range || "Référence non précisée") + '</span>' +
+          (isBad ? '<span class="pill bad">' : '<span class="pill ok">') + security.escapeHtml(status) + '</span>' +
+          '</div>';
+      }).join("") + '</div>';
+    }
+    async function openResultDetail(resultId) {
+      try {
+        const result = await api('/api/v1/results/' + resultId, { headers: headers(false) });
+        let bioref = null;
+        try { bioref = await api('/api/v1/results/' + resultId + '/bioref', { headers: headers(false) }); } catch {}
+        _selectedResultDetail = { result, bioref };
+        $('resultDetailTitle').textContent = '#' + result.id;
+        $('resultDetailSample').textContent = result.sample_id || '—';
+        $('resultDetailExam').textContent = result.exam_code || '—';
+        $('resultDetailCritical').innerHTML = result.is_critical
+          ? result.critical_ack_at
+            ? _resultStatusBadge('Pris en charge', true)
+            : _resultStatusBadge('À prendre en charge')
+          : '<span class="pill ok">Non critique</span>';
+        $('resultDetailValidation').innerHTML = result.is_validated
+          ? '<span class="pill ok">Validé</span>'
+          : '<span class="pill" style="background:var(--amber);color:#fff;">Non validé</span>';
+        $('resultDetailValues').innerHTML = _resultValueDetailRows(result.data_points || {});
+        $('resultDetailBioref').innerHTML = _renderBiorefDetail(bioref);
+        $('resultDetailTrace').innerHTML =
+          'Analyse: <strong>' + security.escapeHtml(_formatResultDate(result.analysis_date)) + '</strong>' +
+          ' · Bio-validation: <strong>' + security.escapeHtml(_formatResultDate(result.bio_validated_at)) + '</strong>' +
+          ' · Auto §5.8: <strong>' + (result.is_auto_validated ? 'oui' : 'non') + '</strong>' +
+          (result.amendment_reason ? '<br>Dernière correction: ' + security.escapeHtml(result.amendment_reason) : '');
+        const ackBtn = $('resultDetailAckBtn');
+        if (ackBtn) {
+          ackBtn.style.display = result.is_critical && !result.critical_ack_at ? '' : 'none';
+          ackBtn.textContent = 'Prendre en charge';
+        }
+        $('resultDetailPanel').style.display = 'block';
+        $('resultDetailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (e) {
+        showToast('Erreur chargement détail résultat', 'error');
+      }
+    }
+    function closeResultDetail() {
+      _selectedResultDetail = null;
+      const panel = $('resultDetailPanel');
+      if (panel) panel.style.display = 'none';
+    }
+    async function ackCriticalFromDetail(btn) {
+      if (!_selectedResultDetail?.result?.id) return;
+      await ackCritical(_selectedResultDetail.result.id, btn);
+      await openResultDetail(_selectedResultDetail.result.id);
+    }
+    function useDetailedResult() {
+      if (!_selectedResultDetail?.result?.id) return;
+      selectResult(_selectedResultDetail.result.id);
+    }
+    async function openDetailedResultFhir() {
+      if (!_selectedResultDetail?.result?.id) return;
+      try {
+        const resultId = _selectedResultDetail.result.id;
+        const resp = await fetch(normalizeApiPath(`/api/v1/results/${resultId}/fhir`), { headers: headers(false) });
+        if (!resp.ok) { showToast('Export FHIR résultat indisponible', 'error'); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `result-${resultId}-diagnostic-report.fhir.json`; a.click();
+        URL.revokeObjectURL(url);
+        showToast('FHIR résultat téléchargé', 'success');
+      } catch {
+        showToast('Erreur export FHIR résultat', 'error');
+      }
+    }
     function templateDataPoints() {
       const values = {};
       document.querySelectorAll("#dataPoints input[data-result-key], #resultFields input[data-result-key]")
@@ -6594,7 +6792,7 @@ window.onload=renderLabels;
       // Toast si nouvelle valeur critique apparaît
       const critCount = (snap.counts && snap.counts.criticals) || 0;
       if (critCount > _lastCriticalCount) {
-        showToast(`🔴 ${critCount} valeur(s) critique(s) non acquittée(s)`, 'error', 6000);
+        showToast(`🔴 ${critCount} valeur(s) critique(s) à prendre en charge`, 'error', 6000);
       }
       _lastCriticalCount = critCount;
 
