@@ -782,6 +782,111 @@ def compliance_html_report(
     )
 
 
+def _critical_compliance_rows(db: Session, start_date: datetime, end_date: datetime) -> list[dict]:
+    results = (
+        db.query(Result)
+        .filter(
+            Result.is_critical.is_(True),
+            Result.analysis_date >= start_date,
+            Result.analysis_date <= end_date,
+        )
+        .order_by(Result.analysis_date.desc(), Result.id.desc())
+        .all()
+    )
+    rows = []
+    for result in results:
+        sample = result.sample
+        patient = sample.patient if sample else None
+        ack_delay_minutes = None
+        if result.critical_ack_at and result.analysis_date:
+            ack_delay_minutes = round(
+                (result.critical_ack_at - result.analysis_date).total_seconds() / 60,
+                1,
+            )
+        rows.append(
+            {
+                "result_id": result.id,
+                "analysis_date": result.analysis_date.isoformat() if result.analysis_date else None,
+                "critical_ack_at": result.critical_ack_at.isoformat()
+                if result.critical_ack_at
+                else None,
+                "ack_delay_minutes": ack_delay_minutes,
+                "status": "pris_en_charge" if result.critical_ack_at else "en_attente",
+                "sample_barcode": sample.barcode if sample else None,
+                "patient_ipp": patient.ipp_unique_id if patient else None,
+                "patient_name": f"{patient.first_name} {patient.last_name}" if patient else None,
+                "exam_code": result.exam_code,
+            }
+        )
+    return rows
+
+
+@router.get("/critical-compliance")
+def critical_compliance_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    days: int = Query(default=30, ge=1, le=366),
+) -> dict:
+    """Rapport conformité des valeurs critiques : attente, délai, taux de prise en charge."""
+    del current_user
+    end_date = datetime.now(UTC).replace(tzinfo=None)
+    start_date = end_date - timedelta(days=days)
+    rows = _critical_compliance_rows(db, start_date, end_date)
+    handled = [row for row in rows if row["critical_ack_at"]]
+    pending = [row for row in rows if not row["critical_ack_at"]]
+    delays = [
+        float(row["ack_delay_minutes"])
+        for row in handled
+        if row["ack_delay_minutes"] is not None
+    ]
+    return {
+        "period_days": days,
+        "period_start": start_date.date().isoformat(),
+        "period_end": end_date.date().isoformat(),
+        "critical_total": len(rows),
+        "critical_handled": len(handled),
+        "critical_pending": len(pending),
+        "ack_rate_pct": round((len(handled) / len(rows)) * 100, 1) if rows else 0.0,
+        "avg_ack_delay_minutes": round(sum(delays) / len(delays), 1) if delays else None,
+        "max_ack_delay_minutes": max(delays) if delays else None,
+        "rows": rows,
+    }
+
+
+@router.get("/critical-compliance/export.csv")
+def critical_compliance_export_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    days: int = Query(default=30, ge=1, le=366),
+) -> Response:
+    """Export CSV du rapport conformité des valeurs critiques."""
+    del current_user
+    end_date = datetime.now(UTC).replace(tzinfo=None)
+    start_date = end_date - timedelta(days=days)
+    rows = _critical_compliance_rows(db, start_date, end_date)
+    output = StringIO()
+    writer = csv.writer(output)
+    columns = [
+        "result_id",
+        "analysis_date",
+        "critical_ack_at",
+        "ack_delay_minutes",
+        "status",
+        "sample_barcode",
+        "patient_ipp",
+        "patient_name",
+        "exam_code",
+    ]
+    writer.writerow(columns)
+    for row in rows:
+        writer.writerow([sanitize_csv_cell(row.get(column) or "") for column in columns])
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="critical-compliance.csv"'},
+    )
+
+
 @router.get(
     "/qc-report",
     summary="Rapport QC mensuel HTML (imprimable / export PDF navigateur)",

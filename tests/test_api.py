@@ -302,6 +302,76 @@ def test_ack_critical_batch_and_clinical_audit(client) -> None:
     assert any(event["event_type"] == "result.critical_ack" for event in audit_response.json())
 
 
+def test_critical_compliance_report_and_export(client) -> None:
+    headers = _auth_headers(client)
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-CRIT-COMP-001",
+            "first_name": "Conformite",
+            "last_name": "Critique",
+            "birth_date": "1984-05-06",
+            "sex": "F",
+            "rank": "Commandant",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "CRIT-COMP-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    handled_result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"K": 7.1},
+            "is_critical": True,
+            "exam_code": "IONO",
+        },
+    ).json()
+    pending_result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"CRP": 320},
+            "is_critical": True,
+            "exam_code": "CRP",
+        },
+    ).json()
+
+    ack_response = client.patch(
+        f"/api/v1/results/{handled_result['id']}/ack-critical",
+        headers=headers,
+    )
+    assert ack_response.status_code == 200, ack_response.text
+
+    report_response = client.get("/api/v1/reports/critical-compliance?days=30", headers=headers)
+    assert report_response.status_code == 200, report_response.text
+    report = report_response.json()
+    assert report["critical_total"] >= 2
+    assert report["critical_handled"] >= 1
+    assert report["critical_pending"] >= 1
+
+    rows_by_id = {row["result_id"]: row for row in report["rows"]}
+    assert rows_by_id[handled_result["id"]]["status"] == "pris_en_charge"
+    assert rows_by_id[handled_result["id"]]["sample_barcode"] == "CRIT-COMP-SAMPLE-001"
+    assert rows_by_id[handled_result["id"]]["patient_ipp"] == "IPP-CRIT-COMP-001"
+    assert rows_by_id[pending_result["id"]]["status"] == "en_attente"
+
+    csv_response = client.get(
+        "/api/v1/reports/critical-compliance/export.csv?days=30",
+        headers=headers,
+    )
+    assert csv_response.status_code == 200, csv_response.text
+    assert "text/csv" in csv_response.headers["content-type"]
+    assert "result_id,analysis_date,critical_ack_at" in csv_response.text
+    assert "CRIT-COMP-SAMPLE-001" in csv_response.text
+
+
 def test_result_history_returns_comparable_patient_results(client) -> None:
     headers = _auth_headers(client)
 

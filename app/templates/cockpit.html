@@ -1774,6 +1774,33 @@
             </div></div>
             <div class="panel"><h3>Surveillance epidemiologique</h3><div class="actions"><button onclick="loadDashboard()">Actualiser resume</button><button class="secondary" onclick="downloadEpiCsv()">Exporter CSV</button></div></div>
           </div>
+          <div class="panel" style="margin-top:12px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+              <div>
+                <h3 style="margin:0;">Conformité valeurs critiques</h3>
+                <div id="criticalComplianceHint" style="font-size:12px;color:var(--muted);margin-top:4px;">Chargement…</div>
+              </div>
+              <div class="actions">
+                <select id="criticalComplianceDays" onchange="loadCriticalCompliance()">
+                  <option value="7">7 jours</option>
+                  <option value="30" selected>30 jours</option>
+                  <option value="90">90 jours</option>
+                </select>
+                <button class="ghost" onclick="loadCriticalCompliance()">↻ Actualiser</button>
+                <button class="secondary" onclick="exportCriticalComplianceCsv()">Exporter CSV</button>
+              </div>
+            </div>
+            <div class="grid4" style="margin-top:12px;">
+              <div class="panel metric"><div id="critCompTotal" class="value">—</div><div class="label">Critiques</div></div>
+              <div class="panel metric metric-teal"><div id="critCompHandled" class="value">—</div><div class="label">Prises en charge</div></div>
+              <div class="panel metric metric-amber"><div id="critCompPending" class="value">—</div><div class="label">En attente</div></div>
+              <div class="panel metric"><div id="critCompDelay" class="value">—</div><div class="label">Délai moyen</div></div>
+            </div>
+            <table id="criticalComplianceTable" class="compact-mobile-table" style="margin-top:12px;">
+              <thead><tr><th>Résultat</th><th>Patient</th><th>Échantillon</th><th>Analyse</th><th>Prise en charge</th><th>Délai</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
 
         <div id="epidemio" class="view band hidden">
@@ -2979,6 +3006,7 @@
     }
     async function refreshCurrent() {
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
+      if (currentView === "reports") await loadCriticalCompliance();
       if (currentView === "patients") await loadPatients();
 
       if (currentView === "results") {
@@ -3476,6 +3504,7 @@
           '<td>' + autoCell + '</td>' +
           '<td style="white-space:nowrap;">' +
             '<button class="ghost" onclick="openResultDetail(' + r.id + ')">Détail</button> ' +
+            '<button class="ghost" onclick="openResultAuditFromList(' + r.id + ')">Audit</button> ' +
             '<button class="ghost" onclick="selectResult(' + r.id + ')">Utiliser</button> ' +
             '<button class="ghost" style="font-size:11px;padding:2px 8px;" onclick=\'openAmendPanel(' + r.id + ',' + JSON.stringify(r.data_points || {}) + ')\'>✏️</button>' +
           '</td>'
@@ -3561,14 +3590,33 @@
       win.document.close();
     }
     async function ackDisplayedCriticals(btn) {
-      const ids = _resultsViewCache
-        .filter((r) => r.is_critical && !r.critical_ack_at)
-        .map((r) => r.id);
+      const criticalRows = _resultsViewCache.filter((r) => r.is_critical && !r.critical_ack_at);
+      const ids = criticalRows.map((r) => r.id);
       if (ids.length === 0) {
         showToast("Aucune valeur critique affichée à prendre en charge", "error");
         return;
       }
-      if (!confirm("Prendre en charge " + ids.length + " valeur(s) critique(s) affichée(s) ?")) return;
+      const patients = new Set();
+      const samples = [];
+      criticalRows.forEach((r) => {
+        const { sample, patient } = _resultContext(r);
+        const patientLabel = patient
+          ? [patient.first_name, patient.last_name].filter(Boolean).join(" ") || patient.ipp_unique_id
+          : "Patient non renseigné";
+        patients.add(patientLabel || "Patient non renseigné");
+        samples.push(sample?.barcode || ("#" + r.sample_id));
+      });
+      const visibleSamples = samples.slice(0, 6).join(", ") + (samples.length > 6 ? "…" : "");
+      const message = [
+        "Confirmer la prise en charge groupée ?",
+        "",
+        ids.length + " valeur(s) critique(s) affichée(s)",
+        patients.size + " patient(s) concerné(s)",
+        "Échantillons : " + visibleSamples,
+        "",
+        "Cette action sera tracée dans l'audit clinique."
+      ].join("\n");
+      if (!confirm(message)) return;
       if (btn) { btn.disabled = true; btn.textContent = "…"; }
       try {
         const response = await api("/api/v1/results/ack-critical-batch", {
@@ -3600,6 +3648,10 @@
       }
     }
     function selectResult(id) { $("reportResultId").value = id; $("malariaResultId").value = id; showView("reports"); }
+    async function openResultAuditFromList(resultId) {
+      await openResultDetail(resultId);
+      $("resultDetailAudit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     function _resultStatusBadge(label, ok = false) {
       return ok ? '<span class="pill ok">' + security.escapeHtml(label) + '</span>' : '<span class="pill bad">' + security.escapeHtml(label) + '</span>';
     }
@@ -6699,6 +6751,65 @@ window.onload=renderLabels;
         if (w) { w.document.write(html); w.document.close(); }
         else showToast('Autoriser les pop-ups pour ouvrir le rapport', 'warning');
       } catch { showToast('Erreur rapport conformité', 'error'); }
+    }
+    function _formatCriticalDelay(minutes) {
+      if (minutes === null || minutes === undefined || minutes === "") return "—";
+      const value = Number(minutes);
+      if (!Number.isFinite(value)) return "—";
+      if (Math.abs(value) < 60) return Math.round(value) + " min";
+      return (Math.round((value / 60) * 10) / 10).toLocaleString("fr-FR") + " h";
+    }
+    async function loadCriticalCompliance() {
+      const days = $("criticalComplianceDays")?.value || "30";
+      const hint = $("criticalComplianceHint");
+      if (hint) hint.textContent = "Chargement du rapport valeurs critiques…";
+      try {
+        const data = await api('/api/v1/reports/critical-compliance?days=' + encodeURIComponent(days), { headers: headers(false) });
+        if ($("critCompTotal")) $("critCompTotal").textContent = data.critical_total ?? 0;
+        if ($("critCompHandled")) $("critCompHandled").textContent = (data.ack_rate_pct ?? 0) + "%";
+        if ($("critCompPending")) $("critCompPending").textContent = data.critical_pending ?? 0;
+        if ($("critCompDelay")) $("critCompDelay").textContent = _formatCriticalDelay(data.avg_ack_delay_minutes);
+        if (hint) {
+          hint.textContent = (data.critical_pending || 0) > 0
+            ? `${data.critical_pending} valeur(s) critique(s) encore en attente sur ${data.period_days} jour(s).`
+            : `Toutes les valeurs critiques de la période sont prises en charge.`;
+        }
+        const rows = (data.rows || []).map((item) => {
+          const status = item.status === "pris_en_charge"
+            ? '<span class="pill ok">Prise en charge</span>'
+            : '<span class="pill bad">En attente</span>';
+          return row(
+            '<td><strong>#' + security.escapeHtml(item.result_id) + '</strong></td>' +
+            '<td>' + security.escapeHtml(item.patient_name || "—") + '<div class="result-staleness">' + security.escapeHtml(item.patient_ipp || "IPP non renseigné") + '</div></td>' +
+            '<td>' + security.escapeHtml(item.sample_barcode || "—") + '</td>' +
+            '<td>' + security.escapeHtml(item.exam_code || "—") + '<div class="result-staleness">' + security.escapeHtml(_formatResultDate(item.analysis_date)) + '</div></td>' +
+            '<td>' + status + (item.critical_ack_at ? '<div class="result-staleness">' + security.escapeHtml(_formatResultDate(item.critical_ack_at)) + '</div>' : '') + '</td>' +
+            '<td>' + security.escapeHtml(_formatCriticalDelay(item.ack_delay_minutes)) + '</td>'
+          );
+        });
+        setRows("criticalComplianceTable", rows);
+      } catch (e) {
+        if (hint) hint.textContent = "Rapport valeurs critiques indisponible.";
+        setRows("criticalComplianceTable", []);
+        log('loadCriticalCompliance: ' + (e.message || e));
+      }
+    }
+    async function exportCriticalComplianceCsv() {
+      const days = $("criticalComplianceDays")?.value || "30";
+      try {
+        const resp = await fetch(normalizeApiPath('/api/v1/reports/critical-compliance/export.csv?days=' + encodeURIComponent(days)), { headers: headers(false) });
+        if (!resp.ok) { showToast("Export valeurs critiques indisponible", "error"); return; }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ruggylab-valeurs-critiques-conformite.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("Export conformité valeurs critiques généré", "success");
+      } catch {
+        showToast("Erreur export conformité valeurs critiques", "error");
+      }
     }
 
     // ── Unification des vocabulaires (mappings de codes) ──────────────────────

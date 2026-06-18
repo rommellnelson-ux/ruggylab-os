@@ -57,6 +57,8 @@ class TestNewViewsPresent:
             "function exportDisplayedResultsCsv",  # export opérationnel CSV
             "function printDisplayedResults",  # export imprimable/PDF
             "function ackDisplayedCriticals",  # prise en charge groupée
+            "function openResultAuditFromList",  # audit accessible depuis une ligne
+            "Cette action sera tracée dans l'audit clinique.",  # confirmation batch explicite
             "/api/v1/results/cockpit?limit=100",  # liste résultats enrichie côté API
             "/api/v1/results/ack-critical-batch",  # action groupée critiques
             'id="resultDetailPanel"',  # panneau détail résultat
@@ -69,6 +71,11 @@ class TestNewViewsPresent:
             "function _renderResultClinicalAudit",  # rendu timeline clinique
             "function copyResultClinicalSummary",  # copie de synthèse clinique
             "Prendre en charge",  # libellé agent pour le suivi critique
+            'id="criticalComplianceTable"',  # rapport valeurs critiques
+            "function loadCriticalCompliance",  # chargement conformité critiques
+            "function exportCriticalComplianceCsv",  # export conformité critiques
+            "/api/v1/reports/critical-compliance?days=",  # API rapport critiques
+            "/api/v1/reports/critical-compliance/export.csv?days=",  # CSV rapport critiques
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
