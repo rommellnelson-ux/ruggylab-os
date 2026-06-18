@@ -15,7 +15,7 @@ from typing import Any
 
 from sqlalchemy import or_
 
-from app.models import Patient, User, UserRole
+from app.models import Patient, Result, Sample, User, UserRole
 
 
 def _is_unrestricted(user: User) -> bool:
@@ -36,3 +36,30 @@ def apply_patient_scope(query: Any, user: User) -> Any:
     if _is_unrestricted(user):
         return query
     return query.filter(or_(Patient.unit.is_(None), Patient.unit == user.unit))
+
+
+def can_access_result(user: User, result: Result) -> bool:
+    """Autorisation d'accès aux données cliniques d'un résultat (via son patient).
+
+    Un résultat sans patient rattaché ne porte pas de PII cloisonnable → autorisé.
+    """
+    if _is_unrestricted(user):
+        return True
+    patient = result.sample.patient if result.sample else None
+    if patient is None:
+        return True
+    return patient.unit is None or patient.unit == user.unit
+
+
+def apply_result_patient_scope(query: Any, user: User) -> Any:
+    """Restreint une requête ``Result`` au périmètre patient autorisé pour ``user``.
+
+    Inclut les résultats sans patient rattaché (pas de PII à cloisonner).
+    """
+    if _is_unrestricted(user):
+        return query
+    return (
+        query.outerjoin(Sample, Result.sample_id == Sample.id)
+        .outerjoin(Patient, Sample.patient_id == Patient.id)
+        .filter(or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit))
+    )

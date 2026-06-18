@@ -31,10 +31,28 @@ from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
 from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
+from app.services.patient_access import (
+    apply_result_patient_scope,
+    can_access_result,
+)
 from app.services.reference_checker import compute_flags
 from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
+
+
+def _get_accessible_result_or_error(db: Session, result_id: int, user: User) -> Result:
+    """404 si le résultat n'existe pas ; 403 si son patient est hors périmètre RBAC."""
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    if not can_access_result(user, result):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès au résultat hors de votre périmètre.",
+        )
+    return result
+
 
 _NON_ANALYTIC_KEYS = {"manual_entry_by", "entry_timestamp", "calibration", "overall_flags"}
 
@@ -78,7 +96,6 @@ def list_results(
     is_critical: bool | None = Query(default=None),
     is_validated: bool | None = Query(default=None),
 ) -> ResultListResponse:
-    del current_user
     query = db.query(Result)
     if sample_id is not None:
         query = query.filter(Result.sample_id == sample_id)
@@ -88,6 +105,8 @@ def list_results(
         query = query.filter(Result.is_critical == is_critical)
     if is_validated is not None:
         query = query.filter(Result.is_validated == is_validated)
+    # Cloisonnement RBAC : restreindre aux patients du périmètre de l'utilisateur
+    query = apply_result_patient_scope(query, current_user)
 
     total = query.with_entities(func.count(Result.id)).scalar() or 0
     items = query.order_by(Result.id.desc()).offset(skip).limit(limit).all()
@@ -104,8 +123,9 @@ def list_results_cockpit(
     limit: int = Query(100, ge=1, le=200),
 ) -> list[ResultCockpitItem]:
     """Liste enrichie pour le cockpit : résultat + échantillon + patient."""
-    del current_user
-    results = db.query(Result).order_by(Result.id.desc()).limit(limit).all()
+    # Cloisonnement RBAC : restreindre aux patients du périmètre de l'utilisateur
+    query = apply_result_patient_scope(db.query(Result), current_user)
+    results = query.order_by(Result.id.desc()).limit(limit).all()
     return [
         ResultCockpitItem(
             result=ResultRead.model_validate(result),
@@ -135,6 +155,9 @@ def ack_critical_batch(
         if result is None:
             skipped[result_id] = "introuvable"
             continue
+        if not can_access_result(current_user, result):
+            skipped[result_id] = "hors périmètre"
+            continue
         if not result.is_critical:
             skipped[result_id] = "non critique"
             continue
@@ -163,11 +186,7 @@ def get_result(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Result:
-    del current_user
-    result = db.query(Result).filter(Result.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resultat introuvable.")
-    return result
+    return _get_accessible_result_or_error(db, result_id, current_user)
 
 
 @router.get("/{result_id}/bioref")
@@ -180,12 +199,9 @@ def get_result_bioref(
 
     N'affecte pas les flags ni le statut critique ; couche additive.
     """
-    del current_user
     from app.services.code_mapping_service import interpret_result_bioref
 
-    result = db.query(Result).filter(Result.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    result = _get_accessible_result_or_error(db, result_id, current_user)
     outcome = interpret_result_bioref(db, result)
     if outcome is None:
         return {"mapped": False, "exam_code": result.exam_code}
@@ -199,12 +215,9 @@ def get_result_detail(
     current_user: User = Depends(get_current_active_user),
 ) -> ResultDetailRead:
     """Détail cockpit d'un résultat avec contexte patient, échantillon et bioref."""
-    del current_user
     from app.services.code_mapping_service import interpret_result_bioref
 
-    result = db.query(Result).filter(Result.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    result = _get_accessible_result_or_error(db, result_id, current_user)
 
     bioref_outcome = interpret_result_bioref(db, result)
     bioref = (
@@ -229,10 +242,7 @@ def get_result_history(
     limit: int = Query(5, ge=1, le=20),
 ) -> ResultHistoryRead:
     """Antériorités comparables du même patient pour la fiche résultat."""
-    del current_user
-    result = db.query(Result).filter(Result.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    result = _get_accessible_result_or_error(db, result_id, current_user)
 
     patient_id = result.sample.patient_id if result.sample else None
     if patient_id is None:
@@ -288,10 +298,7 @@ def get_result_clinical_audit(
     limit: int = Query(20, ge=1, le=100),
 ) -> list[ResultClinicalAuditEvent]:
     """Timeline clinique/audit liée à un résultat."""
-    del current_user
-    result = db.query(Result).filter(Result.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    _get_accessible_result_or_error(db, result_id, current_user)
     events = (
         db.query(AuditEvent)
         .filter(AuditEvent.entity_type == "result", AuditEvent.entity_id == str(result_id))
@@ -329,10 +336,7 @@ def get_result_fhir(
     current_user: User = Depends(get_current_active_user),
 ) -> JSONResponse:
     """Return a FHIR R4 DiagnosticReport for the requested result."""
-    del current_user
-    result = db.query(Result).filter(Result.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resultat introuvable.")
+    result = _get_accessible_result_or_error(db, result_id, current_user)
 
     report = build_diagnostic_report(result)
     return JSONResponse(
@@ -520,9 +524,7 @@ def ack_critical(
     current_user: User = Depends(get_current_active_user),
 ) -> Result:
     """Acknowledge a critical value — records operator and timestamp."""
-    result = db.query(Result).filter(Result.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    result = _get_accessible_result_or_error(db, result_id, current_user)
     if not result.is_critical:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
