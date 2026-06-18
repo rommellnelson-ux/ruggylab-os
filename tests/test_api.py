@@ -201,6 +201,72 @@ def test_result_detail_includes_patient_sample_and_bioref(client) -> None:
     assert detail["bioref"]["exam_code"] == "NFS"
 
 
+def test_result_history_returns_comparable_patient_results(client) -> None:
+    headers = _auth_headers(client)
+
+    patient_response = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-HISTORY-001",
+            "first_name": "History",
+            "last_name": "Patient",
+            "birth_date": "1987-06-01",
+            "sex": "M",
+            "rank": "Adjudant",
+        },
+    )
+    assert patient_response.status_code == 201, patient_response.text
+    patient = patient_response.json()
+
+    first_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "HISTORY-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    second_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "HISTORY-SAMPLE-002", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+
+    previous = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": first_sample["id"],
+            "data_points": {"WBC": 5.0, "HGB": 12.0},
+            "is_critical": False,
+            "exam_code": "NFS",
+        },
+    )
+    assert previous.status_code == 201, previous.text
+    current = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": second_sample["id"],
+            "data_points": {"WBC": 8.5, "HGB": 11.0},
+            "is_critical": False,
+            "exam_code": "NFS",
+        },
+    )
+    assert current.status_code == 201, current.text
+    current_result = current.json()
+
+    response = client.get(f"/api/v1/results/{current_result['id']}/history", headers=headers)
+    assert response.status_code == 200, response.text
+    history = response.json()
+    assert history["patient_id"] == patient["id"]
+    assert history["exam_code"] == "NFS"
+    assert len(history["items"]) == 1
+    item = history["items"][0]
+    assert item["sample"]["barcode"] == "HISTORY-SAMPLE-001"
+    assert item["shared_analytes"] == ["HGB", "WBC"]
+    assert item["delta_from_current"]["WBC"] == 3.5
+    assert item["delta_from_current"]["HGB"] == -1.0
+
+
 def test_create_user_requires_admin_token(client) -> None:
     response = client.post(
         "/api/v1/users",

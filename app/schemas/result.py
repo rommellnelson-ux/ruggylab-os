@@ -62,6 +62,20 @@ class ResultDetailRead(BaseModel):
     bioref: dict | None = None
 
 
+class ResultHistoryItem(BaseModel):
+    result: ResultRead
+    sample: SampleRead | None = None
+    shared_analytes: list[str] = Field(default_factory=list)
+    delta_from_current: dict[str, float] = Field(default_factory=dict)
+
+
+class ResultHistoryRead(BaseModel):
+    result_id: int
+    patient_id: int | None = None
+    exam_code: str | None = None
+    items: list[ResultHistoryItem] = Field(default_factory=list)
+
+
 class ResultAmend(BaseModel):
     data_points: dict
     amendment_reason: str = Field(..., min_length=5, max_length=500)

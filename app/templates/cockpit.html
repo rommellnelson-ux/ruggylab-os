@@ -1265,6 +1265,7 @@
               </div>
               <div class="actions">
                 <button id="resultDetailAckBtn" class="danger" onclick="ackCriticalFromDetail(this)">Prendre en charge</button>
+                <button class="ghost" onclick="copyResultClinicalSummary()">Copier synthèse</button>
                 <button class="ghost" onclick="useDetailedResult()">Rapport</button>
                 <button class="ghost" onclick="openDetailedResultFhir()">FHIR</button>
                 <button class="ghost" onclick="closeResultDetail()">✕ Fermer</button>
@@ -1279,6 +1280,7 @@
               <div class="result-detail-chip"><span>Critique</span><strong id="resultDetailCritical">—</strong></div>
               <div class="result-detail-chip"><span>Validation</span><strong id="resultDetailValidation">—</strong></div>
             </div>
+            <div id="resultDetailClinicalSummary" class="notice" style="margin-top:12px;"></div>
             <div class="result-detail-grid">
               <div>
                 <h4 style="margin:0 0 8px;">Valeurs analytiques</h4>
@@ -1289,6 +1291,10 @@
                 <div id="resultDetailBioref"></div>
                 <div id="resultDetailTrace" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
               </div>
+            </div>
+            <div style="margin-top:12px;">
+              <h4 style="margin:0 0 8px;">Antériorités comparables</h4>
+              <div id="resultDetailHistory"></div>
             </div>
           </div>
           <!-- Panneau seuils critiques (panic values) -->
@@ -3465,6 +3471,66 @@
           '</div>';
       }).join("") + '</div>';
     }
+    function _resultPrimaryValues(dataPoints, maxItems = 4) {
+      return Object.entries(dataPoints || {})
+        .filter(([key]) => !["manual_entry_by", "entry_timestamp", "calibration", "overall_flags"].includes(key))
+        .slice(0, maxItems)
+        .map(([key, raw]) => key + '=' + _resultValuePreview(raw));
+    }
+    function _formatResultDeltas(deltaMap) {
+      const entries = Object.entries(deltaMap || {});
+      if (entries.length === 0) return "—";
+      return entries.slice(0, 4).map(([key, value]) => key + ' ' + (value > 0 ? '+' : '') + value).join(', ');
+    }
+    function _resultClinicalSummary(result, context, bioref, history) {
+      const patient = _patientDisplayName(context.patient);
+      const ipp = context.patient?.ipp_unique_id || "IPP non renseigné";
+      const sample = context.sample?.barcode || (result.sample_id ? "échantillon #" + result.sample_id : "échantillon non renseigné");
+      const values = _resultPrimaryValues(result.data_points || {}).join(', ') || "aucune valeur analytique";
+      const biorefStatus = bioref?.components?.length
+        ? bioref.components.map((c) => (c.component || c.canonical_code || c.test_code || "Test") + ": " + (c.bioref_status || "—")).join(', ')
+        : (result.bioref_status || bioref?.bioref_status || "interprétation bioref non disponible");
+      const critical = result.is_critical
+        ? (result.critical_ack_at ? "critique pris en charge" : "critique à prendre en charge")
+        : "non critique";
+      const delta = result.delta_exceeded
+        ? "delta-check dépassé" + (result.delta_analytes ? " (" + _formatResultDeltas(result.delta_analytes) + ")" : "")
+        : "pas de delta-check signalé";
+      const historyCount = history?.items?.length || 0;
+      return [
+        "Patient " + patient + " (" + ipp + ")",
+        sample,
+        "résultat #" + result.id + (result.exam_code ? " · " + result.exam_code : ""),
+        values,
+        critical,
+        delta,
+        biorefStatus,
+        historyCount + " antériorité(s) comparable(s)"
+      ].join(" · ");
+    }
+    function _renderResultHistory(history) {
+      const items = history?.items || [];
+      if (items.length === 0) {
+        return '<div class="empty-state">Aucune antériorité comparable pour ce patient.</div>';
+      }
+      return '<table class="compact-mobile-table"><thead><tr><th>Date</th><th>Échantillon</th><th>Valeurs</th><th>Delta</th><th>Statut</th></tr></thead><tbody>' +
+        items.map((item) => {
+          const result = item.result || {};
+          const sample = item.sample || {};
+          const status = result.is_critical
+            ? '<span class="pill bad">Critique</span>'
+            : result.delta_exceeded
+              ? '<span class="pill" style="background:var(--amber);color:#fff;">Delta</span>'
+              : '<span class="pill ok">OK</span>';
+          return '<tr>' +
+            '<td>' + security.escapeHtml(_formatResultDate(result.analysis_date)) + '</td>' +
+            '<td>' + security.escapeHtml(sample.barcode || ("#" + result.sample_id)) + '</td>' +
+            '<td>' + security.escapeHtml(_resultPrimaryValues(result.data_points || {}, 3).join(', ') || '—') + '</td>' +
+            '<td>' + security.escapeHtml(_formatResultDeltas(item.delta_from_current || {})) + '</td>' +
+            '<td>' + status + '</td>' +
+            '</tr>';
+        }).join("") + '</tbody></table>';
+    }
     function _patientDisplayName(patient) {
       if (!patient) return "—";
       const name = [patient.first_name, patient.last_name].filter(Boolean).join(" ").trim();
@@ -3493,10 +3559,12 @@
         if (!detail) {
           try { bioref = await api('/api/v1/results/' + resultId + '/bioref', { headers: headers(false) }); } catch {}
         }
+        let history = { items: [] };
+        try { history = await api('/api/v1/results/' + resultId + '/history?limit=5', { headers: headers(false) }); } catch {}
         const context = detail
           ? { sample: detail.sample || null, patient: detail.patient || null }
           : await _loadResultContext(result);
-        _selectedResultDetail = { result, bioref, sample: context.sample, patient: context.patient };
+        _selectedResultDetail = { result, bioref, history, sample: context.sample, patient: context.patient };
         $('resultDetailTitle').textContent = '#' + result.id;
         $('resultDetailPatient').textContent = _patientDisplayName(context.patient);
         $('resultDetailIpp').textContent = context.patient?.ipp_unique_id || (context.sample?.patient_id ? 'Patient #' + context.sample.patient_id : '—');
@@ -3513,6 +3581,8 @@
           : '<span class="pill" style="background:var(--amber);color:#fff;">Non validé</span>';
         $('resultDetailValues').innerHTML = _resultValueDetailRows(result.data_points || {});
         $('resultDetailBioref').innerHTML = _renderBiorefDetail(bioref);
+        $('resultDetailClinicalSummary').textContent = _resultClinicalSummary(result, context, bioref, history);
+        $('resultDetailHistory').innerHTML = _renderResultHistory(history);
         $('resultDetailTrace').innerHTML =
           'Analyse: <strong>' + security.escapeHtml(_formatResultDate(result.analysis_date)) + '</strong>' +
           ' · Bio-validation: <strong>' + security.escapeHtml(_formatResultDate(result.bio_validated_at)) + '</strong>' +
@@ -3545,6 +3615,16 @@
     function useDetailedResult() {
       if (!_selectedResultDetail?.result?.id) return;
       selectResult(_selectedResultDetail.result.id);
+    }
+    async function copyResultClinicalSummary() {
+      const summary = $('resultDetailClinicalSummary')?.textContent?.trim();
+      if (!summary) { showToast('Aucune synthèse à copier', 'error'); return; }
+      try {
+        await navigator.clipboard.writeText(summary);
+        showToast('Synthèse résultat copiée', 'success');
+      } catch {
+        showToast('Copie indisponible dans ce navigateur', 'error');
+      }
     }
     async function openDetailedResultFhir() {
       if (!_selectedResultDetail?.result?.id) return;

@@ -52,7 +52,10 @@ class TestNewViewsPresent:
             'id="resultDetailPanel"',  # panneau détail résultat
             'id="resultDetailPatient"',  # contexte patient dans le détail
             'id="resultDetailBarcode"',  # contexte échantillon dans le détail
+            'id="resultDetailClinicalSummary"',  # synthèse médicale copiable
+            'id="resultDetailHistory"',  # antériorités comparables
             "function openResultDetail",  # ouverture détail depuis une ligne
+            "function copyResultClinicalSummary",  # copie de synthèse clinique
             "Prendre en charge",  # libellé agent pour le suivi critique
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="patientUnit"',  # champ unité (création patient)
@@ -62,6 +65,7 @@ class TestNewViewsPresent:
             "/static/branding/RuggyLab_OS.jpg",  # image de marque login
             "/static/ai/malaria_dataset_collector.js?v=",  # évite les anciens assets en cache
             "/api/v1/results/' + resultId + '/detail",  # détail résultat enrichi côté API
+            "/api/v1/results/' + resultId + '/history",  # antériorités résultat
         ],
     )
     def test_marker_present(self, html: str, marker: str) -> None:

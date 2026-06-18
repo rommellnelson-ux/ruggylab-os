@@ -11,7 +11,14 @@ from app.db.session import get_db
 from app.models import AuditEvent, Equipment, ReportSignature, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
 from app.schemas.pagination import PaginationMeta, ResultListResponse
-from app.schemas.result import ResultAmend, ResultCreate, ResultDetailRead, ResultRead
+from app.schemas.result import (
+    ResultAmend,
+    ResultCreate,
+    ResultDetailRead,
+    ResultHistoryItem,
+    ResultHistoryRead,
+    ResultRead,
+)
 from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
@@ -21,6 +28,26 @@ from app.services.reference_checker import compute_flags
 from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
+
+_NON_ANALYTIC_KEYS = {"manual_entry_by", "entry_timestamp", "calibration", "overall_flags"}
+
+
+def _result_analytes(result: Result) -> set[str]:
+    return {
+        key
+        for key in (result.data_points or {})
+        if isinstance(key, str) and key not in _NON_ANALYTIC_KEYS
+    }
+
+
+def _numeric_data_point(raw: object) -> float | None:
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return float(raw)
+    if isinstance(raw, dict):
+        value = raw.get("value")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
 
 
 @router.get("", response_model=ResultListResponse)
@@ -114,6 +141,65 @@ def get_result_detail(
         sample=sample,
         patient=sample.patient if sample else None,
         bioref=bioref,
+    )
+
+
+@router.get("/{result_id}/history", response_model=ResultHistoryRead)
+def get_result_history(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    limit: int = Query(5, ge=1, le=20),
+) -> ResultHistoryRead:
+    """Antériorités comparables du même patient pour la fiche résultat."""
+    del current_user
+    result = db.query(Result).filter(Result.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+
+    patient_id = result.sample.patient_id if result.sample else None
+    if patient_id is None:
+        return ResultHistoryRead(result_id=result.id, patient_id=None, exam_code=result.exam_code)
+
+    query = (
+        db.query(Result)
+        .join(Sample, Result.sample_id == Sample.id)
+        .filter(Sample.patient_id == patient_id, Result.id != result.id)
+    )
+    if result.exam_code:
+        query = query.filter(Result.exam_code == result.exam_code)
+
+    candidates = query.order_by(Result.analysis_date.desc(), Result.id.desc()).limit(50).all()
+    current_analytes = _result_analytes(result)
+    current_points = result.data_points or {}
+    items: list[ResultHistoryItem] = []
+    for previous in candidates:
+        shared_analytes = sorted(current_analytes & _result_analytes(previous))
+        if not result.exam_code and not shared_analytes:
+            continue
+        previous_points = previous.data_points or {}
+        deltas = {}
+        for analyte in shared_analytes:
+            current_value = _numeric_data_point(current_points.get(analyte))
+            previous_value = _numeric_data_point(previous_points.get(analyte))
+            if current_value is not None and previous_value is not None:
+                deltas[analyte] = round(current_value - previous_value, 4)
+        items.append(
+            ResultHistoryItem(
+                result=ResultRead.model_validate(previous),
+                sample=previous.sample,
+                shared_analytes=shared_analytes,
+                delta_from_current=deltas,
+            )
+        )
+        if len(items) >= limit:
+            break
+
+    return ResultHistoryRead(
+        result_id=result.id,
+        patient_id=patient_id,
+        exam_code=result.exam_code,
+        items=items,
     )
 
 
