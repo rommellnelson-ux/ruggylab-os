@@ -17,6 +17,23 @@ def list_samples(
     return db.query(Sample).order_by(Sample.id.desc()).all()
 
 
+@router.get("/by-barcode/{barcode}", response_model=SampleRead)
+def get_sample_by_barcode(
+    barcode: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Sample:
+    """Résout un échantillon par son code-barres (saisie/scan en salle)."""
+    del current_user
+    sample = db.query(Sample).filter(Sample.barcode == barcode).first()
+    if not sample:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Aucun échantillon pour le code-barres {barcode}.",
+        )
+    return sample
+
+
 @router.post("", response_model=SampleRead, status_code=status.HTTP_201_CREATED)
 def create_sample(
     payload: SampleCreate,

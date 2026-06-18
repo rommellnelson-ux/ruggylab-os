@@ -983,6 +983,15 @@
     /* ── Pill status ─────────────────────────────── */
     .pill.warn { background: #fef3c7; color: #92400e; }
     .pill.done { background: #dcfce7; color: #166534; }
+    /* ── Sélecteur patient/échantillon (saisie labo réel) ── */
+    .picker-matches {
+      position: absolute; z-index: 50; left: 0; right: 0;
+      background: var(--card, #fff); border: 1px solid var(--border, #d1d5db);
+      border-radius: 8px; margin-top: 2px; max-height: 240px; overflow-y: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    }
+    .picker-item { padding: 7px 10px; cursor: pointer; font-size: 13px; }
+    .picker-item:hover { background: #eef2f7; }
   </style>
 </head>
 <body>
@@ -1203,7 +1212,14 @@
           </div>
           <div class="grid2">
             <div class="panel"><h3>Nouvel echantillon</h3><div class="form">
-              <div><label>Patient ID</label><input id="samplePatientId" type="number" /></div>
+              <div style="position:relative;">
+                <label>Patient (IPP ou nom)</label>
+                <input id="samplePatientSearch" autocomplete="off" placeholder="Tapez l'IPP ou le nom…"
+                  oninput="searchSamplePatient(this.value)" />
+                <div id="samplePatientMatches" class="picker-matches" style="display:none;"></div>
+                <input id="samplePatientId" type="hidden" />
+                <div id="samplePatientSelected" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+              </div>
               <div><label>Examen demande</label><select id="sampleExam" onchange="updateTubeGuide()">
                 <option value="nfs">NFS - Dymind DH36</option>
                 <option value="poct">Biochimie POCT - Precis Expert</option>
@@ -1230,8 +1246,18 @@
           </div>
           <div class="grid2">
             <div class="panel"><h3>Nouveau résultat</h3><div class="form">
-              <div><label>ID échantillon</label><input id="resultSampleId" type="number" /></div>
-              <div><label>ID équipement</label><input id="resultEquipmentId" type="number" /></div>
+              <div><label>Échantillon (code-barres)</label>
+                <input id="resultSampleBarcode" autocomplete="off"
+                  placeholder="Scannez/saisissez le code-barres, puis Entrée…"
+                  style="font-family:monospace;"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();resolveResultSample(this.value.trim());}"
+                  onblur="if(this.value.trim())resolveResultSample(this.value.trim());" />
+                <input id="resultSampleId" type="hidden" />
+                <div id="resultSampleSelected" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+              </div>
+              <div><label>Équipement</label>
+                <select id="resultEquipmentId"><option value="">— Manuel / non spécifié —</option></select>
+              </div>
               <div><label>Modèle de saisie</label><select id="resultTemplate" onchange="renderResultTemplate()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
               <div id="dataPoints"></div>
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Créer un résultat validé</button>
@@ -3005,6 +3031,7 @@
         const sa = $('sideAvatar'); if (sa) sa.textContent = initials;
         const sn = $('sideUserName'); if (sn) sn.textContent = me.full_name || me.username;
         const sr = $('sideUserRole'); if (sr) sr.textContent = me.role || 'Utilisateur';
+        applyRoleNavigation(me.role);
         startClock();
         connectNotifications();
         updateTubeGuide();
@@ -3042,7 +3069,7 @@
       if (currentView === "patients") await loadPatients();
 
       if (currentView === "results") {
-        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs(), loadBioref(), loadCodeMappings()]);
+        await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs(), loadBioref(), loadCodeMappings(), loadResultEquipmentOptions()]);
       }
       if (currentView === "stocks") { await loadReagents(); await loadExpiryAlerts(); }
       if (currentView === "epidemio") await loadEpidemio();
@@ -3261,9 +3288,89 @@
     }
     function useCreatedPatientForSample() {
       if (!lastCreatedPatient) return;
-      $("samplePatientId").value = lastCreatedPatient.id;
+      const p = lastCreatedPatient;
+      $("samplePatientId").value = p.id;
+      const label = `${p.ipp_unique_id} — ${p.first_name} ${p.last_name}`;
+      if ($("samplePatientSearch")) $("samplePatientSearch").value = label;
+      if ($("samplePatientSelected")) $("samplePatientSelected").textContent = "✓ " + label;
       showView("samples");
       generateBarcode();
+    }
+
+    // ── Saisie « labo réel » : sélection patient par IPP/nom, échantillon par code-barres ──
+    const ROLE_HIDDEN_VIEWS = {
+      technician: ["users", "audit", "bnpl", "pharmacy", "prescription", "ai_training", "registre", "equipments"],
+      officer: ["users", "audit", "ai_training"],
+      admin: [],
+    };
+    function applyRoleNavigation(role) {
+      const hidden = ROLE_HIDDEN_VIEWS[role] || [];
+      document.querySelectorAll('.nav button[data-view]').forEach((b) => {
+        b.style.display = hidden.includes(b.dataset.view) ? "none" : "";
+      });
+      // Si la vue courante n'est plus autorisée, revenir au tableau de bord
+      if (hidden.includes(currentView)) showView("dashboard");
+    }
+
+    let _samplePatientTimer = null;
+    let _samplePatientResults = [];
+    function searchSamplePatient(q) {
+      clearTimeout(_samplePatientTimer);
+      const box = $("samplePatientMatches");
+      q = (q || "").trim();
+      $("samplePatientId").value = "";  // toute frappe invalide la sélection précédente
+      $("samplePatientSelected").textContent = "";
+      if (q.length < 2) { box.style.display = "none"; return; }
+      _samplePatientTimer = setTimeout(async () => {
+        try {
+          const data = await api(`/api/v1/patients?q=${encodeURIComponent(q)}&limit=8`, { headers: headers(false) });
+          _samplePatientResults = data.items || [];
+          if (!_samplePatientResults.length) {
+            box.innerHTML = '<div class="picker-item" style="color:var(--muted);">Aucun patient</div>';
+          } else {
+            box.innerHTML = _samplePatientResults.map((p, i) =>
+              `<div class="picker-item" onclick="pickSamplePatient(${i})">` +
+              `<code>${security.escapeHtml(p.ipp_unique_id)}</code> — ${security.escapeHtml(p.first_name + " " + p.last_name)}</div>`
+            ).join("");
+          }
+          box.style.display = "block";
+        } catch { box.style.display = "none"; }
+      }, 250);
+    }
+    function pickSamplePatient(idx) {
+      const p = _samplePatientResults[idx];
+      if (!p) return;
+      const label = `${p.ipp_unique_id} — ${p.first_name} ${p.last_name}`;
+      $("samplePatientId").value = p.id;
+      $("samplePatientSearch").value = label;
+      $("samplePatientSelected").textContent = "✓ " + label;
+      $("samplePatientMatches").style.display = "none";
+    }
+
+    async function resolveResultSample(barcode) {
+      if (!barcode) return;
+      try {
+        const s = await api(`/api/v1/samples/by-barcode/${encodeURIComponent(barcode)}`, { headers: headers(false) });
+        $("resultSampleId").value = s.id;
+        $("resultSampleSelected").textContent = `✓ Échantillon #${s.id} (${security.escapeHtml(barcode)})`;
+      } catch {
+        $("resultSampleId").value = "";
+        $("resultSampleSelected").textContent = "✗ Code-barres introuvable";
+        showToast("Code-barres échantillon introuvable", "error");
+      }
+    }
+
+    async function loadResultEquipmentOptions() {
+      const sel = $("resultEquipmentId");
+      if (!sel) return;
+      try {
+        const data = await api("/api/v1/equipments", { headers: headers(false) });
+        const items = _listItems(data);
+        const current = sel.value;
+        sel.innerHTML = '<option value="">— Manuel / non spécifié —</option>' +
+          items.map((e) => `<option value="${e.id}">${security.escapeHtml(e.name)}</option>`).join("");
+        if (current) sel.value = current;
+      } catch { /* liste équipements indisponible : on garde l'option Manuel */ }
     }
     async function loadSamples() {
       const tbody = $("samplesTable").querySelector("tbody");
@@ -3344,6 +3451,8 @@
         );
         
         $("resultSampleId").value = created.id;
+        if ($("resultSampleBarcode")) $("resultSampleBarcode").value = created.barcode;
+        if ($("resultSampleSelected")) $("resultSampleSelected").textContent = `✓ Échantillon #${created.id} (${created.barcode})`;
         $("imageBarcode").value = created.barcode;
         $("poctBarcode").value = created.barcode;
         showToast(`Échantillon ${security.escapeHtml(created.barcode)} créé avec succès`, "success");

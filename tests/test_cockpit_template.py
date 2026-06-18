@@ -90,6 +90,9 @@ class TestNewViewsPresent:
             "Hors délai",  # statut qualité valeurs critiques
             "Synthèse qualité",  # résumé qualité médicale
             'id="complianceTrendChart"',  # courbe de tendance conformité
+            'id="samplePatientSearch"',  # saisie patient par IPP/nom (labo réel)
+            'id="resultSampleBarcode"',  # saisie échantillon par code-barres
+            "/api/v1/samples/by-barcode/",  # résolution échantillon par code-barres
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
             'data-view="quality"',  # bouton de navigation qualité
@@ -154,6 +157,12 @@ class TestHandlerFunctionsDefined:
             "deleteMapping",
             "testMapping",
             "loadMappingOrphans",
+            # Saisie « labo réel » + navigation par rôle
+            "searchSamplePatient",
+            "pickSamplePatient",
+            "resolveResultSample",
+            "loadResultEquipmentOptions",
+            "applyRoleNavigation",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:
