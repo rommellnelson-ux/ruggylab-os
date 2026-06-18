@@ -1229,18 +1229,18 @@
             <div class="result-kpi"><strong id="resultsKpiLoaded">—</strong><span>Résultats affichables</span></div>
           </div>
           <div class="grid2">
-            <div class="panel"><h3>Nouveau resultat</h3><div class="form">
-              <div><label>Sample ID</label><input id="resultSampleId" type="number" /></div>
-              <div><label>Equipment ID</label><input id="resultEquipmentId" type="number" /></div>
-              <div><label>Template</label><select id="resultTemplate" onchange="renderResultTemplate()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
+            <div class="panel"><h3>Nouveau résultat</h3><div class="form">
+              <div><label>ID échantillon</label><input id="resultSampleId" type="number" /></div>
+              <div><label>ID équipement</label><input id="resultEquipmentId" type="number" /></div>
+              <div><label>Modèle de saisie</label><select id="resultTemplate" onchange="renderResultTemplate()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
               <div id="dataPoints"></div>
-              <button onclick="createResult(this)" aria-label="Créer un résultat validé">Creer resultat valide</button>
+              <button onclick="createResult(this)" aria-label="Créer un résultat validé">Créer un résultat validé</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
             <div class="panel">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                 <div>
-                  <h3 style="margin-bottom:4px;">Derniers resultats</h3>
+                  <h3 style="margin-bottom:4px;">Derniers résultats</h3>
                   <div id="resultsListHint" style="font-size:12px;color:var(--muted);">Chargement…</div>
                 </div>
                 <button class="ghost" onclick="loadResults()">↻ Actualiser</button>
@@ -1252,15 +1252,15 @@
                 <button class="ghost" data-result-filter="unvalidated" onclick="setResultFilter('unvalidated', this)">Non validés</button>
                 <button class="ghost" data-result-filter="auto" onclick="setResultFilter('auto', this)">Auto §5.8</button>
               </div>
-              <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Sample</th><th>Analyse</th><th>Critique</th><th>Flags</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
+              <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Échantillon</th><th>Analyse</th><th>Critique</th><th>Alertes</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
             </div>
           </div>
           <div id="resultDetailPanel" class="panel" style="margin-top:12px;display:none;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
               <div>
-                <h3 style="margin:0;">Détail résultat <span id="resultDetailTitle"></span></h3>
+                <h3 style="margin:0;">Détail du résultat <span id="resultDetailTitle"></span></h3>
                 <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">
-                  “Prendre en charge” signifie confirmer qu’une valeur critique a été vue et traitée par un agent.
+                  “Prendre en charge” signifie tracer qu’une valeur critique a été vérifiée et transmise selon le circuit clinique.
                 </p>
               </div>
               <div class="actions">
@@ -1271,7 +1271,10 @@
               </div>
             </div>
             <div class="result-detail-strip">
+              <div class="result-detail-chip"><span>Patient</span><strong id="resultDetailPatient">—</strong></div>
+              <div class="result-detail-chip"><span>IPP</span><strong id="resultDetailIpp">—</strong></div>
               <div class="result-detail-chip"><span>Échantillon</span><strong id="resultDetailSample">—</strong></div>
+              <div class="result-detail-chip"><span>Code-barres</span><strong id="resultDetailBarcode">—</strong></div>
               <div class="result-detail-chip"><span>Examen</span><strong id="resultDetailExam">—</strong></div>
               <div class="result-detail-chip"><span>Critique</span><strong id="resultDetailCritical">—</strong></div>
               <div class="result-detail-chip"><span>Validation</span><strong id="resultDetailValidation">—</strong></div>
@@ -1494,7 +1497,7 @@
             </div>
           </div>
 
-          <!-- Panneau alertes critiques non-acquittées -->
+          <!-- Panneau alertes critiques à prendre en charge -->
           <div class="panel" style="margin-top:12px;">
             <h3>🔔 Alertes critiques <span id="pendingBadge" style="display:none;" class="pill bad">!</span></h3>
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
@@ -3462,14 +3465,37 @@
           '</div>';
       }).join("") + '</div>';
     }
+    function _patientDisplayName(patient) {
+      if (!patient) return "—";
+      const name = [patient.first_name, patient.last_name].filter(Boolean).join(" ").trim();
+      return name || ("Patient #" + patient.id);
+    }
+    async function _loadResultContext(result) {
+      const context = { sample: null, patient: null };
+      if (!result?.sample_id) return context;
+      try {
+        const samples = await api('/api/v1/samples', { headers: headers(false) });
+        context.sample = (samples || []).find((sample) => Number(sample.id) === Number(result.sample_id)) || null;
+      } catch {}
+      if (context.sample?.patient_id) {
+        try {
+          context.patient = await api('/api/v1/patients/' + context.sample.patient_id, { headers: headers(false) });
+        } catch {}
+      }
+      return context;
+    }
     async function openResultDetail(resultId) {
       try {
         const result = await api('/api/v1/results/' + resultId, { headers: headers(false) });
         let bioref = null;
         try { bioref = await api('/api/v1/results/' + resultId + '/bioref', { headers: headers(false) }); } catch {}
-        _selectedResultDetail = { result, bioref };
+        const context = await _loadResultContext(result);
+        _selectedResultDetail = { result, bioref, sample: context.sample, patient: context.patient };
         $('resultDetailTitle').textContent = '#' + result.id;
-        $('resultDetailSample').textContent = result.sample_id || '—';
+        $('resultDetailPatient').textContent = _patientDisplayName(context.patient);
+        $('resultDetailIpp').textContent = context.patient?.ipp_unique_id || (context.sample?.patient_id ? 'Patient #' + context.sample.patient_id : '—');
+        $('resultDetailSample').textContent = result.sample_id ? '#' + result.sample_id : '—';
+        $('resultDetailBarcode').textContent = context.sample?.barcode || '—';
         $('resultDetailExam').textContent = result.exam_code || '—';
         $('resultDetailCritical').innerHTML = result.is_critical
           ? result.critical_ack_at
@@ -3485,6 +3511,9 @@
           'Analyse: <strong>' + security.escapeHtml(_formatResultDate(result.analysis_date)) + '</strong>' +
           ' · Bio-validation: <strong>' + security.escapeHtml(_formatResultDate(result.bio_validated_at)) + '</strong>' +
           ' · Auto §5.8: <strong>' + (result.is_auto_validated ? 'oui' : 'non') + '</strong>' +
+          (context.sample?.status ? ' · Statut échantillon: <strong>' + security.escapeHtml(context.sample.status) + '</strong>' : '') +
+          (context.sample?.collection_date ? ' · Prélèvement: <strong>' + security.escapeHtml(_formatResultDate(context.sample.collection_date)) + '</strong>' : '') +
+          (context.sample?.received_date ? ' · Réception: <strong>' + security.escapeHtml(_formatResultDate(context.sample.received_date)) + '</strong>' : '') +
           (result.amendment_reason ? '<br>Dernière correction: ' + security.escapeHtml(result.amendment_reason) : '');
         const ackBtn = $('resultDetailAckBtn');
         if (ackBtn) {
