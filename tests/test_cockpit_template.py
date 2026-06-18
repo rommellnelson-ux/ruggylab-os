@@ -93,6 +93,8 @@ class TestNewViewsPresent:
             'id="samplePatientSearch"',  # saisie patient par IPP/nom (labo réel)
             'id="resultSampleBarcode"',  # saisie échantillon par code-barres
             "/api/v1/samples/by-barcode/",  # résolution échantillon par code-barres
+            'addEventListener("hashchange"',  # routage par hash (lien profond)
+            'const target = "#/" + name',  # synchronisation URL ↔ vue
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
             'data-view="quality"',  # bouton de navigation qualité
@@ -163,6 +165,7 @@ class TestHandlerFunctionsDefined:
             "resolveResultSample",
             "loadResultEquipmentOptions",
             "applyRoleNavigation",
+            "_navFromHash",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:

@@ -2378,6 +2378,7 @@
     };
     let token = "";
     let currentView = "dashboard";
+    let _currentRole = null;
     let lastCreatedPatient = null;
     const API_PREFIX = "/api/v1";
     
@@ -3046,6 +3047,7 @@
           });
         }
         await loadDashboard();
+        _navFromHash();  // rechargement sur #/results → restaure la vue (lien profond)
       } catch { logout(); }
     }
     function showView(name) {
@@ -3055,14 +3057,32 @@
         showToast(`Vue indisponible: ${name}`, "error");
         return;
       }
+      // Vue masquée pour le rôle courant (y compris URL forgée) → tableau de bord
+      if ((ROLE_HIDDEN_VIEWS[_currentRole] || []).includes(name) && name !== "dashboard") {
+        return showView("dashboard");
+      }
       currentView = name;
       document.querySelectorAll(".view").forEach((el) => el.classList.add("hidden"));
       view.classList.remove("hidden");
       document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
       $("viewTitle").textContent = navButton.textContent;
+      // Synchronise l'URL : lien partageable, bouton Précédent, rechargement sans perte de vue
+      const target = "#/" + name;
+      if (location.hash !== target) location.hash = target;
       closeSidebar();
       refreshCurrent();
     }
+    // Routage par hash : restaure/navigue la vue depuis l'URL (#/results, #/patients…)
+    function _navFromHash() {
+      const name = (location.hash || "").replace(/^#\/?/, "").trim() || "dashboard";
+      if (name === currentView) return;
+      if ($(name) && document.querySelector(`.nav button[data-view="${name}"]`)) {
+        showView(name);
+      } else {
+        showView("dashboard");
+      }
+    }
+    window.addEventListener("hashchange", _navFromHash);
     async function refreshCurrent() {
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
       if (currentView === "reports") await loadCriticalCompliance();
@@ -3304,6 +3324,7 @@
       admin: [],
     };
     function applyRoleNavigation(role) {
+      _currentRole = role;
       const hidden = ROLE_HIDDEN_VIEWS[role] || [];
       document.querySelectorAll('.nav button[data-view]').forEach((b) => {
         b.style.display = hidden.includes(b.dataset.view) ? "none" : "";
