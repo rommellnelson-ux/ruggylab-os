@@ -1251,6 +1251,7 @@
                 <button class="ghost" data-result-filter="critical" onclick="setResultFilter('critical', this)">Critiques</button>
                 <button class="ghost" data-result-filter="unvalidated" onclick="setResultFilter('unvalidated', this)">Non validés</button>
                 <button class="ghost" data-result-filter="auto" onclick="setResultFilter('auto', this)">Auto §5.8</button>
+                <input id="resultSearch" style="max-width:260px;" placeholder="Rechercher patient, IPP, code-barres…" oninput="setResultSearch(this.value)" />
               </div>
               <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Échantillon</th><th>Analyse</th><th>Critique</th><th>Alertes</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
             </div>
@@ -3200,8 +3201,8 @@
           api("/api/v1/patients", { headers: headers(false) }).catch(() => ({ items: [] })),
         ]);
         _patientsCache = {};
-        (patientsData.items || []).forEach(p => { _patientsCache[p.id] = p; });
-        _samplesCache = samplesData.items || [];
+        _listItems(patientsData).forEach(p => { _patientsCache[p.id] = p; });
+        _samplesCache = _listItems(samplesData);
 
         const rows = _samplesCache.map(s => {
           const p = _patientsCache[s.patient_id] || null;
@@ -3281,8 +3282,15 @@
       const s = _flagStyle[flag] || 'background:#6b7280;color:white';
       return '<span class="pill" style="' + s + ';margin:1px;font-size:10px;" title="' + security.escapeHtml(analyte) + '">' + security.escapeHtml(analyte) + ':' + flag + '</span>';
     }
+    function _listItems(payload) {
+      if (Array.isArray(payload)) return payload;
+      return payload?.items || [];
+    }
     let _resultsCache = [];
     let _resultFilter = "all";
+    let _resultSearch = "";
+    let _resultSampleById = {};
+    let _resultPatientById = {};
     let _selectedResultDetail = null;
     function _resultValuePreview(value) {
       if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -3326,6 +3334,29 @@
       if (_resultFilter === "auto") return r.is_auto_validated;
       return true;
     }
+    function _resultContext(r) {
+      const sample = _resultSampleById[r.sample_id] || null;
+      const patient = sample?.patient_id ? (_resultPatientById[sample.patient_id] || null) : null;
+      return { sample, patient };
+    }
+    function _resultSearchText(r) {
+      const { sample, patient } = _resultContext(r);
+      const analytes = Object.keys(r.data_points || {}).join(" ");
+      return [
+        r.id,
+        r.sample_id,
+        sample?.barcode,
+        patient?.ipp_unique_id,
+        patient?.first_name,
+        patient?.last_name,
+        r.exam_code,
+        analytes,
+      ].filter(Boolean).join(" ").toLowerCase();
+    }
+    function _resultMatchesSearch(r) {
+      if (!_resultSearch) return true;
+      return _resultSearchText(r).includes(_resultSearch);
+    }
     function _updateResultFilterButtons() {
       document.querySelectorAll("[data-result-filter]").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.resultFilter === _resultFilter);
@@ -3337,8 +3368,12 @@
       _updateResultFilterButtons();
       renderResultsTable();
     }
+    function setResultSearch(value) {
+      _resultSearch = String(value || "").trim().toLowerCase();
+      renderResultsTable();
+    }
     function renderResultsTable() {
-      const rowsData = _resultsCache.filter(_resultMatchesFilter);
+      const rowsData = _resultsCache.filter(_resultMatchesFilter).filter(_resultMatchesSearch);
       const pendingCount = _resultsCache.filter((r) => r.is_critical && !r.critical_ack_at).length;
       const criticalCount = _resultsCache.filter((r) => r.is_critical).length;
       const unvalidatedCount = _resultsCache.filter((r) => !r.is_validated).length;
@@ -3352,6 +3387,13 @@
           : `${_resultsCache.length} résultat(s) chargés, aucune critique en attente.`;
       }
       const rows = rowsData.map((r) => {
+        const { sample, patient } = _resultContext(r);
+        const patientName = patient ? [patient.first_name, patient.last_name].filter(Boolean).join(" ") : "";
+        const sampleCell = '<strong>' + security.escapeHtml(sample?.barcode || ("#" + r.sample_id)) + '</strong>' +
+          '<div class="result-staleness">' +
+            security.escapeHtml(patientName || (sample?.patient_id ? "Patient #" + sample.patient_id : "Patient non renseigné")) +
+            (patient?.ipp_unique_id ? ' · ' + security.escapeHtml(patient.ipp_unique_id) : '') +
+          '</div>';
         let critCell = r.is_critical ? '<span class="pill bad">⛔ Critique</span>' : '<span style="color:var(--muted)">—</span>';
         if (r.delta_exceeded) critCell += ' <span class="pill" style="background:#b45309;color:white;font-size:10px;" title="Delta-check dépassé">△ Delta</span>';
 
@@ -3377,7 +3419,7 @@
         const exam = r.exam_code ? '<div class="result-staleness">exam ' + security.escapeHtml(r.exam_code) + '</div>' : '';
         const tr = row(
           '<td><strong>#' + r.id + '</strong></td>' +
-          '<td>' + r.sample_id + '</td>' +
+          '<td>' + sampleCell + '</td>' +
           '<td><div class="result-analytes">' + _resultAnalyteBadges(r) + '</div>' + exam + '</td>' +
           '<td>' + critCell + '</td>' +
           '<td style="white-space:nowrap;">' + flagsHtml + '</td>' +
@@ -3402,8 +3444,16 @@
       loadingStates.showSkeleton(tbody, 5);
 
       try {
-        const data = await api("/api/v1/results?limit=100", { headers: headers(false) });
-        _resultsCache = data.items || [];
+        const [data, samplesData, patientsData] = await Promise.all([
+          api("/api/v1/results?limit=100", { headers: headers(false) }),
+          api("/api/v1/samples", { headers: headers(false) }).catch(() => ({ items: [] })),
+          api("/api/v1/patients?limit=100", { headers: headers(false) }).catch(() => ({ items: [] })),
+        ]);
+        _resultsCache = _listItems(data);
+        _resultSampleById = {};
+        _listItems(samplesData).forEach((sample) => { _resultSampleById[sample.id] = sample; });
+        _resultPatientById = {};
+        _listItems(patientsData).forEach((patient) => { _resultPatientById[patient.id] = patient; });
         renderResultsTable();
       } catch (error) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';

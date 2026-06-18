@@ -48,7 +48,10 @@ class TestNewViewsPresent:
             'id="mapTestExam"',  # outil de test de mapping
             'id="resultsKpiPending"',  # KPI critiques à prendre en charge
             'data-result-filter="pending"',  # filtre résultats critiques à traiter
+            'id="resultSearch"',  # recherche patient/IPP/code-barres résultats
             "function renderResultsTable",  # rendu filtré de la liste résultats
+            "function setResultSearch",  # recherche dans la liste résultats
+            "function _resultContext",  # enrichissement patient/échantillon
             'id="resultDetailPanel"',  # panneau détail résultat
             'id="resultDetailPatient"',  # contexte patient dans le détail
             'id="resultDetailBarcode"',  # contexte échantillon dans le détail
