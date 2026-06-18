@@ -6,16 +6,48 @@ cloisonnée, comptes nominatifs, audit activé.
 
 ## 1. Démarrer une instance de test
 
-```bash
-# Variables d'environnement (valeurs de test)
-export SECRET_KEY="ruggylab-uat-secret-key-min-32-characters"
-export FIRST_SUPERUSER_PASSWORD="SuperAdmin2026!SecurePass"   # ≥ 16 caractères
-export DATABASE_URL="postgresql+psycopg://ruggylab:motdepasse@localhost:5432/ruggylab_uat"
-# (ou SQLite pour un essai rapide : sqlite:///./uat.db)
+### Windows / PowerShell (recommandé — SQLite, sans installation)
 
-alembic upgrade head                       # crée le schéma
+```powershell
+# Variables d'environnement (PowerShell : $env:, surtout pas "export")
+$env:SECRET_KEY = "ruggylab-uat-secret-key-min-32-characters"
+$env:FIRST_SUPERUSER_PASSWORD = "SuperAdmin2026!SecurePass"   # >= 16 caractères
+$env:DATABASE_URL = "sqlite:///./uat.db"
+
+alembic upgrade head            # crée le schéma
+python -m scripts.seed_demo     # référentiels + jeu de démonstration (voir §2)
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+> Important : définissez les 3 `$env:` **avant** `alembic`/`uvicorn`. Sinon le
+> serveur refuse de démarrer (réglages de sécurité par défaut trop faibles) et
+> la base reste vide.
+
+### Linux / macOS (bash)
+
+```bash
+export SECRET_KEY="ruggylab-uat-secret-key-min-32-characters"
+export FIRST_SUPERUSER_PASSWORD="SuperAdmin2026!SecurePass"
+export DATABASE_URL="sqlite:///./uat.db"
+alembic upgrade head && python -m scripts.seed_demo
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Variante PostgreSQL (optionnelle, « comme en production »)
+
+Uniquement si un serveur PostgreSQL est installé et démarré, avec une base et un
+utilisateur créés au préalable. Remplacez `motdepasse` par le vrai mot de passe :
+
+```powershell
+# PowerShell
+$env:DATABASE_URL = "postgresql+psycopg://ruggylab:motdepasse@localhost:5432/ruggylab_uat"
+```
+```bash
+# bash
+export DATABASE_URL="postgresql+psycopg://ruggylab:motdepasse@localhost:5432/ruggylab_uat"
+```
+
+Pour valider les fonctionnalités, **SQLite suffit** — PostgreSQL n'est pas nécessaire.
 
 Cockpit : http://127.0.0.1:8000/app · Doc API : http://127.0.0.1:8000/docs
 
