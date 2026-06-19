@@ -118,6 +118,8 @@ class TestNewViewsPresent:
             "/api/v1/worklist/my",  # API file de travail
             "function loadWorklist",  # chargement Ma file
             "function openWorklistLink",  # navigation sûre depuis les actions Ma file
+            "function openSampleFromWorklist",  # deep link échantillon depuis Ma file
+            "function openQcControlFromWorklist",  # deep link QC depuis Ma file
             "/static/ai/malaria_dataset_collector.js?v=",  # évite les anciens assets en cache
             "/api/v1/results/' + resultId + '/detail",  # détail résultat enrichi côté API
             "/api/v1/results/' + resultId + '/history",  # antériorités résultat

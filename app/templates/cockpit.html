@@ -3214,14 +3214,45 @@
       }
       return `<button class="${action.style === "danger" ? "danger" : "ghost"}" onclick="runWorklistAction('${encoded}', '${security.escapeHtml(itemId)}')">${label}</button>`;
     }
-    function openWorklistLink(encodedPath) {
+    async function openWorklistLink(encodedPath) {
       const path = decodeURIComponent(encodedPath || "%23/dashboard");
+      const [, query = ""] = path.split("?");
+      const params = new URLSearchParams(query);
       const name = path.replace(/^#\/?/, "").split(/[?#]/)[0] || "dashboard";
       if ($(name) && document.querySelector(`.nav button[data-view="${name}"]`)) {
         showView(name);
       } else {
         showView("dashboard");
+        return;
       }
+      const resultId = Number(params.get("result"));
+      const sampleId = Number(params.get("sample"));
+      const controlId = Number(params.get("control"));
+      const ncId = Number(params.get("nc"));
+      if (name === "results" && resultId) await openResultDetail(resultId);
+      if (name === "samples" && sampleId) await openSampleFromWorklist(sampleId);
+      if (name === "qc" && controlId) await openQcControlFromWorklist(controlId);
+      if (name === "quality" && ncId) await openNcDetail(ncId);
+    }
+    async function openSampleFromWorklist(sampleId) {
+      await loadSamples();
+      const tr = document.querySelector(`#samplesTable tbody tr[data-sample-id="${sampleId}"]`);
+      if (!tr) {
+        showToast("Échantillon introuvable dans la liste", "error");
+        return;
+      }
+      tr.style.outline = "3px solid var(--blue)";
+      tr.style.outlineOffset = "-3px";
+      tr.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    async function openQcControlFromWorklist(controlId) {
+      const controls = await api("/api/v1/qc/controls", { headers: headers(false) });
+      const control = (controls || []).find((item) => Number(item.id) === Number(controlId));
+      if (!control) {
+        showToast("Contrôle QC introuvable", "error");
+        return;
+      }
+      await selectQcControl(control);
     }
     async function runWorklistAction(encodedAction, itemId) {
       const action = JSON.parse(decodeURIComponent(encodedAction));
@@ -3812,13 +3843,15 @@
             (nextSt
               ? ` <button class="ghost" style="font-size:11px;padding:3px 7px;" onclick="advanceSampleStatus(${s.id},'${nextSt}')">→ ${nextSt}</button>`
               : '');
-          return row(
+          const tr = row(
             `<td>${s.id}</td>` +
             `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code></td>` +
             `<td>${pLabel}</td>` +
             `<td style="white-space:nowrap;">${statusCell}</td>` +
             `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(labelData)})'>🖨️</button></td>`
           );
+          tr.dataset.sampleId = String(s.id);
+          return tr;
         });
         setRows("samplesTable", rows);
       } catch (error) {
