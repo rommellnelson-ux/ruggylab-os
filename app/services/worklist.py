@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from typing import Any
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
@@ -20,7 +21,7 @@ def _is_unrestricted(user: User) -> bool:
     return user.role in (UserRole.ADMIN, UserRole.OFFICER) or user.unit is None
 
 
-def _sample_scope(query, user: User):
+def _sample_scope(query: Any, user: User) -> Any:
     if _is_unrestricted(user):
         return query
     return query.outerjoin(Patient, Sample.patient_id == Patient.id).filter(
@@ -163,17 +164,28 @@ def _sample_items(db: Session, user: User, limit: int) -> list[WorklistItem]:
 
 def _qc_items(db: Session, limit: int) -> list[WorklistItem]:
     controls = db.query(QcControl).filter(QcControl.is_active.is_(True)).all()
+    latest_results: dict[int, QcResult] = {}
+    control_ids = [control.id for control in controls]
+    if control_ids:
+        for result in (
+            db.query(QcResult)
+            .filter(QcResult.control_id.in_(control_ids))
+            .order_by(QcResult.control_id.asc(), QcResult.measured_at.desc(), QcResult.id.desc())
+            .all()
+        ):
+            latest_results.setdefault(result.control_id, result)
+
     items: list[WorklistItem] = []
     for control in controls:
-        last = (
-            db.query(QcResult)
-            .filter(QcResult.control_id == control.id)
-            .order_by(QcResult.measured_at.desc(), QcResult.id.desc())
-            .first()
-        )
+        last = latest_results.get(control.id)
         if last is None:
             continue
-        violations = json.loads(last.violations or "[]")
+        try:
+            violations = json.loads(last.violations or "[]")
+        except json.JSONDecodeError:
+            violations = []
+        if not isinstance(violations, list):
+            violations = []
         rejects = [v for v in violations if v in QC_REJECT_RULES]
         if not rejects:
             continue
@@ -218,14 +230,7 @@ def _nc_items(db: Session, limit: int) -> list[WorklistItem]:
                 subtitle=f"{nc.severity} · {nc.source}",
                 status="en retard" if overdue else nc.status,
                 due_at=nc.due_date,
-                actions=[
-                    WorklistAction(label="Ouvrir qualité", path="#/quality"),
-                    WorklistAction(
-                        label="Clôturer",
-                        method="POST",
-                        path=f"/api/v1/quality/non-conformities/{nc.id}/transition",
-                    ),
-                ],
+                actions=[WorklistAction(label="Ouvrir qualité", path="#/quality")],
             )
         )
     return items

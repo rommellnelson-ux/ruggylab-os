@@ -3210,19 +3210,24 @@
       const label = security.escapeHtml(action.label || "Ouvrir");
       const encoded = encodeURIComponent(JSON.stringify(action));
       if ((action.path || "").startsWith("#")) {
-        return `<button class="ghost" onclick="location.hash='${security.escapeHtml(action.path)}'">${label}</button>`;
+        return `<button class="ghost" onclick="openWorklistLink('${encodeURIComponent(action.path)}')">${label}</button>`;
       }
       return `<button class="${action.style === "danger" ? "danger" : "ghost"}" onclick="runWorklistAction('${encoded}', '${security.escapeHtml(itemId)}')">${label}</button>`;
+    }
+    function openWorklistLink(encodedPath) {
+      const path = decodeURIComponent(encodedPath || "%23/dashboard");
+      const name = path.replace(/^#\/?/, "").split(/[?#]/)[0] || "dashboard";
+      if ($(name) && document.querySelector(`.nav button[data-view="${name}"]`)) {
+        showView(name);
+      } else {
+        showView("dashboard");
+      }
     }
     async function runWorklistAction(encodedAction, itemId) {
       const action = JSON.parse(decodeURIComponent(encodedAction));
       const label = action.label || "cette action";
       if (!confirm(`${label} ? Cette action sera tracée si elle modifie un dossier.`)) return;
       const options = { method: action.method || "GET", headers: headers(false) };
-      if (action.path.includes("/transition")) {
-        options.headers["Content-Type"] = "application/json";
-        options.body = JSON.stringify({ status: "closed" });
-      }
       await api(action.path, options);
       showToast(`Action effectuée: ${itemId}`, "success");
       await loadWorklist();

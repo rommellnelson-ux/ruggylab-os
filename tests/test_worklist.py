@@ -130,6 +130,11 @@ def test_worklist_aggregates_priority_items(client) -> None:
     assert payload["summary"]["overdue"] >= 1
     assert payload["items"][0]["priority"] in {"critical", "overdue"}
     assert any(action["label"] == "Prendre en charge" for action in payload["items"][0]["actions"])
+    quality_items = [item for item in payload["items"] if item["category"] == "quality"]
+    assert quality_items
+    assert all(
+        action["label"] != "Clôturer" for item in quality_items for action in item["actions"]
+    )
 
 
 def test_worklist_category_filter(client) -> None:
