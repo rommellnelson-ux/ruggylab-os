@@ -1041,6 +1041,7 @@
       <nav class="nav" role="navigation" aria-label="Navigation principale">
         <div class="nav-section">Clinique</div>
         <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">🏠 Tableau de bord</button>
+        <button data-view="worklist" onclick="showView('worklist')">📌 Ma file</button>
         <button type="button" onclick="window.location.href='/app/bench'">📡 Vue Paillasse</button>
         <button data-view="patients" onclick="showView('patients')">👤 Patients</button>
         <button data-view="samples" onclick="showView('samples')">🧪 Échantillons</button>
@@ -1137,6 +1138,38 @@
           <div class="panel" style="margin-top:12px;">
             <h3>📈 Contrôle Qualité Analytique <span id="qcRejectBadge" style="display:none;" class="pill bad">Rejet</span><span id="qcWarnBadge" style="display:none;" class="pill" style="background:var(--amber);">Alerte</span></h3>
             <table id="dashQcTable"><thead><tr><th>Analyte</th><th>Niveau</th><th>Dernière valeur</th><th>Date</th><th>Violations</th><th>Statut</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div id="worklist" class="view band hidden">
+          <div class="panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div>
+                <h3 style="margin:0;">Ma file de travail</h3>
+                <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Actions terrain prioritaires : critiques, TAT, échantillons, QC et NC/CAPA.</p>
+              </div>
+              <div class="toolbar">
+                <select id="worklistCategory" onchange="loadWorklist()">
+                  <option value="">Toutes priorités</option>
+                  <option value="critical">Critiques</option>
+                  <option value="tat">TAT</option>
+                  <option value="sample">Échantillons</option>
+                  <option value="qc">QC</option>
+                  <option value="quality">NC/CAPA</option>
+                </select>
+                <button onclick="loadWorklist(this)">↻</button>
+              </div>
+            </div>
+            <div class="grid4" style="margin-top:12px;">
+              <div class="panel metric metric-blue"><div id="wlTotal" class="value">—</div><div class="label">Total actions</div></div>
+              <div class="panel metric metric-rose"><div id="wlCritical" class="value">—</div><div class="label">Critiques</div></div>
+              <div class="panel metric metric-amber"><div id="wlOverdue" class="value">—</div><div class="label">Hors délai</div></div>
+              <div class="panel metric"><div id="wlBlocked" class="value">—</div><div class="label">Bloqués</div></div>
+            </div>
+            <table id="worklistTable" style="margin-top:12px;">
+              <thead><tr><th>Priorité</th><th>Catégorie</th><th>Action</th><th>Statut</th><th>Échéance</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
 
@@ -3146,6 +3179,7 @@
     window.addEventListener("hashchange", _navFromHash);
     async function refreshCurrent() {
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
+      if (currentView === "worklist") await loadWorklist();
       if (currentView === "reports") await loadCriticalCompliance();
       if (currentView === "patients") await loadPatients();
 
@@ -3164,6 +3198,69 @@
       if (currentView === "tat") await loadTat();
       if (currentView === "prescription") await loadExamOrdersView();
       if (currentView === "invoices") await Promise.all([loadFinanceSummary(), loadInvoices(), ensureInvoiceLine()]);
+    }
+    function _worklistBadge(priority) {
+      const labels = { critical: "Critique", overdue: "Hors délai", urgent: "Urgent", blocked: "Bloqué", normal: "Routine" };
+      const cls = priority === "critical" ? "bad" : priority === "overdue" || priority === "urgent" ? "" : priority === "blocked" ? "bad" : "ok";
+      const style = priority === "overdue" || priority === "urgent" ? ' style="background:var(--amber);color:#fff;"' : "";
+      return `<span class="pill ${cls}"${style}>${labels[priority] || priority}</span>`;
+    }
+    function _worklistActionButton(action, itemId) {
+      if (!action) return "";
+      const label = security.escapeHtml(action.label || "Ouvrir");
+      const encoded = encodeURIComponent(JSON.stringify(action));
+      if ((action.path || "").startsWith("#")) {
+        return `<button class="ghost" onclick="openWorklistLink('${encodeURIComponent(action.path)}')">${label}</button>`;
+      }
+      return `<button class="${action.style === "danger" ? "danger" : "ghost"}" onclick="runWorklistAction('${encoded}', '${security.escapeHtml(itemId)}')">${label}</button>`;
+    }
+    function openWorklistLink(encodedPath) {
+      const path = decodeURIComponent(encodedPath || "%23/dashboard");
+      const name = path.replace(/^#\/?/, "").split(/[?#]/)[0] || "dashboard";
+      if ($(name) && document.querySelector(`.nav button[data-view="${name}"]`)) {
+        showView(name);
+      } else {
+        showView("dashboard");
+      }
+    }
+    async function runWorklistAction(encodedAction, itemId) {
+      const action = JSON.parse(decodeURIComponent(encodedAction));
+      const label = action.label || "cette action";
+      if (!confirm(`${label} ? Cette action sera tracée si elle modifie un dossier.`)) return;
+      const options = { method: action.method || "GET", headers: headers(false) };
+      await api(action.path, options);
+      showToast(`Action effectuée: ${itemId}`, "success");
+      await loadWorklist();
+      await loadDashboard();
+    }
+    async function loadWorklist(btn = null) {
+      if (btn) setLoading(btn, true);
+      try {
+        const category = $("worklistCategory")?.value || "";
+        const query = category ? `?category=${encodeURIComponent(category)}` : "";
+        const payload = await api(`/api/v1/worklist/my${query}`, { headers: headers(false) });
+        $("wlTotal").textContent = payload.summary.total;
+        $("wlCritical").textContent = payload.summary.critical;
+        $("wlOverdue").textContent = payload.summary.overdue;
+        $("wlBlocked").textContent = payload.summary.blocked;
+        setRows("worklistTable", (payload.items || []).map((item) => {
+          const primaryAction = (item.actions || [])[0];
+          const secondaryAction = (item.actions || [])[1];
+          return row(
+            `<td>${_worklistBadge(item.priority)}</td>` +
+            `<td><strong>${security.escapeHtml(item.category)}</strong><br><small>${security.escapeHtml(item.unit || "")}</small></td>` +
+            `<td><strong>${security.escapeHtml(item.title)}</strong><br><small>${security.escapeHtml(item.subtitle || "")}</small></td>` +
+            `<td>${security.escapeHtml(item.status)}</td>` +
+            `<td>${item.due_at ? new Date(item.due_at).toLocaleString("fr-FR") : "—"}</td>` +
+            `<td>${_worklistActionButton(primaryAction, item.id)} ${_worklistActionButton(secondaryAction, item.id)}</td>`
+          );
+        }));
+        if (!payload.items || payload.items.length === 0) {
+          setRows("worklistTable", [row('<td colspan="6" style="text-align:center;color:var(--muted);">Aucune action prioritaire.</td>')]);
+        }
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);

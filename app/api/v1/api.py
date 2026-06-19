@@ -49,6 +49,7 @@ from app.api.v1.endpoints.stock_notifications import router as stock_notificatio
 from app.api.v1.endpoints.stock_predictor import router as stock_predictor_router
 from app.api.v1.endpoints.tat import router as tat_router
 from app.api.v1.endpoints.users import router as users_router
+from app.api.v1.endpoints.worklist import router as worklist_router
 
 api_router = APIRouter()
 
@@ -78,6 +79,7 @@ api_router.include_router(samples_router, tags=["samples"], dependencies=_no_acc
 api_router.include_router(results_router, tags=["results"], dependencies=_no_accountant)
 api_router.include_router(bench_router, tags=["Vue Paillasse"], dependencies=_no_accountant)
 api_router.include_router(analyzer_router, tags=["Ingestion automates"])
+api_router.include_router(worklist_router, tags=["File de travail"], dependencies=_no_accountant)
 api_router.include_router(auto_validation_router, tags=["Auto-Validation"])
 api_router.include_router(results_poct_router, tags=["poct"], dependencies=_no_accountant)
 api_router.include_router(military_facilities_router, tags=["military-facilities"])
