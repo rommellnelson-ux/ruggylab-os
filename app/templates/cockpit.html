@@ -1091,7 +1091,7 @@
             <span id="notifWsDot" title="WebSocket déconnecté" style="position:absolute;bottom:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:var(--muted);"></span>
           </button>
           <button class="theme-toggle" onclick="toggleTheme()" title="Changer le thème" aria-label="Basculer entre mode clair et sombre">☀️</button>
-          <button class="ghost" onclick="refreshCurrent()" aria-label="Rafraîchir">↻</button>
+          <button class="ghost" onclick="refreshCurrent(true)" aria-label="Rafraîchir">↻</button>
           <button class="secondary" onclick="logout()" aria-label="Se déconnecter">⏻ Quitter</button>
         </div>
         <div id="notifPopover" style="display:none;position:absolute;top:60px;right:16px;width:380px;max-height:60vh;overflow-y:auto;background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);z-index:200;padding:12px;">
@@ -2473,6 +2473,11 @@
     let token = "";
     let currentView = "dashboard";
     let _currentRole = null;
+    // Perf single-page : éviter de re-télécharger une vue déjà chargée
+    // récemment lors d'une simple navigation. Les mutations rafraîchissent via
+    // leurs loaders dédiés (loadSamples/loadResults…) et le bouton ↻ force.
+    const _viewLoadedAt = {};
+    const _VIEW_TTL_MS = 30000;
     let lastCreatedPatient = null;
     const API_PREFIX = "/api/v1";
     
@@ -2746,7 +2751,7 @@
           showView('samples');
           setTimeout(() => $("sampleBarcode")?.focus(), 100);
         },
-        'Ctrl+Alt+R': () => refreshCurrent(),
+        'Ctrl+Alt+R': () => refreshCurrent(true),
         'Ctrl+Alt+D': () => showView('dashboard'),
         'Ctrl+Alt+Q': () => logout(),
         'Ctrl+Alt+T': () => toggleTheme(),
@@ -3177,7 +3182,15 @@
       }
     }
     window.addEventListener("hashchange", _navFromHash);
-    async function refreshCurrent() {
+    async function refreshCurrent(force = false) {
+      // Navigation : si la vue a été chargée il y a moins de _VIEW_TTL_MS, on
+      // saute le re-téléchargement (navigation instantanée). Le bouton ↻, le
+      // raccourci, la reconnexion et la fin de synchro passent force=true.
+      const now = Date.now();
+      if (!force && _viewLoadedAt[currentView] && now - _viewLoadedAt[currentView] < _VIEW_TTL_MS) {
+        return;
+      }
+      _viewLoadedAt[currentView] = now;
       if (currentView === "dashboard" || currentView === "reports") await loadDashboard();
       if (currentView === "worklist") await loadWorklist();
       if (currentView === "reports") await loadCriticalCompliance();
@@ -5242,7 +5255,7 @@
       navigator.serviceWorker.addEventListener('message', event => {
         if (event.data.type === 'SYNC_COMPLETE') {
           showToast('Synchronisation terminée', 'success');
-          refreshCurrent();
+          refreshCurrent(true);
         }
       });
     }
@@ -5252,7 +5265,7 @@
       init: () => {
         window.addEventListener('online', () => {
           showToast('Connexion rétablie', 'success');
-          refreshCurrent();
+          refreshCurrent(true);
         });
         
         window.addEventListener('offline', () => {
