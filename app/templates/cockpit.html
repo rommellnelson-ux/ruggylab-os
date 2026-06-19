@@ -992,6 +992,9 @@
     }
     .picker-item { padding: 7px 10px; cursor: pointer; font-size: 13px; }
     .picker-item:hover { background: #eef2f7; }
+    .exam-checklist { max-height: 220px; overflow-y: auto; border: 1px solid var(--border, #d1d5db); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .exam-opt { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+    .inv-line { margin-bottom: 6px; }
   </style>
 </head>
 <body>
@@ -1038,6 +1041,7 @@
       <nav class="nav" role="navigation" aria-label="Navigation principale">
         <div class="nav-section">Clinique</div>
         <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">🏠 Tableau de bord</button>
+        <button type="button" onclick="window.location.href='/app/bench'">📡 Vue Paillasse</button>
         <button data-view="patients" onclick="showView('patients')">👤 Patients</button>
         <button data-view="samples" onclick="showView('samples')">🧪 Échantillons</button>
         <button data-view="results" onclick="showView('results')">📋 Résultats</button>
@@ -1051,7 +1055,8 @@
         <button data-view="tat" onclick="showView('tat')">⏱️ Suivi TAT</button>
         <div class="nav-section">Logistique</div>
         <button data-view="pharmacy" onclick="showView('pharmacy')">💊 Pharmacie FHIR</button>
-        <button data-view="prescription" onclick="showView('prescription')">🧾 Ordonnances CMU</button>
+        <button data-view="prescription" onclick="showView('prescription')">🧾 Prescriptions d'examens</button>
+        <button data-view="invoices" onclick="showView('invoices')">💰 Facturation</button>
         <button data-view="bnpl" onclick="showView('bnpl')">💳 Paiements BNPL</button>
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
         <div class="nav-section">Système</div>
@@ -1923,24 +1928,80 @@
         <div id="prescription" class="view band hidden">
           <div class="grid2">
             <div class="panel">
-              <h3>Scanner ordonnance CMU / ONMCI</h3>
+              <h3>Nouvelle prescription d'examens</h3>
               <div class="form">
-                <div class="grid2"><div><label>Patient ID</label><input id="rxPatientId" placeholder="IPP-CI-2026-001234" /></div><div><label>Prescripteur ONMCI</label><input id="rxPrescriber" placeholder="ONMCI-2026-001" /></div></div>
-                <div class="grid2"><div><label>Date ordonnance</label><input id="rxDate" type="date" /></div><div><label>QR token</label><input id="rxQrToken" placeholder="Token QR optionnel" /></div></div>
-                <div><label>Diagnostics CIM-10 (séparés par virgule)</label><input id="rxDiagnoses" value="B54" /></div>
-                <div><label>Médicaments DCI (un par ligne: DCI, dose mg, fréquence/j, durée j)</label><textarea id="rxDrugs">ARTEMETHER-LUMEFANTRINE, 80, 2, 3</textarea></div>
-                <div class="grid3">
-                  <div><label>Age</label><input id="rxAge" type="number" value="30" /></div>
-                  <div><label>Poids kg</label><input id="rxWeight" type="number" value="70" /></div>
-                  <div><label>Sexe</label><select id="rxSex"><option>M</option><option>F</option></select></div>
+                <div style="position:relative;">
+                  <label>Patient (IPP ou nom)</label>
+                  <input id="rxPatientSearch" autocomplete="off" placeholder="Rechercher par IPP ou nom…" oninput="searchRxPatient(this.value)" />
+                  <div id="rxPatientMatches" class="picker-matches"></div>
+                  <input id="rxOrderPatientId" type="hidden" />
+                  <div id="rxPatientSelected" class="muted"></div>
                 </div>
+                <div class="grid2">
+                  <div><label>Prescripteur</label><input id="rxOrderPrescriber" placeholder="Dr ..." /></div>
+                  <div><label>Priorité</label><select id="rxOrderPriority"><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="stat">STAT (vital)</option></select></div>
+                </div>
+                <div><label>Renseignements cliniques</label><textarea id="rxOrderClinical" placeholder="Contexte clinique (optionnel)"></textarea></div>
+                <div><label>Examens demandés</label><div id="rxExamChecklist" class="exam-checklist muted">Chargement du catalogue…</div></div>
                 <div class="actions">
-                  <button onclick="scanPrescription(this)">Scanner ordonnance</button>
-                  <button class="success" onclick="openPrescriptionPdf(this)">Rapport PDF</button>
+                  <button onclick="createExamOrder(this)">Créer la prescription</button>
                 </div>
               </div>
             </div>
-            <pre id="rxResult" class="result-box">Aucune ordonnance scannée.</pre>
+            <div class="panel">
+              <h3>Suivi du fil 🧵</h3>
+              <div class="muted" style="margin-bottom:8px;">La prescription guide la paillasse : prélèvement → résultat par examen. Elle reste facultative — la saisie d'échantillons et de résultats fonctionne sans elle.</div>
+              <div id="rxThreadPanel"><div class="muted">Sélectionnez une prescription pour suivre son avancement.</div></div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <div class="toolbar"><h3 style="margin:0;flex:1;">Prescriptions récentes</h3><button class="ghost" onclick="loadExamOrders()">Rafraîchir</button></div>
+            <table id="examOrdersTable"><thead><tr><th>#</th><th>Patient</th><th>Priorité</th><th>Statut</th><th>Avancement</th><th></th></tr></thead><tbody><tr><td colspan="6" class="muted">Aucune prescription.</td></tr></tbody></table>
+          </div>
+        </div>
+
+        <div id="invoices" class="view band hidden">
+          <div class="grid4" id="financeKpis" style="margin-bottom:12px;">
+            <div class="panel metric metric-blue"><div id="finNet" class="value">—</div><div class="label">Chiffre net (FCFA)</div></div>
+            <div class="panel metric metric-teal"><div id="finCollected" class="value">—</div><div class="label">Encaissé (FCFA)</div></div>
+            <div class="panel metric metric-rose"><div id="finOutstanding" class="value">—</div><div class="label">Créances (FCFA)</div></div>
+            <div class="panel metric"><div id="finCnam" class="value">—</div><div class="label">Part CNAM (FCFA)</div></div>
+            <div class="panel metric"><div id="finCount" class="value">—</div><div class="label">Factures</div></div>
+          </div>
+          <div class="grid2">
+            <div class="panel">
+              <h3>Nouvelle facture</h3>
+              <div class="form">
+                <div><label>Patient (libellé sur facture)</label><input id="invPatientLabel" placeholder="Nom du patient / réf. dossier" /></div>
+                <div class="grid2">
+                  <div><label>Couverture</label><select id="invPatientType" onchange="toggleInvInsurance()"><option value="UNINSURED">Non assuré</option><option value="INSURED">Assuré CNAM</option></select></div>
+                  <div id="invInsuranceWrap" style="display:none;"><label>N° CNAM</label><input id="invInsuranceId" placeholder="CNAM-CI-2026-..." /></div>
+                </div>
+                <div><label>Examens facturés</label><div id="invLines"></div><button class="ghost" type="button" onclick="addInvoiceLine()">+ Ligne</button></div>
+                <div class="grid2"><div><label>Remise XOF</label><input id="invDiscount" type="number" value="0" min="0" /></div><div><label>Total estimé</label><input id="invEstimate" readonly value="0 FCFA" /></div></div>
+                <div class="actions"><button onclick="createInvoice(this)">Émettre la facture</button></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Encaissement</h3>
+              <div class="form">
+                <div class="grid2"><div><label>Facture #</label><input id="payInvoiceId" type="number" /></div><div><label>Montant XOF</label><input id="payAmount" type="number" /></div></div>
+                <div class="grid2">
+                  <div><label>Mode</label><select id="payMethod"><option value="CASH">Espèces</option><option value="MOBILE_MONEY">Mobile Money</option><option value="INSURANCE">Assurance</option><option value="BNPL">BNPL</option></select></div>
+                  <div><label>Référence</label><input id="payReference" placeholder="Reçu / transaction" /></div>
+                </div>
+                <div class="actions"><button class="success" onclick="recordInvoicePayment(this)">Enregistrer paiement</button></div>
+              </div>
+              <pre id="invoiceResult" class="result-box" style="margin-top:10px;">Aucune facture sélectionnée.</pre>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:12px;">
+            <div class="toolbar">
+              <h3 style="margin:0;flex:1;">Journal des factures</h3>
+              <select id="invStatusFilter" onchange="loadInvoices()"><option value="">Tous statuts</option><option value="issued">Émise</option><option value="partially_paid">Partiel</option><option value="paid">Payée</option><option value="cancelled">Annulée</option></select>
+              <button class="ghost" onclick="loadInvoices()">Rafraîchir</button>
+            </div>
+            <table id="invoicesTable"><thead><tr><th>N°</th><th>Patient</th><th>Net</th><th>Reste à payer</th><th>Statut</th><th></th></tr></thead><tbody><tr><td colspan="6" class="muted">Aucune facture.</td></tr></tbody></table>
           </div>
         </div>
 
@@ -3101,6 +3162,8 @@
       if (currentView === "stats") await loadStats();
       if (currentView === "quality") await loadQuality();
       if (currentView === "tat") await loadTat();
+      if (currentView === "prescription") await loadExamOrdersView();
+      if (currentView === "invoices") await Promise.all([loadFinanceSummary(), loadInvoices(), ensureInvoiceLine()]);
     }
     async function loadDashboard(btn = null) {
       if (btn) setLoading(btn, true);
@@ -3319,9 +3382,12 @@
 
     // ── Saisie « labo réel » : sélection patient par IPP/nom, échantillon par code-barres ──
     const ROLE_HIDDEN_VIEWS = {
-      technician: ["users", "audit", "bnpl", "pharmacy", "prescription", "ai_training", "registre", "equipments"],
-      officer: ["users", "audit", "ai_training", "bnpl"],  // finance déléguée au comptable
-      // Comptable : uniquement facturation/paiements + activité agrégée (dashboard, stats).
+      // Le technicien voit la prescription d'examens (suivi du fil) mais ce n'est
+      // pas obligatoire ; la finance (factures, BNPL) lui est masquée.
+      technician: ["users", "audit", "bnpl", "invoices", "pharmacy", "ai_training", "registre", "equipments"],
+      // Finance déléguée au comptable : l'officier ne gère ni factures ni BNPL.
+      officer: ["users", "audit", "ai_training", "bnpl", "invoices"],
+      // Comptable : facturation + paiements + activité agrégée (dashboard, stats).
       // Aucun accès clinique (renforcé côté backend par forbid_accountant).
       accountant: ["patients", "samples", "results", "epidemio", "machines", "imaging", "reports", "qc", "tat", "pharmacy", "prescription", "stocks", "equipments", "ai_training", "registre", "quality", "users", "audit"],
       admin: [],
@@ -3395,6 +3461,222 @@
           items.map((e) => `<option value="${e.id}">${security.escapeHtml(e.name)}</option>`).join("");
         if (current) sel.value = current;
       } catch { /* liste équipements indisponible : on garde l'option Manuel */ }
+    }
+
+    // ── Prescription d'examens : création + suivi du fil ──────────────────────
+    let _examCatalogCache = [];
+    let _rxPatientTimer = null;
+    let _rxPatientResults = [];
+    const _ORDER_STATUS_LABELS = { prescribed: "Prescrit", collected: "Prélevé", in_progress: "En cours", completed: "Terminé", cancelled: "Annulé" };
+
+    async function loadExamOrdersView() {
+      await Promise.all([loadExamCatalog(), loadExamOrders()]);
+    }
+    async function loadExamCatalog() {
+      const box = $("rxExamChecklist");
+      if (!box) return;
+      try {
+        if (_examCatalogCache.length === 0) {
+          _examCatalogCache = _listItems(await api("/api/v1/tat/catalog", { headers: headers(false) }));
+        }
+        box.classList.remove("muted");
+        box.innerHTML = _examCatalogCache.map((e) =>
+          `<label class="exam-opt"><input type="checkbox" value="${security.escapeHtml(e.code)}" data-label="${security.escapeHtml(e.label || e.code)}"> ${security.escapeHtml(e.code)} — ${security.escapeHtml(e.label || "")}</label>`
+        ).join("") || '<span class="muted">Catalogue vide.</span>';
+      } catch { box.innerHTML = '<span class="muted">Catalogue indisponible.</span>'; }
+    }
+    function searchRxPatient(q) {
+      clearTimeout(_rxPatientTimer);
+      const box = $("rxPatientMatches");
+      q = (q || "").trim();
+      $("rxOrderPatientId").value = "";
+      $("rxPatientSelected").textContent = "";
+      if (q.length < 2) { box.style.display = "none"; return; }
+      _rxPatientTimer = setTimeout(async () => {
+        try {
+          const data = await api(`/api/v1/patients?q=${encodeURIComponent(q)}&limit=8`, { headers: headers(false) });
+          _rxPatientResults = _listItems(data);
+          if (_rxPatientResults.length === 0) { box.style.display = "none"; return; }
+          box.innerHTML = _rxPatientResults.map((p, i) =>
+            `<div class="picker-item" onclick="pickRxPatient(${i})">${security.escapeHtml(p.ipp_unique_id || "")} — ${security.escapeHtml((p.last_name || "") + " " + (p.first_name || ""))}</div>`
+          ).join("");
+          box.style.display = "block";
+        } catch { box.style.display = "none"; }
+      }, 250);
+    }
+    function pickRxPatient(idx) {
+      const p = _rxPatientResults[idx];
+      if (!p) return;
+      $("rxOrderPatientId").value = p.id;
+      $("rxPatientSearch").value = `${p.ipp_unique_id} — ${p.last_name} ${p.first_name}`;
+      $("rxPatientSelected").textContent = `Patient sélectionné : #${p.id}`;
+      $("rxPatientMatches").style.display = "none";
+    }
+    async function createExamOrder(btn) {
+      const pid = $("rxOrderPatientId").value;
+      if (!pid) { showToast("Sélectionnez un patient.", "error"); return; }
+      const exams = Array.from(document.querySelectorAll('#rxExamChecklist input[type=checkbox]:checked'))
+        .map((c) => ({ exam_code: c.value, exam_label: c.dataset.label }));
+      if (exams.length === 0) { showToast("Sélectionnez au moins un examen.", "error"); return; }
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/exam-orders", {
+          method: "POST", headers: headers(),
+          body: JSON.stringify({
+            patient_id: Number(pid),
+            prescriber: $("rxOrderPrescriber").value || null,
+            clinical_info: $("rxOrderClinical").value || null,
+            priority: $("rxOrderPriority").value,
+            exams,
+          }),
+        });
+        showToast("Prescription créée.", "success");
+        document.querySelectorAll('#rxExamChecklist input:checked').forEach((c) => { c.checked = false; });
+        $("rxPatientSearch").value = ""; $("rxOrderPatientId").value = ""; $("rxPatientSelected").textContent = "";
+        await loadExamOrders();
+      } catch { showToast("Échec de la création.", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function loadExamOrders() {
+      const tbody = $("examOrdersTable").querySelector("tbody");
+      try {
+        const rows = _listItems(await api("/api/v1/exam-orders?limit=50", { headers: headers(false) }));
+        if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">Aucune prescription.</td></tr>'; return; }
+        tbody.innerHTML = rows.map((o) => {
+          const done = o.items.filter((i) => i.status === "resulted").length;
+          const tot = o.items.filter((i) => i.status !== "cancelled").length;
+          return `<tr><td>#${o.id}</td><td>${o.patient_id}</td><td>${security.escapeHtml(o.priority)}</td><td>${_ORDER_STATUS_LABELS[o.status] || o.status}</td><td>${done}/${tot}</td><td><button class="ghost" onclick="openOrderThread(${o.id})">Suivre le fil</button></td></tr>`;
+        }).join("");
+      } catch { tbody.innerHTML = '<tr><td colspan="6" class="muted">Indisponible.</td></tr>'; }
+    }
+    async function openOrderThread(orderId) {
+      const panel = $("rxThreadPanel");
+      panel.innerHTML = '<div class="muted">Chargement…</div>';
+      try {
+        const t = await api(`/api/v1/exam-orders/${orderId}/thread`, { headers: headers(false) });
+        const steps = t.steps.map((s) => {
+          const icon = s.status === "resulted" ? (s.is_critical ? "🔴" : "✅") : "⏳";
+          return `<tr><td>${icon}</td><td>${security.escapeHtml(s.exam_code)}</td><td>${security.escapeHtml(s.exam_label || "")}</td><td>${s.status === "resulted" ? "Résultat #" + s.result_id : "En attente"}</td></tr>`;
+        }).join("");
+        const collect = t.sample_id
+          ? `<div class="muted" style="margin:6px 0;">Échantillon : ${security.escapeHtml(t.sample_barcode || "")} (${security.escapeHtml(t.sample_status || "")})</div>`
+          : `<div class="form" style="margin:6px 0;"><label>Rattacher l'échantillon prélevé (code-barres)</label><div class="toolbar"><input id="rxCollectBarcode" placeholder="Scanner / saisir"><button onclick="collectOrderSample(${orderId})">Rattacher</button></div></div>`;
+        panel.innerHTML =
+          `<div><strong>Prescription #${t.order_id}</strong> — ${_ORDER_STATUS_LABELS[t.status] || t.status} · ${t.progress_pct}%</div>` +
+          `<div class="muted">${security.escapeHtml(t.patient_label || "")}${t.prescriber ? " · " + security.escapeHtml(t.prescriber) : ""}</div>` +
+          collect +
+          `<table style="margin-top:8px;"><thead><tr><th></th><th>Examen</th><th>Libellé</th><th>État</th></tr></thead><tbody>${steps}</tbody></table>`;
+      } catch { panel.innerHTML = '<div class="muted">Fil indisponible.</div>'; }
+    }
+    async function collectOrderSample(orderId) {
+      const barcode = ($("rxCollectBarcode")?.value || "").trim();
+      if (!barcode) { showToast("Saisir un code-barres.", "error"); return; }
+      try {
+        await api(`/api/v1/exam-orders/${orderId}/collect`, { method: "POST", headers: headers(), body: JSON.stringify({ barcode }) });
+        showToast("Échantillon rattaché.", "success");
+        await openOrderThread(orderId); await loadExamOrders();
+      } catch { showToast("Code-barres introuvable.", "error"); }
+    }
+
+    // ── Comptabilité : facturation des examens, encaissements, créances ───────
+    const _INV_STATUS_LABELS = { draft: "Brouillon", issued: "Émise", partially_paid: "Partiel", paid: "Payée", cancelled: "Annulée" };
+    function toggleInvInsurance() {
+      $("invInsuranceWrap").style.display = $("invPatientType").value === "INSURED" ? "" : "none";
+    }
+    function ensureInvoiceLine() { if ($("invLines") && $("invLines").children.length === 0) addInvoiceLine(); }
+    function addInvoiceLine(code = "", label = "", price = "") {
+      const wrap = $("invLines"); if (!wrap) return;
+      const r = document.createElement("div");
+      r.className = "inv-line grid3";
+      r.innerHTML =
+        `<input placeholder="Code examen" value="${security.escapeHtml(code)}" class="inv-code">` +
+        `<input placeholder="Libellé" value="${security.escapeHtml(label)}" class="inv-label">` +
+        `<div class="toolbar"><input type="number" min="0" placeholder="Prix XOF" value="${price}" class="inv-price" oninput="updateInvEstimate()"><button class="ghost" type="button" onclick="this.closest('.inv-line').remove();updateInvEstimate()">✕</button></div>`;
+      wrap.appendChild(r);
+      updateInvEstimate();
+    }
+    function _invoiceLines() {
+      return Array.from(document.querySelectorAll('#invLines .inv-line')).map((r) => ({
+        exam_code: r.querySelector('.inv-code').value.trim() || null,
+        label: r.querySelector('.inv-label').value.trim(),
+        quantity: 1,
+        unit_price_xof: r.querySelector('.inv-price').value || "0",
+      })).filter((l) => l.label);
+    }
+    function updateInvEstimate() {
+      const gross = _invoiceLines().reduce((s, l) => s + Number(l.unit_price_xof || 0), 0);
+      const disc = Number($("invDiscount").value || 0);
+      $("invEstimate").value = `${Math.max(0, gross - disc).toLocaleString("fr-FR")} FCFA`;
+    }
+    async function createInvoice(btn) {
+      const lines = _invoiceLines();
+      if (lines.length === 0) { showToast("Ajoutez au moins une ligne.", "error"); return; }
+      const type = $("invPatientType").value;
+      setLoading(btn, true);
+      try {
+        const inv = await api("/api/v1/invoices", {
+          method: "POST", headers: headers(),
+          body: JSON.stringify({
+            patient_label: $("invPatientLabel").value || null,
+            patient_type: type,
+            insurance_id: type === "INSURED" ? ($("invInsuranceId").value || null) : null,
+            lines, discount_xof: $("invDiscount").value || "0",
+          }),
+        });
+        showToast(`Facture ${inv.invoice_number} émise.`, "success");
+        $("invoiceResult").textContent = `Facture ${inv.invoice_number}\nNet : ${inv.net_total_xof} FCFA\nCNAM : ${inv.cnam_part_xof} FCFA\nReste patient : ${inv.patient_due_xof} FCFA`;
+        $("payInvoiceId").value = inv.id;
+        await Promise.all([loadInvoices(), loadFinanceSummary()]);
+      } catch { showToast("Échec de l'émission.", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function loadInvoices() {
+      const tbody = $("invoicesTable").querySelector("tbody");
+      const st = $("invStatusFilter") ? $("invStatusFilter").value : "";
+      try {
+        const rows = _listItems(await api(`/api/v1/invoices${st ? "?status=" + st : ""}`, { headers: headers(false) }));
+        if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">Aucune facture.</td></tr>'; return; }
+        tbody.innerHTML = rows.map((i) => {
+          const canCancel = i.status !== "cancelled" && Number(i.paid_xof) === 0;
+          return `<tr><td>${security.escapeHtml(i.invoice_number)}</td><td>${security.escapeHtml(i.patient_label || "—")}</td><td>${Number(i.net_total_xof).toLocaleString("fr-FR")}</td><td>${Number(i.balance_xof).toLocaleString("fr-FR")}</td><td>${_INV_STATUS_LABELS[i.status] || i.status}</td><td><button class="ghost" onclick="selectInvoice(${i.id},${i.balance_xof})">Encaisser</button>${canCancel ? ` <button class="ghost" onclick="cancelInvoice(${i.id})">Annuler</button>` : ""}</td></tr>`;
+        }).join("");
+      } catch { tbody.innerHTML = '<tr><td colspan="6" class="muted">Indisponible.</td></tr>'; }
+    }
+    function selectInvoice(id, balance) { $("payInvoiceId").value = id; $("payAmount").value = balance; $("payAmount").focus(); }
+    async function recordInvoicePayment(btn) {
+      const id = $("payInvoiceId").value;
+      const amount = $("payAmount").value;
+      if (!id || !amount) { showToast("Facture et montant requis.", "error"); return; }
+      setLoading(btn, true);
+      try {
+        const inv = await api(`/api/v1/invoices/${id}/payments`, {
+          method: "POST", headers: headers(),
+          body: JSON.stringify({ amount_xof: amount, method: $("payMethod").value, reference: $("payReference").value || null }),
+        });
+        showToast(`Paiement enregistré (${_INV_STATUS_LABELS[inv.status]}).`, "success");
+        $("invoiceResult").textContent = `Facture ${inv.invoice_number}\nEncaissé : ${inv.paid_xof} FCFA\nReste : ${inv.balance_xof} FCFA\nStatut : ${_INV_STATUS_LABELS[inv.status]}`;
+        await Promise.all([loadInvoices(), loadFinanceSummary()]);
+      } catch { showToast("Échec de l'encaissement.", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function cancelInvoice(id) {
+      if (!confirm("Annuler cette facture ?")) return;
+      try {
+        await api(`/api/v1/invoices/${id}/cancel`, { method: "POST", headers: headers() });
+        showToast("Facture annulée.", "success");
+        await Promise.all([loadInvoices(), loadFinanceSummary()]);
+      } catch { showToast("Annulation impossible (déjà encaissée ?).", "error"); }
+    }
+    async function loadFinanceSummary() {
+      try {
+        const s = await api("/api/v1/invoices/summary", { headers: headers(false) });
+        const fmt = (v) => Number(v || 0).toLocaleString("fr-FR");
+        if ($("finNet")) $("finNet").textContent = fmt(s.net_total_xof);
+        if ($("finCollected")) $("finCollected").textContent = fmt(s.collected_xof);
+        if ($("finOutstanding")) $("finOutstanding").textContent = fmt(s.outstanding_xof);
+        if ($("finCnam")) $("finCnam").textContent = fmt(s.cnam_part_xof);
+        if ($("finCount")) $("finCount").textContent = s.invoice_count;
+      } catch { /* résumé indisponible */ }
     }
     async function loadSamples() {
       const tbody = $("samplesTable").querySelector("tbody");

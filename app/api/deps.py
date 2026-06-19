@@ -91,6 +91,20 @@ def require_admin(current_user: User = Depends(get_current_active_user)) -> User
     return current_user
 
 
+def require_finance(current_user: User = Depends(get_current_active_user)) -> User:
+    """Réserve la comptabilité (facturation/encaissements) au comptable et à l'admin.
+
+    Séparation des tâches : ni le technicien ni l'officier (biologiste) n'ont
+    accès à la facturation ; inversement le comptable n'a pas accès au clinique.
+    """
+    if current_user.role not in {UserRole.ACCOUNTANT, UserRole.ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé à la comptabilité (comptable / administrateur).",
+        )
+    return current_user
+
+
 def forbid_accountant(current_user: User = Depends(get_current_active_user)) -> User:
     """Interdit l'accès aux données cliniques au profil comptable (gestion).
 

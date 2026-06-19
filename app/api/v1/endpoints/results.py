@@ -85,6 +85,25 @@ def _patient_read(sample: Sample | None) -> PatientRead | None:
     return PatientRead.model_validate(sample.patient)
 
 
+def _critical_value_alert_payload(result: Result) -> dict:
+    sample = result.sample
+    patient = sample.patient if sample else None
+    patient_name = f"{patient.last_name} {patient.first_name}".strip() if patient else None
+    return {
+        "result_id": result.id,
+        "sample_id": result.sample_id,
+        "sample_barcode": sample.barcode if sample else None,
+        "exam_code": result.exam_code,
+        "patient_id": patient.id if patient else None,
+        "patient_ipp": patient.ipp_unique_id if patient else None,
+        "patient_name": patient_name,
+        "occurred_at": (result.tech_validated_at or result.analysis_date).isoformat()
+        if (result.tech_validated_at or result.analysis_date)
+        else None,
+        "message": "Valeur critique techniquement validée - prise en charge immédiate requise.",
+    }
+
+
 @router.get("", response_model=ResultListResponse)
 def list_results(
     db: Session = Depends(get_db),
@@ -428,10 +447,10 @@ def create_result(
     if result.is_critical or result.delta_exceeded:
         from app.services.notification_bus import publish_alert_event
 
-        publish_alert_event(
-            "critical" if result.is_critical else "delta",
-            result_id=result.id,
-        )
+        if result.is_critical:
+            publish_alert_event("critical_value_alert", **_critical_value_alert_payload(result))
+        if result.delta_exceeded:
+            publish_alert_event("delta", result_id=result.id)
     return result
 
 

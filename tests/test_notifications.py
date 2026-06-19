@@ -111,3 +111,17 @@ class TestNotificationsWebSocket:
             assert "total" in snap
             assert "counts" in snap
             assert "criticals" in snap
+
+    def test_ws_pushes_critical_value_alert_event(self, client):
+        hdrs = _auth(client)
+        tok = _token(client)
+        with client.websocket_connect(f"/api/v1/notifications/ws?token={tok}") as ws:
+            snap = ws.receive_json()
+            assert "counts" in snap
+
+            result_id = _make_critical_result(client, hdrs)
+            event = ws.receive_json()
+
+            assert event["type"] == "critical_value_alert"
+            assert event["result_id"] == result_id
+            assert event["message"].startswith("Valeur critique techniquement validée")

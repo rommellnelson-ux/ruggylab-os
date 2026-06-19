@@ -117,6 +117,14 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str | None = None
     NOTIFICATION_WEBHOOK_TIMEOUT_SECONDS: int = 10
 
+    # Analyzer middleware ingestion (ASTM/automates -> RuggyLab REST).
+    # ANALYZER_API_KEY must be set before enabling the /analyzer/results endpoint.
+    # ANALYZER_ALLOWED_IPS can stay empty when network controls are handled by firewall/VLAN.
+    ANALYZER_API_KEY: str = ""
+    ANALYZER_ALLOWED_IPS: list[str] = []
+    ANALYZER_HMAC_SECRET: str | None = None
+    ANALYZER_SIGNATURE_MAX_SKEW_SECONDS: int = 300
+
     # Trusted reverse-proxy IPs.
     # X-Forwarded-For is only trusted when the direct client IP is in this list.
     # Example: ["127.0.0.1", "10.0.0.1"]

@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import forbid_accountant
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
+from app.api.v1.endpoints.analyzer import router as analyzer_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.auto_validation import router as auto_validation_router
+from app.api.v1.endpoints.bench import router as bench_router
 from app.api.v1.endpoints.billing import router as billing_router
 from app.api.v1.endpoints.bioref import router as bioref_router
 from app.api.v1.endpoints.bnpl import router as bnpl_router
@@ -19,9 +21,11 @@ from app.api.v1.endpoints.equipment_reagent_ratios import (
     router as equipment_reagent_ratios_router,
 )
 from app.api.v1.endpoints.equipments import router as equipments_router
+from app.api.v1.endpoints.exam_orders import router as exam_orders_router
 from app.api.v1.endpoints.fhir_pharmacy import router as fhir_pharmacy_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.imaging import router as imaging_router
+from app.api.v1.endpoints.invoices import router as invoices_router
 from app.api.v1.endpoints.login import router as login_router
 from app.api.v1.endpoints.maintenance import router as maintenance_router
 from app.api.v1.endpoints.military_facilities import router as military_facilities_router
@@ -72,6 +76,8 @@ api_router.include_router(equipment_maintenance_router, tags=["Equipment Mainten
 api_router.include_router(stats_router, tags=["Lab Stats"])
 api_router.include_router(samples_router, tags=["samples"], dependencies=_no_accountant)
 api_router.include_router(results_router, tags=["results"], dependencies=_no_accountant)
+api_router.include_router(bench_router, tags=["Vue Paillasse"], dependencies=_no_accountant)
+api_router.include_router(analyzer_router, tags=["Ingestion automates"])
 api_router.include_router(auto_validation_router, tags=["Auto-Validation"])
 api_router.include_router(results_poct_router, tags=["poct"], dependencies=_no_accountant)
 api_router.include_router(military_facilities_router, tags=["military-facilities"])
@@ -95,3 +101,9 @@ api_router.include_router(tat_router, tags=["Suivi TAT"])
 api_router.include_router(registre_router, tags=["Registre maître"], dependencies=_no_accountant)
 api_router.include_router(bioref_router, tags=["Référentiel biologique"])
 api_router.include_router(code_mappings_router, tags=["Unification vocabulaires"])
+# Prescription d'examens (clinique) → interdite au comptable.
+api_router.include_router(
+    exam_orders_router, tags=["Prescription d'examens"], dependencies=_no_accountant
+)
+# Comptabilité : cloisonnement géré dans le routeur (require_finance).
+api_router.include_router(invoices_router, tags=["Comptabilité"])

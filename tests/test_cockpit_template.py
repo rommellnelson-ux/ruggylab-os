@@ -96,11 +96,23 @@ class TestNewViewsPresent:
             'addEventListener("hashchange"',  # routage par hash (lien profond)
             'const target = "#/" + name',  # synchronisation URL ↔ vue
             "accountant: [",  # navigation cloisonnée du rôle comptable
+            'id="prescription"',  # vue prescription d'examens (ex-ordonnances)
+            'id="rxExamChecklist"',  # sélection des examens demandés
+            'id="examOrdersTable"',  # liste des prescriptions (suivi du fil)
+            'data-view="invoices"',  # bouton de navigation Facturation
+            'id="invoices"',  # vue comptabilité / facturation
+            'id="invoicesTable"',  # journal des factures
+            'id="finOutstanding"',  # KPI créances
+            "/api/v1/exam-orders",  # API prescription d'examens
+            "/api/v1/exam-orders/${orderId}/thread",  # suivi du fil
+            "/api/v1/invoices",  # API facturation
+            "/api/v1/invoices/summary",  # tableau de bord comptable
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
             'data-view="quality"',  # bouton de navigation qualité
             'class="login-banner"',  # bannière visuelle de connexion
             "/static/branding/RuggyLab_OS.jpg",  # image de marque login
+            "window.location.href='/app/bench'",  # accès Vue Paillasse dédiée
             "/static/ai/malaria_dataset_collector.js?v=",  # évite les anciens assets en cache
             "/api/v1/results/' + resultId + '/detail",  # détail résultat enrichi côté API
             "/api/v1/results/' + resultId + '/history",  # antériorités résultat
@@ -167,6 +179,24 @@ class TestHandlerFunctionsDefined:
             "loadResultEquipmentOptions",
             "applyRoleNavigation",
             "_navFromHash",
+            # Prescription d'examens (le fil)
+            "loadExamOrdersView",
+            "loadExamCatalog",
+            "searchRxPatient",
+            "pickRxPatient",
+            "createExamOrder",
+            "loadExamOrders",
+            "openOrderThread",
+            "collectOrderSample",
+            # Comptabilité / facturation
+            "toggleInvInsurance",
+            "addInvoiceLine",
+            "createInvoice",
+            "loadInvoices",
+            "selectInvoice",
+            "recordInvoicePayment",
+            "cancelInvoice",
+            "loadFinanceSummary",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:

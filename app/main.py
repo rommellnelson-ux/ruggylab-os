@@ -132,6 +132,7 @@ def _load_template(name: str) -> str:
 _TPL_COCKPIT = _load_template("cockpit.html")
 _TPL_COCKPIT_EXPRESS = _load_template("cockpit_express.html")
 _TPL_EHM_MAP = _load_template("ehm_map.html")
+_TPL_BENCH_RADAR = _load_template("bench_radar.html")
 
 
 def create_app() -> FastAPI:
@@ -187,6 +188,10 @@ def create_app() -> FastAPI:
     @fastapi_app.get("/app/express", response_class=HTMLResponse, tags=["ui"])
     async def cockpit_express() -> str:
         return _TPL_COCKPIT_EXPRESS
+
+    @fastapi_app.get("/app/bench", response_class=HTMLResponse, tags=["ui"])
+    async def bench_radar() -> str:
+        return _TPL_BENCH_RADAR
 
     @fastapi_app.get("/app/map", response_class=HTMLResponse, tags=["ui"])
     async def ehm_map() -> str:

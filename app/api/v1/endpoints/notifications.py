@@ -127,8 +127,11 @@ async def notifications_ws(
         await websocket.send_json(_snapshot())
         while True:
             # Attend un événement (push immédiat) OU le heartbeat (keepalive)
+            event: dict | None = None
             with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(queue.get(), timeout=_WS_PUSH_INTERVAL)
+                event = await asyncio.wait_for(queue.get(), timeout=_WS_PUSH_INTERVAL)
+            if event and event.get("type") == "critical_value_alert":
+                await websocket.send_json(event)
             await websocket.send_json(_snapshot())
     except WebSocketDisconnect:
         return

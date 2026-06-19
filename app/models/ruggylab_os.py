@@ -1,5 +1,6 @@
 import datetime as dt
 import enum
+from decimal import Decimal
 
 from sqlalchemy import (
     CHAR,
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -651,3 +653,119 @@ class MilitaryFacility(Base):
     bureau: Mapped[str] = mapped_column(String(100), nullable=False)
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Prescription d'examens (bon de demande d'analyses) — le « fil » du labo
+# Le médecin prescrit des examens → l'échantillon est prélevé/rattaché →
+# les résultats remontent par examen. La prescription est une AIDE au suivi :
+# elle n'est pas indispensable à la saisie des échantillons/résultats.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class ExamOrder(Base):
+    __tablename__ = "exam_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    prescriber: Mapped[str | None] = mapped_column(String(150))
+    clinical_info: Mapped[str | None] = mapped_column(Text)
+    # routine | urgent | stat
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="routine")
+    # prescribed → collected → in_progress → completed | cancelled
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="prescribed", index=True
+    )
+    ordered_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    # Échantillon rattaché une fois prélevé : c'est le maillon central du fil.
+    sample_id: Mapped[int | None] = mapped_column(ForeignKey("samples.id"))
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    patient: Mapped["Patient"] = relationship()
+    sample: Mapped["Sample | None"] = relationship()
+    items: Mapped[list["ExamOrderItem"]] = relationship(
+        back_populates="order", cascade="all, delete-orphan"
+    )
+
+
+class ExamOrderItem(Base):
+    __tablename__ = "exam_order_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("exam_orders.id"), nullable=False, index=True)
+    exam_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    exam_label: Mapped[str | None] = mapped_column(String(150))
+    # pending | resulted | cancelled
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    # Résultat produit pour cet examen (le bout du fil).
+    result_id: Mapped[int | None] = mapped_column(ForeignKey("results.id"))
+
+    order: Mapped["ExamOrder"] = relationship(back_populates="items")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Comptabilité — facturation des examens (FCFA), répartition CMU, encaissements
+# Données dénormalisées (patient_label) : le comptable n'accède pas aux dossiers.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class Invoice(Base):
+    __tablename__ = "invoices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    invoice_number: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
+    patient_id: Mapped[int | None] = mapped_column(ForeignKey("patients.id"))
+    # Libellé patient figé sur la facture (le comptable n'a pas accès aux PII).
+    patient_label: Mapped[str | None] = mapped_column(String(150))
+    exam_order_id: Mapped[int | None] = mapped_column(ForeignKey("exam_orders.id"))
+    # INSURED (assuré CNAM) | UNINSURED (non assuré)
+    patient_type: Mapped[str] = mapped_column(String(20), nullable=False, default="UNINSURED")
+    insurance_id: Mapped[str | None] = mapped_column(String(50))
+
+    gross_total_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    discount_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    net_total_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    cnam_part_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    patient_due_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    paid_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+
+    # draft | issued | partially_paid | paid | cancelled
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="issued", index=True)
+    issued_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    lines: Mapped[list["InvoiceLine"]] = relationship(
+        back_populates="invoice", cascade="all, delete-orphan"
+    )
+    payments: Mapped[list["InvoicePayment"]] = relationship(
+        back_populates="invoice", cascade="all, delete-orphan"
+    )
+
+
+class InvoiceLine(Base):
+    __tablename__ = "invoice_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), nullable=False, index=True)
+    exam_code: Mapped[str | None] = mapped_column(String(50))
+    label: Mapped[str] = mapped_column(String(150), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    unit_price_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    line_total_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+
+    invoice: Mapped["Invoice"] = relationship(back_populates="lines")
+
+
+class InvoicePayment(Base):
+    __tablename__ = "invoice_payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), nullable=False, index=True)
+    amount_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # CASH | MOBILE_MONEY | INSURANCE | BNPL
+    method: Mapped[str] = mapped_column(String(20), nullable=False, default="CASH")
+    reference: Mapped[str | None] = mapped_column(String(100))
+    paid_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    received_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+
+    invoice: Mapped["Invoice"] = relationship(back_populates="payments")
