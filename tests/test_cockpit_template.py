@@ -113,6 +113,10 @@ class TestNewViewsPresent:
             'class="login-banner"',  # bannière visuelle de connexion
             "/static/branding/RuggyLab_OS.jpg",  # image de marque login
             "window.location.href='/app/bench'",  # accès Vue Paillasse dédiée
+            'data-view="worklist"',  # file de travail terrain consolidée
+            'id="worklistTable"',  # tableau Ma file
+            "/api/v1/worklist/my",  # API file de travail
+            "function loadWorklist",  # chargement Ma file
             "/static/ai/malaria_dataset_collector.js?v=",  # évite les anciens assets en cache
             "/api/v1/results/' + resultId + '/detail",  # détail résultat enrichi côté API
             "/api/v1/results/' + resultId + '/history",  # antériorités résultat
