@@ -95,6 +95,8 @@ class TestNewViewsPresent:
             "/api/v1/samples/by-barcode/",  # résolution échantillon par code-barres
             'addEventListener("hashchange"',  # routage par hash (lien profond)
             'const target = "#/" + name',  # synchronisation URL ↔ vue
+            "_VIEW_TTL_MS",  # garde de fraîcheur navigation (perf single-page)
+            "async function refreshCurrent(force",  # rafraîchissement forçable
             "accountant: [",  # navigation cloisonnée du rôle comptable
             'id="prescription"',  # vue prescription d'examens (ex-ordonnances)
             'id="rxExamChecklist"',  # sélection des examens demandés
