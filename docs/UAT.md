@@ -79,8 +79,25 @@ Via `POST /api/v1/users` (admin) :
 - **admin** — déjà présent (accès total).
 - **officer** — `{"username":"biologiste","password":"...","role":"officer"}`.
 - **technician** — `{"username":"tech_hema","password":"...","role":"technician","unit":"hematologie"}`.
+- **accountant** — `{"username":"comptable","password":"...","role":"accountant"}`
+  (comptabilité uniquement ; aucun accès clinique).
 
 ## 4. Scénarios à valider
+
+### Validation automatique rapide (smoke test)
+
+Instance démarrée, lancer le smoke test bout-en-bout (santé → patient →
+échantillon → prescription → fil → résultat → facture → encaissement) :
+
+```bash
+# Cible et identifiants par défaut : http://127.0.0.1:8000, admin / $FIRST_SUPERUSER_PASSWORD
+python -m scripts.uat_smoke
+# Autre cible :
+UAT_BASE_URL=https://uat.exemple.ci UAT_ADMIN_PASSWORD='...' python -m scripts.uat_smoke
+```
+
+Sortie attendue : « N OK, 0 échec(s) » et code de sortie 0. À lancer uniquement
+contre une instance de test.
 
 ### A. Cycle de vie d'un résultat
 1. Créer un patient → un échantillon → un résultat (vue Résultats du cockpit).
@@ -105,6 +122,23 @@ Via `POST /api/v1/users` (admin) :
 ### E. Registre maître
 1. Vue « 📚 Registre & Import » : coller un CSV, **Analyser** (recettes, CMU, paludisme).
 2. **Prévisualiser** (dry-run) puis **Importer** (confirmation requise).
+
+### G. Prescription d'examens (le fil)
+1. Vue « 🧾 Prescriptions d'examens » : sélectionner un patient par IPP/nom,
+   cocher des examens (NFS, GE…), **Créer la prescription**.
+2. « Suivre le fil » → **Rattacher** l'échantillon prélevé par code-barres.
+3. Saisir un résultat avec le même `exam_code` → le fil passe l'examen à
+   **résulté** et l'avancement progresse (terminé quand tous résultés).
+4. La prescription est **facultative** : la saisie échantillon/résultat marche
+   sans bon (à vérifier).
+
+### H. Facturation (comptabilité)
+1. Connecté en **comptable** : vue « 💰 Facturation ».
+2. Émettre une facture (non assuré) de 5 000 + 2 500 → **reste patient 7 500 FCFA**.
+3. Assuré CNAM → **CNAM 70 % / patient 30 %** (ex. 10 000 → 7 000 / 3 000).
+4. Encaisser en deux fois → statut **partiel** puis **payée** ; vérifier les KPI
+   (chiffre, encaissé, **créances**) et le journal.
+5. Cloisonnement : le comptable reçoit **403** sur `/api/v1/patients` (clinique).
 
 ### F. Transverse
 - Qualité NC/CAPA (déclaration → workflow → clôture).
