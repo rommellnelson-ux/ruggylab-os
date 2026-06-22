@@ -19,6 +19,7 @@ from app.schemas.bnpl import BNPLScheduleCreate, BNPLScheduleOut
 from app.schemas.invoice import (
     INVOICE_STATUSES,
     PAYMENT_METHODS,
+    AgingReport,
     FinanceSummary,
     InvoiceCreate,
     InvoiceRead,
@@ -26,6 +27,7 @@ from app.schemas.invoice import (
     PaymentPlanCreate,
 )
 from app.services.accounting_service import (
+    aging_report,
     balance_of,
     build_invoice,
     finance_summary,
@@ -78,6 +80,16 @@ def get_finance_summary(
 ) -> FinanceSummary:
     del current_user
     return finance_summary(db)
+
+
+@router.get("/aging", response_model=AgingReport)
+def get_aging_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance),
+) -> AgingReport:
+    """Créances âgées (0-30 / 31-60 / 61-90 / 90+ j) pour les relances."""
+    del current_user
+    return aging_report(db)
 
 
 @router.get("", response_model=list[InvoiceRead])

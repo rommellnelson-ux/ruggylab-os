@@ -13,8 +13,10 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import ExamOrder, Invoice, InvoiceLine
+from app.models import ExamOrder, Invoice, InvoiceLine, InvoicePayment
 from app.schemas.invoice import (
+    AgingBucket,
+    AgingReport,
     FinanceSummary,
     InvoiceCreate,
     InvoiceFromOrder,
@@ -175,4 +177,61 @@ def finance_summary(db: Session) -> FinanceSummary:
         collected_xof=collected,
         outstanding_xof=outstanding,
         by_status=by_status,
+    )
+
+
+def apply_bnpl_installment_to_invoice(
+    db: Session, schedule_id: int, amount_xof: Decimal | int
+) -> Invoice | None:
+    """Répercute un paiement d'échéance BNPL sur la facture liée (le cas échéant).
+
+    Le plan BNPL est le point d'entrée des règlements fractionnés ; la facture
+    rattachée (``payment_plan_id``) est mise à jour automatiquement pour éviter
+    une double saisie. Sans facture liée (plan BNPL autonome), ne fait rien.
+    """
+    invoice = (
+        db.query(Invoice)
+        .filter(Invoice.payment_plan_id == schedule_id, Invoice.status != "cancelled")
+        .first()
+    )
+    if invoice is None:
+        return None
+    amount = _xof(Decimal(amount_xof))
+    invoice.payments.append(
+        InvoicePayment(amount_xof=amount, method="BNPL", reference=f"Plan BNPL #{schedule_id}")
+    )
+    invoice.paid_xof = Decimal(invoice.paid_xof or 0) + amount
+    recompute_status(invoice)
+    db.commit()
+    db.refresh(invoice)
+    return invoice
+
+
+def aging_report(db: Session) -> AgingReport:
+    """Créances âgées : ventile le reste à payer par ancienneté de la facture."""
+    now = dt.datetime.now(dt.UTC).replace(tzinfo=None)
+    buckets = [("0-30 j", 0, 30), ("31-60 j", 31, 60), ("61-90 j", 61, 90), ("90+ j", 91, None)]
+    counts = {b[0]: 0 for b in buckets}
+    sums = {b[0]: Decimal("0") for b in buckets}
+    total = Decimal("0")
+
+    for inv in db.query(Invoice).filter(Invoice.status != "cancelled").all():
+        bal = balance_of(inv)
+        if bal <= 0:
+            continue
+        age = (now - inv.issued_at).days
+        for label, lo, hi in buckets:
+            if age >= lo and (hi is None or age <= hi):
+                counts[label] += 1
+                sums[label] += bal
+                break
+        total += bal
+
+    return AgingReport(
+        generated_at=now,
+        total_outstanding_xof=total,
+        buckets=[
+            AgingBucket(label=label, invoice_count=counts[label], outstanding_xof=sums[label])
+            for label, _, _ in buckets
+        ],
     )

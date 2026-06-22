@@ -99,6 +99,20 @@ class InvoiceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AgingBucket(BaseModel):
+    label: str
+    invoice_count: int
+    outstanding_xof: Decimal
+
+
+class AgingReport(BaseModel):
+    """Créances âgées : reste à payer ventilé par ancienneté (relances)."""
+
+    generated_at: dt.datetime
+    total_outstanding_xof: Decimal
+    buckets: list[AgingBucket] = Field(default_factory=list)
+
+
 class FinanceSummary(BaseModel):
     """Tableau de bord comptable : chiffre, encaissé, créances."""
 

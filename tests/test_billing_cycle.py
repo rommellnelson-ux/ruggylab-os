@@ -203,3 +203,103 @@ class TestReceiptAndPaymentPlan:
         assert (
             client.get(f"/api/v1/invoices/{inv['id']}/receipt.pdf", headers=tech).status_code == 403
         )
+
+
+class TestBnplInvoiceSync:
+    def _invoice(self, client, admin) -> dict:
+        client.post("/api/v1/tariffs/seed-defaults", headers=admin)
+        order_id = _order_with_exams(client, admin, ("NFS", "GE"))  # reste patient 7500
+        return client.post(f"/api/v1/exam-orders/{order_id}/invoice", headers=admin).json()
+
+    def test_bnpl_installment_reflects_on_invoice(self, client):
+        admin = _auth(client)
+        inv = self._invoice(client, admin)
+        plan = client.post(
+            f"/api/v1/invoices/{inv['id']}/payment-plan",
+            headers=admin,
+            json={"installment_months": 3},
+        ).json()
+        sid = plan["id"]
+
+        # Échéance 1 réglée via BNPL → répercutée sur la facture.
+        r = client.post(
+            f"/api/v1/billing/bnpl/schedule/{sid}/pay",
+            headers=admin,
+            json={"schedule_id": sid, "installment_number": 1, "amount_xof": 2500},
+        )
+        assert r.status_code in (200, 201), r.text
+        inv1 = client.get(f"/api/v1/invoices/{inv['id']}", headers=admin).json()
+        assert float(inv1["paid_xof"]) == 2500
+        assert inv1["status"] == "partially_paid"
+        assert float(inv1["balance_xof"]) == 5000
+
+        # Solde des deux échéances restantes → facture payée.
+        client.post(
+            f"/api/v1/billing/bnpl/schedule/{sid}/pay",
+            headers=admin,
+            json={"schedule_id": sid, "installment_number": 2, "amount_xof": 2500},
+        )
+        client.post(
+            f"/api/v1/billing/bnpl/schedule/{sid}/pay",
+            headers=admin,
+            json={"schedule_id": sid, "installment_number": 3, "amount_xof": 2500},
+        )
+        inv2 = client.get(f"/api/v1/invoices/{inv['id']}", headers=admin).json()
+        assert float(inv2["paid_xof"]) == 7500
+        assert inv2["status"] == "paid"
+
+    def test_standalone_bnpl_plan_touches_no_invoice(self, client):
+        admin = _auth(client)
+        # Plan BNPL autonome (sans facture liée) : ne doit rien casser.
+        plan = client.post(
+            "/api/v1/billing/bnpl/schedule",
+            headers=admin,
+            json={"patient_ref": "AUTONOME", "total_amount_xof": 6000, "installment_months": 2},
+        ).json()
+        r = client.post(
+            f"/api/v1/billing/bnpl/schedule/{plan['id']}/pay",
+            headers=admin,
+            json={"schedule_id": plan["id"], "installment_number": 1, "amount_xof": 3000},
+        )
+        assert r.status_code in (200, 201)
+
+
+class TestBnplRequiresFinance:
+    """Séparation des tâches : BNPL est une opération financière (comptable/admin)."""
+
+    def test_technician_denied_bnpl_create(self, client):
+        admin = _auth(client)
+        tech = _make_user(client, admin, "technician")
+        r = client.post(
+            "/api/v1/billing/bnpl/schedule",
+            headers=tech,
+            json={"patient_ref": "X", "total_amount_xof": 5000, "installment_months": 2},
+        )
+        assert r.status_code == 403
+
+    def test_officer_denied_bnpl_overdue(self, client):
+        admin = _auth(client)
+        officer = _make_user(client, admin, "officer")
+        assert client.get("/api/v1/billing/bnpl/overdue", headers=officer).status_code == 403
+
+
+class TestAgingReport:
+    def test_aging_buckets_capture_outstanding(self, client):
+        admin = _auth(client)
+        client.post("/api/v1/tariffs/seed-defaults", headers=admin)
+        order_id = _order_with_exams(client, admin, ("NFS", "GE"))
+        client.post(f"/api/v1/exam-orders/{order_id}/invoice", headers=admin)
+
+        r = client.get("/api/v1/invoices/aging", headers=admin)
+        assert r.status_code == 200, r.text
+        report = r.json()
+        assert len(report["buckets"]) == 4
+        assert float(report["total_outstanding_xof"]) >= 7500
+        # Facture émise à l'instant → tranche 0-30 jours.
+        recent = next(b for b in report["buckets"] if b["label"] == "0-30 j")
+        assert float(recent["outstanding_xof"]) >= 7500
+
+    def test_aging_requires_finance(self, client):
+        admin = _auth(client)
+        tech = _make_user(client, admin, "technician")
+        assert client.get("/api/v1/invoices/aging", headers=tech).status_code == 403
