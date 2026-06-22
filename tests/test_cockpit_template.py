@@ -12,11 +12,17 @@ from pathlib import Path
 import pytest
 
 _TEMPLATE = Path(__file__).resolve().parents[1] / "app" / "templates" / "cockpit.html"
+# Le JS applicatif est extrait dans un fichier statique mis en cache ; les
+# marqueurs JS y vivent désormais. On recompose HTML + JS pour les vérifs.
+_COCKPIT_JS = Path(__file__).resolve().parents[1] / "app" / "static" / "js" / "cockpit.js"
 
 
 @pytest.fixture(scope="module")
 def html() -> str:
-    return _TEMPLATE.read_text(encoding="utf-8")
+    text = _TEMPLATE.read_text(encoding="utf-8")
+    if _COCKPIT_JS.exists():
+        text += "\n" + _COCKPIT_JS.read_text(encoding="utf-8")
+    return text
 
 
 def _is_defined(html: str, fn: str) -> bool:
@@ -230,6 +236,25 @@ class TestRealtimeAuthHardening:
         assert "Critiques à prendre en charge" in html
         assert 'api("/api/v1/critical-alerts/pending"' in html
         assert '$("mCritical").textContent = pendingCriticalCount;' in html
+
+
+class TestCockpitScriptExtraction:
+    """Le JS applicatif est servi depuis un fichier statique mis en cache."""
+
+    def test_template_references_external_script(self) -> None:
+        page = _TEMPLATE.read_text(encoding="utf-8")
+        assert 'src="/static/js/cockpit.js' in page
+
+    def test_heavy_js_lives_in_static_file_not_inline(self) -> None:
+        page = _TEMPLATE.read_text(encoding="utf-8")
+        js = _COCKPIT_JS.read_text(encoding="utf-8")
+        # Le cœur applicatif a quitté le HTML (page nettement allégée)…
+        assert "async function boot()" not in page
+        assert "async function refreshCurrent(force" not in page
+        # …et vit dans le fichier statique.
+        assert "async function boot()" in js
+        assert "async function refreshCurrent(force" in js
+        assert len(page) < len(js)  # le HTML est plus léger que le JS extrait
 
 
 class TestStaticJavascriptAssets:
