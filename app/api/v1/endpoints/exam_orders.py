@@ -208,7 +208,9 @@ def generate_invoice_from_order(
     if options.patient_type == "INSURED" and not options.insurance_id:
         raise HTTPException(status_code=422, detail="Numéro CNAM obligatoire pour un assuré.")
     if not any(item.status != "cancelled" for item in order.items):
-        raise HTTPException(status_code=422, detail="Aucun examen à facturer sur cette prescription.")
+        raise HTTPException(
+            status_code=422, detail="Aucun examen à facturer sur cette prescription."
+        )
 
     invoice = build_invoice_from_order(db, order, options, created_by_id=current_user.id)
     read = InvoiceRead.model_validate(invoice)

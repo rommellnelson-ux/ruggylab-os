@@ -37,9 +37,7 @@ def upgrade() -> None:
             sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
             sa.Column("updated_at", sa.DateTime(), nullable=False),
         )
-        op.create_index(
-            "ix_exam_tariffs_exam_code", "exam_tariffs", ["exam_code"], unique=True
-        )
+        op.create_index("ix_exam_tariffs_exam_code", "exam_tariffs", ["exam_code"], unique=True)
 
     if "invoices" in tables:
         cols = {c["name"] for c in insp.get_columns("invoices")}
