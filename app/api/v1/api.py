@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import forbid_accountant
 from app.api.v1.endpoints.admin_ui import router as admin_ui_router
+from app.api.v1.endpoints.aes import router as aes_router
 from app.api.v1.endpoints.analyzer import router as analyzer_router
 from app.api.v1.endpoints.audit_events import router as audit_events_router
 from app.api.v1.endpoints.auto_validation import router as auto_validation_router
@@ -65,6 +66,7 @@ api_router.include_router(reagents_router, tags=["reagents"])
 api_router.include_router(equipment_reagent_ratios_router, tags=["equipment-reagent-ratios"])
 api_router.include_router(ratio_presets_router, tags=["ratio-presets"])
 api_router.include_router(audit_events_router, tags=["audit-events"])
+api_router.include_router(aes_router, tags=["Registre AES"])
 api_router.include_router(patients_router, tags=["patients"], dependencies=_no_accountant)
 api_router.include_router(qc_router, tags=["QC Analytique"])
 api_router.include_router(critical_ranges_router, tags=["Critical Ranges"])
