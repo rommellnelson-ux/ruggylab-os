@@ -15,9 +15,18 @@ from app.services.malaria_ai import (
     process_malaria_job,
     process_malaria_job_background,
 )
+from app.services.patient_access import can_access_patient, can_access_result
 
 router = APIRouter(prefix="/imaging")
 microscope_service = MicroscopeCaptureService(storage_dir=settings.MICROSCOPY_STORAGE_DIR)
+
+_OUT_OF_SCOPE = "Accès refusé : dossier hors de votre périmètre."
+
+
+def _require_result_access(current_user: User, result: Result) -> None:
+    """403 si le résultat (via son patient) est hors du périmètre de l'agent."""
+    if not can_access_result(current_user, result):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
 
 
 @router.post("/capture-microscope", status_code=status.HTTP_201_CREATED)
@@ -32,6 +41,8 @@ def trigger_microscope_capture(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Code-barres inconnu dans RuggyLab OS: {sample_barcode}.",
         )
+    if sample.patient is not None and not can_access_patient(current_user, sample.patient):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
 
     equipment = db.query(Equipment).filter(Equipment.name == "Magnus Theia-i").first()
     image_path = microscope_service.reserve_image_path(sample_barcode)
@@ -83,6 +94,7 @@ def submit_malaria_analysis(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Resultat introuvable.",
         )
+    _require_result_access(current_user, result)
     if not result.image_url:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -127,7 +139,15 @@ def submit_malaria_analysis(
 def process_malaria_analysis_job(
     job_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> MalariaAnalysisJob:
+    existing = db.query(MalariaAnalysisJob).filter(MalariaAnalysisJob.id == job_id).first()
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job analyse paludisme introuvable.",
+        )
+    _require_result_access(current_user, existing.result)
     job = process_malaria_job(db, job_id=job_id)
     if not job:
         raise HTTPException(
@@ -144,6 +164,7 @@ def process_malaria_analysis_job(
 def get_malaria_analysis_job(
     job_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> MalariaAnalysisJob:
     job = db.query(MalariaAnalysisJob).filter(MalariaAnalysisJob.id == job_id).first()
     if not job:
@@ -151,4 +172,5 @@ def get_malaria_analysis_job(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job analyse paludisme introuvable.",
         )
+    _require_result_access(current_user, job.result)
     return job

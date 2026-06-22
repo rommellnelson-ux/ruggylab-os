@@ -10,6 +10,7 @@ from app.models import Equipment, Patient, Result, Sample, User
 from app.schemas.precis_expert import PrecisExpertManualInput
 from app.services.audit import log_audit_event
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
+from app.services.patient_access import can_access_patient
 from app.services.validation.precis_expert import PrecisExpertValidator
 
 router = APIRouter(prefix="/results/precis-expert")
@@ -37,6 +38,11 @@ def submit_precis_expert_results(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"L'echantillon {sample.barcode} n'est lie a aucun patient valide.",
+        )
+    if not can_access_patient(current_user, patient):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès refusé : dossier hors de votre périmètre.",
         )
 
     analysis_date = utcnow_naive()
