@@ -13,8 +13,14 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Invoice, InvoiceLine
-from app.schemas.invoice import FinanceSummary, InvoiceCreate
+from app.models import ExamOrder, Invoice, InvoiceLine
+from app.schemas.invoice import (
+    FinanceSummary,
+    InvoiceCreate,
+    InvoiceFromOrder,
+    InvoiceLineCreate,
+)
+from app.services.tariff_service import get_price
 
 CNAM_RATE = Decimal("0.70")  # part assurance (assuré CMU)
 
@@ -85,6 +91,44 @@ def build_invoice(db: Session, payload: InvoiceCreate, *, created_by_id: int | N
     db.commit()
     db.refresh(invoice)
     return invoice
+
+
+def _patient_label(order: ExamOrder) -> str | None:
+    """Libellé patient figé sur la facture (dénormalisé depuis la prescription)."""
+    patient = order.patient  # FK non nullable : toujours présent
+    last = (patient.last_name or "").upper()
+    return f"{last} {patient.first_name or ''}".strip() or None
+
+
+def build_invoice_from_order(
+    db: Session, order: ExamOrder, options: InvoiceFromOrder, *, created_by_id: int | None
+) -> Invoice:
+    """Génère une facture à partir d'une prescription d'examens.
+
+    Les lignes reprennent les examens demandés (hors annulés), au tarif courant
+    du catalogue (0 si non tarifé). La répartition CMU et la numérotation
+    réutilisent ``build_invoice``.
+    """
+    lines = [
+        InvoiceLineCreate(
+            exam_code=item.exam_code,
+            label=item.exam_label or item.exam_code,
+            quantity=1,
+            unit_price_xof=get_price(db, item.exam_code) or Decimal("0"),
+        )
+        for item in order.items
+        if item.status != "cancelled"
+    ]
+    payload = InvoiceCreate(
+        patient_id=order.patient_id,
+        patient_label=_patient_label(order),
+        exam_order_id=order.id,
+        patient_type=options.patient_type,
+        insurance_id=options.insurance_id,
+        lines=lines,
+        discount_xof=options.discount_xof,
+    )
+    return build_invoice(db, payload, created_by_id=created_by_id)
 
 
 def recompute_status(invoice: Invoice) -> None:

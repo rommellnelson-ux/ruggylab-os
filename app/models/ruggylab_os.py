@@ -733,6 +733,9 @@ class Invoice(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="issued", index=True)
     issued_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # Plan de paiement fractionné BNPL (optionnel) : seulement si le patient ne
+    # peut pas régler le reste à charge comptant. Référence le plan BNPL créé.
+    payment_plan_id: Mapped[int | None] = mapped_column(Integer)
 
     lines: Mapped[list["InvoiceLine"]] = relationship(
         back_populates="invoice", cascade="all, delete-orphan"
@@ -769,3 +772,22 @@ class InvoicePayment(Base):
     received_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
     invoice: Mapped["Invoice"] = relationship(back_populates="payments")
+
+
+class ExamTariff(Base):
+    """Tarif d'un examen (FCFA), pour la facturation automatique des prescriptions.
+
+    Référentiel éditable (le prix dépend du laboratoire) : sert à pré-remplir les
+    lignes de facture générées depuis une prescription d'examens terminée.
+    """
+
+    __tablename__ = "exam_tariffs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    exam_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(150), nullable=False)
+    price_xof: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False
+    )

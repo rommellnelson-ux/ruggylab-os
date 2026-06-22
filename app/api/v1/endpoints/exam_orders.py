@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import ExamOrder, ExamOrderItem, Patient, Sample, User
+from app.models import ExamOrder, ExamOrderItem, Invoice, Patient, Sample, User
 from app.schemas.exam_order import (
     ORDER_STATUSES,
     PRIORITIES,
@@ -22,6 +22,8 @@ from app.schemas.exam_order import (
     ExamOrderStatusUpdate,
     ExamOrderThread,
 )
+from app.schemas.invoice import InvoiceFromOrder, InvoiceRead
+from app.services.accounting_service import balance_of, build_invoice_from_order
 from app.services.exam_order_service import build_thread, sync_order_progress
 
 router = APIRouter(prefix="/exam-orders")
@@ -156,3 +158,44 @@ def update_exam_order_status(
     order.status = payload.status
     db.commit()
     return sync_order_progress(db, order)
+
+
+@router.post(
+    "/{order_id}/invoice",
+    response_model=InvoiceRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def generate_invoice_from_order(
+    order_id: int,
+    payload: InvoiceFromOrder | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> InvoiceRead:
+    """Génère la facture des examens prescrits (tarifs catalogue + répartition CMU).
+
+    Acte de facturation côté clinique (le comptable la gère ensuite). Refuse de
+    créer un doublon si une facture active existe déjà pour cette prescription.
+    """
+    order = _get_order_or_404(db, order_id)
+    existing = (
+        db.query(Invoice)
+        .filter(Invoice.exam_order_id == order_id, Invoice.status != "cancelled")
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Une facture existe déjà pour cette prescription ({existing.invoice_number}).",
+        )
+    options = payload or InvoiceFromOrder()
+    if options.patient_type not in ("INSURED", "UNINSURED"):
+        raise HTTPException(status_code=422, detail="patient_type invalide (INSURED/UNINSURED).")
+    if options.patient_type == "INSURED" and not options.insurance_id:
+        raise HTTPException(status_code=422, detail="Numéro CNAM obligatoire pour un assuré.")
+    if not any(item.status != "cancelled" for item in order.items):
+        raise HTTPException(status_code=422, detail="Aucun examen à facturer sur cette prescription.")
+
+    invoice = build_invoice_from_order(db, order, options, created_by_id=current_user.id)
+    read = InvoiceRead.model_validate(invoice)
+    read.balance_xof = balance_of(invoice)
+    return read

@@ -38,6 +38,25 @@ class PaymentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class InvoiceFromOrder(BaseModel):
+    """Options de facturation auto depuis une prescription d'examens terminée."""
+
+    patient_type: str = Field(default="UNINSURED")
+    insurance_id: str | None = Field(default=None, max_length=50)
+    discount_xof: Decimal = Field(default=Decimal("0"), ge=0)
+    model_config = ConfigDict(extra="forbid")
+
+
+class PaymentPlanCreate(BaseModel):
+    """Plan de paiement fractionné (BNPL) sur le reste à charge d'une facture.
+
+    Optionnel : à n'utiliser que lorsque le patient ne peut pas régler comptant.
+    """
+
+    installment_months: int = Field(..., ge=2, le=24)
+    model_config = ConfigDict(extra="forbid")
+
+
 class InvoiceLineRead(BaseModel):
     id: int
     exam_code: str | None = None
@@ -73,6 +92,7 @@ class InvoiceRead(BaseModel):
     paid_xof: Decimal
     balance_xof: Decimal = Decimal("0")
     status: str
+    payment_plan_id: int | None = None
     issued_at: dt.datetime
     lines: list[InvoiceLineRead] = Field(default_factory=list)
     payments: list[PaymentRead] = Field(default_factory=list)

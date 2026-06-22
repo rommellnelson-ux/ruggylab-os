@@ -47,6 +47,7 @@ from app.api.v1.endpoints.samples import router as samples_router
 from app.api.v1.endpoints.stats import router as stats_router
 from app.api.v1.endpoints.stock_notifications import router as stock_notifications_router
 from app.api.v1.endpoints.stock_predictor import router as stock_predictor_router
+from app.api.v1.endpoints.tariffs import router as tariffs_router
 from app.api.v1.endpoints.tat import router as tat_router
 from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.worklist import router as worklist_router
@@ -100,6 +101,7 @@ api_router.include_router(notifications_router, tags=["Notifications temps-réel
 api_router.include_router(bulk_import_router, tags=["Import en lot"], dependencies=_no_accountant)
 api_router.include_router(quality_router, tags=["Qualité NC/CAPA"])
 api_router.include_router(tat_router, tags=["Suivi TAT"])
+api_router.include_router(tariffs_router, tags=["Tarifs examens"])
 api_router.include_router(registre_router, tags=["Registre maître"], dependencies=_no_accountant)
 api_router.include_router(bioref_router, tags=["Référentiel biologique"])
 api_router.include_router(code_mappings_router, tags=["Unification vocabulaires"])
