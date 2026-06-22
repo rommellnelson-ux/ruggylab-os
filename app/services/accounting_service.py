@@ -153,6 +153,15 @@ def balance_of(invoice: Invoice) -> Decimal:
     return bal if bal > 0 else Decimal("0")
 
 
+def credit_of(invoice: Invoice) -> Decimal:
+    """Trop-perçu (avoir) : encaissé au-delà du reste à charge (jamais négatif).
+
+    Le surpaiement est accepté (acompte/avoir) ; on l'expose au lieu de le masquer.
+    """
+    over = Decimal(invoice.paid_xof or 0) - Decimal(invoice.patient_due_xof or 0)
+    return over if over > 0 else Decimal("0")
+
+
 def finance_summary(db: Session) -> FinanceSummary:
     """Agrège le chiffre, l'encaissé et les créances (hors factures annulées)."""
     active = db.query(Invoice).filter(Invoice.status != "cancelled")
@@ -163,6 +172,7 @@ def finance_summary(db: Session) -> FinanceSummary:
     due = sum((Decimal(i.patient_due_xof or 0) for i in rows), Decimal("0"))
     collected = sum((Decimal(i.paid_xof or 0) for i in rows), Decimal("0"))
     outstanding = sum((balance_of(i) for i in rows), Decimal("0"))
+    credit = sum((credit_of(i) for i in rows), Decimal("0"))
 
     by_status: dict[str, int] = {}
     for inv in db.query(Invoice).all():
@@ -176,6 +186,7 @@ def finance_summary(db: Session) -> FinanceSummary:
         patient_due_xof=due,
         collected_xof=collected,
         outstanding_xof=outstanding,
+        credit_xof=credit,
         by_status=by_status,
     )
 

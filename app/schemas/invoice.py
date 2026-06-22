@@ -91,6 +91,7 @@ class InvoiceRead(BaseModel):
     patient_due_xof: Decimal
     paid_xof: Decimal
     balance_xof: Decimal = Decimal("0")
+    credit_xof: Decimal = Decimal("0")  # trop-perçu (avoir) si encaissé > reste à charge
     status: str
     payment_plan_id: int | None = None
     issued_at: dt.datetime
@@ -123,4 +124,5 @@ class FinanceSummary(BaseModel):
     patient_due_xof: Decimal
     collected_xof: Decimal
     outstanding_xof: Decimal
+    credit_xof: Decimal = Decimal("0")  # total des trop-perçus (avoirs)
     by_status: dict[str, int] = Field(default_factory=dict)

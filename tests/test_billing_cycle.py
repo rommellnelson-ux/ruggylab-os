@@ -303,3 +303,27 @@ class TestAgingReport:
         admin = _auth(client)
         tech = _make_user(client, admin, "technician")
         assert client.get("/api/v1/invoices/aging", headers=tech).status_code == 403
+
+
+class TestOverpaymentAccepted:
+    def test_overpayment_becomes_credit(self, client):
+        admin = _auth(client)
+        client.post("/api/v1/tariffs/seed-defaults", headers=admin)
+        order_id = _order_with_exams(client, admin, ("NFS", "GE"))  # reste 7500
+        inv = client.post(f"/api/v1/exam-orders/{order_id}/invoice", headers=admin).json()
+
+        # Encaissement supérieur au reste à charge : accepté comme avoir.
+        r = client.post(
+            f"/api/v1/invoices/{inv['id']}/payments",
+            headers=admin,
+            json={"amount_xof": "8000"},
+        )
+        assert r.status_code == 200, r.text
+        paid = r.json()
+        assert paid["status"] == "paid"
+        assert float(paid["balance_xof"]) == 0
+        assert float(paid["credit_xof"]) == 500  # 8000 - 7500
+
+        # Le trop-perçu remonte dans la synthèse comptable.
+        summary = client.get("/api/v1/invoices/summary", headers=admin).json()
+        assert float(summary["credit_xof"]) >= 500

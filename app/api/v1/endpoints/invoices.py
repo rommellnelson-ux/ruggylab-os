@@ -30,6 +30,7 @@ from app.services.accounting_service import (
     aging_report,
     balance_of,
     build_invoice,
+    credit_of,
     finance_summary,
     recompute_status,
 )
@@ -44,6 +45,7 @@ router = APIRouter(prefix="/invoices")
 def _to_read(invoice: Invoice) -> InvoiceRead:
     read = InvoiceRead.model_validate(invoice)
     read.balance_xof = balance_of(invoice)
+    read.credit_xof = credit_of(invoice)
     return read
 
 

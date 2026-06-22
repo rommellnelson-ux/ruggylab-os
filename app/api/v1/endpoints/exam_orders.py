@@ -23,7 +23,7 @@ from app.schemas.exam_order import (
     ExamOrderThread,
 )
 from app.schemas.invoice import InvoiceFromOrder, InvoiceRead
-from app.services.accounting_service import balance_of, build_invoice_from_order
+from app.services.accounting_service import balance_of, build_invoice_from_order, credit_of
 from app.services.exam_order_service import build_thread, sync_order_progress
 from app.services.patient_access import (
     apply_order_patient_scope,
@@ -212,4 +212,5 @@ def generate_invoice_from_order(
     invoice = build_invoice_from_order(db, order, options, created_by_id=current_user.id)
     read = InvoiceRead.model_validate(invoice)
     read.balance_xof = balance_of(invoice)
+    read.credit_xof = credit_of(invoice)
     return read
