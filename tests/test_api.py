@@ -20,12 +20,18 @@ def test_cockpit_ui_is_served(client) -> None:
     response = client.get("/app")
     assert response.status_code == 200
     assert "RuggyLab OS" in response.text
-    assert "/api/v1/login/access-token" in response.text
-    assert 'API_PREFIX = "/api/v1"' in response.text
-    assert "/stock/notify" in response.text
-    assert "/billing/bnpl/schedule" in response.text
-    assert "/api/v1/prescription/report" in response.text
-    assert "normalizeApiPath" in response.text
+    # Le JS applicatif est désormais externalisé (mise en cache navigateur).
+    assert 'src="/static/js/cockpit.js' in response.text
+
+    # …et servi comme fichier statique avec les mêmes marqueurs qu'auparavant.
+    js = client.get("/static/js/cockpit.js")
+    assert js.status_code == 200
+    assert "/api/v1/login/access-token" in js.text
+    assert 'API_PREFIX = "/api/v1"' in js.text
+    assert "/stock/notify" in js.text
+    assert "/billing/bnpl/schedule" in js.text
+    assert "/api/v1/prescription/report" in js.text
+    assert "normalizeApiPath" in js.text
 
 
 def test_login_with_seeded_admin(client) -> None:

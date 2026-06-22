@@ -156,7 +156,9 @@ def _sample_items(db: Session, user: User, limit: int) -> list[WorklistItem]:
                 subtitle=f"{sample.barcode} · {_patient_label(sample)}",
                 status=sample.status or "inconnu",
                 unit=sample.patient.unit if sample.patient else None,
-                actions=[WorklistAction(label="Ouvrir échantillons", path="#/samples")],
+                actions=[
+                    WorklistAction(label="Ouvrir échantillon", path=f"#/samples?sample={sample.id}")
+                ],
             )
         )
     return items
@@ -198,7 +200,7 @@ def _qc_items(db: Session, limit: int) -> list[WorklistItem]:
                 subtitle=f"{control.level} · violations {', '.join(rejects)}",
                 status="rejet Westgard",
                 actions=[
-                    WorklistAction(label="Ouvrir QC", path="#/qc"),
+                    WorklistAction(label="Ouvrir QC", path=f"#/qc?control={control.id}"),
                     WorklistAction(label="Créer NC", path="#/quality"),
                 ],
             )
@@ -230,7 +232,7 @@ def _nc_items(db: Session, limit: int) -> list[WorklistItem]:
                 subtitle=f"{nc.severity} · {nc.source}",
                 status="en retard" if overdue else nc.status,
                 due_at=nc.due_date,
-                actions=[WorklistAction(label="Ouvrir qualité", path="#/quality")],
+                actions=[WorklistAction(label="Ouvrir qualité", path=f"#/quality?nc={nc.id}")],
             )
         )
     return items
