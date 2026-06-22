@@ -3,13 +3,14 @@ import datetime as dt
 import json
 from datetime import UTC, datetime, timedelta
 from io import StringIO
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user, require_admin, require_officer
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import (
     AuditEvent,
@@ -19,6 +20,7 @@ from app.models import (
     QcResult,
     Reagent,
     ReportSignature,
+    ReportSnapshot,
     Result,
     Sample,
     User,
@@ -26,7 +28,14 @@ from app.models import (
 from app.schemas.audit_event import AuditEventRead
 from app.schemas.qc import QC_REJECT_RULES, QcStatusEntry, QcSummaryResponse
 from app.schemas.reagent import ReagentRead
-from app.schemas.report_signature import ReportSignatureCreate, ReportSignatureRead
+from app.schemas.report_signature import (
+    ReportReleaseCreate,
+    ReportSignatureCreate,
+    ReportSignatureRead,
+    ReportSnapshotRead,
+    ReportSnapshotRevoke,
+    ReportVerifyRead,
+)
 from app.schemas.reports import (
     AuditActivityEntry,
     AuditDashboardResponse,
@@ -39,9 +48,19 @@ from app.schemas.reports import (
     MonthlyConsumptionEntry,
     StockDashboardResponse,
 )
+from app.services.audit import log_audit_event
+from app.services.patient_access import can_access_result
 from app.services.qc_pdf_report import build_qc_html_report
-from app.services.report_signing import build_result_report_pdf, create_report_signature
+from app.services.report_signing import (
+    build_result_report_pdf,
+    build_snapshot_pdf,
+    create_report_signature,
+    reissue_report_signature,
+    release_result_report,
+    report_snapshot_token_hash,
+)
 from app.utils.csv_safety import sanitize_csv_cell
+from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/reports")
 
@@ -62,6 +81,48 @@ def _get_result_or_404(db: Session, result_id: int) -> Result:
             detail="Resultat introuvable.",
         )
     return result
+
+
+def _get_accessible_result_or_error(db: Session, result_id: int, user: User) -> Result:
+    result = _get_result_or_404(db, result_id)
+    if not can_access_result(user, result):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès au résultat hors de votre périmètre.",
+        )
+    return result
+
+
+def _get_accessible_snapshot_or_error(db: Session, snapshot_id: int, user: User) -> ReportSnapshot:
+    snapshot = db.query(ReportSnapshot).filter(ReportSnapshot.id == snapshot_id).first()
+    if not snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Version de compte-rendu introuvable.",
+        )
+    if not can_access_result(user, snapshot.result):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès au compte-rendu hors de votre périmètre.",
+        )
+    return snapshot
+
+
+def _ensure_releasable_result(result: Result) -> None:
+    # Validation non bloquante par défaut (effectif réduit, pas de double
+    # validation quotidienne) : publiable « provisoire », validé a posteriori.
+    # Réglage REQUIRE_VALIDATION_FOR_RELEASE pour revenir au mode ISO strict.
+    if settings.REQUIRE_VALIDATION_FOR_RELEASE and not result.is_validated:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Publication impossible: le resultat n'est pas valide.",
+        )
+    # Sécurité patient : une valeur critique non prise en charge reste bloquante.
+    if result.is_critical and result.critical_ack_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Publication impossible: valeur critique non prise en charge.",
+        )
 
 
 @router.get("/stock-dashboard", response_model=StockDashboardResponse)
@@ -325,8 +386,7 @@ def result_report_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Response:
-    del current_user
-    result = _get_result_or_404(db, result_id)
+    result = _get_accessible_result_or_error(db, result_id, current_user)
     signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
     pdf_bytes = build_result_report_pdf(result, signature)
     return Response(
@@ -349,26 +409,34 @@ def sign_result_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_officer),
 ) -> ReportSignature:
-    result = _get_result_or_404(db, result_id)
-    if not result.is_validated:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Signature impossible: le resultat n'est pas valide.",
-        )
+    result = _get_accessible_result_or_error(db, result_id, current_user)
+    _ensure_releasable_result(result)
 
     existing = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
-    if existing:
+    if existing and existing.revoked_at is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Rapport deja signe pour ce resultat.",
         )
 
-    return create_report_signature(
-        db,
-        result=result,
-        user=current_user,
-        signature_meaning=payload.signature_meaning,
+    signature = (
+        reissue_report_signature(
+            db,
+            signature=existing,
+            result=result,
+            user=current_user,
+            signature_meaning=payload.signature_meaning,
+        )
+        if existing
+        else create_report_signature(
+            db,
+            result=result,
+            user=current_user,
+            signature_meaning=payload.signature_meaning,
+        )
     )
+    release_result_report(db, result=result, user=current_user, signature=signature)
+    return signature
 
 
 @router.get(
@@ -380,7 +448,7 @@ def get_result_report_signature(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> ReportSignature:
-    del current_user
+    _get_accessible_result_or_error(db, result_id, current_user)
     signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
     if not signature:
         raise HTTPException(
@@ -388,6 +456,136 @@ def get_result_report_signature(
             detail="Signature de rapport introuvable.",
         )
     return signature
+
+
+@router.post(
+    "/results/{result_id}/release",
+    response_model=ReportSnapshotRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def release_result_report_endpoint(
+    result_id: int,
+    payload: ReportReleaseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+) -> ReportSnapshot:
+    result = _get_accessible_result_or_error(db, result_id, current_user)
+    _ensure_releasable_result(result)
+    signature = (
+        db.query(ReportSignature)
+        .filter(ReportSignature.result_id == result_id, ReportSignature.revoked_at.is_(None))
+        .first()
+    )
+    return release_result_report(
+        db,
+        result=result,
+        user=current_user,
+        audience=payload.audience,
+        signature=signature,
+        delivery_channels=list(payload.delivery_channels),
+    )
+
+
+@router.get("/results/{result_id}/snapshots", response_model=list[ReportSnapshotRead])
+def list_result_report_snapshots(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> list[ReportSnapshot]:
+    _get_accessible_result_or_error(db, result_id, current_user)
+    return (
+        db.query(ReportSnapshot)
+        .filter(ReportSnapshot.result_id == result_id)
+        .order_by(ReportSnapshot.version_number.desc(), ReportSnapshot.id.desc())
+        .all()
+    )
+
+
+@router.get("/snapshots/{snapshot_id}/pdf")
+def report_snapshot_pdf(
+    snapshot_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Response:
+    snapshot = _get_accessible_snapshot_or_error(db, snapshot_id, current_user)
+    return Response(
+        content=build_snapshot_pdf(snapshot),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="result-{snapshot.result_id}-v{snapshot.version_number}.pdf"'
+            ),
+        },
+    )
+
+
+@router.post("/snapshots/{snapshot_id}/revoke", response_model=ReportSnapshotRead)
+def revoke_report_snapshot(
+    snapshot_id: int,
+    payload: ReportSnapshotRevoke,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+) -> ReportSnapshot:
+    snapshot = _get_accessible_snapshot_or_error(db, snapshot_id, current_user)
+    if snapshot.revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Compte-rendu deja revoque.",
+        )
+    snapshot.status = "revoked"
+    snapshot.revoked_at = utcnow_naive()
+    snapshot.revocation_reason = payload.reason
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="report.revoke",
+        entity_type="report_snapshot",
+        entity_id=str(snapshot.id),
+        payload={
+            "result_id": snapshot.result_id,
+            "version_number": snapshot.version_number,
+            "reason": payload.reason,
+        },
+    )
+    db.commit()
+    db.refresh(snapshot)
+    return snapshot
+
+
+@router.get("/verify/{token}", response_model=ReportVerifyRead)
+def verify_report_snapshot(
+    token: str,
+    db: Session = Depends(get_db),
+) -> ReportVerifyRead:
+    snapshot = (
+        db.query(ReportSnapshot)
+        .filter(ReportSnapshot.verification_token_hash == report_snapshot_token_hash(token))
+        .first()
+    )
+    if not snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Compte-rendu introuvable ou jeton invalide.",
+        )
+    public_status: Literal["valid", "provisional", "corrected", "revoked"]
+    if snapshot.revoked_at is not None or snapshot.status == "revoked":
+        public_status = "revoked"
+    elif snapshot.status == "corrected":
+        public_status = "corrected"
+    elif snapshot.status == "provisional":
+        public_status = "provisional"
+    else:
+        public_status = "valid"
+    return ReportVerifyRead(
+        status=public_status,
+        snapshot_id=snapshot.id,
+        result_id=snapshot.result_id,
+        version_number=snapshot.version_number,
+        document_status=snapshot.status,
+        created_at=snapshot.created_at,
+        pdf_sha256=snapshot.pdf_sha256,
+        revoked_at=snapshot.revoked_at,
+    )
 
 
 @router.get(

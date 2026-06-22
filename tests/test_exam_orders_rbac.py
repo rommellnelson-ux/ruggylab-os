@@ -141,6 +141,8 @@ class TestConsolidatedReport:
         assert r.status_code == 200, r.text
         assert r.headers["content-type"] == "application/pdf"
         assert r.content[:5] == b"%PDF-"
+        assert b"Document medical confidentiel" in r.content
+        assert b"Ce document doit etre interprete avec le contexte clinique" in r.content
 
     def test_report_denied_other_unit(self, client):
         admin = _auth(client)

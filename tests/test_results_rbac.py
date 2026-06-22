@@ -86,6 +86,16 @@ class TestResultsUnitScope:
             client.get(f"/api/v1/results/{rid_bio}/history", headers=tech_hema).status_code == 403
         )
         assert client.get(f"/api/v1/results/{rid_bio}/fhir", headers=tech_hema).status_code == 403
+        assert (
+            client.get(f"/api/v1/reports/results/{rid_bio}/pdf", headers=tech_hema).status_code
+            == 403
+        )
+        assert (
+            client.get(
+                f"/api/v1/reports/results/{rid_bio}/signature", headers=tech_hema
+            ).status_code
+            == 403
+        )
 
     def test_detail_allowed_same_unit(self, client):
         admin = _auth(client)

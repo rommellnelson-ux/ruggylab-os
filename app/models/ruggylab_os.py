@@ -156,6 +156,7 @@ class Result(Base):
     stock_movements: Mapped[list["StockMovement"]] = relationship(back_populates="result")
     dh36_messages: Mapped[list["DH36InboundMessage"]] = relationship(back_populates="result")
     report_signature: Mapped["ReportSignature | None"] = relationship(back_populates="result")
+    report_snapshots: Mapped[list["ReportSnapshot"]] = relationship(back_populates="result")
     malaria_analysis_jobs: Mapped[list["MalariaAnalysisJob"]] = relationship(
         back_populates="result"
     )
@@ -318,6 +319,76 @@ class ReportSignature(Base):
 
     result: Mapped["Result"] = relationship(back_populates="report_signature")
     signed_by: Mapped["User"] = relationship(back_populates="report_signatures")
+
+
+class ReportSnapshot(Base):
+    """Version figée du compte-rendu remis ou vérifiable.
+
+    Le résultat analytique reste la source vivante. Ce snapshot capture le
+    contenu médical visible au moment de la libération, pour éviter qu'un PDF
+    déjà diffusé ne change silencieusement après correction.
+    """
+
+    __tablename__ = "report_snapshots"
+    __table_args__ = (
+        UniqueConstraint("result_id", "version_number", name="uq_report_snapshot_version"),
+        UniqueConstraint("verification_token_hash", name="uq_report_snapshot_verify_token"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    result_id: Mapped[int] = mapped_column(ForeignKey("results.id"), nullable=False, index=True)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="final", index=True)
+    audience: Mapped[str] = mapped_column(String(20), nullable=False, default="clinician")
+    schema_version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
+    content_snapshot: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
+    )
+    pdf_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    verification_token_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    verification_path: Mapped[str] = mapped_column(String(255), nullable=False)
+    supersedes_snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("report_snapshots.id"))
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    revocation_reason: Mapped[str | None] = mapped_column(Text)
+
+    result: Mapped["Result"] = relationship(back_populates="report_snapshots")
+    created_by: Mapped["User | None"] = relationship(foreign_keys=[created_by_user_id])
+    supersedes_snapshot: Mapped["ReportSnapshot | None"] = relationship(
+        remote_side=[id],
+    )
+
+
+class ReportDeliveryOutbox(Base):
+    """File transactionnelle de diffusion des comptes-rendus.
+
+    Les workers externes peuvent consommer ces lignes pour envoyer un PDF,
+    notifier un patient ou transmettre un flux FHIR sans perdre l'événement si
+    le serveur web redémarre après le commit.
+    """
+
+    __tablename__ = "report_delivery_outbox"
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_report_delivery_idempotency"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    report_snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("report_snapshots.id"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    channel: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
+    )
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    processed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+
+    report_snapshot: Mapped["ReportSnapshot"] = relationship()
 
 
 class MalariaAnalysisJob(Base):

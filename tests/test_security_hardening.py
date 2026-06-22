@@ -173,6 +173,12 @@ class TestAmendRbac:
         assert amend.status_code == 200, amend.text
         sig = client.get(f"/api/v1/reports/results/{rid}/signature", headers=hdrs).json()
         assert sig["revoked_at"] is not None
+        pdf = client.get(f"/api/v1/reports/results/{rid}/pdf", headers=hdrs)
+        assert pdf.status_code == 200
+        assert b"Signature electronique: revoquee" in pdf.content
+        assert (
+            b"Ce PDF ne doit pas etre considere comme un compte-rendu signe valide" in pdf.content
+        )
 
 
 # ── Audit des changements d'auto-validation ─────────────────────────────────

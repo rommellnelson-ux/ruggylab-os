@@ -11,7 +11,9 @@ from app.models.ruggylab_os import (
     RatioPreset,
     RatioPresetItem,
     Reagent,
+    ReportDeliveryOutbox,
     ReportSignature,
+    ReportSnapshot,
     Result,
     Sample,
     StockMovement,
@@ -35,6 +37,8 @@ __all__ = [
     "MalariaAnalysisJob",
     "RatioPreset",
     "RatioPresetItem",
+    "ReportDeliveryOutbox",
     "ReportSignature",
+    "ReportSnapshot",
     "StockMovement",
 ]
