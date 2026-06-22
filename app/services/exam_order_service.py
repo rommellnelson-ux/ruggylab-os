@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ExamOrder, Patient, Result, Sample
 from app.schemas.exam_order import ExamOrderThread, ExamThreadStep
+from app.services.exam_catalog import exam_catalog_entry
 
 
 def _patient_label(patient: Patient | None) -> str | None:
@@ -93,6 +94,7 @@ def build_thread(db: Session, order: ExamOrder) -> ExamOrderThread:
         if item.status == "resulted":
             resulted += 1
         res: Result | None = results_by_id.get(item.result_id) if item.result_id else None
+        catalog = exam_catalog_entry(item.exam_code)
         steps.append(
             ExamThreadStep(
                 exam_code=item.exam_code,
@@ -101,6 +103,8 @@ def build_thread(db: Session, order: ExamOrder) -> ExamOrderThread:
                 result_id=item.result_id,
                 is_critical=bool(res.is_critical) if res else False,
                 is_validated=bool(res.is_validated) if res else False,
+                preanalytics=catalog.get("preanalytics") if catalog else None,
+                technical_sheet=catalog.get("technical_sheet") if catalog else None,
             )
         )
 

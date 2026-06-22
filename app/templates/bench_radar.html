@@ -229,6 +229,14 @@
       font-weight: 600;
     }
 
+    .guide {
+      display: block;
+      margin-top: 6px;
+      color: #334155;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
     .minutes {
       font-size: 1.45rem;
       font-weight: 900;
@@ -457,6 +465,13 @@
       return `<span class="main-cell">${esc(sample && sample.barcode)}</span><span class="sub">ID ${esc(sample && sample.id)}</span>`;
     }
 
+    function guidanceLine(item) {
+      const pre = item && item.guidance && item.guidance.preanalytics;
+      if (!pre) return "";
+      const parts = [pre.container, pre.collection_condition, pre.bench].filter(Boolean);
+      return parts.length ? `<span class="guide">${esc(parts.join(" · "))}</span>` : "";
+    }
+
     function renderCriticals(items) {
       const banner = document.getElementById("criticalBanner");
       const bannerText = document.getElementById("criticalBannerText");
@@ -474,7 +489,7 @@
         <tr class="critical">
           <td>${sampleCell(item.sample)}</td>
           <td><span class="main-cell">${esc(patientLabel(item.patient))}</span><span class="sub">${esc(item.patient && item.patient.ipp)}</span></td>
-          <td><span class="main-cell">${esc(item.exam_code, "Panel")}</span><span class="sub">${esc((item.analytes || []).join(", ") || "Analytes non listés")}</span></td>
+          <td><span class="main-cell">${esc(item.exam_code, "Panel")}</span><span class="sub">${esc((item.analytes || []).join(", ") || "Analytes non listés")}</span>${guidanceLine(item)}</td>
           <td><button class="action" type="button" onclick="openResult(${item.result_id})">Ouvrir</button></td>
         </tr>
       `).join("");
@@ -491,7 +506,7 @@
         <tr>
           <td>${sampleCell(item.sample)}</td>
           <td><span class="main-cell">${esc(patientLabel(item.patient))}</span><span class="sub">${esc(item.patient && item.patient.ipp)}</span></td>
-          <td><span class="main-cell">${esc(item.exam_code)}</span><span class="sub">Cible ${esc(item.target_minutes)} min</span></td>
+          <td><span class="main-cell">${esc(item.exam_code)}</span><span class="sub">Cible ${esc(item.target_minutes)} min</span>${guidanceLine(item)}</td>
           <td><span class="minutes">${Math.ceil(item.remaining_minutes)} min</span><span class="sub">Échéance ${formatTime(item.due_at)}</span></td>
         </tr>
       `).join("");
@@ -508,7 +523,7 @@
         <tr>
           <td>${sampleCell(item.sample)}</td>
           <td><span class="main-cell">${esc(patientLabel(item.patient))}</span><span class="sub">${esc(item.patient && item.patient.ipp)}</span></td>
-          <td><span class="main-cell">${esc(item.exam_code, "Panel")}</span><span class="sub">${esc((item.analytes || []).join(", ") || "Analytes non listés")}</span></td>
+          <td><span class="main-cell">${esc(item.exam_code, "Panel")}</span><span class="sub">${esc((item.analytes || []).join(", ") || "Analytes non listés")}</span>${guidanceLine(item)}</td>
           <td><span class="main-cell">${formatTime(item.analysis_date)}</span><span class="sub">Prêt pour revue</span></td>
         </tr>
       `).join("");

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from app.services.exam_catalog import EXAM_BY_CODE, EXAM_CATALOG, resolve_exam_code
+from app.services.exam_catalog import (
+    EXAM_BY_CODE,
+    EXAM_CATALOG,
+    exam_catalog_entry,
+    resolve_exam_code,
+)
 from app.services.registre_parser import (
     build_import_preview,
     parse_exam_cell,
@@ -50,6 +55,19 @@ class TestExamCatalog:
     def test_loinc_present_for_nfs(self):
         assert EXAM_BY_CODE["NFS"]["loinc"] == "58410-2"
 
+    def test_catalog_exposes_preanalytic_and_technical_sheet(self):
+        nfs = exam_catalog_entry("nfs")
+        assert nfs is not None
+        assert nfs["preanalytics"]["container"] == "Tube EDTA violet"
+        assert nfs["preanalytics"]["bench"] == "Hematologie"
+        assert nfs["technical_sheet"]["key_steps"]
+
+    def test_default_workflow_metadata_for_less_detailed_exam(self):
+        crp = exam_catalog_entry("CRP")
+        assert crp is not None
+        assert crp["preanalytics"]["bench"] == "Biochimie"
+        assert crp["technical_sheet"]["qc_requirements"]
+
 
 class TestCatalogEndpoint:
     def test_get_catalog(self, client):
@@ -58,6 +76,21 @@ class TestCatalogEndpoint:
         assert r.status_code == 200
         data = r.json()
         assert any(e["code"] == "NFS" for e in data)
+        nfs = next(e for e in data if e["code"] == "NFS")
+        assert nfs["preanalytics"]["container"] == "Tube EDTA violet"
+
+    def test_get_catalog_detail(self, client):
+        hdrs = _auth(client)
+        r = client.get("/api/v1/tat/catalog/glycemie", headers=hdrs)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["code"] == "GLYC"
+        assert "fluorure" in data["preanalytics"]["container"].lower()
+
+    def test_get_catalog_detail_unknown(self, client):
+        hdrs = _auth(client)
+        r = client.get("/api/v1/tat/catalog/UNKNOWN", headers=hdrs)
+        assert r.status_code == 404
 
     def test_seed_uses_catalog(self, client):
         hdrs = _auth(client)

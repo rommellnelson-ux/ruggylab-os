@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Patient, Result, Sample, TatTarget, User
+from app.services.exam_catalog import exam_catalog_entry
 from app.services.patient_access import apply_result_patient_scope
 from app.utils.datetime_utils import utcnow_naive
 
@@ -38,6 +39,18 @@ def _patient_context(patient: Patient | None) -> dict | None:
 
 def _sample_context(sample: Sample) -> dict:
     return {"id": sample.id, "barcode": sample.barcode, "status": sample.status}
+
+
+def _exam_guidance(exam_code: str | None) -> dict | None:
+    entry = exam_catalog_entry(exam_code)
+    if entry is None:
+        return None
+    return {
+        "label": entry.get("label"),
+        "category": entry.get("category"),
+        "preanalytics": entry.get("preanalytics"),
+        "technical_sheet": entry.get("technical_sheet"),
+    }
 
 
 def _targets_by_code(db: Session) -> dict[str, TatTarget]:
@@ -69,6 +82,7 @@ def list_pending_critical_values(db: Session, current_user: User, *, limit: int 
                 "sample": _sample_context(result.sample),
                 "analytes": _analytes(result.data_points),
                 "message": "Valeur critique à prendre en charge",
+                "guidance": _exam_guidance(result.exam_code),
             }
         )
     return items
@@ -117,6 +131,7 @@ def list_tat_expiring_soon(
                 "due_at": due_at,
                 "patient": _patient_context(result.sample.patient if result.sample else None),
                 "sample": _sample_context(result.sample),
+                "guidance": _exam_guidance(result.exam_code),
             }
         )
         if len(items) >= limit:
@@ -157,6 +172,7 @@ def list_routine_validation_queue(
                 "patient": _patient_context(result.sample.patient if result.sample else None),
                 "sample": _sample_context(result.sample),
                 "analytes": _analytes(result.data_points),
+                "guidance": _exam_guidance(result.exam_code),
             }
         )
         if len(items) >= limit:

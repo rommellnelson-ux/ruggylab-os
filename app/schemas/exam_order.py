@@ -71,6 +71,8 @@ class ExamThreadStep(BaseModel):
     result_id: int | None = None
     is_critical: bool = False
     is_validated: bool = False
+    preanalytics: dict | None = None
+    technical_sheet: dict | None = None
 
 
 class ExamOrderThread(BaseModel):

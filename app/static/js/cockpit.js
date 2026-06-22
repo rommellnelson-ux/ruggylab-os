@@ -441,12 +441,13 @@
       btn.disabled = loading;
     }
     const tubeGuides = {
-      nfs: { code: "NFS", tube: "Tube EDTA violet", order: "Ordre 3", note: "Inversions douces 8 a 10 fois. Automate Dymind DH36." },
-      poct: { code: "POCT", tube: "Tube heparine vert ou sang capillaire", order: "Ordre 4", note: "Acheminer rapidement pour Precis Expert." },
-      malaria: { code: "PALU", tube: "Tube EDTA violet ou lame goutte epaisse", order: "Ordre 3", note: "Preparer lame, frottis mince et goutte epaisse; compatible IA offline." },
-      urine: { code: "URIN", tube: "Flacon urine sterile", order: "Prelevement separe", note: "Identifier le flacon et tester rapidement." },
-      coag: { code: "COAG", tube: "Tube citrate bleu", order: "Ordre 1", note: "Remplissage exact jusqu'au trait; inversions douces." }
+      NFS: { code: "NFS", label: "NFS", preanalytics: { container: "Tube EDTA violet", collection_condition: "Inversions douces 8 a 10 fois.", bench: "Hematologie" } },
+      GLYC: { code: "GLYC", label: "Glycemie", preanalytics: { container: "Tube fluorure oxalate recommande", collection_condition: "A jeun si glycemie a jeun; acheminer rapidement.", bench: "Biochimie" } },
+      GE: { code: "GE", label: "Goutte epaisse", preanalytics: { container: "Lame goutte epaisse/frottis ou tube EDTA", collection_condition: "Identifier les lames et preparer rapidement.", bench: "Parasitologie" } },
+      ECBU: { code: "ECBU", label: "ECBU", preanalytics: { container: "Flacon urine sterile", collection_condition: "Milieu de jet; acheminer rapidement.", bench: "Microbiologie" } },
+      GRH: { code: "GRH", label: "Groupe sanguin", preanalytics: { container: "Tube EDTA ou sec selon procedure", collection_condition: "Identitovigilance renforcee.", bench: "Immuno-hematologie" } }
     };
+    let examCatalogCache = null;
     const resultTemplates = {
       dh36: [
         ["WBC", "GB", "6.1"], ["RBC", "GR", "4.7"], ["HGB", "Hb g/L", "132"], ["HCT", "Ht %", "40"],
@@ -598,13 +599,32 @@
       const d = new Date();
       return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
     }
-    function updateTubeGuide() {
-      const guide = tubeGuides[$("sampleExam").value];
-      $("tubeGuide").innerHTML = `<div class="tube">${guide.tube}</div><div class="order">${guide.order}</div><div>${guide.note}</div>`;
+    async function loadExamCatalogGuides() {
+      if (examCatalogCache) return examCatalogCache;
+      try {
+        const entries = await api("/api/v1/tat/catalog", { headers: headers(false) });
+        examCatalogCache = {};
+        for (const entry of entries) examCatalogCache[entry.code] = entry;
+      } catch {
+        examCatalogCache = {};
+      }
+      return examCatalogCache;
+    }
+    async function updateTubeGuide() {
+      const code = $("sampleExam").value;
+      const catalog = await loadExamCatalogGuides();
+      const guide = catalog[code] || tubeGuides[code];
+      const pre = guide && guide.preanalytics ? guide.preanalytics : {};
+      $("tubeGuide").innerHTML = `
+        <div class="tube">${security.escapeHtml(pre.container || "Contenant non renseigne")}</div>
+        <div class="order">${security.escapeHtml(pre.bench || guide.label || code)}</div>
+        <div>${security.escapeHtml(pre.collection_condition || "Verifier identite patient et code-barres.")}</div>
+        ${pre.transport_delay_minutes ? `<div class="muted">Delai pre-analytique cible : ${security.escapeHtml(String(pre.transport_delay_minutes))} min</div>` : ""}
+      `;
     }
     function generateBarcode() {
       const patientId = $("samplePatientId").value || "0";
-      const guide = tubeGuides[$("sampleExam").value];
+      const guide = tubeGuides[$("sampleExam").value] || { code: $("sampleExam").value };
       $("sampleBarcode").value = `${guide.code}-P${patientId}-${stamp()}`;
       updateTubeGuide();
     }

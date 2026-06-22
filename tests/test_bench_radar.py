@@ -76,21 +76,21 @@ def test_bench_radar_prefilters_critical_tat_and_routine(client) -> None:
     client.post(
         "/api/v1/tat/targets",
         headers=headers,
-        json={"exam_code": "NFSBENCH", "label": "NFS bench", "target_minutes": 30},
+        json={"exam_code": "NFS", "label": "NFS bench", "target_minutes": 30},
     )
 
     critical_id = _make_result(
         client,
         headers,
         sample_id=_make_patient_sample(client, headers, "CRIT"),
-        exam_code="NFSBENCH",
+        exam_code="NFS",
         is_critical=True,
     )
     tat_id = _make_result(
         client,
         headers,
         sample_id=_make_patient_sample(client, headers, "TAT"),
-        exam_code="NFSBENCH",
+        exam_code="NFS",
     )
     routine_id = _make_result(
         client,
@@ -128,6 +128,8 @@ def test_bench_radar_prefilters_critical_tat_and_routine(client) -> None:
     assert [item["result_id"] for item in payload["criticals"]] == [critical_id]
     assert [item["result_id"] for item in payload["tat_expiring"]] == [tat_id]
     assert [item["result_id"] for item in payload["routine"]] == [routine_id]
+    assert payload["criticals"][0]["guidance"]["preanalytics"]["container"] == "Tube EDTA violet"
+    assert payload["tat_expiring"][0]["guidance"]["preanalytics"]["bench"] == "Hematologie"
     assert hidden_id not in {item["result_id"] for item in payload["routine"]}
 
 
@@ -145,5 +147,6 @@ def test_bench_template_contains_fat_finger_guards() -> None:
     assert "critical_value_alert" in html
     assert "scheduleReconnect" in html
     assert "2 ** Math.min(reconnectAttempt, 5)" in html
+    assert "guidanceLine" in html
     assert "/api/v1/bench/radar" not in html
     assert "`${API_PREFIX}/bench/radar`" in html

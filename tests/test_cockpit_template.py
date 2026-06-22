@@ -45,6 +45,10 @@ class TestNewViewsPresent:
             'id="tat"',  # vue Suivi TAT
             'id="tatByExamTable"',  # tableau TAT par examen
             'data-view="tat"',  # bouton de navigation TAT
+            "/api/v1/tat/catalog",  # consignes pre-analytiques depuis le backend
+            "async function loadExamCatalogGuides",  # cache du catalogue pour la reception
+            "pre.transport_delay_minutes",  # delai pre-analytique affiche
+            'value="GLYC"',  # choix reception alimente par catalogue
             'id="registre"',  # vue Registre & Import
             'id="registreCsvText"',  # zone de saisie CSV
             'data-view="registre"',  # bouton de navigation Registre

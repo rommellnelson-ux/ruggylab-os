@@ -106,6 +106,10 @@ class TestExamOrderLifecycle:
         nfs = next(s for s in thread["steps"] if s["exam_code"] == "NFS")
         assert nfs["status"] == "resulted"
         assert nfs["result_id"] is not None
+        assert nfs["preanalytics"]["container"] == "Tube EDTA violet"
+        assert nfs["technical_sheet"]["key_steps"]
+        ge = next(s for s in thread["steps"] if s["exam_code"] == "GE")
+        assert ge["preanalytics"]["bench"] == "Parasitologie"
 
         # 3) le second résultat → fil complété
         client.post(

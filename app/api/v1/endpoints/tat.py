@@ -25,11 +25,29 @@ router = APIRouter(prefix="/tat")
 def exam_catalog(
     current_user: User = Depends(get_current_active_user),
 ) -> list[dict]:
-    """Catalogue de référence des examens (code, libellé, catégorie, LOINC, TAT cible)."""
+    """Catalogue de référence des examens, enrichi des consignes terrain."""
     del current_user
     from app.services.exam_catalog import EXAM_CATALOG
 
     return EXAM_CATALOG
+
+
+@router.get("/catalog/{exam_code}")
+def exam_catalog_detail(
+    exam_code: str,
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Détail d'un examen : TAT, pré-analytique et fiche technique paillasse."""
+    del current_user
+    from app.services.exam_catalog import exam_catalog_entry
+
+    entry = exam_catalog_entry(exam_code)
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Examen inconnu : {exam_code}.",
+        )
+    return entry
 
 
 # ── Cibles TAT par examen ───────────────────────────────────────────────────
