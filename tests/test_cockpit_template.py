@@ -113,6 +113,7 @@ class TestNewViewsPresent:
             'id="finOutstanding"',  # KPI créances
             "/api/v1/exam-orders",  # API prescription d'examens
             "/api/v1/exam-orders/${orderId}/thread",  # suivi du fil
+            "/api/v1/exam-orders/${orderId}/report.pdf",  # compte-rendu consolidé
             "/api/v1/invoices",  # API facturation
             "/api/v1/invoices/summary",  # tableau de bord comptable
             "/api/v1/exam-orders/${orderId}/invoice",  # facture auto depuis prescription
@@ -208,6 +209,7 @@ class TestHandlerFunctionsDefined:
             "loadExamOrders",
             "openOrderThread",
             "collectOrderSample",
+            "openOrderReport",
             # Comptabilité / facturation
             "toggleInvInsurance",
             "addInvoiceLine",

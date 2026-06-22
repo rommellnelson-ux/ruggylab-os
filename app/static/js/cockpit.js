@@ -1262,8 +1262,15 @@
           `<div class="muted">${security.escapeHtml(t.patient_label || "")}${t.prescriber ? " · " + security.escapeHtml(t.prescriber) : ""}</div>` +
           collect +
           `<table style="margin-top:8px;"><thead><tr><th></th><th>Examen</th><th>Libellé</th><th>État</th></tr></thead><tbody>${steps}</tbody></table>` +
-          `<div class="actions" style="margin-top:8px;"><button class="success" onclick="generateInvoiceFromOrder(${t.order_id})">💵 Générer la facture</button></div>`;
+          `<div class="actions" style="margin-top:8px;"><button class="success" onclick="generateInvoiceFromOrder(${t.order_id})">💵 Générer la facture</button> <button class="secondary" onclick="openOrderReport(${t.order_id})">📄 Compte-rendu PDF</button></div>`;
       } catch { panel.innerHTML = '<div class="muted">Fil indisponible.</div>'; }
+    }
+    async function openOrderReport(orderId) {
+      try {
+        const resp = await fetch(`/api/v1/exam-orders/${orderId}/report.pdf`, { headers: headers(false) });
+        if (!resp.ok) throw new Error();
+        window.open(URL.createObjectURL(await resp.blob()), "_blank");
+      } catch { showToast("Compte-rendu indisponible.", "error"); }
     }
     async function generateInvoiceFromOrder(orderId) {
       try {

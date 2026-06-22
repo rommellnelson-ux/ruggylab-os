@@ -7,12 +7,12 @@ pas requise pour saisir un échantillon ou un résultat.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import ExamOrder, ExamOrderItem, Invoice, Patient, Sample, User
+from app.models import ExamOrder, ExamOrderItem, Invoice, Patient, Result, Sample, User
 from app.schemas.exam_order import (
     ORDER_STATUSES,
     PRIORITIES,
@@ -25,6 +25,7 @@ from app.schemas.exam_order import (
 from app.schemas.invoice import InvoiceFromOrder, InvoiceRead
 from app.services.accounting_service import balance_of, build_invoice_from_order, credit_of
 from app.services.exam_order_service import build_thread, sync_order_progress
+from app.services.order_report import build_order_report_pdf
 from app.services.patient_access import (
     apply_order_patient_scope,
     can_access_order,
@@ -214,3 +215,26 @@ def generate_invoice_from_order(
     read.balance_xof = balance_of(invoice)
     read.credit_xof = credit_of(invoice)
     return read
+
+
+@router.get("/{order_id}/report.pdf")
+def order_report_pdf(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Response:
+    """Compte-rendu consolidé (PDF) regroupant tous les examens de la prescription."""
+    order = _get_accessible_order_or_404(db, order_id, current_user)
+    sync_order_progress(db, order)  # rafraîchit les liens examen -> résultat
+    result_ids = [it.result_id for it in order.items if it.result_id]
+    results = (
+        {r.id: r for r in db.query(Result).filter(Result.id.in_(result_ids)).all()}
+        if result_ids
+        else {}
+    )
+    pdf_bytes = build_order_report_pdf(order, results)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="prescription-{order.id}.pdf"'},
+    )
