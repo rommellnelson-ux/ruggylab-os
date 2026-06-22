@@ -7,7 +7,10 @@ dossiers cliniques).
 
 from __future__ import annotations
 
+import csv
+import datetime as dt
 from decimal import Decimal
+from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session, selectinload
@@ -25,6 +28,7 @@ from app.schemas.invoice import (
     InvoiceRead,
     PaymentCreate,
     PaymentPlanCreate,
+    RefundCreate,
 )
 from app.services.accounting_service import (
     aging_report,
@@ -36,6 +40,7 @@ from app.services.accounting_service import (
 )
 from app.services.bnpl_tracker import BNPLTracker
 from app.services.invoice_pdf import build_invoice_receipt_pdf
+from app.utils.csv_safety import sanitize_csv_cell
 
 _bnpl = BNPLTracker()
 
@@ -92,6 +97,92 @@ def get_aging_report(
     """Créances âgées (0-30 / 31-60 / 61-90 / 90+ j) pour les relances."""
     del current_user
     return aging_report(db)
+
+
+@router.get("/overdue", response_model=list[InvoiceRead])
+def list_overdue_invoices(
+    min_age_days: int = Query(default=30, ge=0, le=3650),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance),
+) -> list[InvoiceRead]:
+    """Factures à relancer : solde dû et émises il y a au moins ``min_age_days`` jours."""
+    del current_user
+    now = dt.datetime.now(dt.UTC).replace(tzinfo=None)
+    rows = (
+        db.query(Invoice)
+        .options(selectinload(Invoice.lines), selectinload(Invoice.payments))
+        .filter(Invoice.status != "cancelled")
+        .order_by(Invoice.issued_at)
+        .all()
+    )
+    overdue = [
+        _to_read(inv)
+        for inv in rows
+        if balance_of(inv) > 0 and (now - inv.issued_at).days >= min_age_days
+    ]
+    return overdue
+
+
+@router.get("/export.csv")
+def export_invoices_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance),
+) -> Response:
+    """Journal des factures au format CSV (grand livre simplifié)."""
+    del current_user
+    rows = (
+        db.query(Invoice)
+        .options(selectinload(Invoice.lines), selectinload(Invoice.payments))
+        .order_by(Invoice.id)
+        .all()
+    )
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "numero",
+            "date",
+            "patient",
+            "type",
+            "assurance",
+            "brut_xof",
+            "remise_xof",
+            "net_xof",
+            "cnam_xof",
+            "reste_a_charge_xof",
+            "encaisse_xof",
+            "solde_xof",
+            "avoir_xof",
+            "statut",
+        ]
+    )
+    for inv in rows:
+        writer.writerow(
+            [
+                sanitize_csv_cell(x)
+                for x in (
+                    inv.invoice_number,
+                    inv.issued_at.strftime("%Y-%m-%d %H:%M"),
+                    inv.patient_label or "",
+                    inv.patient_type,
+                    inv.insurance_id or "",
+                    inv.gross_total_xof,
+                    inv.discount_xof,
+                    inv.net_total_xof,
+                    inv.cnam_part_xof,
+                    inv.patient_due_xof,
+                    inv.paid_xof,
+                    balance_of(inv),
+                    credit_of(inv),
+                    inv.status,
+                )
+            ]
+        )
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="journal-factures.csv"'},
+    )
 
 
 @router.get("", response_model=list[InvoiceRead])
@@ -219,6 +310,38 @@ def create_payment_plan(
     invoice.payment_plan_id = schedule.id
     db.commit()
     return schedule
+
+
+@router.post("/{invoice_id}/refund", response_model=InvoiceRead)
+def refund_credit(
+    invoice_id: int,
+    payload: RefundCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_finance),
+) -> InvoiceRead:
+    """Rembourse un avoir (trop-perçu) : enregistre un mouvement négatif tracé."""
+    invoice = _get_invoice_or_404(db, invoice_id)
+    credit = credit_of(invoice)
+    if credit <= 0:
+        raise HTTPException(status_code=409, detail="Aucun avoir à rembourser sur cette facture.")
+    amount = Decimal(payload.amount_xof)
+    if amount > credit:
+        raise HTTPException(
+            status_code=422, detail=f"Remboursement ({amount}) supérieur à l'avoir ({credit})."
+        )
+    invoice.payments.append(
+        InvoicePayment(
+            amount_xof=-amount,
+            method="REFUND",
+            reference=payload.reference or "Remboursement avoir",
+            received_by_id=current_user.id,
+        )
+    )
+    invoice.paid_xof = Decimal(invoice.paid_xof or 0) - amount
+    recompute_status(invoice)
+    db.commit()
+    db.refresh(invoice)
+    return _to_read(invoice)
 
 
 # Réservé : statuts exposés pour cohérence d'API/documentation.

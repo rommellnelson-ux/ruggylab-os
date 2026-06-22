@@ -305,6 +305,69 @@ class TestAgingReport:
         assert client.get("/api/v1/invoices/aging", headers=tech).status_code == 403
 
 
+class TestAccountingTools:
+    def _invoice(self, client, admin) -> dict:
+        client.post("/api/v1/tariffs/seed-defaults", headers=admin)
+        order_id = _order_with_exams(client, admin, ("NFS", "GE"))
+        return client.post(f"/api/v1/exam-orders/{order_id}/invoice", headers=admin).json()
+
+    def test_csv_export_journal(self, client):
+        admin = _auth(client)
+        inv = self._invoice(client, admin)
+        r = client.get("/api/v1/invoices/export.csv", headers=admin)
+        assert r.status_code == 200
+        assert "text/csv" in r.headers["content-type"]
+        assert "numero" in r.text
+        assert inv["invoice_number"] in r.text
+
+    def test_csv_export_requires_finance(self, client):
+        admin = _auth(client)
+        tech = _make_user(client, admin, "technician")
+        assert client.get("/api/v1/invoices/export.csv", headers=tech).status_code == 403
+
+    def test_refund_of_credit(self, client):
+        admin = _auth(client)
+        inv = self._invoice(client, admin)  # reste 7500
+        client.post(
+            f"/api/v1/invoices/{inv['id']}/payments", headers=admin, json={"amount_xof": "8000"}
+        )
+        # Avoir de 500 ; on rembourse 500.
+        r = client.post(
+            f"/api/v1/invoices/{inv['id']}/refund", headers=admin, json={"amount_xof": "500"}
+        )
+        assert r.status_code == 200, r.text
+        assert float(r.json()["credit_xof"]) == 0
+        assert r.json()["status"] == "paid"
+
+    def test_refund_exceeding_credit_rejected(self, client):
+        admin = _auth(client)
+        inv = self._invoice(client, admin)
+        client.post(
+            f"/api/v1/invoices/{inv['id']}/payments", headers=admin, json={"amount_xof": "8000"}
+        )
+        r = client.post(
+            f"/api/v1/invoices/{inv['id']}/refund", headers=admin, json={"amount_xof": "9000"}
+        )
+        assert r.status_code == 422
+
+    def test_refund_without_credit_rejected(self, client):
+        admin = _auth(client)
+        inv = self._invoice(client, admin)  # aucun paiement → pas d'avoir
+        r = client.post(
+            f"/api/v1/invoices/{inv['id']}/refund", headers=admin, json={"amount_xof": "100"}
+        )
+        assert r.status_code == 409
+
+    def test_overdue_respects_age(self, client):
+        admin = _auth(client)
+        inv = self._invoice(client, admin)
+        # Émise à l'instant : absente des relances à 30 j, présente à 0 j.
+        none_yet = client.get("/api/v1/invoices/overdue?min_age_days=30", headers=admin).json()
+        assert inv["id"] not in {i["id"] for i in none_yet}
+        now = client.get("/api/v1/invoices/overdue?min_age_days=0", headers=admin).json()
+        assert inv["id"] in {i["id"] for i in now}
+
+
 class TestOverpaymentAccepted:
     def test_overpayment_becomes_credit(self, client):
         admin = _auth(client)

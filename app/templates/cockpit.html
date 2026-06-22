@@ -2033,6 +2033,7 @@
               <h3 style="margin:0;flex:1;">Journal des factures</h3>
               <select id="invStatusFilter" onchange="loadInvoices()"><option value="">Tous statuts</option><option value="issued">Émise</option><option value="partially_paid">Partiel</option><option value="paid">Payée</option><option value="cancelled">Annulée</option></select>
               <button class="ghost" onclick="seedTariffs(this)" title="Crée les tarifs d'examens par défaut (à ajuster)">Initialiser tarifs</button>
+              <button class="ghost" onclick="exportInvoicesCsv()" title="Exporter le journal des factures (CSV)">Export CSV</button>
               <button class="ghost" onclick="loadInvoices()">Rafraîchir</button>
             </div>
             <table id="invoicesTable"><thead><tr><th>N°</th><th>Patient</th><th>Net</th><th>Reste à payer</th><th>Statut</th><th></th></tr></thead><tbody><tr><td colspan="6" class="muted">Aucune facture.</td></tr></tbody></table>

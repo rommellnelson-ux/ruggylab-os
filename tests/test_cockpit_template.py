@@ -116,6 +116,9 @@ class TestNewViewsPresent:
             "/api/v1/exam-orders/${orderId}/report.pdf",  # compte-rendu consolidé
             "/api/v1/invoices",  # API facturation
             "/api/v1/invoices/summary",  # tableau de bord comptable
+            "/api/v1/invoices/export.csv",  # journal comptable CSV
+            "/api/v1/invoices/${id}/refund",  # remboursement d'avoir
+            "Export CSV",  # bouton export comptable
             "/api/v1/exam-orders/${orderId}/invoice",  # facture auto depuis prescription
             "/api/v1/invoices/${id}/receipt.pdf",  # reçu PDF
             "/api/v1/invoices/${id}/payment-plan",  # plan BNPL optionnel
@@ -224,6 +227,8 @@ class TestHandlerFunctionsDefined:
             "openInvoiceReceipt",
             "createInvoicePaymentPlan",
             "seedTariffs",
+            "exportInvoicesCsv",
+            "refundCredit",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:

@@ -47,6 +47,14 @@ class InvoiceFromOrder(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class RefundCreate(BaseModel):
+    """Remboursement d'un avoir (trop-perçu) sur une facture."""
+
+    amount_xof: Decimal = Field(..., gt=0)
+    reference: str | None = Field(default=None, max_length=100)
+    model_config = ConfigDict(extra="forbid")
+
+
 class PaymentPlanCreate(BaseModel):
     """Plan de paiement fractionné (BNPL) sur le reste à charge d'une facture.
 

@@ -1350,7 +1350,8 @@
           const canCancel = i.status !== "cancelled" && Number(i.paid_xof) === 0;
           // Plan BNPL proposé uniquement s'il reste à payer et qu'aucun plan n'existe.
           const canPlan = i.status !== "cancelled" && Number(i.balance_xof) > 0 && !i.payment_plan_id;
-          return `<tr><td>${security.escapeHtml(i.invoice_number)}</td><td>${security.escapeHtml(i.patient_label || "—")}</td><td>${Number(i.net_total_xof).toLocaleString("fr-FR")}</td><td>${Number(i.balance_xof).toLocaleString("fr-FR")}</td><td>${_INV_STATUS_LABELS[i.status] || i.status}${i.payment_plan_id ? " · BNPL" : ""}${Number(i.credit_xof) > 0 ? " · Avoir " + Number(i.credit_xof).toLocaleString("fr-FR") : ""}</td><td><button class="ghost" onclick="selectInvoice(${i.id},${i.balance_xof})">Encaisser</button> <button class="ghost" onclick="openInvoiceReceipt(${i.id})">Reçu PDF</button>${canPlan ? ` <button class="ghost" onclick="createInvoicePaymentPlan(${i.id})">Échelonner</button>` : ""}${canCancel ? ` <button class="ghost" onclick="cancelInvoice(${i.id})">Annuler</button>` : ""}</td></tr>`;
+          const canRefund = Number(i.credit_xof) > 0;
+          return `<tr><td>${security.escapeHtml(i.invoice_number)}</td><td>${security.escapeHtml(i.patient_label || "—")}</td><td>${Number(i.net_total_xof).toLocaleString("fr-FR")}</td><td>${Number(i.balance_xof).toLocaleString("fr-FR")}</td><td>${_INV_STATUS_LABELS[i.status] || i.status}${i.payment_plan_id ? " · BNPL" : ""}${Number(i.credit_xof) > 0 ? " · Avoir " + Number(i.credit_xof).toLocaleString("fr-FR") : ""}</td><td><button class="ghost" onclick="selectInvoice(${i.id},${i.balance_xof})">Encaisser</button> <button class="ghost" onclick="openInvoiceReceipt(${i.id})">Reçu PDF</button>${canPlan ? ` <button class="ghost" onclick="createInvoicePaymentPlan(${i.id})">Échelonner</button>` : ""}${canRefund ? ` <button class="ghost" onclick="refundCredit(${i.id},${i.credit_xof})">Rembourser</button>` : ""}${canCancel ? ` <button class="ghost" onclick="cancelInvoice(${i.id})">Annuler</button>` : ""}</td></tr>`;
         }).join("");
       } catch { tbody.innerHTML = '<tr><td colspan="6" class="muted">Indisponible.</td></tr>'; }
     }
@@ -1397,6 +1398,27 @@
         await Promise.all([loadInvoices(), loadFinanceSummary()]);
       } catch { showToast("Échec de l'encaissement.", "error"); }
       finally { setLoading(btn, false); }
+    }
+    async function exportInvoicesCsv() {
+      try {
+        const resp = await fetch("/api/v1/invoices/export.csv", { headers: headers(false) });
+        if (!resp.ok) throw new Error();
+        const url = URL.createObjectURL(await resp.blob());
+        const a = document.createElement("a");
+        a.href = url; a.download = "journal-factures.csv"; a.click();
+        URL.revokeObjectURL(url);
+      } catch { showToast("Export indisponible.", "error"); }
+    }
+    async function refundCredit(id, credit) {
+      const v = prompt(`Rembourser quel montant d'avoir ? (max ${Number(credit).toLocaleString("fr-FR")} FCFA)`, String(credit));
+      if (!v) return;
+      const amount = Number(v);
+      if (!(amount > 0 && amount <= Number(credit))) { showToast("Montant invalide (≤ avoir).", "error"); return; }
+      try {
+        const inv = await api(`/api/v1/invoices/${id}/refund`, { method: "POST", headers: headers(), body: JSON.stringify({ amount_xof: String(amount) }) });
+        showToast(`Avoir remboursé. Reste avoir : ${Number(inv.credit_xof).toLocaleString("fr-FR")} FCFA.`, "success");
+        await Promise.all([loadInvoices(), loadFinanceSummary()]);
+      } catch { showToast("Remboursement impossible.", "error"); }
     }
     async function cancelInvoice(id) {
       if (!confirm("Annuler cette facture ?")) return;
