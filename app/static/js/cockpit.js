@@ -1261,8 +1261,15 @@
           `<div><strong>Prescription #${t.order_id}</strong> — ${_ORDER_STATUS_LABELS[t.status] || t.status} · ${t.progress_pct}%</div>` +
           `<div class="muted">${security.escapeHtml(t.patient_label || "")}${t.prescriber ? " · " + security.escapeHtml(t.prescriber) : ""}</div>` +
           collect +
-          `<table style="margin-top:8px;"><thead><tr><th></th><th>Examen</th><th>Libellé</th><th>État</th></tr></thead><tbody>${steps}</tbody></table>`;
+          `<table style="margin-top:8px;"><thead><tr><th></th><th>Examen</th><th>Libellé</th><th>État</th></tr></thead><tbody>${steps}</tbody></table>` +
+          `<div class="actions" style="margin-top:8px;"><button class="success" onclick="generateInvoiceFromOrder(${t.order_id})">💵 Générer la facture</button></div>`;
       } catch { panel.innerHTML = '<div class="muted">Fil indisponible.</div>'; }
+    }
+    async function generateInvoiceFromOrder(orderId) {
+      try {
+        const inv = await api(`/api/v1/exam-orders/${orderId}/invoice`, { method: "POST", headers: headers(), body: "{}" });
+        showToast(`Facture ${inv.invoice_number} générée · reste patient ${Number(inv.patient_due_xof).toLocaleString("fr-FR")} FCFA.`, "success");
+      } catch { showToast("Facturation impossible (déjà émise, ou tarifs à initialiser).", "error"); }
     }
     async function collectOrderSample(orderId) {
       const barcode = ($("rxCollectBarcode")?.value || "").trim();
@@ -1334,11 +1341,40 @@
         if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">Aucune facture.</td></tr>'; return; }
         tbody.innerHTML = rows.map((i) => {
           const canCancel = i.status !== "cancelled" && Number(i.paid_xof) === 0;
-          return `<tr><td>${security.escapeHtml(i.invoice_number)}</td><td>${security.escapeHtml(i.patient_label || "—")}</td><td>${Number(i.net_total_xof).toLocaleString("fr-FR")}</td><td>${Number(i.balance_xof).toLocaleString("fr-FR")}</td><td>${_INV_STATUS_LABELS[i.status] || i.status}</td><td><button class="ghost" onclick="selectInvoice(${i.id},${i.balance_xof})">Encaisser</button>${canCancel ? ` <button class="ghost" onclick="cancelInvoice(${i.id})">Annuler</button>` : ""}</td></tr>`;
+          // Plan BNPL proposé uniquement s'il reste à payer et qu'aucun plan n'existe.
+          const canPlan = i.status !== "cancelled" && Number(i.balance_xof) > 0 && !i.payment_plan_id;
+          return `<tr><td>${security.escapeHtml(i.invoice_number)}</td><td>${security.escapeHtml(i.patient_label || "—")}</td><td>${Number(i.net_total_xof).toLocaleString("fr-FR")}</td><td>${Number(i.balance_xof).toLocaleString("fr-FR")}</td><td>${_INV_STATUS_LABELS[i.status] || i.status}${i.payment_plan_id ? " · BNPL" : ""}</td><td><button class="ghost" onclick="selectInvoice(${i.id},${i.balance_xof})">Encaisser</button> <button class="ghost" onclick="openInvoiceReceipt(${i.id})">Reçu PDF</button>${canPlan ? ` <button class="ghost" onclick="createInvoicePaymentPlan(${i.id})">Échelonner</button>` : ""}${canCancel ? ` <button class="ghost" onclick="cancelInvoice(${i.id})">Annuler</button>` : ""}</td></tr>`;
         }).join("");
       } catch { tbody.innerHTML = '<tr><td colspan="6" class="muted">Indisponible.</td></tr>'; }
     }
     function selectInvoice(id, balance) { $("payInvoiceId").value = id; $("payAmount").value = balance; $("payAmount").focus(); }
+    async function openInvoiceReceipt(id) {
+      try {
+        const resp = await fetch(`/api/v1/invoices/${id}/receipt.pdf`, { headers: headers(false) });
+        if (!resp.ok) throw new Error();
+        window.open(URL.createObjectURL(await resp.blob()), "_blank");
+      } catch { showToast("Reçu indisponible.", "error"); }
+    }
+    async function createInvoicePaymentPlan(id) {
+      // Optionnel : seulement si le patient ne peut pas régler comptant.
+      const months = prompt("Échelonner le reste à charge sur combien de mois ? (2 à 24)\nÀ n'utiliser que si le patient ne peut pas payer comptant.", "3");
+      if (!months) return;
+      const n = parseInt(months, 10);
+      if (!(n >= 2 && n <= 24)) { showToast("Indiquez un nombre de mois entre 2 et 24.", "error"); return; }
+      try {
+        const plan = await api(`/api/v1/invoices/${id}/payment-plan`, { method: "POST", headers: headers(), body: JSON.stringify({ installment_months: n }) });
+        showToast(`Plan de paiement créé : ${plan.installment_months} échéances.`, "success");
+        await Promise.all([loadInvoices(), loadFinanceSummary()]);
+      } catch { showToast("Plan impossible (facture soldée ou plan déjà créé).", "error"); }
+    }
+    async function seedTariffs(btn) {
+      setLoading(btn, true);
+      try {
+        const r = await api("/api/v1/tariffs/seed-defaults", { method: "POST", headers: headers() });
+        showToast(`Tarifs initialisés (${r.created} examens ajoutés). Ajustez les prix au besoin.`, "success");
+      } catch { showToast("Initialisation des tarifs impossible.", "error"); }
+      finally { setLoading(btn, false); }
+    }
     async function recordInvoicePayment(btn) {
       const id = $("payInvoiceId").value;
       const amount = $("payAmount").value;

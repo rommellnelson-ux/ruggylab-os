@@ -115,6 +115,11 @@ class TestNewViewsPresent:
             "/api/v1/exam-orders/${orderId}/thread",  # suivi du fil
             "/api/v1/invoices",  # API facturation
             "/api/v1/invoices/summary",  # tableau de bord comptable
+            "/api/v1/exam-orders/${orderId}/invoice",  # facture auto depuis prescription
+            "/api/v1/invoices/${id}/receipt.pdf",  # reçu PDF
+            "/api/v1/invoices/${id}/payment-plan",  # plan BNPL optionnel
+            "/api/v1/tariffs/seed-defaults",  # initialisation des tarifs
+            "Initialiser tarifs",  # bouton tarifs (facturation)
             'id="patientUnit"',  # champ unité (création patient)
             'id="userUnit"',  # champ unité (création utilisateur)
             'data-view="quality"',  # bouton de navigation qualité
@@ -212,6 +217,11 @@ class TestHandlerFunctionsDefined:
             "recordInvoicePayment",
             "cancelInvoice",
             "loadFinanceSummary",
+            # Bouclage du cycle facturation
+            "generateInvoiceFromOrder",
+            "openInvoiceReceipt",
+            "createInvoicePaymentPlan",
+            "seedTariffs",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:
