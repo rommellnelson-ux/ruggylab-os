@@ -25,6 +25,13 @@ from app.schemas.exam_order import (
 from app.schemas.invoice import InvoiceFromOrder, InvoiceRead
 from app.services.accounting_service import balance_of, build_invoice_from_order
 from app.services.exam_order_service import build_thread, sync_order_progress
+from app.services.patient_access import (
+    apply_order_patient_scope,
+    can_access_order,
+    can_access_patient,
+)
+
+_OUT_OF_SCOPE = "Accès refusé : prescription hors de votre périmètre."
 
 router = APIRouter(prefix="/exam-orders")
 
@@ -43,6 +50,14 @@ def _get_order_or_404(db: Session, order_id: int) -> ExamOrder:
     return order
 
 
+def _get_accessible_order_or_404(db: Session, order_id: int, user: User) -> ExamOrder:
+    """Charge la prescription en refusant (403) celles hors du périmètre unité."""
+    order = _get_order_or_404(db, order_id)
+    if not can_access_order(user, order):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
+    return order
+
+
 @router.post("", response_model=ExamOrderRead, status_code=status.HTTP_201_CREATED)
 def create_exam_order(
     payload: ExamOrderCreate,
@@ -54,6 +69,8 @@ def create_exam_order(
     patient = db.query(Patient).filter(Patient.id == payload.patient_id).first()
     if not patient:
         raise HTTPException(status_code=404, detail="Patient introuvable.")
+    if not can_access_patient(current_user, patient):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
 
     order = ExamOrder(
         patient_id=payload.patient_id,
@@ -81,13 +98,14 @@ def list_exam_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> list[ExamOrder]:
-    del current_user
     query = db.query(ExamOrder).options(selectinload(ExamOrder.items))
     if status_filter:
         query = query.filter(ExamOrder.status == status_filter)
     if patient_id is not None:
         query = query.filter(ExamOrder.patient_id == patient_id)
-    return query.order_by(ExamOrder.id.desc()).limit(limit).all()
+    query = apply_order_patient_scope(query, current_user)  # cloisonnement par unité
+    orders: list[ExamOrder] = query.order_by(ExamOrder.id.desc()).limit(limit).all()
+    return orders
 
 
 @router.get("/{order_id}", response_model=ExamOrderRead)
@@ -96,8 +114,7 @@ def get_exam_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> ExamOrder:
-    del current_user
-    return _get_order_or_404(db, order_id)
+    return _get_accessible_order_or_404(db, order_id, current_user)
 
 
 @router.get("/{order_id}/thread", response_model=ExamOrderThread)
@@ -107,8 +124,7 @@ def get_exam_order_thread(
     current_user: User = Depends(get_current_active_user),
 ) -> ExamOrderThread:
     """Le « fil » : avancement de chaque examen, de la prescription au résultat."""
-    del current_user
-    order = _get_order_or_404(db, order_id)
+    order = _get_accessible_order_or_404(db, order_id, current_user)
     return build_thread(db, order)
 
 
@@ -120,8 +136,7 @@ def collect_exam_order(
     current_user: User = Depends(get_current_active_user),
 ) -> ExamOrderThread:
     """Rattache l'échantillon prélevé (par id ou code-barres) et synchronise."""
-    del current_user
-    order = _get_order_or_404(db, order_id)
+    order = _get_accessible_order_or_404(db, order_id, current_user)
     if payload.sample_id is None and not payload.barcode:
         raise HTTPException(status_code=422, detail="Fournir sample_id ou barcode.")
 
@@ -145,10 +160,9 @@ def update_exam_order_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> ExamOrder:
-    del current_user
     if payload.status not in ORDER_STATUSES:
         raise HTTPException(status_code=422, detail=f"Statut invalide : {payload.status}.")
-    order = _get_order_or_404(db, order_id)
+    order = _get_accessible_order_or_404(db, order_id, current_user)
     if payload.status == "cancelled":
         order.status = "cancelled"
         db.commit()
@@ -176,7 +190,7 @@ def generate_invoice_from_order(
     Acte de facturation côté clinique (le comptable la gère ensuite). Refuse de
     créer un doublon si une facture active existe déjà pour cette prescription.
     """
-    order = _get_order_or_404(db, order_id)
+    order = _get_accessible_order_or_404(db, order_id, current_user)
     existing = (
         db.query(Invoice)
         .filter(Invoice.exam_order_id == order_id, Invoice.status != "cancelled")

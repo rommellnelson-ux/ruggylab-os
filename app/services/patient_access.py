@@ -15,7 +15,7 @@ from typing import Any
 
 from sqlalchemy import or_
 
-from app.models import Patient, Result, Sample, User, UserRole
+from app.models import ExamOrder, Patient, Result, Sample, User, UserRole
 
 
 def _is_unrestricted(user: User) -> bool:
@@ -62,4 +62,21 @@ def apply_result_patient_scope(query: Any, user: User) -> Any:
         query.outerjoin(Sample, Result.sample_id == Sample.id)
         .outerjoin(Patient, Sample.patient_id == Patient.id)
         .filter(or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit))
+    )
+
+
+def can_access_order(user: User, order: ExamOrder) -> bool:
+    """Autorisation d'accès à une prescription d'examens (via son patient)."""
+    if _is_unrestricted(user):
+        return True
+    patient = order.patient  # FK patient non nullable : toujours présent
+    return patient.unit is None or patient.unit == user.unit
+
+
+def apply_order_patient_scope(query: Any, user: User) -> Any:
+    """Restreint une requête ``ExamOrder`` au périmètre patient autorisé pour ``user``."""
+    if _is_unrestricted(user):
+        return query
+    return query.join(Patient, ExamOrder.patient_id == Patient.id).filter(
+        or_(Patient.unit.is_(None), Patient.unit == user.unit)
     )
