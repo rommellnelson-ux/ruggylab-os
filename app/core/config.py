@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_FULL_NAME: str = "RuggyLab Administrator"
     ENABLE_DH36_LISTENER: bool = True
     TESTING: bool = False
+    # Validation non bloquante par défaut : un effectif réduit ne permet pas une
+    # double validation quotidienne. La publication / le compte-rendu reste
+    # possible sans validation (document « provisoire »), validée a posteriori.
+    # Mettre à True pour imposer la validation avant publication (ISO 15189 strict).
+    REQUIRE_VALIDATION_FOR_RELEASE: bool = False
     DH36_LISTENER_HOST: str = "127.0.0.1"  # Changed from 0.0.0.0 for security
     DH36_LISTENER_PORT: int = 5001
     BASE_DATA_DIR: str = "data"
