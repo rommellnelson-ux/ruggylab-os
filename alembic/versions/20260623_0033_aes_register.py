@@ -1,14 +1,13 @@
 """Registre des Accidents d'Exposition au Sang (AES)
 
 Revision ID: 20260623_0033
-Revises: 20260622_0031
+Revises: 20260622_0032
 Create Date: 2026-06-23 00:00:33
 
 Table de traçabilité des AES (sécurité du personnel). Additive et idempotente.
 
-NB : basée sur 0031 (dernier head committé). Une autre migration (report
-snapshots) est en cours en parallèle sur la même base — une migration de
-fusion alembic sera nécessaire quand les deux seront committées.
+NB : re-parentée sur 0032 (report snapshots, désormais committé) pour garder une
+chaîne de migrations strictement linéaire.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20260623_0033"
-down_revision = "20260622_0031"
+down_revision = "20260622_0032"
 branch_labels = None
 depends_on = None
 
