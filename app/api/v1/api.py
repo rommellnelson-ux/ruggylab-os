@@ -16,6 +16,7 @@ from app.api.v1.endpoints.critical_alerts import router as critical_alerts_route
 from app.api.v1.endpoints.critical_ranges import router as critical_ranges_router
 from app.api.v1.endpoints.delta_check import router as delta_check_router
 from app.api.v1.endpoints.dh36 import router as dh36_router
+from app.api.v1.endpoints.epi_notifications import router as epi_notifications_router
 from app.api.v1.endpoints.epidemiology import router as epidemiology_router
 from app.api.v1.endpoints.equipment_maintenance import router as equipment_maintenance_router
 from app.api.v1.endpoints.equipment_reagent_ratios import (
@@ -38,6 +39,7 @@ from app.api.v1.endpoints.prescription_scanner import router as prescription_sca
 from app.api.v1.endpoints.qc import router as qc_router
 from app.api.v1.endpoints.quality import router as quality_router
 from app.api.v1.endpoints.ratio_presets import router as ratio_presets_router
+from app.api.v1.endpoints.reagent_lots import router as reagent_lots_router
 from app.api.v1.endpoints.reagents import router as reagents_router
 from app.api.v1.endpoints.reference_ranges import router as reference_ranges_router
 from app.api.v1.endpoints.registre import router as registre_router
@@ -63,6 +65,7 @@ api_router.include_router(admin_ui_router, tags=["admin-ui"])
 api_router.include_router(login_router, tags=["auth"])
 api_router.include_router(users_router, tags=["users"])
 api_router.include_router(reagents_router, tags=["reagents"])
+api_router.include_router(reagent_lots_router, tags=["Lots réactifs (FEFO)"])
 api_router.include_router(equipment_reagent_ratios_router, tags=["equipment-reagent-ratios"])
 api_router.include_router(ratio_presets_router, tags=["ratio-presets"])
 api_router.include_router(audit_events_router, tags=["audit-events"])
@@ -98,6 +101,9 @@ api_router.include_router(prescription_scanner_router, tags=["Prescription Scann
 api_router.include_router(pdf_prescription_router, tags=["Prescription Scanner CMU"])
 api_router.include_router(fhir_pharmacy_router, tags=["FHIR R4 Pharmacy"])
 api_router.include_router(epidemiology_router, tags=["Epidemiology"], dependencies=_no_accountant)
+api_router.include_router(
+    epi_notifications_router, tags=["Notifications épidémiologiques"], dependencies=_no_accountant
+)
 api_router.include_router(bnpl_router, tags=["BNPL CMU"])
 api_router.include_router(notifications_router, tags=["Notifications temps-réel"])
 api_router.include_router(bulk_import_router, tags=["Import en lot"], dependencies=_no_accountant)

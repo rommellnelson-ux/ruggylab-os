@@ -1,3 +1,5 @@
+import datetime as dt
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -8,6 +10,15 @@ from app.models import Patient, Sample, User
 from app.schemas.sample import SampleCreate, SampleRead, SampleUpdate
 
 router = APIRouter(prefix="/samples")
+
+
+def _next_lab_number(db: Session) -> str:
+    """N° de laboratoire lisible, séquence annuelle : AAAA-NNNNNN."""
+    prefix = f"{dt.datetime.now(dt.UTC).year}-"
+    count = (
+        db.query(func.count(Sample.id)).filter(Sample.lab_number.like(f"{prefix}%")).scalar() or 0
+    )
+    return f"{prefix}{count + 1:06d}"
 
 
 @router.get("", response_model=list[SampleRead])
@@ -94,6 +105,8 @@ def create_sample(
 
     sample_data = payload.model_dump(exclude_none=True)
     sample = Sample(**sample_data)
+    if not sample.lab_number:
+        sample.lab_number = _next_lab_number(db)
     db.add(sample)
     db.commit()
     db.refresh(sample)

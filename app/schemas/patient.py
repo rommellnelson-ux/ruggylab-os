@@ -11,6 +11,8 @@ class PatientBase(BaseModel):
     birth_date: dt.date
     sex: str | None = Field(default=None, max_length=1)
     rank: str | None = Field(default=None, max_length=50)
+    phone: str | None = Field(default=None, max_length=30)
+    residence_quarter: str | None = Field(default=None, max_length=150)
     unit: str | None = Field(default=None, max_length=100)
 
     @field_validator("sex")
@@ -42,6 +44,8 @@ class PatientUpdate(BaseModel):
     birth_date: dt.date | None = None
     sex: str | None = Field(default=None, max_length=1)
     rank: str | None = Field(default=None, max_length=50)
+    phone: str | None = Field(default=None, max_length=30)
+    residence_quarter: str | None = Field(default=None, max_length=150)
     unit: str | None = Field(default=None, max_length=100)
 
     model_config = ConfigDict(extra="forbid")

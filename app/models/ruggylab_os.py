@@ -81,6 +81,9 @@ class Patient(Base):
     birth_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     sex: Mapped[str | None] = mapped_column(CHAR(1))
     rank: Mapped[str | None] = mapped_column(String(50))
+    phone: Mapped[str | None] = mapped_column(String(30))
+    # Quartier / zone de résidence : cartographie épidémiologique de terrain.
+    residence_quarter: Mapped[str | None] = mapped_column(String(150))
     # Unité / service rattaché (cloisonnement RBAC). NULL = pool partagé.
     unit: Mapped[str | None] = mapped_column(String(100))
 
@@ -98,6 +101,10 @@ class Sample(Base):
     )
     received_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
     status: Mapped[str | None] = mapped_column(String(50))
+    # N° de laboratoire lisible (séquence annuelle AAAA-NNNNNN) pour le registre.
+    lab_number: Mapped[str | None] = mapped_column(String(20), index=True)
+    # Préleveur (libellé libre : nom de l'agent ayant prélevé).
+    collected_by_label: Mapped[str | None] = mapped_column(String(150))
     # Aspect / qualité pré-analytique : conforme | hemolyse | icterique |
     # lipemique | coagule | insuffisant. Distinct du statut (workflow), il
     # conditionne la fiabilité des résultats (interférences analytiques).
@@ -744,6 +751,8 @@ class ExamOrder(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
     prescriber: Mapped[str | None] = mapped_column(String(150))
+    # Service demandeur (Urgences, Maternité, Consultation externe…).
+    requesting_service: Mapped[str | None] = mapped_column(String(100))
     clinical_info: Mapped[str | None] = mapped_column(Text)
     # routine | urgent | stat
     priority: Mapped[str] = mapped_column(String(20), nullable=False, default="routine")

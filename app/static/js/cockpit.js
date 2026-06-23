@@ -1060,6 +1060,8 @@
           birth_date: $("patientBirth").value, 
           sex: $("patientSex").value,
           rank: $("patientRank").value || null,
+          phone: ($("patientPhone")?.value || "").trim() || null,
+          residence_quarter: ($("patientQuarter")?.value || "").trim() || null,
           unit: ($("patientUnit")?.value || "").trim() || null
         };
         
@@ -1241,6 +1243,7 @@
           body: JSON.stringify({
             patient_id: Number(pid),
             prescriber: $("rxOrderPrescriber").value || null,
+            requesting_service: ($("rxOrderService")?.value || "").trim() || null,
             clinical_info: $("rxOrderClinical").value || null,
             priority: $("rxOrderPriority").value,
             exams,
@@ -1502,7 +1505,7 @@
             : '';
           const tr = row(
             `<td>${s.id}</td>` +
-            `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code>${aspectBadge}</td>` +
+            `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code>${aspectBadge}${s.lab_number ? `<div style="font-size:10px;color:var(--muted);">N° ${security.escapeHtml(s.lab_number)}</div>` : ''}</td>` +
             `<td>${pLabel}</td>` +
             `<td style="white-space:nowrap;">${statusCell}</td>` +
             `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(labelData)})'>🖨️</button></td>`

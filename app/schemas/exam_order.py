@@ -21,6 +21,7 @@ class ExamOrderItemCreate(BaseModel):
 class ExamOrderCreate(BaseModel):
     patient_id: int
     prescriber: str | None = Field(default=None, max_length=150)
+    requesting_service: str | None = Field(default=None, max_length=100)
     clinical_info: str | None = None
     priority: str = Field(default="routine")
     exams: list[ExamOrderItemCreate] = Field(..., min_length=1)
@@ -53,6 +54,7 @@ class ExamOrderRead(BaseModel):
     id: int
     patient_id: int
     prescriber: str | None = None
+    requesting_service: str | None = None
     clinical_info: str | None = None
     priority: str
     status: str

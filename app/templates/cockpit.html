@@ -1180,6 +1180,7 @@
               <div class="grid2"><div><label>Prenom</label><input id="patientFirst" /></div><div><label>Nom</label><input id="patientLast" /></div></div>
               <div class="grid2"><div><label>Naissance</label><input id="patientBirth" type="date" /></div><div><label>Sexe</label><select id="patientSex"><option>M</option><option>F</option></select></div></div>
               <div class="grid2"><div><label>Grade</label><input id="patientRank" /></div><div><label>Unité / service</label><input id="patientUnit" placeholder="ex. hematologie (vide = partagé)" /></div></div>
+              <div class="grid2"><div><label>Téléphone</label><input id="patientPhone" placeholder="+225 ..." /></div><div><label>Quartier / résidence</label><input id="patientQuarter" placeholder="ex. Abobo (épidémio)" /></div></div>
               <button onclick="createPatient(this)" aria-label="Créer un nouveau patient">Creer patient</button>
               <div id="patientCreated" class="notice hidden">
                 Patient enregistre
@@ -1973,6 +1974,7 @@
                 </div>
                 <div class="grid2">
                   <div><label>Prescripteur</label><input id="rxOrderPrescriber" placeholder="Dr ..." /></div>
+                  <div><label>Service demandeur</label><input id="rxOrderService" placeholder="Urgences, Maternité…" /></div>
                   <div><label>Priorité</label><select id="rxOrderPriority"><option value="routine">Routine</option><option value="urgent">Urgent</option><option value="stat">STAT (vital)</option></select></div>
                 </div>
                 <div><label>Renseignements cliniques</label><textarea id="rxOrderClinical" placeholder="Contexte clinique (optionnel)"></textarea></div>

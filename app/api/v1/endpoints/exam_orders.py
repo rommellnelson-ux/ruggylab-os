@@ -76,6 +76,7 @@ def create_exam_order(
     order = ExamOrder(
         patient_id=payload.patient_id,
         prescriber=payload.prescriber,
+        requesting_service=payload.requesting_service,
         clinical_info=payload.clinical_info,
         priority=payload.priority,
         status="prescribed",

@@ -31,6 +31,9 @@ class SampleBase(BaseModel):
     received_date: dt.datetime | None = None
     status: str | None = Field(default=None, max_length=50)
     aspect: str | None = Field(default=None, max_length=20)
+    # N° labo lisible : généré côté serveur si absent (séquence annuelle).
+    lab_number: str | None = Field(default=None, max_length=20)
+    collected_by_label: str | None = Field(default=None, max_length=150)
 
     @field_validator("status")
     @classmethod

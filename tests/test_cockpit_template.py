@@ -103,6 +103,9 @@ class TestNewViewsPresent:
             'id="samplePatientSearch"',  # saisie patient par IPP/nom (labo réel)
             'id="resultSampleBarcode"',  # saisie échantillon par code-barres
             'id="sampleAspect"',  # aspect / qualité pré-analytique de l'échantillon
+            'id="patientPhone"',  # téléphone patient
+            'id="patientQuarter"',  # quartier / résidence (épidémio)
+            'id="rxOrderService"',  # service demandeur (prescription)
             "/api/v1/samples/by-barcode/",  # résolution échantillon par code-barres
             'addEventListener("hashchange"',  # routage par hash (lien profond)
             'const target = "#/" + name',  # synchronisation URL ↔ vue
