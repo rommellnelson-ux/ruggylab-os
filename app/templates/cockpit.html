@@ -1269,6 +1269,7 @@
               <div class="actions"><button class="secondary" onclick="generateBarcode()">Generer code-barres</button></div>
               <div id="tubeGuide" class="tube-card"></div>
               <div><label>Statut</label><select id="sampleStatus"><option>Recu</option><option>En cours</option><option>Termine</option></select></div>
+              <div><label>Aspect (qualité pré-analytique)</label><select id="sampleAspect"><option value="conforme">Conforme</option><option value="hemolyse">Hémolysé</option><option value="icterique">Ictérique</option><option value="lipemique">Lipémique</option><option value="coagule">Coagulé</option><option value="insuffisant">Insuffisant (QNS)</option></select></div>
               <button onclick="createSample(this)" aria-label="Créer un nouvel échantillon">Creer echantillon</button>
             </div></div>
             <div class="panel"><h3>Echantillons</h3><table id="samplesTable"><thead><tr><th>ID</th><th>Code-barres</th><th>Patient</th><th>Statut</th><th></th></tr></thead><tbody></tbody></table></div>

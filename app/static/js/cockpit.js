@@ -1496,9 +1496,13 @@
             (nextSt
               ? ` <button class="ghost" style="font-size:11px;padding:3px 7px;" onclick="advanceSampleStatus(${s.id},'${nextSt}')">→ ${nextSt}</button>`
               : '');
+          const _ASPECT_LBL = { hemolyse: 'Hémolysé', icterique: 'Ictérique', lipemique: 'Lipémique', coagule: 'Coagulé', insuffisant: 'Insuffisant' };
+          const aspectBadge = (s.aspect && s.aspect !== 'conforme')
+            ? ` <span class="pill bad" title="Aspect pré-analytique">⚠ ${_ASPECT_LBL[s.aspect] || security.escapeHtml(s.aspect)}</span>`
+            : '';
           const tr = row(
             `<td>${s.id}</td>` +
-            `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code></td>` +
+            `<td><code style="font-size:11px;">${security.escapeHtml(s.barcode)}</code>${aspectBadge}</td>` +
             `<td>${pLabel}</td>` +
             `<td style="white-space:nowrap;">${statusCell}</td>` +
             `<td><button class="ghost" title="Imprimer étiquette tube" onclick='printSampleLabel(${JSON.stringify(labelData)})'>🖨️</button></td>`
@@ -1529,10 +1533,11 @@
         
         if (!$("sampleBarcode").value) generateBarcode();
         
-        const body = { 
-          barcode: security.sanitize($("sampleBarcode").value), 
-          patient_id: Number(security.sanitizeNumber($("samplePatientId").value)), 
-          status: $("sampleStatus").value 
+        const body = {
+          barcode: security.sanitize($("sampleBarcode").value),
+          patient_id: Number(security.sanitizeNumber($("samplePatientId").value)),
+          status: $("sampleStatus").value,
+          aspect: $("sampleAspect") ? $("sampleAspect").value : undefined,
         };
         
         const created = await perfMonitor.measureAsync('createSample', () =>

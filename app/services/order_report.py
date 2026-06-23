@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from app.models import ExamOrder, Result
 from app.services.pdf import build_simple_pdf
+from app.services.preanalytic import aspect_label, interfering_analytes
 
 _PRIORITY = {"routine": "Routine", "urgent": "Urgent", "stat": "STAT (immediat)"}
 
@@ -53,6 +54,13 @@ def build_order_report_pdf(order: ExamOrder, results: dict[int, Result]) -> byte
         sample = res.sample
         if sample:
             lines.append(f"  Echantillon: {sample.barcode} / statut {sample.status}")
+            if sample.aspect and sample.aspect != "conforme":
+                lines.append(f"  Aspect: {aspect_label(sample.aspect)}")
+                hits = interfering_analytes(sample.aspect, res.data_points)
+                if hits:
+                    lines.append(
+                        f"  /!\\ {', '.join(hits)} potentiellement fausse(s) par l'aspect"
+                    )
             if sample.received_date:
                 lines.append(f"  Reception: {sample.received_date:%d/%m/%Y %H:%M}")
         lines.append(f"  Analyse: {res.analysis_date:%d/%m/%Y %H:%M}")

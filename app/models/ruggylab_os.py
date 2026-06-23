@@ -98,6 +98,10 @@ class Sample(Base):
     )
     received_date: Mapped[dt.datetime | None] = mapped_column(DateTime)
     status: Mapped[str | None] = mapped_column(String(50))
+    # Aspect / qualité pré-analytique : conforme | hemolyse | icterique |
+    # lipemique | coagule | insuffisant. Distinct du statut (workflow), il
+    # conditionne la fiabilité des résultats (interférences analytiques).
+    aspect: Mapped[str | None] = mapped_column(String(20))
 
     patient: Mapped["Patient | None"] = relationship(back_populates="samples")
     results: Mapped[list["Result"]] = relationship(back_populates="sample")

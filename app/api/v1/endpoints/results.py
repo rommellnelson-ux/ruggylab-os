@@ -451,6 +451,20 @@ def create_result(
             publish_alert_event("critical_value_alert", **_critical_value_alert_payload(result))
         if result.delta_exceeded:
             publish_alert_event("delta", result_id=result.id)
+    # Alerte pré-analytique NON bloquante : aspect d'échantillon faussant un analyte.
+    from app.services.preanalytic import interference_warning
+
+    _warn = interference_warning(sample.aspect, result.data_points)
+    if _warn:
+        from app.services.notification_bus import publish_alert_event
+
+        publish_alert_event(
+            "preanalytic_interference",
+            result_id=result.id,
+            sample_id=sample.id,
+            aspect=sample.aspect,
+            message=_warn,
+        )
     return result
 
 

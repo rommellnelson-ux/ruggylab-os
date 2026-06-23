@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
@@ -15,6 +16,41 @@ def list_samples(
 ) -> list[Sample]:
     del current_user
     return db.query(Sample).order_by(Sample.id.desc()).all()
+
+
+@router.get("/quality-summary")
+def sample_quality_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict[str, object]:
+    """Indicateur qualité pré-analytique : répartition par aspect + taux de non-conformité.
+
+    Le taux d'hémolyse / de non-conformité est un indicateur reconnu de la qualité
+    du prélèvement (formation des préleveurs).
+    """
+    del current_user
+    rows = (
+        db.query(Sample.aspect, func.count(Sample.id))
+        .group_by(Sample.aspect)
+        .all()
+    )
+    by_aspect = {(aspect or "non_renseigne"): count for aspect, count in rows}
+    total = sum(by_aspect.values())
+    qualified = sum(c for a, c in by_aspect.items() if a not in ("non_renseigne",))
+    non_conforming = sum(
+        c for a, c in by_aspect.items() if a not in ("conforme", "non_renseigne")
+    )
+    hemolyzed = by_aspect.get("hemolyse", 0)
+
+    def _rate(n: int, d: int) -> float:
+        return round(100 * n / d, 1) if d else 0.0
+
+    return {
+        "total_samples": total,
+        "by_aspect": by_aspect,
+        "non_conformity_rate_pct": _rate(non_conforming, qualified),
+        "hemolysis_rate_pct": _rate(hemolyzed, qualified),
+    }
 
 
 @router.get("/by-barcode/{barcode}", response_model=SampleRead)
@@ -71,7 +107,7 @@ def update_sample(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Sample:
-    """Partial update — change status (Recu → En cours → Termine / Annule)."""
+    """Partial update — statut (Recu → En cours → Termine / Annule) et/ou aspect."""
     del current_user
     sample = db.query(Sample).filter(Sample.id == sample_id).first()
     if not sample:
@@ -81,6 +117,8 @@ def update_sample(
         )
     if payload.status is not None:
         sample.status = payload.status
+    if payload.aspect is not None:
+        sample.aspect = payload.aspect
     db.commit()
     db.refresh(sample)
     return sample
