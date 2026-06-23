@@ -106,6 +106,12 @@ class TestNewViewsPresent:
             'id="patientPhone"',  # téléphone patient
             'id="patientQuarter"',  # quartier / résidence (épidémio)
             'id="rxOrderService"',  # service demandeur (prescription)
+            'id="epinotif"',  # vue notifications épidémiologiques (MADO)
+            'data-view="epinotif"',  # nav notifications épidémio
+            'id="lots"',  # vue lots réactifs FEFO
+            'data-view="lots"',  # nav lots réactifs
+            "/api/v1/epi-notifications",  # API notifications épidémio
+            "/api/v1/reagent-lots",  # API lots réactifs FEFO
             "/api/v1/samples/by-barcode/",  # résolution échantillon par code-barres
             'addEventListener("hashchange"',  # routage par hash (lien profond)
             'const target = "#/" + name',  # synchronisation URL ↔ vue
@@ -237,6 +243,12 @@ class TestHandlerFunctionsDefined:
             "seedTariffs",
             "exportInvoicesCsv",
             "refundCredit",
+            "loadEpiNotifs",
+            "declareEpiNotif",
+            "transmitEpiNotif",
+            "loadReagentLots",
+            "addReagentLot",
+            "consumeReagentLots",
         ],
     )
     def test_function_defined(self, html: str, fn: str) -> None:

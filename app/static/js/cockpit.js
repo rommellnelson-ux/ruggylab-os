@@ -775,7 +775,9 @@
         await Promise.all([loadResults(), loadCriticalRanges(), loadDeltaRules(), loadRefRanges(), loadNotifConfigs(), loadPendingCriticals(), loadAutoValidationConfigs(), loadBioref(), loadCodeMappings(), loadResultEquipmentOptions()]);
       }
       if (currentView === "stocks") { await loadReagents(); await loadExpiryAlerts(); }
+      if (currentView === "lots") await loadReagentLots();
       if (currentView === "epidemio") await loadEpidemio();
+      if (currentView === "epinotif") await loadEpiNotifs();
       if (currentView === "users") await loadUsers();
       if (currentView === "samples") { await loadSamples(); setTimeout(() => $('barcodeScanner')?.focus(), 150); }
       if (currentView === "equipments") await Promise.all([loadEquipments(), loadMaintenances()]);
@@ -1099,6 +1101,70 @@
     }
 
     // ── Saisie « labo réel » : sélection patient par IPP/nom, échantillon par code-barres ──
+    // ── Notifications épidémiologiques (MADO) ──────────────────────────────────
+    async function loadEpiNotifs() {
+      const tbody = $("epiNotifTable").querySelector("tbody");
+      const st = $("epiStatusFilter") ? $("epiStatusFilter").value : "";
+      try {
+        const rows = _listItems(await api(`/api/v1/epi-notifications${st ? "?status=" + st : ""}`, { headers: headers(false) }));
+        if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" class="muted">Aucune notification.</td></tr>'; return; }
+        tbody.innerHTML = rows.map((n) => {
+          const sent = n.status === "sent_to_district";
+          return `<tr><td>${n.id}</td><td>${security.escapeHtml(n.pathology)}</td><td>${security.escapeHtml(n.residence_quarter || "—")}</td><td>${sent ? "✅ Transmis" : "⏳ À envoyer"}</td><td>${sent ? "" : `<button class="ghost" onclick="transmitEpiNotif(${n.id})">Transmettre district</button>`}</td></tr>`;
+        }).join("");
+      } catch { tbody.innerHTML = '<tr><td colspan="5" class="muted">Indisponible.</td></tr>'; }
+    }
+    async function declareEpiNotif(btn) {
+      const pathology = $("epiPathology").value.trim();
+      if (!pathology) { showToast("Pathologie requise.", "error"); return; }
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/epi-notifications", { method: "POST", headers: headers(), body: JSON.stringify({ pathology, residence_quarter: $("epiQuarter").value.trim() || null, sample_barcode: $("epiBarcode").value.trim() || null, patient_label: $("epiPatientLabel").value.trim() || null }) });
+        showToast("Notification déclarée.", "success");
+        $("epiPathology").value = ""; $("epiQuarter").value = ""; $("epiBarcode").value = ""; $("epiPatientLabel").value = "";
+        await loadEpiNotifs();
+      } catch { showToast("Échec de la déclaration.", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function transmitEpiNotif(id) {
+      const channel = prompt("Canal de transmission au district sanitaire ?", "Téléphone district");
+      if (channel === null) return;
+      try {
+        await api(`/api/v1/epi-notifications/${id}/transmit`, { method: "POST", headers: headers(), body: JSON.stringify({ channel: channel || null }) });
+        showToast("Transmis au district.", "success"); await loadEpiNotifs();
+      } catch { showToast("Transmission réservée à l'encadrement.", "error"); }
+    }
+    // ── Lots de réactifs (FEFO) ────────────────────────────────────────────────
+    async function loadReagentLots() {
+      const tbody = $("reagentLotsTable").querySelector("tbody");
+      const rid = $("lotFilterReagent") ? $("lotFilterReagent").value : "";
+      try {
+        const rows = _listItems(await api(`/api/v1/reagent-lots${rid ? "?reagent_id=" + rid : ""}`, { headers: headers(false) }));
+        if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" class="muted">Aucun lot.</td></tr>'; return; }
+        tbody.innerHTML = rows.map((l) => `<tr><td>${l.reagent_id}</td><td>${security.escapeHtml(l.lot_number)}</td><td>${l.expiry_date || "—"}</td><td>${l.quantity}</td><td>${security.escapeHtml(l.status)}</td></tr>`).join("");
+      } catch { tbody.innerHTML = '<tr><td colspan="5" class="muted">Indisponible.</td></tr>'; }
+    }
+    async function addReagentLot(btn) {
+      const reagent_id = Number($("lotReagentId").value); const lot_number = $("lotNumber").value.trim();
+      if (!reagent_id || !lot_number) { showToast("Réactif et n° de lot requis.", "error"); return; }
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/reagent-lots", { method: "POST", headers: headers(), body: JSON.stringify({ reagent_id, lot_number, expiry_date: $("lotExpiry").value || null, quantity: Number($("lotQuantity").value) || 0 }) });
+        showToast("Lot ajouté.", "success"); $("lotNumber").value = ""; $("lotExpiry").value = ""; $("lotQuantity").value = "";
+        await loadReagentLots();
+      } catch { showToast("Échec (réactif introuvable ?).", "error"); }
+      finally { setLoading(btn, false); }
+    }
+    async function consumeReagentLots(btn) {
+      const reagent_id = Number($("lotConsumeReagent").value); const quantity = Number($("lotConsumeQty").value);
+      if (!reagent_id || !(quantity > 0)) { showToast("Réactif et quantité requis.", "error"); return; }
+      setLoading(btn, true);
+      try {
+        await api("/api/v1/reagent-lots/consume", { method: "POST", headers: headers(), body: JSON.stringify({ reagent_id, quantity }) });
+        showToast("Consommé en FEFO.", "success"); $("lotConsumeQty").value = ""; await loadReagentLots();
+      } catch { showToast("Quantité insuffisante ou réactif inconnu.", "error"); }
+      finally { setLoading(btn, false); }
+    }
     const ROLE_HIDDEN_VIEWS = {
       // Le technicien voit la prescription d'examens (suivi du fil) mais ce n'est
       // pas obligatoire ; la finance (factures, BNPL) lui est masquée.
@@ -1107,7 +1173,7 @@
       officer: ["users", "audit", "ai_training", "bnpl", "invoices"],
       // Comptable : facturation + paiements + activité agrégée (dashboard, stats).
       // Aucun accès clinique (renforcé côté backend par forbid_accountant).
-      accountant: ["patients", "samples", "results", "epidemio", "machines", "imaging", "reports", "qc", "tat", "pharmacy", "prescription", "stocks", "equipments", "ai_training", "registre", "quality", "users", "audit"],
+      accountant: ["patients", "samples", "results", "epidemio", "epinotif", "machines", "imaging", "reports", "qc", "tat", "pharmacy", "prescription", "stocks", "lots", "equipments", "ai_training", "registre", "quality", "users", "audit"],
       admin: [],
     };
     function applyRoleNavigation(role) {

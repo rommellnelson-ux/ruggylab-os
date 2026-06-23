@@ -1048,6 +1048,7 @@
         <button data-view="results" onclick="showView('results')">📋 Résultats</button>
         <div class="nav-section">Analytique</div>
         <button data-view="epidemio" onclick="showView('epidemio')">📊 Épidémiologie</button>
+        <button data-view="epinotif" onclick="showView('epinotif')">🦟 Notif. épidémio (MADO)</button>
         <button data-view="machines" onclick="showView('machines')">🔬 DH36 &amp; POCT</button>
         <button data-view="imaging" onclick="showView('imaging')">👁 Imagerie IA</button>
         <button data-view="reports" onclick="showView('reports')">📄 Rapports</button>
@@ -1060,6 +1061,7 @@
         <button data-view="invoices" onclick="showView('invoices')">💰 Facturation</button>
         <button data-view="bnpl" onclick="showView('bnpl')">💳 Paiements BNPL</button>
         <button data-view="stocks" onclick="showView('stocks')">📦 Stocks</button>
+        <button data-view="lots" onclick="showView('lots')">🧴 Lots réactifs (FEFO)</button>
         <div class="nav-section">Système</div>
         <button data-view="equipments" onclick="showView('equipments')">🔬 Équipements</button>
         <button data-view="ai_training" onclick="showView('ai_training')">🤖 Entraînement IA</button>
@@ -2369,6 +2371,42 @@
           <div class="grid2" style="margin-top:12px;">
             <div class="panel"><h3>TAT moyen par automate</h3><table id="tatByAutoTable"><thead><tr><th>Automate</th><th>N</th><th>Moy. (min)</th><th>Max</th></tr></thead><tbody></tbody></table></div>
             <div class="panel"><h3>TAT moyen par journée</h3><div id="tatByDayChart"></div></div>
+          </div>
+        </div>
+
+        <div id="epinotif" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Déclarer une notification (MADO)</h3><div class="form">
+              <div><label>Pathologie</label><input id="epiPathology" placeholder="Paludisme grave, Choléra, Méningite…" /></div>
+              <div class="grid2"><div><label>Quartier / résidence</label><input id="epiQuarter" placeholder="ex. Abobo" /></div><div><label>Code-barres échantillon</label><input id="epiBarcode" placeholder="optionnel" /></div></div>
+              <div><label>Patient (libellé)</label><input id="epiPatientLabel" placeholder="optionnel" /></div>
+              <div class="actions"><button onclick="declareEpiNotif(this)">Déclarer</button></div>
+            </div></div>
+            <div class="panel"><div class="toolbar"><h3 style="margin:0;flex:1;">Notifications épidémiologiques</h3>
+              <select id="epiStatusFilter" onchange="loadEpiNotifs()"><option value="">Tous</option><option value="to_send">À envoyer</option><option value="sent_to_district">Transmis district</option></select>
+              <button class="ghost" onclick="loadEpiNotifs()">Rafraîchir</button></div>
+              <table id="epiNotifTable"><thead><tr><th>#</th><th>Pathologie</th><th>Quartier</th><th>Statut</th><th></th></tr></thead><tbody><tr><td colspan="5" class="muted">Aucune notification.</td></tr></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <div id="lots" class="view band hidden">
+          <div class="grid2">
+            <div class="panel"><h3>Réceptionner un lot de réactif</h3><div class="form">
+              <div class="grid2"><div><label>Réactif ID</label><input id="lotReagentId" type="number" min="1" /></div><div><label>N° de lot</label><input id="lotNumber" /></div></div>
+              <div class="grid2"><div><label>Péremption</label><input id="lotExpiry" type="date" /></div><div><label>Quantité</label><input id="lotQuantity" type="number" min="0" /></div></div>
+              <div class="actions"><button onclick="addReagentLot(this)">Ajouter le lot</button></div>
+            </div>
+            <div class="form" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+              <strong style="font-size:13px;">Consommation FEFO</strong>
+              <div class="grid2"><div><label>Réactif ID</label><input id="lotConsumeReagent" type="number" min="1" /></div><div><label>Quantité</label><input id="lotConsumeQty" type="number" min="0" /></div></div>
+              <div class="actions"><button class="secondary" onclick="consumeReagentLots(this)">Consommer (péremption la plus proche)</button></div>
+            </div></div>
+            <div class="panel"><div class="toolbar"><h3 style="margin:0;flex:1;">Lots (ordre FEFO)</h3>
+              <input id="lotFilterReagent" type="number" placeholder="Réactif ID" oninput="loadReagentLots()" style="width:120px;" />
+              <button class="ghost" onclick="loadReagentLots()">Rafraîchir</button></div>
+              <table id="reagentLotsTable"><thead><tr><th>Réactif</th><th>Lot</th><th>Péremption</th><th>Qté</th><th>Statut</th></tr></thead><tbody><tr><td colspan="5" class="muted">Aucun lot.</td></tr></tbody></table>
+            </div>
           </div>
         </div>
 
