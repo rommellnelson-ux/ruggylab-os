@@ -617,10 +617,55 @@
       const pre = guide && guide.preanalytics ? guide.preanalytics : {};
       $("tubeGuide").innerHTML = `
         <div class="tube">${security.escapeHtml(pre.container || "Contenant non renseigne")}</div>
-        <div class="order">${security.escapeHtml(pre.bench || guide.label || code)}</div>
+        <div class="order">${security.escapeHtml(pre.bench || guide?.label || code)}</div>
         <div>${security.escapeHtml(pre.collection_condition || "Verifier identite patient et code-barres.")}</div>
         ${pre.transport_delay_minutes ? `<div class="muted">Delai pre-analytique cible : ${security.escapeHtml(String(pre.transport_delay_minutes))} min</div>` : ""}
+        <button class="ghost" type="button" onclick="showExamTechnicalSheet('${encodeURIComponent(code)}')">Fiche technique</button>
       `;
+    }
+    async function showExamTechnicalSheet(encodedCode) {
+      const code = decodeURIComponent(encodedCode || "");
+      const catalog = await loadExamCatalogGuides();
+      const guide = catalog[code] || tubeGuides[code];
+      if (!guide) {
+        showToast("Fiche technique indisponible.", "error");
+        return;
+      }
+      const pre = guide.preanalytics || {};
+      const sheet = guide.technical_sheet || {};
+      const keySteps = Array.isArray(sheet.key_steps) ? sheet.key_steps : [];
+      const qc = Array.isArray(sheet.qc_requirements) ? sheet.qc_requirements : [];
+      const rejects = Array.isArray(sheet.common_rejection_reasons) ? sheet.common_rejection_reasons : [];
+      const modal = document.createElement("div");
+      modal.className = "modal";
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width:720px;">
+          <button class="modal-close" type="button" aria-label="Fermer" onclick="this.closest('.modal').remove()">×</button>
+          <h2>${security.escapeHtml(guide.code || code)} — ${security.escapeHtml(guide.label || "")}</h2>
+          <p class="muted">${security.escapeHtml(sheet.summary || "Procedure a adapter aux modes operatoires locaux valides.")}</p>
+          <div class="grid2">
+            <div>
+              <h3>Pre-analytique</h3>
+              <p><strong>Tube/contenant :</strong> ${security.escapeHtml(pre.container || "Non renseigne")}</p>
+              <p><strong>Paillasse :</strong> ${security.escapeHtml(pre.bench || "Routine")}</p>
+              <p><strong>Consigne :</strong> ${security.escapeHtml(pre.collection_condition || "Verifier identite patient et conformite du prelevement.")}</p>
+              ${pre.patient_instruction ? `<p><strong>Patient :</strong> ${security.escapeHtml(pre.patient_instruction)}</p>` : ""}
+            </div>
+            <div>
+              <h3>Points de controle</h3>
+              <ul>${qc.map((item) => `<li>${security.escapeHtml(item)}</li>`).join("") || "<li>Controle interne selon procedure locale.</li>"}</ul>
+              <h3>Rejeter si</h3>
+              <ul>${rejects.map((item) => `<li>${security.escapeHtml(item)}</li>`).join("") || "<li>Tube non conforme ou identite insuffisante.</li>"}</ul>
+            </div>
+          </div>
+          <h3>Etapes clefs</h3>
+          <ol>${keySteps.map((item) => `<li>${security.escapeHtml(item)}</li>`).join("") || "<li>Verifier le prelevement.</li><li>Controler la serie.</li><li>Valider les alertes.</li>"}</ol>
+        </div>
+      `;
+      modal.onclick = (event) => {
+        if (event.target === modal) modal.remove();
+      };
+      document.body.appendChild(modal);
     }
     function generateBarcode() {
       const patientId = $("samplePatientId").value || "0";
