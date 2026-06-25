@@ -39,7 +39,12 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(150))
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole), default=UserRole.TECHNICIAN, nullable=False
+        # values_callable : stocke les VALEURS du StrEnum (minuscules) et non les
+        # NOMS (majuscules). Sans cela, SQLAlchemy écrirait 'ADMIN', rejeté par le
+        # type PostgreSQL `userrole` (labels minuscules définis par les migrations).
+        Enum(UserRole, name="userrole", values_callable=lambda e: [m.value for m in e]),
+        default=UserRole.TECHNICIAN,
+        nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Unité / service de rattachement (cloisonnement RBAC des dossiers patient).
