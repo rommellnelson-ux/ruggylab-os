@@ -98,9 +98,7 @@ class TestImagingScope:
         assert job.status_code in (200, 202), job.text
         job_id = job.json()["id"]
         tech = _tech(client, admin, unit="hematologie")
-        assert (
-            client.get(f"/api/v1/imaging/malaria/jobs/{job_id}", headers=tech).status_code == 403
-        )
+        assert client.get(f"/api/v1/imaging/malaria/jobs/{job_id}", headers=tech).status_code == 403
         assert (
             client.get(f"/api/v1/imaging/malaria/jobs/{job_id}", headers=admin).status_code == 200
         )
@@ -111,7 +109,5 @@ class TestPoctScope:
         admin = _auth(client)
         barcode = _sample(client, admin, unit="biochimie")
         tech = _tech(client, admin, unit="hematologie")
-        r = client.post(
-            "/api/v1/results/precis-expert", headers=tech, json=_poct_payload(barcode)
-        )
+        r = client.post("/api/v1/results/precis-expert", headers=tech, json=_poct_payload(barcode))
         assert r.status_code == 403

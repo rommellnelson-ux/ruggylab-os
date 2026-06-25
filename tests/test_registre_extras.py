@@ -113,7 +113,9 @@ class TestEpiNotifications:
         ).json()["id"]
         tech = _user(client, admin, "technician")
         assert (
-            client.post(f"/api/v1/epi-notifications/{nid}/transmit", headers=tech, json={}).status_code
+            client.post(
+                f"/api/v1/epi-notifications/{nid}/transmit", headers=tech, json={}
+            ).status_code
             == 403
         )
 
@@ -133,7 +135,12 @@ class TestReagentLotsFefo:
         lot_a = client.post(
             "/api/v1/reagent-lots",
             headers=admin,
-            json={"reagent_id": rid, "lot_number": "A", "expiry_date": "2027-12-31", "quantity": 10},
+            json={
+                "reagent_id": rid,
+                "lot_number": "A",
+                "expiry_date": "2027-12-31",
+                "quantity": 10,
+            },
         ).json()
         lot_b = client.post(
             "/api/v1/reagent-lots",
@@ -145,9 +152,7 @@ class TestReagentLotsFefo:
         )
         lots = {
             lot["lot_number"]: lot
-            for lot in client.get(
-                f"/api/v1/reagent-lots?reagent_id={rid}", headers=admin
-            ).json()
+            for lot in client.get(f"/api/v1/reagent-lots?reagent_id={rid}", headers=admin).json()
         }
         assert lots["B"]["quantity"] == 0  # B (péremption proche) épuisé
         assert lots["B"]["status"] == "exhausted"

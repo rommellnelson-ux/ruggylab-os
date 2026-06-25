@@ -23,7 +23,9 @@ router = APIRouter(prefix="/aes")
 def _get_or_404(db: Session, aes_id: int) -> AesIncident:
     incident = db.query(AesIncident).filter(AesIncident.id == aes_id).first()
     if not incident:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Déclaration AES introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Déclaration AES introuvable."
+        )
     return incident
 
 
@@ -35,7 +37,9 @@ def declare_aes(
 ) -> AesIncident:
     """Déclare un accident d'exposition au sang (tout agent authentifié)."""
     if payload.exposure_type not in EXPOSURE_TYPES:
-        raise HTTPException(status_code=422, detail=f"Type d'exposition invalide : {payload.exposure_type}.")
+        raise HTTPException(
+            status_code=422, detail=f"Type d'exposition invalide : {payload.exposure_type}."
+        )
     incident = AesIncident(
         **payload.model_dump(),
         declared_by_id=current_user.id,
@@ -49,7 +53,10 @@ def declare_aes(
         event_type="aes.declare",
         entity_type="aes_incident",
         entity_id=str(incident.id),
-        payload={"exposure_type": incident.exposure_type, "occurred_at": incident.occurred_at.isoformat()},
+        payload={
+            "exposure_type": incident.exposure_type,
+            "occurred_at": incident.occurred_at.isoformat(),
+        },
     )
     db.commit()
     db.refresh(incident)
