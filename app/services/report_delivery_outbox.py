@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 from app.models import ReportDeliveryOutbox
 from app.utils.datetime_utils import utcnow_naive
 
-
 SUPPORTED_LOCAL_CHANNELS = {"internal"}
 TERMINAL_STATUSES = {"processed", "dead_letter"}
 RETRYABLE_STATUSES = {"pending", "failed"}
