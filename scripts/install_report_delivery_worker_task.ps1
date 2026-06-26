@@ -15,7 +15,8 @@ param(
     [string]$TaskName = "RuggyLab Report Delivery Outbox Worker",
     [int]$IntervalMinutes = 5,
     [int]$Limit = 50,
-    [int]$MaxAttempts = 8
+    [int]$MaxAttempts = 8,
+    [int]$RepetitionDays = 3650
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,7 +38,7 @@ $Action = New-ScheduledTaskAction `
 
 $Trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
     -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes) `
-    -RepetitionDuration ([TimeSpan]::MaxValue)
+    -RepetitionDuration (New-TimeSpan -Days $RepetitionDays)
 
 $Settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
@@ -50,7 +51,9 @@ Register-ScheduledTask `
     -Trigger $Trigger `
     -Settings $Settings `
     -Description "Traite la file outbox de diffusion des comptes-rendus RuggyLab OS." `
-    -Force | Out-Null
+    -Force `
+    -ErrorAction Stop | Out-Null
 
 Write-Host "Tache installee: $TaskName" -ForegroundColor Green
 Write-Host "Frequence: toutes les $IntervalMinutes minutes. Limite par passage: $Limit."
+Write-Host "Duree de repetition: $RepetitionDays jours."
