@@ -1,6 +1,7 @@
 from collections.abc import Generator
+from typing import Any
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -9,7 +10,15 @@ from app.core.config import settings
 
 def _create_engine(database_url: str) -> Engine:
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, future=True, connect_args=connect_args)
+    engine = create_engine(database_url, future=True, connect_args=connect_args)
+    if database_url.startswith("sqlite"):
+
+        @event.listens_for(engine, "connect")
+        def _set_sqlite_pragmas(dbapi_conn: Any, _rec: Any) -> None:
+            dbapi_conn.execute("PRAGMA journal_mode=WAL")
+            dbapi_conn.execute("PRAGMA synchronous=NORMAL")
+
+    return engine
 
 
 engine = _create_engine(settings.DATABASE_URL)

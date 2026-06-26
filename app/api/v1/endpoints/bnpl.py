@@ -17,7 +17,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user
+from app.api.deps import require_finance
 from app.db.session import get_db
 from app.models.bnpl import BNPLSchedule
 from app.models.ruggylab_os import User
@@ -28,6 +28,7 @@ from app.schemas.bnpl import (
     BNPLScheduleOut,
     BNPLSummary,
 )
+from app.services.accounting_service import apply_bnpl_installment_to_invoice
 from app.services.bnpl_tracker import BNPLTracker
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ _tracker = BNPLTracker()
 def create_schedule(
     payload: BNPLScheduleCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_active_user),
+    _current_user: User = Depends(require_finance),
 ) -> BNPLScheduleOut:
     """Crée un plan BNPL avec ses échéances."""
     result = _tracker.create_schedule(db, payload)
@@ -72,7 +73,7 @@ def create_schedule(
 def get_schedule(
     schedule_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_active_user),
+    _current_user: User = Depends(require_finance),
 ) -> BNPLScheduleOut:
     """Récupère un plan BNPL par son identifiant."""
     schedule = db.get(BNPLSchedule, schedule_id)
@@ -94,7 +95,7 @@ def record_payment(
     schedule_id: int,
     payload: BNPLPaymentCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_active_user),
+    _current_user: User = Depends(require_finance),
 ) -> BNPLPaymentOut:
     """Enregistre le paiement d'une échéance BNPL."""
     result = _tracker.record_payment(
@@ -103,6 +104,8 @@ def record_payment(
         payload.installment_number,
         payload.amount_xof,
     )
+    # Cohérence comptable : répercute l'échéance sur la facture liée (le cas échéant).
+    apply_bnpl_installment_to_invoice(db, schedule_id, payload.amount_xof)
     logger.info(
         "bnpl.payment.recorded",
         extra={
@@ -123,7 +126,7 @@ def record_payment(
 def get_summary(
     schedule_id: int,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_active_user),
+    _current_user: User = Depends(require_finance),
 ) -> BNPLSummary:
     """Retourne le résumé financier d'un plan BNPL."""
     return _tracker.get_summary(db, schedule_id)
@@ -137,7 +140,7 @@ def get_summary(
 )
 def get_overdue(
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_active_user),
+    _current_user: User = Depends(require_finance),
 ) -> list[BNPLSummary]:
     """Liste tous les plans BNPL en situation de retard."""
     return _tracker.get_overdue(db)

@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_FULL_NAME: str = "RuggyLab Administrator"
     ENABLE_DH36_LISTENER: bool = True
     TESTING: bool = False
+    # Validation non bloquante par défaut : un effectif réduit ne permet pas une
+    # double validation quotidienne. La publication / le compte-rendu reste
+    # possible sans validation (document « provisoire »), validée a posteriori.
+    # Mettre à True pour imposer la validation avant publication (ISO 15189 strict).
+    REQUIRE_VALIDATION_FOR_RELEASE: bool = False
     DH36_LISTENER_HOST: str = "127.0.0.1"  # Changed from 0.0.0.0 for security
     DH36_LISTENER_PORT: int = 5001
     BASE_DATA_DIR: str = "data"
@@ -115,7 +120,19 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "alertes@ruggylab.local"
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
+    SMTP_STARTTLS: bool = False
     NOTIFICATION_WEBHOOK_TIMEOUT_SECONDS: int = 10
+    REPORT_DELIVERY_OUTPUT_DIR: str = "data/report_delivery/pdf"
+    REPORT_DELIVERY_FHIR_DIR: str = "data/report_delivery/fhir"
+    REPORT_DELIVERY_EMAIL_TO: str | None = None
+
+    # Analyzer middleware ingestion (ASTM/automates -> RuggyLab REST).
+    # ANALYZER_API_KEY must be set before enabling the /analyzer/results endpoint.
+    # ANALYZER_ALLOWED_IPS can stay empty when network controls are handled by firewall/VLAN.
+    ANALYZER_API_KEY: str = ""
+    ANALYZER_ALLOWED_IPS: list[str] = []
+    ANALYZER_HMAC_SECRET: str | None = None
+    ANALYZER_SIGNATURE_MAX_SKEW_SECONDS: int = 300
 
     # Trusted reverse-proxy IPs.
     # X-Forwarded-For is only trusted when the direct client IP is in this list.

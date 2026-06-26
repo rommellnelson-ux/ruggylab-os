@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import User, UserRole
+from app.services.token_revocation import is_access_token_revoked
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_PREFIX}/login/access-token",
@@ -42,6 +43,10 @@ def get_current_user(
             raise credentials_exception
     except InvalidTokenError as exc:
         raise credentials_exception from exc
+
+    # Denylist : jeton d'accès révoqué (déconnexion, compromission) → refus
+    if is_access_token_revoked(payload.get("jti"), db):
+        raise credentials_exception
 
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -82,5 +87,34 @@ def require_admin(current_user: User = Depends(get_current_active_user)) -> User
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acces reserve aux administrateurs.",
+        )
+    return current_user
+
+
+def require_finance(current_user: User = Depends(get_current_active_user)) -> User:
+    """Réserve la comptabilité (facturation/encaissements) au comptable et à l'admin.
+
+    Séparation des tâches : ni le technicien ni l'officier (biologiste) n'ont
+    accès à la facturation ; inversement le comptable n'a pas accès au clinique.
+    """
+    if current_user.role not in {UserRole.ACCOUNTANT, UserRole.ADMIN}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé à la comptabilité (comptable / administrateur).",
+        )
+    return current_user
+
+
+def forbid_accountant(current_user: User = Depends(get_current_active_user)) -> User:
+    """Interdit l'accès aux données cliniques au profil comptable (gestion).
+
+    Séparation des tâches : le comptable est cantonné à la facturation et aux
+    paiements ; il n'a aucun accès aux dossiers patients ni aux résultats, même
+    par appel direct de l'API (le masquage de menu ne suffit pas côté sécurité).
+    """
+    if current_user.role == UserRole.ACCOUNTANT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès clinique réservé au personnel de laboratoire.",
         )
     return current_user

@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RuggyLab OS - Vue Paillasse</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #0f172a;
+      --muted: #54627a;
+      --line: #cbd5e1;
+      --panel: #ffffff;
+      --page: #f4f7fb;
+      --nav: #0b1d31;
+      --danger: #b91c1c;
+      --danger-dark: #7f1d1d;
+      --danger-soft: #fee2e2;
+      --warn: #b45309;
+      --ok: #047857;
+      --blue: #1d4ed8;
+      --row-a: #ffffff;
+      --row-b: #e9f0fb;
+      --row-critical-a: #fff1f2;
+      --row-critical-b: #fee2e2;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    .bench-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .topbar {
+      min-height: 72px;
+      padding: 14px clamp(16px, 3vw, 36px);
+      background: var(--nav);
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      border-bottom: 4px solid #22d3ee;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(1.35rem, 2vw, 2rem);
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: #cbd5e1;
+      font-size: 0.95rem;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      font-weight: 700;
+    }
+
+    .pill {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .danger-banner {
+      display: none;
+      padding: 16px clamp(16px, 3vw, 36px);
+      background: var(--danger);
+      color: white;
+      border-bottom: 4px solid var(--danger-dark);
+    }
+
+    .danger-banner.is-active {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      animation: criticalPulse 1.6s ease-in-out infinite;
+    }
+
+    .danger-banner strong {
+      font-size: clamp(1.1rem, 2vw, 1.55rem);
+    }
+
+    @keyframes criticalPulse {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.14); }
+    }
+
+    .grid {
+      padding: 18px clamp(12px, 2.5vw, 28px) 28px;
+      display: grid;
+      grid-template-columns: minmax(300px, 0.82fr) minmax(480px, 1.18fr);
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-width: 0;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    .panel-head {
+      min-height: 64px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: clamp(1.05rem, 1.5vw, 1.25rem);
+      letter-spacing: 0;
+    }
+
+    .count {
+      min-width: 44px;
+      min-height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: 900;
+      color: white;
+      background: var(--blue);
+    }
+
+    .count.danger { background: var(--danger); }
+    .count.warn { background: var(--warn); }
+
+    .table-wrap {
+      max-height: min(64vh, 720px);
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: fixed;
+      font-size: 0.96rem;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #dbe7f8;
+      color: #1e293b;
+      text-align: left;
+      padding: 12px 16px;
+      border-bottom: 2px solid #94a3b8;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tbody tr {
+      min-height: 68px;
+    }
+
+    tbody tr:nth-child(odd) { background: var(--row-a); }
+    tbody tr:nth-child(even) { background: var(--row-b); }
+    tbody tr.critical:nth-child(odd) { background: var(--row-critical-a); }
+    tbody tr.critical:nth-child(even) { background: var(--row-critical-b); }
+
+    tbody td {
+      padding: 16px;
+      border-bottom: 3px solid #f8fafc;
+      vertical-align: middle;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    tbody tr:hover,
+    tbody tr:focus-within {
+      outline: 3px solid #2563eb;
+      outline-offset: -3px;
+    }
+
+    .main-cell {
+      font-weight: 900;
+      font-size: 1.04rem;
+    }
+
+    .sub {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    .guide {
+      display: block;
+      margin-top: 6px;
+      color: #334155;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .minutes {
+      font-size: 1.45rem;
+      font-weight: 900;
+      color: var(--warn);
+    }
+
+    .action {
+      min-width: 112px;
+      min-height: 48px;
+      border: 2px solid #1d4ed8;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1e3a8a;
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .action:hover,
+    .action:focus-visible {
+      background: #dbeafe;
+      outline: 3px solid #93c5fd;
+      outline-offset: 2px;
+    }
+
+    .empty {
+      padding: 28px 18px;
+      color: var(--muted);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .toast-stack {
+      position: fixed;
+      right: 18px;
+      top: 88px;
+      display: grid;
+      gap: 10px;
+      z-index: 20;
+      width: min(420px, calc(100vw - 36px));
+    }
+
+    .toast {
+      padding: 14px 16px;
+      border-radius: 8px;
+      background: var(--danger);
+      color: white;
+      box-shadow: 0 20px 50px rgba(127, 29, 29, 0.3);
+      border-left: 6px solid var(--danger-dark);
+      font-weight: 800;
+    }
+
+    @media (max-width: 980px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .status-line { justify-content: flex-start; }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .table-wrap { max-height: none; }
+    }
+
+    @media (max-width: 640px) {
+      .panel-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      table { min-width: 680px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bench-shell">
+    <header class="topbar">
+      <div class="brand">
+        <h1>Vue Paillasse</h1>
+        <p>RuggyLab OS - validation rapide des flux critiques et routine</p>
+      </div>
+      <div class="status-line">
+        <span class="pill" id="wsState">WebSocket: attente</span>
+        <span class="pill" id="refreshState">Dernière mise à jour: --</span>
+      </div>
+    </header>
+
+    <section class="danger-banner" id="criticalBanner" aria-live="assertive">
+      <strong id="criticalBannerText">Aucune valeur critique en attente</strong>
+      <span>Priorité absolue avant routine.</span>
+    </section>
+
+    <main class="grid">
+      <section class="stack">
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Valeurs critiques non traitées</h2>
+            <span class="count danger" id="criticalCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 32%;">Échantillon</th>
+                  <th style="width: 28%;">Patient</th>
+                  <th style="width: 24%;">Examen</th>
+                  <th style="width: 16%;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="criticalRows"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>TAT expire dans moins de 15 min</h2>
+            <span class="count warn" id="tatCount">0</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 34%;">Échantillon</th>
+                  <th style="width: 26%;">Patient</th>
+                  <th style="width: 20%;">Examen</th>
+                  <th style="width: 20%;">Reste</th>
+                </tr>
+              </thead>
+              <tbody id="tatRows"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Flux de routine à valider</h2>
+          <span class="count" id="routineCount">0</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 24%;">Échantillon</th>
+                <th style="width: 28%;">Patient</th>
+                <th style="width: 24%;">Examen</th>
+                <th style="width: 24%;">Analyse</th>
+              </tr>
+            </thead>
+            <tbody id="routineRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <script>
+    const API_PREFIX = "/api/v1";
+    const token = safeGet("ruggylab_token");
+    let ws = null;
+    let reconnectAttempt = 0;
+    let reconnectTimer = null;
+
+    function safeGet(key) {
+      try { return localStorage.getItem(key) || ""; } catch { return ""; }
+    }
+
+    function text(value, fallback = "-") {
+      return value === null || value === undefined || value === "" ? fallback : String(value);
+    }
+
+    function esc(value, fallback = "-") {
+      return text(value, fallback).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    function formatTime(value) {
+      if (!value) return "-";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "-";
+      return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function authHeaders() {
+      return { Authorization: `Bearer ${token}` };
+    }
+
+    async function loadBenchRadar() {
+      if (!token) {
+        showAuthRequired();
+        return;
+      }
+      const response = await fetch(`${API_PREFIX}/bench/radar`, { headers: authHeaders() });
+      if (response.status === 401) {
+        showAuthRequired();
+        return;
+      }
+      if (!response.ok) throw new Error(`Chargement impossible (${response.status})`);
+      renderRadar(await response.json());
+    }
+
+    function renderRadar(data) {
+      renderCriticals(data.criticals || []);
+      renderTat(data.tat_expiring || []);
+      renderRoutine(data.routine || []);
+      document.getElementById("refreshState").textContent =
+        `Dernière mise à jour: ${formatTime(data.generated_at)}`;
+    }
+
+    function patientLabel(patient) {
+      if (!patient) return "Patient non rattaché";
+      return patient.display_name || patient.ipp || "Patient non identifié";
+    }
+
+    function sampleCell(sample) {
+      return `<span class="main-cell">${esc(sample && sample.barcode)}</span><span class="sub">ID ${esc(sample && sample.id)}</span>`;
+    }
+
+    function guidanceLine(item) {
+      const pre = item && item.guidance && item.guidance.preanalytics;
+      if (!pre) return "";
+      const parts = [pre.container, pre.collection_condition, pre.bench].filter(Boolean);
+      return parts.length ? `<span class="guide">${esc(parts.join(" · "))}</span>` : "";
+    }
+
+    function renderCriticals(items) {
+      const banner = document.getElementById("criticalBanner");
+      const bannerText = document.getElementById("criticalBannerText");
+      document.getElementById("criticalCount").textContent = items.length;
+      banner.classList.toggle("is-active", items.length > 0);
+      bannerText.textContent = items.length
+        ? `${items.length} valeur(s) critique(s) non traitée(s)`
+        : "Aucune valeur critique en attente";
+      const body = document.getElementById("criticalRows");
+      if (!items.length) {
+        body.innerHTML = `<tr><td colspan="4" class="empty">Aucune valeur critique non traitée.</td></tr>`;
+        return;
+      }
+      body.innerHTML = items.map((item) => `
+        <tr class="critical">
+          <td>${sampleCell(item.sample)}</td>
+          <td><span class="main-cell">${esc(patientLabel(item.patient))}</span><span class="sub">${esc(item.patient && item.patient.ipp)}</span></td>
+          <td><span class="main-cell">${esc(item.exam_code, "Panel")}</span><span class="sub">${esc((item.analytes || []).join(", ") || "Analytes non listés")}</span>${guidanceLine(item)}</td>
+          <td><button class="action" type="button" onclick="openResult(${item.result_id})">Ouvrir</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderTat(items) {
+      document.getElementById("tatCount").textContent = items.length;
+      const body = document.getElementById("tatRows");
+      if (!items.length) {
+        body.innerHTML = `<tr><td colspan="4" class="empty">Aucun TAT à moins de 15 minutes.</td></tr>`;
+        return;
+      }
+      body.innerHTML = items.map((item) => `
+        <tr>
+          <td>${sampleCell(item.sample)}</td>
+          <td><span class="main-cell">${esc(patientLabel(item.patient))}</span><span class="sub">${esc(item.patient && item.patient.ipp)}</span></td>
+          <td><span class="main-cell">${esc(item.exam_code)}</span><span class="sub">Cible ${esc(item.target_minutes)} min</span>${guidanceLine(item)}</td>
+          <td><span class="minutes">${Math.ceil(item.remaining_minutes)} min</span><span class="sub">Échéance ${formatTime(item.due_at)}</span></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderRoutine(items) {
+      document.getElementById("routineCount").textContent = items.length;
+      const body = document.getElementById("routineRows");
+      if (!items.length) {
+        body.innerHTML = `<tr><td colspan="4" class="empty">Aucun résultat de routine en attente de validation.</td></tr>`;
+        return;
+      }
+      body.innerHTML = items.map((item) => `
+        <tr>
+          <td>${sampleCell(item.sample)}</td>
+          <td><span class="main-cell">${esc(patientLabel(item.patient))}</span><span class="sub">${esc(item.patient && item.patient.ipp)}</span></td>
+          <td><span class="main-cell">${esc(item.exam_code, "Panel")}</span><span class="sub">${esc((item.analytes || []).join(", ") || "Analytes non listés")}</span>${guidanceLine(item)}</td>
+          <td><span class="main-cell">${formatTime(item.analysis_date)}</span><span class="sub">Prêt pour revue</span></td>
+        </tr>
+      `).join("");
+    }
+
+    function showAuthRequired() {
+      document.getElementById("wsState").textContent = "WebSocket: connexion requise";
+      for (const id of ["criticalRows", "tatRows", "routineRows"]) {
+        document.getElementById(id).innerHTML =
+          `<tr><td colspan="4" class="empty">Connexion requise depuis le cockpit RuggyLab OS.</td></tr>`;
+      }
+    }
+
+    function openResult(resultId) {
+      window.location.href = `/app#results:${resultId}`;
+    }
+
+    function showToast(message) {
+      const stack = document.getElementById("toastStack");
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = message;
+      stack.appendChild(toast);
+      window.setTimeout(() => toast.remove(), 9000);
+    }
+
+    function connectCriticalWebSocket() {
+      if (!token) return;
+      clearTimeout(reconnectTimer);
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      ws = new WebSocket(`${proto}://${location.host}${API_PREFIX}/notifications/ws`, ["bearer", token]);
+      ws.onopen = () => {
+        reconnectAttempt = 0;
+        document.getElementById("wsState").textContent = "WebSocket: connecté";
+      };
+      ws.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+        if (payload.type === "critical_value_alert") {
+          showToast(payload.message || "Valeur critique techniquement validée.");
+          loadBenchRadar().catch((error) => showToast(error.message));
+          return;
+        }
+        if (payload.generated_at) {
+          loadBenchRadar().catch((error) => showToast(error.message));
+        }
+      };
+      ws.onclose = () => scheduleReconnect();
+      ws.onerror = () => {
+        document.getElementById("wsState").textContent = "WebSocket: instable";
+        try { ws.close(); } catch { /* ignore close race */ }
+      };
+    }
+
+    function scheduleReconnect() {
+      if (!token) return;
+      reconnectAttempt += 1;
+      const delay = Math.min(30000, 1000 * (2 ** Math.min(reconnectAttempt, 5)));
+      document.getElementById("wsState").textContent = `WebSocket: reconnexion ${Math.round(delay / 1000)} s`;
+      clearTimeout(reconnectTimer);
+      reconnectTimer = window.setTimeout(connectCriticalWebSocket, delay);
+    }
+
+    loadBenchRadar().catch((error) => showToast(error.message));
+    connectCriticalWebSocket();
+    window.setInterval(() => loadBenchRadar().catch(() => {}), 60000);
+  </script>
+</body>
+</html>

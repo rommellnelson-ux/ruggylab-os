@@ -1,3 +1,6 @@
+from datetime import UTC, datetime, timedelta
+
+
 def _login(client, username: str, password: str) -> str:
     response = client.post(
         "/api/v1/login/access-token",
@@ -17,12 +20,18 @@ def test_cockpit_ui_is_served(client) -> None:
     response = client.get("/app")
     assert response.status_code == 200
     assert "RuggyLab OS" in response.text
-    assert "/api/v1/login/access-token" in response.text
-    assert "API_PREFIX = \"/api/v1\"" in response.text
-    assert "/stock/notify" in response.text
-    assert "/billing/bnpl/schedule" in response.text
-    assert "/api/v1/prescription/report" in response.text
-    assert "normalizeApiPath" in response.text
+    # Le JS applicatif est désormais externalisé (mise en cache navigateur).
+    assert 'src="/static/js/cockpit.js' in response.text
+
+    # …et servi comme fichier statique avec les mêmes marqueurs qu'auparavant.
+    js = client.get("/static/js/cockpit.js")
+    assert js.status_code == 200
+    assert "/api/v1/login/access-token" in js.text
+    assert 'API_PREFIX = "/api/v1"' in js.text
+    assert "/stock/notify" in js.text
+    assert "/billing/bnpl/schedule" in js.text
+    assert "/api/v1/prescription/report" in js.text
+    assert "normalizeApiPath" in js.text
 
 
 def test_login_with_seeded_admin(client) -> None:
@@ -151,6 +160,401 @@ def test_results_pagination_and_filters(client) -> None:
     assert data["meta"]["total"] == 1
     assert len(data["items"]) == 1
     assert data["items"][0]["is_critical"] is True
+
+
+def test_result_detail_includes_patient_sample_and_bioref(client) -> None:
+    headers = _auth_headers(client)
+
+    patient_response = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-DETAIL-001",
+            "first_name": "Detail",
+            "last_name": "Patient",
+            "birth_date": "1991-02-03",
+            "sex": "F",
+            "rank": "Capitaine",
+        },
+    )
+    assert patient_response.status_code == 201, patient_response.text
+    patient = patient_response.json()
+
+    sample_response = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "DETAIL-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    )
+    assert sample_response.status_code == 201, sample_response.text
+    sample = sample_response.json()
+
+    result_response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"WBC": 5.2},
+            "is_critical": False,
+            "exam_code": "NFS",
+        },
+    )
+    assert result_response.status_code == 201, result_response.text
+    result = result_response.json()
+
+    detail_response = client.get(f"/api/v1/results/{result['id']}/detail", headers=headers)
+    assert detail_response.status_code == 200, detail_response.text
+    detail = detail_response.json()
+    assert detail["result"]["id"] == result["id"]
+    assert detail["sample"]["barcode"] == "DETAIL-SAMPLE-001"
+    assert detail["patient"]["ipp_unique_id"] == "IPP-DETAIL-001"
+    assert detail["bioref"]["exam_code"] == "NFS"
+
+
+def test_results_cockpit_returns_enriched_rows(client) -> None:
+    headers = _auth_headers(client)
+
+    patient_response = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-COCKPIT-001",
+            "first_name": "Cockpit",
+            "last_name": "Patient",
+            "birth_date": "1992-01-02",
+            "sex": "F",
+            "rank": "Major",
+        },
+    )
+    assert patient_response.status_code == 201, patient_response.text
+    patient = patient_response.json()
+
+    sample_response = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "COCKPIT-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    )
+    assert sample_response.status_code == 201, sample_response.text
+    sample = sample_response.json()
+
+    result_response = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"CRP": 7.5},
+            "is_critical": False,
+            "exam_code": "CRP",
+        },
+    )
+    assert result_response.status_code == 201, result_response.text
+    result = result_response.json()
+
+    response = client.get("/api/v1/results/cockpit?limit=20", headers=headers)
+    assert response.status_code == 200, response.text
+    items = response.json()
+    row = next(item for item in items if item["result"]["id"] == result["id"])
+    assert row["sample"]["barcode"] == "COCKPIT-SAMPLE-001"
+    assert row["patient"]["ipp_unique_id"] == "IPP-COCKPIT-001"
+
+
+def test_ack_critical_batch_and_clinical_audit(client) -> None:
+    headers = _auth_headers(client)
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-BATCH-001",
+            "first_name": "Batch",
+            "last_name": "Critical",
+            "birth_date": "1988-03-04",
+            "sex": "M",
+            "rank": "Sergent",
+        },
+    ).json()
+    first_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BATCH-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    second_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BATCH-SAMPLE-002", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    critical = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={"sample_id": first_sample["id"], "data_points": {"K": 7.2}, "is_critical": True},
+    ).json()
+    normal = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={"sample_id": second_sample["id"], "data_points": {"K": 4.2}, "is_critical": False},
+    ).json()
+
+    response = client.patch(
+        "/api/v1/results/ack-critical-batch",
+        headers=headers,
+        json={"result_ids": [critical["id"], normal["id"], 999999]},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["acknowledged"] == [critical["id"]]
+    assert payload["skipped"][str(normal["id"])] == "non critique"
+    assert payload["skipped"]["999999"] == "introuvable"
+
+    detail = client.get(f"/api/v1/results/{critical['id']}", headers=headers).json()
+    assert detail["critical_ack_at"] is not None
+    audit_response = client.get(f"/api/v1/results/{critical['id']}/clinical-audit", headers=headers)
+    assert audit_response.status_code == 200, audit_response.text
+    assert any(event["event_type"] == "result.critical_ack" for event in audit_response.json())
+
+
+def test_critical_compliance_report_and_export(client) -> None:
+    headers = _auth_headers(client)
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-CRIT-COMP-001",
+            "first_name": "Conformite",
+            "last_name": "Critique",
+            "birth_date": "1984-05-06",
+            "sex": "F",
+            "rank": "Commandant",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "CRIT-COMP-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    client.patch(
+        f"/api/v1/patients/{patient['id']}",
+        headers=headers,
+        json={"unit": "Urgences"},
+    )
+    handled_result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"K": 7.1},
+            "is_critical": True,
+            "exam_code": "IONO",
+        },
+    ).json()
+    pending_result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "analysis_date": (datetime.now(UTC) - timedelta(minutes=45)).isoformat(),
+            "data_points": {"CRP": 320},
+            "is_critical": True,
+            "exam_code": "CRP",
+        },
+    ).json()
+
+    ack_response = client.patch(
+        f"/api/v1/results/{handled_result['id']}/ack-critical",
+        headers=headers,
+    )
+    assert ack_response.status_code == 200, ack_response.text
+
+    report_response = client.get(
+        "/api/v1/reports/critical-compliance?days=30&target_minutes=30",
+        headers=headers,
+    )
+    assert report_response.status_code == 200, report_response.text
+    report = report_response.json()
+    assert report["critical_total"] >= 2
+    assert report["critical_handled"] >= 1
+    assert report["critical_pending"] >= 1
+    assert report["target_minutes"] == 30
+    assert report["filters"] == {"exam_code": None, "unit": None}
+    assert report["critical_late"] >= 1
+    assert "on_time_rate_pct" in report
+    assert report["summary"]["top_exams"]
+    assert any(item["label"] == "CRP" for item in report["summary"]["top_exams"])
+    assert any(item["label"] == "Urgences" for item in report["summary"]["by_unit"])
+
+    rows_by_id = {row["result_id"]: row for row in report["rows"]}
+    assert rows_by_id[handled_result["id"]]["status"] == "pris_en_charge"
+    assert rows_by_id[handled_result["id"]]["ack_by"] == "RuggyLab Administrator"
+    assert rows_by_id[handled_result["id"]]["sample_barcode"] == "CRIT-COMP-SAMPLE-001"
+    assert rows_by_id[handled_result["id"]]["patient_ipp"] == "IPP-CRIT-COMP-001"
+    assert rows_by_id[handled_result["id"]]["unit"] == "Urgences"
+    assert rows_by_id[pending_result["id"]]["status"] == "en_attente"
+    assert rows_by_id[pending_result["id"]]["compliance_status"] == "hors_delai"
+
+    filtered_response = client.get(
+        "/api/v1/reports/critical-compliance?days=30&target_minutes=30&exam_code=CRP&unit=Urgences",
+        headers=headers,
+    )
+    assert filtered_response.status_code == 200, filtered_response.text
+    filtered = filtered_response.json()
+    assert filtered["filters"] == {"exam_code": "CRP", "unit": "Urgences"}
+    assert {row["result_id"] for row in filtered["rows"]} == {pending_result["id"]}
+
+    csv_response = client.get(
+        "/api/v1/reports/critical-compliance/export.csv?days=30&target_minutes=30",
+        headers=headers,
+    )
+    assert csv_response.status_code == 200, csv_response.text
+    assert "text/csv" in csv_response.headers["content-type"]
+    assert "result_id,analysis_date,critical_ack_at,ack_delay_minutes" in csv_response.text
+    assert "compliance_status" in csv_response.text
+    assert "RuggyLab Administrator" in csv_response.text
+    assert "Urgences" in csv_response.text
+    assert "CRIT-COMP-SAMPLE-001" in csv_response.text
+
+
+def test_critical_workflow_multi_role_permissions(client) -> None:
+    admin_headers = _auth_headers(client)
+
+    tech_user = client.post(
+        "/api/v1/users",
+        headers=admin_headers,
+        json={
+            "username": "crit_tech",
+            "password": "TechPass123!",
+            "role": "technician",
+            "full_name": "Technicien Critique",
+        },
+    )
+    assert tech_user.status_code == 201, tech_user.text
+    tech_headers = _auth_headers(client, "crit_tech", "TechPass123!")
+
+    patient = client.post(
+        "/api/v1/patients",
+        headers=admin_headers,
+        json={
+            "ipp_unique_id": "IPP-CRIT-ROLE-001",
+            "first_name": "Role",
+            "last_name": "Critique",
+            "birth_date": "1984-05-06",
+            "sex": "F",
+            "rank": "Commandant",
+            "unit": "Biochimie",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=admin_headers,
+        json={"barcode": "CRIT-ROLE-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    critical = client.post(
+        "/api/v1/results",
+        headers=admin_headers,
+        json={
+            "sample_id": sample["id"],
+            "analysis_date": (datetime.now(UTC) - timedelta(minutes=35)).isoformat(),
+            "data_points": {"K": 7.1},
+            "is_critical": True,
+            "exam_code": "IONO",
+        },
+    ).json()
+
+    report_as_tech = client.get(
+        "/api/v1/reports/critical-compliance?days=30&unit=Biochimie",
+        headers=tech_headers,
+    )
+    assert report_as_tech.status_code == 200, report_as_tech.text
+    assert report_as_tech.json()["critical_pending"] >= 1
+
+    ack_as_tech = client.patch(
+        f"/api/v1/results/{critical['id']}/ack-critical",
+        headers=tech_headers,
+    )
+    assert ack_as_tech.status_code == 200, ack_as_tech.text
+
+    report_after_ack = client.get(
+        "/api/v1/reports/critical-compliance?days=30&unit=Biochimie",
+        headers=tech_headers,
+    ).json()
+    row = next(row for row in report_after_ack["rows"] if row["result_id"] == critical["id"])
+    assert row["ack_by"] == "Technicien Critique"
+    assert row["status"] == "pris_en_charge"
+
+    audit_as_tech = client.get("/api/v1/audit-events", headers=tech_headers)
+    assert audit_as_tech.status_code == 403
+    audit_as_admin = client.get(
+        "/api/v1/audit-events?event_type=result.critical_ack",
+        headers=admin_headers,
+    )
+    assert audit_as_admin.status_code == 200
+    assert any(
+        event["entity_id"] == str(critical["id"]) for event in audit_as_admin.json()["items"]
+    )
+
+
+def test_result_history_returns_comparable_patient_results(client) -> None:
+    headers = _auth_headers(client)
+
+    patient_response = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-HISTORY-001",
+            "first_name": "History",
+            "last_name": "Patient",
+            "birth_date": "1987-06-01",
+            "sex": "M",
+            "rank": "Adjudant",
+        },
+    )
+    assert patient_response.status_code == 201, patient_response.text
+    patient = patient_response.json()
+
+    first_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "HISTORY-SAMPLE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    second_sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "HISTORY-SAMPLE-002", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+
+    previous = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": first_sample["id"],
+            "data_points": {"WBC": 5.0, "HGB": 12.0},
+            "is_critical": False,
+            "exam_code": "NFS",
+        },
+    )
+    assert previous.status_code == 201, previous.text
+    current = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": second_sample["id"],
+            "data_points": {"WBC": 8.5, "HGB": 11.0},
+            "is_critical": False,
+            "exam_code": "NFS",
+        },
+    )
+    assert current.status_code == 201, current.text
+    current_result = current.json()
+
+    response = client.get(f"/api/v1/results/{current_result['id']}/history", headers=headers)
+    assert response.status_code == 200, response.text
+    history = response.json()
+    assert history["patient_id"] == patient["id"]
+    assert history["exam_code"] == "NFS"
+    assert len(history["items"]) == 1
+    item = history["items"][0]
+    assert item["sample"]["barcode"] == "HISTORY-SAMPLE-001"
+    assert item["shared_analytes"] == ["HGB", "WBC"]
+    assert item["delta_from_current"]["WBC"] == 3.5
+    assert item["delta_from_current"]["HGB"] == -1.0
 
 
 def test_create_user_requires_admin_token(client) -> None:

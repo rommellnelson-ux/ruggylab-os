@@ -44,6 +44,7 @@ def create_user(
         hashed_password=get_password_hash(payload.password),
         full_name=payload.full_name,
         role=payload.role,
+        unit=payload.unit,
     )
     db.add(user)
     db.flush()
@@ -92,6 +93,9 @@ def update_user(
     if payload.password is not None:
         target.hashed_password = get_password_hash(payload.password)
         changes["password_changed"] = True
+    if payload.unit is not None:
+        target.unit = payload.unit
+        changes["unit"] = payload.unit
 
     log_audit_event(
         db,

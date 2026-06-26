@@ -1,3 +1,7 @@
+from app.db.session import SessionLocal
+from app.models import ReportDeliveryOutbox
+
+
 def _login(client, username: str = "admin", password: str = "change_me_admin_password") -> str:
     response = client.post(
         "/api/v1/login/access-token",
@@ -658,6 +662,42 @@ def test_result_report_pdf_can_be_signed_and_audited(client) -> None:
     assert len(signature["report_hash"]) == 64
     assert len(signature["signature_hash"]) == 64
 
+    snapshots_response = client.get(
+        f"/api/v1/reports/results/{result['id']}/snapshots",
+        headers=headers,
+    )
+    assert snapshots_response.status_code == 200
+    snapshots = snapshots_response.json()
+    assert len(snapshots) == 1
+    assert snapshots[0]["version_number"] == 1
+    assert snapshots[0]["status"] == "final"
+    assert len(snapshots[0]["pdf_sha256"]) == 64
+    assert snapshots[0]["verification_path"].startswith("/api/v1/reports/verify/rs-")
+
+    snapshot_pdf = client.get(
+        f"/api/v1/reports/snapshots/{snapshots[0]['id']}/pdf",
+        headers=headers,
+    )
+    assert snapshot_pdf.status_code == 200
+    assert snapshot_pdf.content.startswith(b"%PDF-1.4")
+
+    verify_token = snapshots[0]["verification_path"].rsplit("/", 1)[-1]
+    verify_response = client.get(f"/api/v1/reports/verify/{verify_token}")
+    assert verify_response.status_code == 200
+    verify_payload = verify_response.json()
+    assert verify_payload["status"] == "valid"
+    assert verify_payload["pdf_sha256"] == snapshots[0]["pdf_sha256"]
+    assert "patient" not in verify_payload
+    assert "data_points" not in verify_payload
+
+    with SessionLocal() as db:
+        outbox_count = (
+            db.query(ReportDeliveryOutbox)
+            .filter(ReportDeliveryOutbox.report_snapshot_id == snapshots[0]["id"])
+            .count()
+        )
+    assert outbox_count == 1
+
     signed_pdf_response = client.get(
         f"/api/v1/reports/results/{result['id']}/pdf",
         headers=headers,
@@ -677,6 +717,108 @@ def test_result_report_pdf_can_be_signed_and_audited(client) -> None:
         event["event_type"] == "report.sign" and event["entity_id"] == str(result["id"])
         for event in audit_response.json()["items"]
     )
+
+
+def test_report_release_blocks_unhandled_critical_value(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-REL-CRIT",
+            "first_name": "Critique",
+            "last_name": "Bloquee",
+            "birth_date": "1988-01-10",
+            "sex": "F",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BAR-REL-CRIT", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={
+            "sample_id": sample["id"],
+            "data_points": {"HGB": {"value": 42, "unit": "g/L", "status": "LL"}},
+            "is_critical": True,
+        },
+    ).json()
+
+    blocked = client.post(
+        f"/api/v1/reports/results/{result['id']}/release",
+        headers=headers,
+        json={"audience": "clinician", "delivery_channels": ["internal"]},
+    )
+    assert blocked.status_code == 409
+    assert "valeur critique" in blocked.json()["detail"].lower()
+
+    ack = client.patch(f"/api/v1/results/{result['id']}/ack-critical", headers=headers)
+    assert ack.status_code == 200
+    released = client.post(
+        f"/api/v1/reports/results/{result['id']}/release",
+        headers=headers,
+        json={"audience": "clinician", "delivery_channels": ["internal", "prescriber"]},
+    )
+    assert released.status_code == 201, released.text
+    assert released.json()["version_number"] == 1
+
+
+def test_corrected_result_can_be_signed_as_new_report_version(client) -> None:
+    headers = _auth_headers(client)
+    patient = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": "IPP-REISSUE-001",
+            "first_name": "Version",
+            "last_name": "Deux",
+            "birth_date": "1988-01-10",
+            "sex": "M",
+        },
+    ).json()
+    sample = client.post(
+        "/api/v1/samples",
+        headers=headers,
+        json={"barcode": "BAR-REISSUE-001", "patient_id": patient["id"], "status": "Recu"},
+    ).json()
+    result = client.post(
+        "/api/v1/results",
+        headers=headers,
+        json={"sample_id": sample["id"], "data_points": {"WBC": 6.1}, "is_critical": False},
+    ).json()
+
+    first_sign = client.post(
+        f"/api/v1/reports/results/{result['id']}/sign",
+        headers=headers,
+        json={"signature_meaning": "Validation initiale."},
+    )
+    assert first_sign.status_code == 201, first_sign.text
+
+    amended = client.patch(
+        f"/api/v1/results/{result['id']}/amend",
+        headers=headers,
+        json={"data_points": {"WBC": 7.2}, "amendment_reason": "Correction apres controle"},
+    )
+    assert amended.status_code == 200, amended.text
+
+    second_sign = client.post(
+        f"/api/v1/reports/results/{result['id']}/sign",
+        headers=headers,
+        json={"signature_meaning": "Validation apres correction."},
+    )
+    assert second_sign.status_code == 201, second_sign.text
+
+    snapshots = client.get(
+        f"/api/v1/reports/results/{result['id']}/snapshots",
+        headers=headers,
+    ).json()
+    assert [snapshot["version_number"] for snapshot in snapshots] == [2, 1]
+    assert snapshots[0]["status"] == "final"
+    assert snapshots[1]["status"] == "corrected"
+    assert snapshots[0]["pdf_sha256"] != snapshots[1]["pdf_sha256"]
 
 
 def test_technician_cannot_sign_result_report(client) -> None:

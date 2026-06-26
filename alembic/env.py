@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
@@ -13,6 +14,13 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Aligne les logs des migrations sur la configuration structurée de l'application
+# (best-effort : ne doit jamais empêcher l'exécution d'une migration).
+with contextlib.suppress(Exception):
+    from app.core.logging_config import configure_logging
+
+    configure_logging(level="INFO", json_logs=False, log_file=None)
 
 target_metadata = Base.metadata
 

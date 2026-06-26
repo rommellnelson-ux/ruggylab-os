@@ -1,3 +1,5 @@
+import datetime as dt
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -7,6 +9,9 @@ class ReagentBase(BaseModel):
     unit: str = "unit"
     current_stock: float = Field(default=0.0, ge=0)
     alert_threshold: float = Field(default=0.0, ge=0)
+    lot_number: str | None = None
+    expiry_date: dt.date | None = None
+    supplier: str | None = None
 
 
 class ReagentCreate(ReagentBase):

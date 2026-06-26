@@ -12,6 +12,22 @@ from app.services.audit import log_audit_event
 router = APIRouter(prefix="/reagents")
 
 
+@router.get("/expiring")
+def list_expiring_reagents(
+    days: int = Query(default=30, ge=0, le=365, description="Fenêtre en jours"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> list[dict]:
+    """Réactifs dont la date d'expiration est dans les ``days`` prochains jours.
+
+    Inclut les réactifs déjà expirés (``days_remaining < 0``).
+    """
+    del current_user
+    from app.services.expiry_notifier import get_expiring_reagents
+
+    return get_expiring_reagents(db, days=days)
+
+
 @router.get("", response_model=ReagentListResponse)
 def list_reagents(
     db: Session = Depends(get_db),

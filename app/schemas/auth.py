@@ -12,4 +12,6 @@ class RefreshRequest(BaseModel):
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: str
+    # Optionnel : un client qui ne conserve que le jeton d'accès peut tout de
+    # même se déconnecter (révocation du jeton d'accès via l'en-tête Authorization).
+    refresh_token: str | None = None

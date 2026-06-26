@@ -11,6 +11,9 @@ class PatientBase(BaseModel):
     birth_date: dt.date
     sex: str | None = Field(default=None, max_length=1)
     rank: str | None = Field(default=None, max_length=50)
+    phone: str | None = Field(default=None, max_length=30)
+    residence_quarter: str | None = Field(default=None, max_length=150)
+    unit: str | None = Field(default=None, max_length=100)
 
     @field_validator("sex")
     @classmethod
@@ -31,6 +34,37 @@ class PatientBase(BaseModel):
 
 class PatientCreate(PatientBase):
     model_config = ConfigDict(extra="forbid")
+
+
+class PatientUpdate(BaseModel):
+    """Mise à jour partielle d'un patient (champs optionnels)."""
+
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, min_length=1, max_length=100)
+    birth_date: dt.date | None = None
+    sex: str | None = Field(default=None, max_length=1)
+    rank: str | None = Field(default=None, max_length=50)
+    phone: str | None = Field(default=None, max_length=30)
+    residence_quarter: str | None = Field(default=None, max_length=150)
+    unit: str | None = Field(default=None, max_length=100)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("sex")
+    @classmethod
+    def normalize_sex(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.upper()
+        if normalized not in {"F", "M"}:
+            raise ValueError("sex must be F or M")
+        return normalized
+
+    @model_validator(mode="after")
+    def reject_future_birth_date(self) -> Self:
+        if self.birth_date is not None and self.birth_date > dt.date.today():
+            raise ValueError("birth_date cannot be in the future")
+        return self
 
 
 class PatientRead(PatientBase):

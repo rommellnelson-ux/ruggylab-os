@@ -7,6 +7,8 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 *.db
+*.db-shm
+*.db-wal
 backups/
 # ML model weights stored at repo root — never commit large binary model files
 /models/

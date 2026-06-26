@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
@@ -22,10 +23,10 @@ def get_password_hash(password: str) -> str:
 def create_access_token(
     subject: str, expires_delta: timedelta | None = None, scopes: list[str] | None = None
 ) -> str:
-    expire = datetime.now(UTC) + (
-        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    to_encode: dict = {"sub": subject, "exp": expire}
+    now = datetime.now(UTC)
+    expire = now + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    # jti : identifiant unique du jeton, permet la révocation (denylist) ; iat : émission.
+    to_encode: dict = {"sub": subject, "exp": expire, "iat": now, "jti": uuid.uuid4().hex}
     if scopes:
         to_encode["scopes"] = scopes
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

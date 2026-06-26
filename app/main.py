@@ -90,6 +90,25 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         )
         logger.info("Periodic refresh-token cleanup task started (every 3600 s).")
 
+    # Fan-out Redis des notifications temps-réel (multi-worker), si configuré.
+    notif_sub_task = None
+    if not settings.TESTING and settings.REDIS_URL:
+        try:
+            from app.services.redis_notification import (
+                enable_redis_fanout,
+                redis_subscriber_loop,
+            )
+            from app.utils.redis_rate_limiter import get_redis_client
+
+            redis_client = get_redis_client()
+            if redis_client is not None:
+                loop = asyncio.get_running_loop()
+                enable_redis_fanout(loop, redis_client)
+                notif_sub_task = asyncio.create_task(redis_subscriber_loop(redis_client))
+                logger.info("Redis notification fan-out enabled.")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Redis notification fan-out not started: %s", exc)
+
     try:
         yield
     finally:
@@ -97,6 +116,11 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
             listener_task.cancel()
         if cleanup_task:
             cleanup_task.cancel()
+        if notif_sub_task:
+            notif_sub_task.cancel()
+        from app.services.redis_notification import disable_redis_fanout
+
+        disable_redis_fanout()
 
 
 def _load_template(name: str) -> str:
@@ -108,6 +132,7 @@ def _load_template(name: str) -> str:
 _TPL_COCKPIT = _load_template("cockpit.html")
 _TPL_COCKPIT_EXPRESS = _load_template("cockpit_express.html")
 _TPL_EHM_MAP = _load_template("ehm_map.html")
+_TPL_BENCH_RADAR = _load_template("bench_radar.html")
 
 
 def create_app() -> FastAPI:
@@ -163,6 +188,10 @@ def create_app() -> FastAPI:
     @fastapi_app.get("/app/express", response_class=HTMLResponse, tags=["ui"])
     async def cockpit_express() -> str:
         return _TPL_COCKPIT_EXPRESS
+
+    @fastapi_app.get("/app/bench", response_class=HTMLResponse, tags=["ui"])
+    async def bench_radar() -> str:
+        return _TPL_BENCH_RADAR
 
     @fastapi_app.get("/app/map", response_class=HTMLResponse, tags=["ui"])
     async def ehm_map() -> str:
