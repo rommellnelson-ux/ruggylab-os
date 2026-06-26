@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-DeliveryChannel = Literal["internal", "patient_portal", "prescriber"]
+DeliveryChannel = Literal["internal", "patient_portal", "prescriber", "filesystem", "fhir", "email"]
 
 
 def _default_delivery_channels() -> list[DeliveryChannel]:

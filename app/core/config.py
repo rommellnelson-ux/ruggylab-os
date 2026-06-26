@@ -120,7 +120,11 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "alertes@ruggylab.local"
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: str | None = None
+    SMTP_STARTTLS: bool = False
     NOTIFICATION_WEBHOOK_TIMEOUT_SECONDS: int = 10
+    REPORT_DELIVERY_OUTPUT_DIR: str = "data/report_delivery/pdf"
+    REPORT_DELIVERY_FHIR_DIR: str = "data/report_delivery/fhir"
+    REPORT_DELIVERY_EMAIL_TO: str | None = None
 
     # Analyzer middleware ingestion (ASTM/automates -> RuggyLab REST).
     # ANALYZER_API_KEY must be set before enabling the /analyzer/results endpoint.
