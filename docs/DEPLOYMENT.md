@@ -65,7 +65,7 @@ UAT_BASE_URL=https://votre-domaine python -m scripts.uat_smoke
 - [ ] Référentiels initialisés : `bioref/seed-defaults`, `tariffs/seed-defaults` (prix ajustés), cibles TAT.
 - [ ] Comptes nominatifs créés par rôle (technician/officer/accountant) ; pas de comptes partagés.
 - [ ] TLS actif devant l'app ; ports internes (5432/6379/9090) non exposés publiquement.
-- [ ] **Sauvegarde testée** : `scripts/backup.ps1` puis **restauration** `scripts/restore.ps1` validée sur une instance jetable (§6).
+- [ ] **Sauvegarde testée** : `scripts/pg_backup.ps1` puis **restauration vérifiée** `scripts/pg_restore_verify.ps1` → verdict `SUCCÈS` sur base scratch (§6).
 - [ ] Supervision : Prometheus/Grafana accessibles, alertes configurées (voir [observability.md](observability.md)).
 - [ ] Audit activé et consultable (rôle admin).
 - [ ] `uat_smoke` → **15/15** contre l'instance de prod (sur données de test, à nettoyer ensuite via `scripts/cleanup_uat_data.py`).
@@ -73,15 +73,23 @@ UAT_BASE_URL=https://votre-domaine python -m scripts.uat_smoke
 
 ## 6. Sauvegarde & restauration
 
+**Production (PostgreSQL)** — `pg_dump` format custom, empreinte SHA-256, rétention,
+marqueur de dernier succès :
+
 ```powershell
-# Sauvegarde (pg_dump) — planifier en tâche récurrente
-./scripts/backup.ps1
-# Restauration sur une instance de validation (jamais la prod en premier)
-./scripts/restore.ps1 -BackupFile <fichier>
+# Sauvegarde PostgreSQL — planifier en tâche récurrente (chiffrement optionnel)
+./scripts/pg_backup.ps1 -RetentionDays 14            # ajouter -Encrypt + $env:BACKUP_PASSPHRASE
+# Restauration VÉRIFIÉE sur base scratch (les 8 étapes du §28 : schéma, head Alembic,
+# comptes, volumes, smoke test) ; la base de production n'est jamais touchée :
+./scripts/pg_restore_verify.ps1 -BackupFile backups/ruggylab_pg-YYYYMMDD-HHMMSS.dump
 ```
 
-Tester la restauration **avant** le go-live : une sauvegarde non restaurée n'est
-pas une sauvegarde.
+Le verdict `SUCCÈS` du rapport (`artifacts/restore-verify-*.txt`) est la **seule**
+preuve qu'une sauvegarde est exploitable : une sauvegarde non restaurée n'est pas
+une sauvegarde. Copier les dumps **hors-site** (disque chiffré / 4G).
+
+> **Développement local (SQLite)** : `scripts/backup.ps1` / `scripts/restore.ps1`
+> font une simple copie du fichier `.db` — réservés au poste de dev, **pas** à la prod.
 
 ## 7. Rollback
 

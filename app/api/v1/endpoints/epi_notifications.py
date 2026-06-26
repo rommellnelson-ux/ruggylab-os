@@ -33,7 +33,9 @@ def declare_notification(
     current_user: User = Depends(get_current_active_user),
 ) -> EpiNotification:
     """Déclare une pathologie à notifier (statut initial : à envoyer)."""
-    notif = EpiNotification(**payload.model_dump(), declared_by_id=current_user.id, status="to_send")
+    notif = EpiNotification(
+        **payload.model_dump(), declared_by_id=current_user.id, status="to_send"
+    )
     db.add(notif)
     db.flush()
     log_audit_event(
@@ -72,7 +74,9 @@ def transmit_to_district(
     """Marque la notification comme transmise au district sanitaire (encadrement)."""
     notif = db.query(EpiNotification).filter(EpiNotification.id == notif_id).first()
     if not notif:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification introuvable.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Notification introuvable."
+        )
     notif.status = "sent_to_district"
     notif.notified_at = utcnow_naive()
     if payload.channel is not None:

@@ -40,17 +40,11 @@ def sample_quality_summary(
     du prélèvement (formation des préleveurs).
     """
     del current_user
-    rows = (
-        db.query(Sample.aspect, func.count(Sample.id))
-        .group_by(Sample.aspect)
-        .all()
-    )
+    rows = db.query(Sample.aspect, func.count(Sample.id)).group_by(Sample.aspect).all()
     by_aspect = {(aspect or "non_renseigne"): count for aspect, count in rows}
     total = sum(by_aspect.values())
     qualified = sum(c for a, c in by_aspect.items() if a not in ("non_renseigne",))
-    non_conforming = sum(
-        c for a, c in by_aspect.items() if a not in ("conforme", "non_renseigne")
-    )
+    non_conforming = sum(c for a, c in by_aspect.items() if a not in ("conforme", "non_renseigne"))
     hemolyzed = by_aspect.get("hemolyse", 0)
 
     def _rate(n: int, d: int) -> float:

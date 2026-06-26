@@ -54,7 +54,11 @@ class TestAesRegister:
         r = client.post(
             "/api/v1/aes",
             headers=admin,
-            json={"occurred_at": "2026-06-23T08:30:00", "exposure_type": "xxx", "circumstances": "x"},
+            json={
+                "occurred_at": "2026-06-23T08:30:00",
+                "exposure_type": "xxx",
+                "circumstances": "x",
+            },
         )
         assert r.status_code == 422
 
@@ -74,7 +78,11 @@ class TestAesRegister:
         r = client.patch(
             f"/api/v1/aes/{aes_id}",
             headers=officer,
-            json={"status": "closed", "source_serology": "VIH négatif", "followup_notes": "Suivi 6 mois RAS"},
+            json={
+                "status": "closed",
+                "source_serology": "VIH négatif",
+                "followup_notes": "Suivi 6 mois RAS",
+            },
         )
         assert r.status_code == 200, r.text
         body = r.json()
