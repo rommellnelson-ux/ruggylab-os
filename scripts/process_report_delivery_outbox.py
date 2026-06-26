@@ -4,7 +4,7 @@ Usage ponctuel:
     python scripts/process_report_delivery_outbox.py
 
 Usage service/tache planifiee:
-    python scripts/process_report_delivery_outbox.py --once --limit 100
+    python scripts/process_report_delivery_outbox.py --limit 100
 """
 
 from __future__ import annotations

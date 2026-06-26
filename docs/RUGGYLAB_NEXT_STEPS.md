@@ -20,8 +20,16 @@ de la version fonctionnelle actuelle a une exploitation terrain plus robuste.
   l'effectif reel: le document sort en statut provisoire.
 - Une valeur critique non prise en charge reste bloquante avant publication.
 - Chaque publication cree un snapshot versionne et une entree outbox.
-- Les canaux externes doivent fournir un dispatcher explicite: aucun envoi email,
-  SMS ou FHIR n'est marque comme reussi sans integration configuree.
+- Canaux actifs:
+  - `internal`: compte-rendu disponible dans RuggyLab;
+  - `patient_portal` / `filesystem`: depot PDF local dans `REPORT_DELIVERY_OUTPUT_DIR`;
+  - `fhir`: export JSON DiagnosticReport dans `REPORT_DELIVERY_FHIR_DIR`;
+  - `email` / `prescriber`: envoi SMTP reel avec PDF joint si destinataire configure.
+- Aucun email n'est marque comme envoye sans destinataire SMTP explicite.
+- Installation Windows du worker:
+  `.\scripts\install_report_delivery_worker_task.ps1`
+- Desinstallation:
+  `.\scripts\uninstall_report_delivery_worker_task.ps1`
 
 ## Paillasse et cockpit
 
