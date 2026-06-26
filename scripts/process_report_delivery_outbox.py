@@ -11,10 +11,16 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import time
+from pathlib import Path
 
-from app.db.session import SessionLocal
-from app.services.report_delivery_outbox import process_report_delivery_outbox
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.db.session import SessionLocal  # noqa: E402
+from app.services.report_delivery_outbox import process_report_delivery_outbox  # noqa: E402
 
 
 logger = logging.getLogger("ruggylab.report_delivery_outbox")
