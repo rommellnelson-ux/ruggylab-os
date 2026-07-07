@@ -164,6 +164,26 @@
     .brand h1 { margin: 0; font-size: 19px; letter-spacing: 0; }
     .brand p { margin: 6px 0 0; color: #a8b7c7; font-size: 12px; }
     .nav { display: grid; gap: 6px; padding-top: 16px; }
+    .nav-mode {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 14px 0 4px;
+    }
+    .nav-mode button {
+      min-height: 34px;
+      padding: 6px 8px;
+      font-size: 12px;
+      text-align: center;
+      color: #dbe7f0;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .nav-mode button.active {
+      color: #fff;
+      background: rgba(37,99,235,0.32);
+      border-color: rgba(147,197,253,0.48);
+    }
     .nav button {
       width: 100%;
       text-align: left;
@@ -320,6 +340,37 @@
       color: #fff;
       background: var(--nav);
       border-color: var(--nav);
+    }
+    .ux-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 0 12px;
+    }
+    .ux-tabs button {
+      color: var(--nav);
+      background: rgba(255,255,255,0.62);
+      border: 1px solid var(--line);
+      min-height: 36px;
+      padding: 7px 11px;
+    }
+    .ux-tabs button.active {
+      color: #fff;
+      background: var(--nav);
+      border-color: var(--nav);
+    }
+    .ux-tab-panel.hidden { display: none !important; }
+    .table-scroll {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .table-scroll table {
+      min-width: 100%;
+    }
+    .table-scroll table.wide-results {
+      min-width: 920px;
     }
     .result-analytes {
       display: flex;
@@ -1039,6 +1090,10 @@
         <p>Centre de Santé de la Garde Républicaine</p>
       </div>
       <nav class="nav" role="navigation" aria-label="Navigation principale">
+        <div class="nav-mode" aria-label="Densité de navigation">
+          <button type="button" id="navModeTechnician" class="active" onclick="setNavMode('technician')">Terrain</button>
+          <button type="button" id="navModeFull" onclick="setNavMode('full')">Tout</button>
+        </div>
         <div class="nav-section">Clinique</div>
         <button class="active" data-view="dashboard" onclick="showView('dashboard')" aria-current="page">🏠 Tableau de bord</button>
         <button data-view="worklist" onclick="showView('worklist')">📌 Ma file</button>
@@ -1286,7 +1341,13 @@
             <div class="result-kpi"><strong id="resultsKpiUnvalidated">—</strong><span>Revues biologiques en attente</span></div>
             <div class="result-kpi"><strong id="resultsKpiLoaded">—</strong><span>Résultats affichables</span></div>
           </div>
-          <div class="grid2">
+          <div class="ux-tabs" role="tablist" aria-label="Sections résultats">
+            <button type="button" class="active" data-ux-tab="results" data-ux-target="entry" onclick="setUxTab('results','entry',this)">Saisie</button>
+            <button type="button" data-ux-tab="results" data-ux-target="list" onclick="setUxTab('results','list',this)">Résultats</button>
+            <button type="button" data-ux-tab="results" data-ux-target="review" onclick="setUxTab('results','review',this)">Revue</button>
+            <button type="button" data-ux-tab="results" data-ux-target="rules" onclick="setUxTab('results','rules',this)">Règles</button>
+          </div>
+          <div class="ux-tab-panel" data-ux-tab-panel="results" data-ux-panel="entry">
             <div class="panel"><h3>Nouveau résultat</h3><div class="form">
               <div><label>Échantillon (code-barres)</label>
                 <input id="resultSampleBarcode" autocomplete="off"
@@ -1306,6 +1367,8 @@
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Créer un résultat validé</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
             </div></div>
+          </div>
+          <div class="ux-tab-panel hidden" data-ux-tab-panel="results" data-ux-panel="list">
             <div class="panel">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                 <div>
@@ -1332,10 +1395,13 @@
                 <button class="ghost" onclick="printDisplayedResults()">PDF</button>
                 <button class="danger" onclick="ackDisplayedCriticals(this)">Prendre en charge affichés</button>
               </div>
-              <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Échantillon</th><th>Analyse</th><th>Critique</th><th>Alertes</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
+              <div class="table-scroll" aria-label="Tableau des résultats, défilement horizontal si nécessaire">
+                <table id="resultsTable" class="compact-mobile-table wide-results"><thead><tr><th>ID</th><th>Échantillon</th><th>Analyse</th><th>Critique</th><th>Alertes</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
+              </div>
             </div>
           </div>
-          <div id="deferredReviewPanel" class="panel" style="margin-top:12px;display:none;">
+          <div class="ux-tab-panel hidden" data-ux-tab-panel="results" data-ux-panel="review">
+          <div id="deferredReviewPanel" class="panel" style="display:none;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
               <div>
                 <h3 style="margin:0;">File de revue biologique différée</h3>
@@ -1400,8 +1466,10 @@
               <div id="resultDetailAudit"></div>
             </div>
           </div>
+          </div>
+          <div class="ux-tab-panel hidden" data-ux-tab-panel="results" data-ux-panel="rules">
           <!-- Panneau seuils critiques (panic values) -->
-          <div class="panel" style="margin-top:12px;">
+          <div class="panel">
             <h3>⚠️ Seuils critiques (panic values)</h3>
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
               Tout résultat dont une valeur dépasse ces seuils est automatiquement marqué <strong>critique</strong>.
@@ -1628,6 +1696,7 @@
               </div>
             </div>
           </div>
+          </div>
         </div>
 
         <div id="machines" class="view band hidden">
@@ -1666,6 +1735,13 @@
         </div>
 
         <div id="stocks" class="view band hidden">
+          <div class="ux-tabs" role="tablist" aria-label="Sections stocks">
+            <button type="button" class="active" data-ux-tab="stocks" data-ux-target="reagents" onclick="setUxTab('stocks','reagents',this)">Réactifs</button>
+            <button type="button" data-ux-tab="stocks" data-ux-target="expiry" onclick="setUxTab('stocks','expiry',this)">Péremptions</button>
+            <button type="button" data-ux-tab="stocks" data-ux-target="import" onclick="setUxTab('stocks','import',this)">Import</button>
+            <button type="button" data-ux-tab="stocks" data-ux-target="cmu" onclick="setUxTab('stocks','cmu',this)">CMU</button>
+          </div>
+          <div class="ux-tab-panel" data-ux-tab-panel="stocks" data-ux-panel="reagents">
           <div class="grid2">
             <div class="panel"><h3>Nouveau reactif</h3><div class="form">
               <div><label>Nom</label><input id="reagentName" /></div>
@@ -1678,10 +1754,12 @@
             <div class="panel">
               <h3>Réactifs</h3>
               <div class="toolbar"><button class="ghost" onclick="loadReagents()">↻ Actualiser</button></div>
-              <table id="reagentsTable" class="compact-mobile-table">
-                <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Lot</th><th>Péremption</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
-                <tbody></tbody>
-              </table>
+              <div class="table-scroll" aria-label="Tableau des réactifs, défilement horizontal si nécessaire">
+                <table id="reagentsTable" class="compact-mobile-table">
+                  <thead><tr><th>ID</th><th>Nom</th><th>Catégorie</th><th>Lot</th><th>Péremption</th><th>Stock</th><th>Seuil</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -1720,9 +1798,11 @@
               </div>
             </div>
           </div>
+          </div>
 
           <!-- Panneau péremptions réactifs -->
-          <div class="panel" style="margin-top:12px;">
+          <div class="ux-tab-panel hidden" data-ux-tab-panel="stocks" data-ux-panel="expiry">
+          <div class="panel">
             <h3>📅 Péremptions réactifs</h3>
             <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">
               Réactifs dont la date de péremption approche ou est dépassée.
@@ -1738,9 +1818,11 @@
               <tbody></tbody>
             </table>
           </div>
+          </div>
 
           <!-- Import en lot de réactifs -->
-          <div class="panel" style="margin-top:12px;">
+          <div class="ux-tab-panel hidden" data-ux-tab-panel="stocks" data-ux-panel="import">
+          <div class="panel">
             <h3>📥 Import en lot — Réactifs (CSV)</h3>
             <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">
               Colonnes : <code>name, category, unit, current_stock, alert_threshold, lot_number, expiry_date, supplier</code>.
@@ -1757,8 +1839,10 @@
             </div>
             <div id="reagentImportReport" style="margin-top:10px;font-size:13px;"></div>
           </div>
+          </div>
 
-          <div class="panel" style="margin-top:12px;">
+          <div class="ux-tab-panel hidden" data-ux-tab-panel="stocks" data-ux-panel="cmu">
+          <div class="panel">
             <h3>Prédiction et notifications CMU</h3>
             <div class="grid2">
               <div class="form">
@@ -1782,6 +1866,7 @@
               </div>
               <pre id="stockPredictionResult" class="result-box">Aucune prédiction lancée.</pre>
             </div>
+          </div>
           </div>
         </div>
 

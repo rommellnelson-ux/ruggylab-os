@@ -28,6 +28,7 @@
     let token = "";
     let currentView = "dashboard";
     let _currentRole = null;
+    let _navMode = storage.getItem("ruggylab_nav_mode") || "technician";
     // Perf single-page : éviter de re-télécharger une vue déjà chargée
     // récemment lors d'une simple navigation. Les mutations rafraîchissent via
     // leurs loaders dédiés (loadSamples/loadResults…) et le bouton ↻ force.
@@ -40,8 +41,9 @@
     const errorHandler = {
       handle: (error, context = '') => {
         console.error(`Error in ${context}:`, error);
-        log(`Erreur: ${error.message || error}`);
-        showToast(`Une erreur est survenue: ${error.message || 'Erreur inconnue'}`, 'error');
+        const message = humanizeApiError(error);
+        log(`Erreur: ${message}`);
+        showToast(message, 'error');
       },
       
       async safeExecute(fn, context = '') {
@@ -286,6 +288,26 @@
         setTimeout(() => toast.remove(), 300);
       }, duration);
     }
+    function humanizeApiError(error, fallback = "Action impossible pour le moment") {
+      const raw = String(error?.message || error || "").trim();
+      const lower = raw.toLowerCase();
+      if (lower.includes("rate limit") || lower.includes("too many") || lower.includes("trop de requ")) {
+        return "Trop de rafraîchissements. Patientez quelques secondes puis réessayez.";
+      }
+      if (lower.includes("unauthorized") || lower.includes("session expir")) {
+        return "Session expirée. Reconnectez-vous pour continuer.";
+      }
+      if (lower.includes("forbidden")) {
+        return "Action réservée à un profil autorisé.";
+      }
+      if (lower.includes("not found")) {
+        return "Élément introuvable ou déjà modifié.";
+      }
+      if (lower.includes("failed to fetch") || lower.includes("network")) {
+        return "Connexion au serveur indisponible. Vérifiez le réseau puis réessayez.";
+      }
+      return raw || fallback;
+    }
     
     // Keyboard shortcuts and accessibility improvements
     const keyboard = {
@@ -357,9 +379,11 @@
         helpBtn.style.cssText = 'width: 32px; height: 32px; padding: 0; font-weight: bold;';
         
         const actions = document.querySelector('.topbar .actions');
-        if (actions) {
+      if (actions) {
           actions.insertBefore(helpBtn, actions.firstChild);
         }
+        helpBtn.setAttribute('aria-label', 'Raccourcis clavier');
+        helpBtn.setAttribute('title', 'Raccourcis clavier (F1)');
       },
       
       showHelp: () => {
@@ -493,7 +517,8 @@
       try { payload = JSON.parse(text); } catch {}
       if (!response.ok) { 
         log(payload); 
-        throw new Error(response.statusText); 
+        const detail = payload?.detail || payload?.message || response.statusText;
+        throw new Error(humanizeApiError(detail, response.statusText || "Erreur serveur")); 
       }
       return payload;
     }
@@ -838,7 +863,26 @@
       const target = "#/" + name;
       if (location.hash !== target) location.hash = target;
       closeSidebar();
+      restoreUxTabs(name);
       refreshCurrent();
+    }
+    const UX_TAB_DEFAULTS = { results: "entry", stocks: "reagents" };
+    function setUxTab(group, target, button = null) {
+      document.querySelectorAll(`[data-ux-tab-panel="${group}"]`).forEach((panel) => {
+        panel.classList.toggle("hidden", panel.dataset.uxPanel !== target);
+      });
+      document.querySelectorAll(`[data-ux-tab="${group}"]`).forEach((tab) => {
+        const active = tab.dataset.uxTarget === target;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      storage.setItem(`ruggylab_${group}_tab`, target);
+      button?.focus?.();
+    }
+    function restoreUxTabs(viewName) {
+      if (!UX_TAB_DEFAULTS[viewName]) return;
+      const target = storage.getItem(`ruggylab_${viewName}_tab`) || UX_TAB_DEFAULTS[viewName];
+      setUxTab(viewName, target);
     }
     // Routage par hash : restaure/navigue la vue depuis l'URL (#/results, #/patients…)
     function _navFromHash() {
@@ -1097,7 +1141,7 @@
         }
         showToast("Tableau de bord actualisé", "success");
       } catch (e) {
-        showToast("Erreur lors du chargement du dashboard", "error");
+        showToast(humanizeApiError(e, "Tableau de bord indisponible. Réessayez dans quelques secondes."), "error");
       } finally {
         if (btn) setLoading(btn, false);
       }
@@ -1120,7 +1164,7 @@
         ));
         setRows("patientsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Chargement impossible pour le moment</td></tr>';
         throw error;
       }
     }
@@ -1274,12 +1318,50 @@
       accountant: ["patients", "samples", "results", "epidemio", "epinotif", "machines", "imaging", "reports", "qc", "tat", "pharmacy", "prescription", "stocks", "lots", "equipments", "ai_training", "registre", "quality", "users", "audit"],
       admin: [],
     };
+    const TERRAIN_NAV_VIEWS = new Set(["dashboard", "worklist", "samples", "results", "stocks", "qc"]);
+    function _isTerrainNavButton(button) {
+      if (!button.dataset.view) return true;
+      if (button.dataset.view === "patients") return _currentRole === "admin" || _currentRole === "officer";
+      return TERRAIN_NAV_VIEWS.has(button.dataset.view);
+    }
+    function _syncNavSections() {
+      document.querySelectorAll(".nav-section").forEach((section) => {
+        let next = section.nextElementSibling;
+        let hasVisible = false;
+        while (next && !next.classList.contains("nav-section")) {
+          if (next.matches?.("button[data-view]") && next.style.display !== "none") {
+            hasVisible = true;
+            break;
+          }
+          next = next.nextElementSibling;
+        }
+        section.style.display = hasVisible ? "" : "none";
+      });
+    }
+    function setNavMode(mode) {
+      _navMode = mode === "full" ? "full" : "technician";
+      storage.setItem("ruggylab_nav_mode", _navMode);
+      document.querySelectorAll(".nav-mode button").forEach((button) => {
+        button.classList.toggle("active", button.id === (_navMode === "full" ? "navModeFull" : "navModeTechnician"));
+      });
+      applyRoleNavigation(_currentRole);
+      const active = document.querySelector(`.nav button[data-view="${currentView}"]`);
+      if (_navMode !== "full" && active && active.style.display === "none") {
+        showView("worklist");
+      }
+    }
     function applyRoleNavigation(role) {
       _currentRole = role;
       const hidden = ROLE_HIDDEN_VIEWS[role] || [];
       document.querySelectorAll('.nav button[data-view]').forEach((b) => {
-        b.style.display = hidden.includes(b.dataset.view) ? "none" : "";
+        const hiddenByRole = hidden.includes(b.dataset.view);
+        const hiddenByMode = _navMode !== "full" && !_isTerrainNavButton(b);
+        b.style.display = hiddenByRole || hiddenByMode ? "none" : "";
       });
+      document.querySelectorAll(".nav-mode button").forEach((button) => {
+        button.classList.toggle("active", button.id === (_navMode === "full" ? "navModeFull" : "navModeTechnician"));
+      });
+      _syncNavSections();
       // Si la vue courante n'est plus autorisée, revenir au tableau de bord
       if (hidden.includes(currentView)) showView("dashboard");
     }
@@ -1946,7 +2028,7 @@
         renderResultsTable();
         await loadDeferredReviewQueue();
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--rose);">Chargement impossible pour le moment</td></tr>';
         throw error;
       }
     }
@@ -2290,6 +2372,7 @@
     }
     async function openResultDetail(resultId) {
       try {
+        setUxTab("results", "review");
         let detail = null;
         try { detail = await api('/api/v1/results/' + resultId + '/detail', { headers: headers(false) }); } catch {}
         const result = detail?.result || await api('/api/v1/results/' + resultId, { headers: headers(false) });
@@ -5571,6 +5654,7 @@ window.onload=renderLabels;
 
     // ── Correction / ré-analyse résultat ─────────────────────────────────────
     function openAmendPanel(resultId, dataPoints) {
+      setUxTab("results", "rules");
       $('amendResultId').value = resultId;
       $('amendResultLabel').textContent = 'Résultat #' + resultId;
       $('amendDataPoints').value = JSON.stringify(dataPoints, null, 2);
