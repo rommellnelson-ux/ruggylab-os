@@ -59,6 +59,11 @@ class TestInterpretValue:
             == "CRITIQUE HAUT"
         )
 
+    def test_critical_boundaries_are_inclusive(self):
+        ref = _ref(lower_limit=13, upper_limit=17, critical_low=7, critical_high=20)
+        assert interpret_value(7, ref) == "CRITIQUE BAS"
+        assert interpret_value(20, ref) == "CRITIQUE HAUT"
+
     def test_qualitatif_valeur_none(self):
         assert interpret_value(None, _ref(normal_text="Négatif")) == "Négatif"
 
@@ -172,6 +177,16 @@ class TestInterpretEndpoint:
             json={"test_code": "HB", "value": 12.4, "sex": "F"},
         )
         assert r.json()["flag"] == "NORMAL"
+
+    def test_missing_sex_does_not_fall_back_to_male_range(self, client):
+        hdrs = _auth(client)
+        client.post("/api/v1/bioref/seed-defaults", headers=hdrs)
+        response = client.post(
+            "/api/v1/bioref/interpret",
+            headers=hdrs,
+            json={"test_code": "HB", "value": 12.4},
+        )
+        assert "error" in response.json()
 
     def test_glycemie_critique(self, client):
         hdrs = _auth(client)

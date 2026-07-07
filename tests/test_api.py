@@ -1,4 +1,7 @@
+import re
 from datetime import UTC, datetime, timedelta
+
+from app.api.v1.endpoints.results import _infer_exam_code
 
 
 def _login(client, username: str, password: str) -> str:
@@ -32,6 +35,8 @@ def test_cockpit_ui_is_served(client) -> None:
     assert "/billing/bnpl/schedule" in js.text
     assert "/api/v1/prescription/report" in js.text
     assert "normalizeApiPath" in js.text
+    assert "validateResultFromDetail" in js.text
+    assert "/review-batch" in js.text
 
 
 def test_login_with_seeded_admin(client) -> None:
@@ -91,6 +96,26 @@ def test_patients_pagination_and_search(client) -> None:
     me = client.get("/api/v1/users/me", headers=headers)
     assert me.status_code == 200
     assert me.json()["username"] == "admin"
+
+
+def test_generate_patient_ipp(client) -> None:
+    headers = _auth_headers(client)
+
+    first = client.get("/api/v1/patients/generate-ipp", headers=headers)
+    second = client.get("/api/v1/patients/generate-ipp", headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_ipp = first.json()["ipp_unique_id"]
+    second_ipp = second.json()["ipp_unique_id"]
+    assert first_ipp.startswith(f"CSA-{datetime.now(UTC):%y%m}-")
+    assert re.fullmatch(r"CSA-\d{4}-[0-9A-F]{10}", first_ipp)
+    assert first_ipp != second_ipp
+
+
+def test_nfs_exam_code_is_inferred_from_panel_analytes() -> None:
+    assert _infer_exam_code({"WBC": 6.1, "RBC": 4.7, "HGB": 8.0, "HCT": 40}) == "NFS"
+    assert _infer_exam_code({"HGB": 8.0}) is None
 
 
 def test_results_pagination_and_filters(client) -> None:
@@ -624,7 +649,7 @@ def test_sensitive_crud_endpoints_require_authentication(client) -> None:
     assert client.get("/api/v1/results").status_code == 401
 
 
-def test_create_result_uses_authenticated_user_for_validation_fields(client) -> None:
+def test_create_result_is_valid_and_enters_deferred_review_queue(client) -> None:
     headers = _auth_headers(client)
 
     patient_response = client.post(
@@ -662,9 +687,29 @@ def test_create_result_uses_authenticated_user_for_validation_fields(client) -> 
     )
     assert response.status_code == 201, response.text
     payload = response.json()
-    # Server sets validator_id from authenticated user, not from client input
     assert payload["validator_id"] == 1
     assert payload["is_validated"] is True
+    assert payload["bio_validated_at"] is not None
+    assert payload["bio_review_status"] == "pending"
+
+    reviewed = client.post(
+        f"/api/v1/results/{payload['id']}/validate",
+        headers=headers,
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    final_payload = reviewed.json()
+    assert final_payload["validator_id"] == 1
+    assert final_payload["is_validated"] is True
+    assert final_payload["bio_validated_at"] is not None
+    assert final_payload["bio_review_status"] == "reviewed"
+    assert final_payload["bio_reviewed_at"] is not None
+    assert final_payload["bio_reviewed_by_id"] == 1
+
+    repeated = client.post(
+        f"/api/v1/results/{payload['id']}/validate",
+        headers=headers,
+    )
+    assert repeated.status_code == 409
 
 
 def test_patient_sample_and_equipment_business_validation(client) -> None:

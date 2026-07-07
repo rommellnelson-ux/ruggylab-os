@@ -13,6 +13,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.models import CriticalRange
+from app.services.units import convert_value
 
 
 def _extract_numeric(v: object) -> float | None:
@@ -46,9 +47,13 @@ def check_critical(data_points: dict, db: Session) -> bool:
         cr = range_map.get(key.upper())
         if cr is None:
             continue
-        if cr.low_critical is not None and value < cr.low_critical:
+        source_unit = raw.get("unit") if isinstance(raw, dict) else None
+        value, compatible = convert_value(value, source_unit, cr.unit)
+        if not compatible:
+            continue
+        if cr.low_critical is not None and value <= cr.low_critical:
             return True
-        if cr.high_critical is not None and value > cr.high_critical:
+        if cr.high_critical is not None and value >= cr.high_critical:
             return True
 
     return False

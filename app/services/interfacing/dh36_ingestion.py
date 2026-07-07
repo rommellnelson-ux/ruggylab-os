@@ -183,6 +183,14 @@ def ingest_dh36_message(
         validator_id=user.id if user else None,
         is_validated=True,
         is_critical=is_panic,
+        exam_code="NFS",
+        registered_at=sample.collection_date or sample.received_date or analysis_date,
+        collected_at=sample.collection_date,
+        received_at=sample.received_date,
+        analysis_finished_at=analysis_date,
+        tech_validated_at=analysis_date,
+        bio_validated_at=analysis_date,
+        bio_review_status="pending",
     )
     sample.status = "Termine"
     db.add(result)

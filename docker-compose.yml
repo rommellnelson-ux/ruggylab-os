@@ -27,7 +27,10 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      # Le reverse proxy TLS local est le seul point d'entrée public.
+      - "127.0.0.1:8000:8000"
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
@@ -39,7 +42,9 @@ services:
       - app_data:/app/data
       - app_models:/app/models
     networks:
-      - ruggylab
+      - frontend
+      - database
+      - monitoring
 
   # ── PostgreSQL 16 ────────────────────────────────────────────────────────────
   postgres:
@@ -58,7 +63,7 @@ services:
       start_period: 20s
       retries: 5
     networks:
-      - ruggylab
+      - database
 
   # ── Redis 7 ─────────────────────────────────────────────────────────────────
   redis:
@@ -74,7 +79,7 @@ services:
       start_period: 10s
       retries: 5
     networks:
-      - ruggylab
+      - database
 
   # ── Prometheus ───────────────────────────────────────────────────────────────
   prometheus:
@@ -82,6 +87,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -89,11 +95,11 @@ services:
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     depends_on:
       - app
     networks:
-      - ruggylab
+      - monitoring
 
   # ── Grafana ──────────────────────────────────────────────────────────────────
   grafana:
@@ -112,7 +118,7 @@ services:
     depends_on:
       - prometheus
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
       interval: 30s
@@ -120,7 +126,7 @@ services:
       start_period: 30s
       retries: 3
     networks:
-      - ruggylab
+      - monitoring
 
   # ── Migrations (run-once, manual) ────────────────────────────────────────────
   migrate:
@@ -139,7 +145,7 @@ services:
     profiles:
       - migrate
     networks:
-      - ruggylab
+      - database
 
 # ── Named volumes ────────────────────────────────────────────────────────────
 volumes:
@@ -152,5 +158,10 @@ volumes:
 
 # ── Network ──────────────────────────────────────────────────────────────────
 networks:
-  ruggylab:
+  frontend:
+    driver: bridge
+  database:
+    driver: bridge
+    internal: true
+  monitoring:
     driver: bridge

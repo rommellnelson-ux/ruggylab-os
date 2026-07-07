@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models import Result, Sample
 from app.models.ruggylab_os import DeltaCheckRule
 from app.services.critical_checker import _extract_numeric
+from app.services.units import convert_value
 from app.utils.datetime_utils import utcnow_naive
 
 
@@ -76,6 +77,13 @@ def check_delta(
         for k, v in data_points.items():
             if k.upper() == analyte:
                 current_value = _extract_numeric(v)
+                source_unit = v.get("unit") if isinstance(v, dict) else None
+                if current_value is not None:
+                    current_value, compatible = convert_value(
+                        current_value, source_unit, rule.unit
+                    )
+                    if not compatible:
+                        current_value = None
                 break
         if current_value is None:
             continue
@@ -90,6 +98,13 @@ def check_delta(
             for k, v in prev.data_points.items():
                 if k.upper() == analyte:
                     prev_value = _extract_numeric(v)
+                    source_unit = v.get("unit") if isinstance(v, dict) else None
+                    if prev_value is not None:
+                        prev_value, compatible = convert_value(
+                            prev_value, source_unit, rule.unit
+                        )
+                        if not compatible:
+                            prev_value = None
                     break
             if prev_value is not None:
                 break

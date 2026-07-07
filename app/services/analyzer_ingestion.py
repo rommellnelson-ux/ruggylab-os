@@ -106,9 +106,15 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
         analysis_finished_at=analysis_date,
         tech_validated_at=now,
         bio_validated_at=now,
+        bio_review_status="pending",
     )
     db.add(result)
     db.flush()
+
+    with contextlib.suppress(Exception):
+        from app.services.code_mapping_service import apply_bioref_to_result
+
+        apply_bioref_to_result(db, result)
 
     try:
         consume_reagents_for_result(db, result=result, user=None, source="analyzer.ingest")
@@ -118,11 +124,6 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
         ) from exc
 
     try_auto_validate(result, db)
-
-    with contextlib.suppress(Exception):
-        from app.services.code_mapping_service import apply_bioref_to_result
-
-        apply_bioref_to_result(db, result)
 
     log_audit_event(
         db,

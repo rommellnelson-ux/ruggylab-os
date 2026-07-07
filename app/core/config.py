@@ -145,6 +145,17 @@ class Settings(BaseSettings):
     ONMCI_API_URL: str | None = None  # None = vérification locale seulement
     ONMCI_TIMEOUT_SECONDS: int = 5
 
+    # CSA PLATEAU — socle d'interopérabilité volontairement inactif.
+    # Aucun échange nominatif n'est réalisé tant qu'un contrat institutionnel,
+    # le mapping d'identité et une recette de sécurité n'ont pas été approuvés.
+    CSA_PLATEAU_ENABLED: bool = False
+    CSA_PLATEAU_PATIENT_EXCHANGE_ENABLED: bool = False
+    CSA_PLATEAU_BASE_URL: str | None = None
+    CSA_PLATEAU_ANON_KEY: str | None = None
+    CSA_PLATEAU_TECHNICAL_EMAIL: str | None = None
+    CSA_PLATEAU_TECHNICAL_PASSWORD: str | None = None
+    CSA_PLATEAU_TIMEOUT_SECONDS: int = 5
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

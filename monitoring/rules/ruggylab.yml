@@ -1,0 +1,40 @@
+groups:
+  - name: ruggylab-availability
+    rules:
+      - alert: RuggyLabAppDown
+        expr: up{job="ruggylab-os"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RuggyLab OS ne répond plus à Prometheus"
+      - alert: RuggyLabHighServerErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total[5m])), 0.001)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Plus de 5 % de réponses HTTP 5xx pendant 10 minutes"
+      - alert: RuggyLabHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latence HTTP p95 supérieure à 2 secondes"
+      - alert: RuggyLabAuthenticationFailures
+        expr: increase(authentication_attempts_total{status="failure"}[10m]) > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Volume anormal d'échecs d'authentification"

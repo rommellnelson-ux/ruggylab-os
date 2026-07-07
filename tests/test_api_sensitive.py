@@ -500,7 +500,7 @@ def test_insufficient_stock_blocks_result_validation(client) -> None:
     assert all(item["sample_id"] != sample["id"] for item in results["items"])
 
 
-def test_dh36_ingestion_creates_validated_result_and_is_idempotent(client) -> None:
+def test_dh36_ingestion_creates_valid_result_and_is_idempotent(client) -> None:
     headers = _auth_headers(client)
     patient = client.post(
         "/api/v1/patients",

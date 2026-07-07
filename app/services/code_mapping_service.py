@@ -19,6 +19,7 @@ from app.services.bioref_service import (
     normalize_sex,
 )
 from app.services.code_mapping_data import CODE_MAPPING_SEED
+from app.services.units import canonical_unit, convert_value
 
 # ── Résolveurs ──────────────────────────────────────────────────────────────
 
@@ -149,13 +150,17 @@ def _to_number(raw: object) -> float | None:
     return None
 
 
-def _find_value(data_points: dict, keys: list[str | None]) -> float | None:
+def _find_measurement(
+    data_points: dict, keys: list[str | None]
+) -> tuple[float | None, str | None]:
     for k in keys:
         if k and k in data_points:
-            v = _to_number(data_points[k])
+            raw = data_points[k]
+            v = _to_number(raw)
             if v is not None:
-                return v
-    return None
+                unit = raw.get("unit") if isinstance(raw, dict) else None
+                return v, unit if isinstance(unit, str) else None
+    return None, None
 
 
 def _qual_token(raw: object) -> str | None:
@@ -217,19 +222,30 @@ def _interpret_one(
     sex: str | None,
     age: float | None,
     qualitative: str | None = None,
+    source_unit: str | None = None,
 ) -> dict | None:
     ref = _find_bioref(db, test_code, sex, age)
     if ref is None:
         return None
     # Valeur numérique → bornes ; sinon résultat qualitatif positif/négatif ;
     # sinon repli sur le texte normal de la référence.
+    converted_value = value
+    unit_compatible = True
+    if value is not None:
+        converted_value, unit_compatible = convert_value(value, source_unit, ref.unit)
     if value is None and qualitative is not None:
         flag = _qualitative_status(qualitative, ref)
+    elif not unit_compatible:
+        flag = "UNITÉ INCOMPATIBLE"
     else:
-        flag = interpret_value(value, ref)
+        flag = interpret_value(converted_value, ref)
     return {
         "test_code": ref.test_code,
-        "value": value,
+        "value": converted_value,
+        "unit": canonical_unit(ref.unit),
+        "source_value": value,
+        "source_unit": canonical_unit(source_unit),
+        "unit_compatible": unit_compatible,
         "bioref_status": flag,
         "bioref_reference_range": format_reference_range(ref),
         "bioref_comment": ref.interpretation,
@@ -256,14 +272,17 @@ def interpret_result_bioref(db: Session, result: Result) -> dict | None:
         components: list[dict] = []
         for comp in get_components(db, mapping.canonical_code):
             comp_keys = [comp.analyte_code, comp.test_code, comp.canonical_code]
-            value = _find_value(dp, comp_keys)
+            value, source_unit = _find_measurement(dp, comp_keys)
             qual = _find_qualitative(dp, comp_keys) if value is None else None
             if value is None and qual is None:
                 continue
-            interp = _interpret_one(db, comp.test_code, value, sex, age, qual)
+            interp = _interpret_one(
+                db, comp.test_code, value, sex, age, qual, source_unit
+            )
             if interp:
                 interp["component"] = comp.label or comp.canonical_code
                 interp["canonical_code"] = comp.canonical_code
+                interp["analyte_code"] = comp.analyte_code or comp.canonical_code
                 components.append(interp)
         return {
             "is_panel": True,
@@ -279,9 +298,13 @@ def interpret_result_bioref(db: Session, result: Result) -> dict | None:
         mapping.test_code,
         mapping.canonical_code,
     ]
-    value = _find_value(dp, simple_keys)
+    value, source_unit = _find_measurement(dp, simple_keys)
     qual = _find_qualitative(dp, simple_keys) if value is None else None
-    interp = _interpret_one(db, mapping.test_code, value, sex, age, qual)
+    interp = _interpret_one(db, mapping.test_code, value, sex, age, qual, source_unit)
+    if interp:
+        interp["component"] = mapping.label or mapping.canonical_code
+        interp["canonical_code"] = mapping.canonical_code
+        interp["analyte_code"] = mapping.analyte_code or mapping.canonical_code
     return {
         "is_panel": False,
         "canonical_code": mapping.canonical_code,
@@ -291,20 +314,58 @@ def interpret_result_bioref(db: Session, result: Result) -> dict | None:
 
 
 def apply_bioref_to_result(db: Session, result: Result) -> bool:
-    """Renseigne les colonnes bioref_* du résultat (test simple uniquement).
+    """Applique l'interprétation canonique au résultat.
 
-    Pour un panel, les colonnes plates restent nulles (le détail par composant
-    est fourni par l'endpoint dédié). Retourne True si un statut a été posé.
+    Le même référentiel pilote désormais les flags d'affichage et la criticité.
+    Le drapeau critique manuel/configurable reste cumulatif : cette fonction ne
+    remet jamais une valeur déjà critique à ``False``.
     """
     outcome = interpret_result_bioref(db, result)
-    if not outcome or outcome["primary"] is None:
+    if not outcome:
         return False
-    p = outcome["primary"]
-    result.bioref_status = p["bioref_status"]
-    result.bioref_comment = p["bioref_comment"]
-    result.bioref_reference_range = p["bioref_reference_range"]
-    result.bioref_source = p["bioref_source"]
-    return True
+    components = [item for item in outcome.get("components", []) if item]
+    primary = outcome.get("primary")
+    if primary:
+        result.bioref_status = primary["bioref_status"]
+        result.bioref_comment = primary["bioref_comment"]
+        result.bioref_reference_range = primary["bioref_reference_range"]
+        result.bioref_source = primary["bioref_source"]
+
+    statuses = {
+        str(item.get("canonical_code") or item.get("test_code")): item["bioref_status"]
+        for item in components
+        if item.get("bioref_status")
+    }
+    if statuses:
+        result.flags = statuses
+    if any(str(status).startswith("CRITIQUE") for status in statuses.values()):
+        result.is_critical = True
+    status_codes = {
+        "NORMAL": "N",
+        "BAS": "L",
+        "HAUT": "H",
+        "CRITIQUE BAS": "LL",
+        "CRITIQUE HAUT": "HH",
+        "NÉGATIF": "N",
+        "POSITIF (ANORMAL)": "H",
+        "UNITÉ INCOMPATIBLE": "U",
+    }
+    enriched_points = dict(result.data_points or {})
+    for item in components:
+        key = item.get("analyte_code") or item.get("canonical_code")
+        if not key or key not in enriched_points:
+            continue
+        raw = enriched_points[key]
+        point = dict(raw) if isinstance(raw, dict) else {"value": raw}
+        item_status = str(item.get("bioref_status") or "")
+        point["status"] = status_codes.get(item_status.upper(), item_status)
+        point["ref_range"] = item.get("bioref_reference_range")
+        point["is_critical"] = item_status.startswith("CRITIQUE")
+        if not point.get("unit") and item.get("unit"):
+            point["unit"] = item["unit"]
+        enriched_points[key] = point
+    result.data_points = enriched_points
+    return bool(primary or components)
 
 
 # ── Seed + orphelins ────────────────────────────────────────────────────────

@@ -10,6 +10,10 @@ unique pour :
   - les listes déroulantes du cockpit
 
 Aucune donnée patient ici : uniquement la nomenclature des examens.
+
+Les fiches techniques embarquées sont des aides de préparation. Elles ne
+deviennent des procédures locales applicables qu'après renseignement de leur
+référence documentaire et validation par le laboratoire.
 """
 
 from __future__ import annotations
@@ -285,6 +289,10 @@ DEFAULT_PREANALYTICS = {
 
 DEFAULT_TECHNICAL_SHEET = {
     "source": "Referentiel interne RuggyLab OS, inspire des manuels techniques de laboratoire.",
+    "validation_status": "needs_local_validation",
+    "local_document_ref": None,
+    "validated_by": None,
+    "validated_at": None,
     "summary": "Procedure a adapter aux reactifs, automates et modes operatoires locaux valides.",
     "key_steps": [
         "Verifier l'identite et la conformite du prelevement.",
@@ -561,6 +569,51 @@ def exam_catalog_entry(code: str | None) -> dict | None:
     if metadata:
         entry.update(metadata)
     return entry
+
+
+def audit_exam_catalog() -> dict:
+    """Mesure la complétude du catalogue sans présumer d'une validation clinique.
+
+    Une fiche n'est considérée comme validée localement que si son statut est
+    explicite et si elle porte une référence documentaire, un valideur et une
+    date. Les brouillons embarqués restent donc visibles sans pouvoir être
+    confondus avec une SOP approuvée.
+    """
+    issues: list[dict[str, str]] = []
+    validated = 0
+    for entry in EXAM_CATALOG:
+        code = entry["code"]
+        sheet = entry.get("technical_sheet") or {}
+        required_text = ("summary", "key_steps", "qc_requirements", "common_rejection_reasons")
+        for field in required_text:
+            if not sheet.get(field):
+                issues.append({"code": code, "field": field, "issue": "missing"})
+
+        if sheet.get("validation_status") == "validated":
+            approval_fields = ("local_document_ref", "validated_by", "validated_at")
+            missing_approval = [field for field in approval_fields if not sheet.get(field)]
+            if missing_approval:
+                for field in missing_approval:
+                    issues.append(
+                        {
+                            "code": code,
+                            "field": field,
+                            "issue": "required_when_validated",
+                        }
+                    )
+            else:
+                validated += 1
+
+    total = len(EXAM_CATALOG)
+    return {
+        "total_exams": total,
+        "workflow_sheets_present": sum(
+            bool(entry.get("technical_sheet")) for entry in EXAM_CATALOG
+        ),
+        "locally_validated": validated,
+        "pending_local_validation": total - validated,
+        "issues": issues,
+    }
 
 
 def _enrich_catalog_entries() -> None:

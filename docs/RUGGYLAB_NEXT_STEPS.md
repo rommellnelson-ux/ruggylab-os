@@ -3,21 +3,46 @@
 Ce document garde une trace simple de ce qui reste a verrouiller pour passer
 de la version fonctionnelle actuelle a une exploitation terrain plus robuste.
 
+## Etat au 28 juin 2026
+
+- Le depot `main` est synchronise et la passe UAT metier ephemere reussit 15/15.
+- Le worker de diffusion dispose d'un precontrole de base, d'un journal
+  persistant et d'un installateur de tache Windows renforce. La tache locale
+  `RuggyLab Report Delivery Outbox Worker` est installee, revient a l'etat
+  `Ready` et son dernier passage controle s'est termine avec le code 0.
+- Les 23 fiches du catalogue sont explicitement marquees
+  `needs_local_validation`. Aucune procedure locale n'est declaree validee sans
+  reference documentaire, validateur et date.
+- Les scripts PostgreSQL valident desormais l'archive et son SHA-256, isolent la
+  base scratch et arretent la restauration a la premiere erreur.
+- Docker Compose cloisonne application, donnees et supervision. Prometheus
+  cible le port metriques reel et charge les regles d'alerte RuggyLab.
+- La validation visuelle Playwright reste a refaire sur cet hote : le paquet
+  Node est present, mais le binaire Chromium Playwright n'y est pas installe.
+
 ## Priorites immediates
 
-1. Pousser les commits locaux et verifier la CI GitHub.
-2. Relancer `.\scripts\validate.ps1` apres chaque lot fonctionnel.
-3. Refaire une passe UAT visuelle sur cockpit, Resultats, Vue Paillasse et Stocks
-   des que Playwright est disponible dans l'environnement local.
-4. Activer `scripts/process_report_delivery_outbox.py` comme tache planifiee ou
-   service Windows pour traiter la diffusion des comptes-rendus.
-5. Completer le catalogue d'examens avec les procedures locales validees par le
-   laboratoire: tube, delai, motif de rejet, controles qualite, paillasse.
+1. Reproduire l'installation validee du worker sur le serveur Windows cible
+   avec un compte de service et superviser son journal.
+2. Faire valider les 23 fiches par le biologiste responsable selon
+   `docs/VALIDATION_CATALOGUE_EXAMENS.md`.
+3. Installer Chromium Playwright sur le poste UAT autorise puis refaire la passe
+   cockpit, Resultats, Vue Paillasse et Stocks.
+4. Executer la sauvegarde/restauration PostgreSQL sur l'infrastructure cible et
+   conserver le verdict ainsi que le hash de l'archive.
+5. Valider sur l'infrastructure cible TLS, pare-feu/VLAN, Alertmanager,
+   gestionnaire de secrets et sauvegarde hors site.
+6. Executer `check_deploy_readiness`, les migrations, la CI et le plan de
+   rollback sur la preproduction avant le go-live.
 
 ## Comptes-rendus
 
-- La validation biologique reste non bloquante par defaut pour tenir compte de
-  l'effectif reel: le document sort en statut provisoire.
+- Selon la politique d'effectif reduit actuelle, les resultats produits selon
+  les procedures et controles techniques en vigueur sortent immediatement en
+  statut valide et peuvent etre remis au patient.
+- La revue biologique est une verification interne differee, sans effet
+  bloquant sur le document patient. Une file priorisee et une action groupee
+  permettent a l'officier ou a l'administrateur de la solder ulterieurement.
 - Une valeur critique non prise en charge reste bloquante avant publication.
 - Chaque publication cree un snapshot versionne et une entree outbox.
 - Canaux actifs:

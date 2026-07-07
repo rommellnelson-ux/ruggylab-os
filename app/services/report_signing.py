@@ -210,6 +210,11 @@ def build_report_snapshot_payload(
             "bio_validated_at": result.bio_validated_at.isoformat()
             if result.bio_validated_at
             else None,
+            "bio_review_status": result.bio_review_status,
+            "bio_reviewed_at": result.bio_reviewed_at.isoformat()
+            if result.bio_reviewed_at
+            else None,
+            "bio_reviewed_by_id": result.bio_reviewed_by_id,
             "rows": _result_lines(result),
             "bioref_status": result.bioref_status,
             "bioref_comment": result.bioref_comment,
@@ -268,9 +273,9 @@ def build_snapshot_pdf_lines(snapshot: ReportSnapshot, verification_url: str) ->
         f"Statut du document: {snapshot.status}",
         "Mention validation: "
         + (
-            "validation biologique complete"
+            "resultat valide selon la procedure en vigueur"
             if result.get("is_validated")
-            else "provisoire - validation biologique a finaliser"
+            else "resultat provisoire"
         ),
         f"Patient: {patient.get('name') or 'N/A'}",
         f"IPP: {patient.get('ipp') or 'N/A'}",
@@ -283,7 +288,13 @@ def build_snapshot_pdf_lines(snapshot: ReportSnapshot, verification_url: str) ->
         f"Automate: {equipment.get('name') or 'N/A'}",
         f"Numero serie: {equipment.get('serial_number') or 'N/A'}",
         f"Date analyse: {result.get('analysis_date') or 'N/A'}",
-        f"Validation biologique: {result.get('bio_validated_at') or 'a finaliser'}",
+        f"Validation operationnelle: {result.get('bio_validated_at') or 'non renseignee'}",
+        "Revue biologique differee: "
+        + (
+            f"effectuee le {result.get('bio_reviewed_at')}"
+            if result.get("bio_review_status") == "reviewed"
+            else "en attente - sans effet bloquant sur ce resultat"
+        ),
         f"Valeur critique: {'oui' if result.get('is_critical') else 'non'}",
         "Prise en charge critique: "
         + (

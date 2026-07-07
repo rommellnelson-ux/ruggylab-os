@@ -39,6 +39,32 @@ docker compose up -d app prometheus grafana  # application + supervision
 
 Sans Docker (Windows) : voir `scripts/install.ps1` et `scripts/start.ps1`.
 
+### Worker de diffusion des comptes-rendus (Windows)
+
+Installer la tâche avec le même compte Windows et le même répertoire `.env` que
+l'application. L'installation vérifie d'abord la connexion à la base et refuse
+d'enregistrer une tâche non fonctionnelle :
+
+```powershell
+.\scripts\install_report_delivery_worker_task.ps1 -RunNow
+Get-ScheduledTaskInfo -TaskName "RuggyLab Report Delivery Outbox Worker"
+Get-Content .\logs\report-delivery-worker.log -Tail 30
+```
+
+Le code `LastTaskResult = 0` et une ligne récente
+`report outbox processed=...` dans le journal confirment le passage. La tâche
+ignore un nouveau lancement si le précédent travaille encore. Pour la retirer :
+
+```powershell
+.\scripts\uninstall_report_delivery_worker_task.ps1
+```
+
+Après déplacement du dépôt, changement de compte de service, de Python ou de
+`.env`, réinstaller la tâche afin d'actualiser ses chemins absolus. Pour un
+serveur où aucun utilisateur ne reste connecté, configurer ensuite la tâche dans
+le Planificateur Windows avec un compte de service autorisé à « ouvrir une
+session en tant que tâche » et l'option d'exécution hors connexion.
+
 ## 4. Vérification de prêt-au-déploiement (automatique)
 
 Sur l'instance cible, **mêmes variables d'environnement que le serveur** :

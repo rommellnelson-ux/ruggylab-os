@@ -1,3 +1,6 @@
+import datetime as dt
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
@@ -13,6 +16,30 @@ from app.services.patient_access import apply_patient_scope, can_access_patient
 from app.services.patient_history import build_patient_fhir_bundle, build_patient_history
 
 router = APIRouter(prefix="/patients")
+
+
+def _generate_ipp(db: Session) -> str:
+    """Génère un IPP CSA lisible sans exposer d'information patient."""
+    prefix = f"CSA-{dt.date.today():%y%m}-"
+    for _ in range(10):
+        candidate = f"{prefix}{secrets.token_hex(5).upper()}"
+        exists = db.query(Patient.id).filter(Patient.ipp_unique_id == candidate).first()
+        if not exists:
+            return candidate
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Impossible de générer un IPP unique. Réessayez.",
+    )
+
+
+@router.get("/generate-ipp")
+def generate_ipp(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict[str, str]:
+    """Propose un identifiant patient interne unique pour la saisie cockpit."""
+    del current_user
+    return {"ipp_unique_id": _generate_ipp(db)}
 
 
 def _get_patient_or_404(db: Session, patient_id: int) -> Patient:

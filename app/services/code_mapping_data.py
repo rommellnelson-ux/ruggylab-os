@@ -62,7 +62,7 @@ CODE_MAPPING_SEED: list[dict] = [
         analyte="ASAT",
         label="ASAT / TGO",
         category="Bilan hépatique",
-        unit="UI/L",
+        unit="[IU]/L",
     ),
     _m(
         "ALAT",
@@ -71,7 +71,7 @@ CODE_MAPPING_SEED: list[dict] = [
         analyte="ALAT",
         label="ALAT / TGP",
         category="Bilan hépatique",
-        unit="UI/L",
+        unit="[IU]/L",
     ),
     _m(
         "UREE",
@@ -238,7 +238,7 @@ CODE_MAPPING_SEED: list[dict] = [
         component_of="NFS",
         label="Leucocytes",
         category="Hématologie",
-        unit="G/L",
+        unit="10*9/L",
     ),
     _m(
         "PLT",
@@ -247,7 +247,7 @@ CODE_MAPPING_SEED: list[dict] = [
         component_of="NFS",
         label="Plaquettes",
         category="Hématologie",
-        unit="G/L",
+        unit="10*9/L",
     ),
     _m(
         "RBC",
@@ -256,7 +256,7 @@ CODE_MAPPING_SEED: list[dict] = [
         component_of="NFS",
         label="Globules rouges",
         category="Hématologie",
-        unit="T/L",
+        unit="10*12/L",
     ),
     _m(
         "MCV",
@@ -392,9 +392,16 @@ CODE_MAPPING_SEED: list[dict] = [
         analyte="ALP",
         label="Phosphatases alcalines",
         category="Bilan hépatique",
-        unit="UI/L",
+        unit="[IU]/L",
     ),
-    _m("GGT", test="GGT", analyte="GGT", label="Gamma-GT", category="Bilan hépatique", unit="UI/L"),
+    _m(
+        "GGT",
+        test="GGT",
+        analyte="GGT",
+        label="Gamma-GT",
+        category="Bilan hépatique",
+        unit="[IU]/L",
+    ),
     _m("BILT", test="BILT", analyte="BILT", label="Bilirubine totale", category="Bilan hépatique"),
     _m("BILD", test="BILD", analyte="BILD", label="Bilirubine directe", category="Bilan hépatique"),
     _m(
@@ -446,7 +453,7 @@ CODE_MAPPING_SEED: list[dict] = [
         analyte="RBC_H",
         label="Globules rouges homme",
         category="Hématologie",
-        unit="T/L",
+        unit="10*12/L",
     ),
     _m(
         "RBC_F",
@@ -454,7 +461,7 @@ CODE_MAPPING_SEED: list[dict] = [
         analyte="RBC_F",
         label="Globules rouges femme",
         category="Hématologie",
-        unit="T/L",
+        unit="10*12/L",
     ),
     _m(
         "URIC_H",

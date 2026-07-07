@@ -114,6 +114,44 @@ class TestResultsUnitScope:
         rid_bio = _make_result(client, admin, unit="biochimie")
         assert client.get(f"/api/v1/results/{rid_bio}/detail", headers=admin).status_code == 200
 
+    def test_technician_cannot_finalize_biological_validation(self, client):
+        admin = _auth(client)
+        rid = _make_result(client, admin, unit="hematologie")
+        tech_hema = _make_tech(client, admin, unit="hematologie")
+        assert client.post(f"/api/v1/results/{rid}/validate", headers=tech_hema).status_code == 403
+        assert client.get("/api/v1/results/review-queue", headers=tech_hema).status_code == 403
+
+    def test_admin_can_review_pending_results_in_batch(self, client):
+        admin = _auth(client)
+        first = _make_result(client, admin, unit="hematologie")
+        second = _make_result(client, admin, unit="biochimie")
+
+        queue = client.get("/api/v1/results/review-queue", headers=admin)
+        assert queue.status_code == 200
+        queued_ids = {item["result"]["id"] for item in queue.json()["items"]}
+        assert {first, second} <= queued_ids
+
+        reviewed = client.post(
+            "/api/v1/results/review-batch",
+            headers=admin,
+            json={"result_ids": [first, second, first, 999999]},
+        )
+        assert reviewed.status_code == 200, reviewed.text
+        assert reviewed.json()["reviewed"] == [first, second]
+        assert reviewed.json()["skipped"]["999999"] == "introuvable"
+
+        remaining = client.get("/api/v1/results/review-queue", headers=admin).json()
+        remaining_ids = {item["result"]["id"] for item in remaining["items"]}
+        assert first not in remaining_ids
+        assert second not in remaining_ids
+
+    def test_unhandled_critical_value_blocks_direct_pdf(self, client):
+        admin = _auth(client)
+        rid = _make_result(client, admin, unit="hematologie", critical=True)
+        assert client.get(f"/api/v1/reports/results/{rid}/pdf", headers=admin).status_code == 409
+        assert client.patch(f"/api/v1/results/{rid}/ack-critical", headers=admin).status_code == 200
+        assert client.get(f"/api/v1/reports/results/{rid}/pdf", headers=admin).status_code == 200
+
     def test_ack_batch_skips_out_of_scope(self, client):
         admin = _auth(client)
         rid_bio = _make_result(client, admin, unit="biochimie", critical=True)

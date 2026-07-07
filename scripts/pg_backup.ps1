@@ -61,6 +61,12 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 if ($Encrypt -and [string]::IsNullOrWhiteSpace($env:BACKUP_PASSPHRASE)) {
     throw "-Encrypt demandé mais \$env:BACKUP_PASSPHRASE est vide."
 }
+if ($RetentionDays -lt 0) {
+    throw "RetentionDays doit être positif ou nul."
+}
+if ($Encrypt -and -not (Get-Command openssl -ErrorAction SilentlyContinue)) {
+    throw "openssl introuvable : requis avec -Encrypt."
+}
 
 New-Item -ItemType Directory -Force -Path "backups" | Out-Null
 $Stamp      = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -76,8 +82,17 @@ $InContainer = "/tmp/$DumpName"
 & docker compose exec -T $ComposeService pg_dump -U $PgUser -d $PgDb -Fc -f $InContainer
 if ($LASTEXITCODE -ne 0) { throw "pg_dump a échoué (code $LASTEXITCODE)." }
 & docker compose cp "${ComposeService}:$InContainer" $DumpPath
-if ($LASTEXITCODE -ne 0) { throw "Copie du dump hors conteneur échouée." }
+if ($LASTEXITCODE -ne 0) {
+    & docker compose exec -T $ComposeService rm -f $InContainer | Out-Null
+    throw "Copie du dump hors conteneur échouée."
+}
+& docker compose exec -T $ComposeService pg_restore --list $InContainer | Out-Null
+$listExitCode = $LASTEXITCODE
 & docker compose exec -T $ComposeService rm -f $InContainer | Out-Null
+if ($listExitCode -ne 0) {
+    Remove-Item $DumpPath -Force -ErrorAction SilentlyContinue
+    throw "Le catalogue du dump est illisible selon pg_restore --list."
+}
 
 $SizeBytes = (Get-Item $DumpPath).Length
 if ($SizeBytes -lt 1024) { throw "Dump suspicieusement petit ($SizeBytes octets) — abandon." }

@@ -53,6 +53,8 @@ from app.schemas.fhir import (
     MedicationDispenseRequest,
     SupplyDeliveryRequest,
 )
+from app.services.exam_catalog import exam_catalog_entry
+from app.services.units import canonical_unit
 
 # ---------------------------------------------------------------------------
 # NFS parameter catalogue
@@ -83,6 +85,14 @@ _NFS_CATALOGUE: dict[str, tuple[str, str, str, str]] = {
     "BASO_pct": ("706-2", "Basophils/100 leukocytes in Blood by Automated count", "%", "%"),
 }
 
+_IONO_CATALOGUE: dict[str, tuple[str, str, str, str]] = {
+    "NA": ("2951-2", "Sodium [Moles/volume] in Serum or Plasma", "mmol/L", "mmol/L"),
+    "K": ("2823-3", "Potassium [Moles/volume] in Serum or Plasma", "mmol/L", "mmol/L"),
+    "CL": ("2075-0", "Chloride [Moles/volume] in Serum or Plasma", "mmol/L", "mmol/L"),
+    "CA": ("17861-6", "Calcium [Mass/volume] in Serum or Plasma", "mmol/L", "mmol/L"),
+    "MG": ("19123-9", "Magnesium [Mass/volume] in Serum or Plasma", "mmol/L", "mmol/L"),
+}
+
 # RuggyLab status → FHIR interpretation code
 _RUGGYLAB_STATUS_TO_FHIR: dict[str, tuple[str, str]] = {
     "NORMAL": ("N", "Normal"),
@@ -90,6 +100,15 @@ _RUGGYLAB_STATUS_TO_FHIR: dict[str, tuple[str, str]] = {
     "HIGH": ("H", "High"),
     "CRITICAL_LOW": ("LL", "Critical low"),
     "CRITICAL_HIGH": ("HH", "Critical high"),
+    "N": ("N", "Normal"),
+    "L": ("L", "Low"),
+    "H": ("H", "High"),
+    "LL": ("LL", "Critical low"),
+    "HH": ("HH", "Critical high"),
+    "BAS": ("L", "Low"),
+    "HAUT": ("H", "High"),
+    "CRITIQUE BAS": ("LL", "Critical low"),
+    "CRITIQUE HAUT": ("HH", "Critical high"),
 }
 
 _INTERP_SYSTEM = "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation"
@@ -110,40 +129,71 @@ _OBS_CATEGORY = FHIRCodeableConcept(
 
 def _build_observation(
     param_key: str,
-    data_point: dict,
+    data_point: dict | int | float | str,
     subject_ref: str,
     effective_dt: str,
+    exam_code: str | None = None,
 ) -> FHIRObservation | None:
     """Return a single FHIR Observation or None if the key is unknown."""
-    entry = _NFS_CATALOGUE.get(param_key)
+    normalized_key = param_key.upper()
+    entry = _NFS_CATALOGUE.get(normalized_key) or _IONO_CATALOGUE.get(normalized_key)
+    code_system = _LOINC_SYSTEM
     if entry is None:
-        return None
+        catalog = exam_catalog_entry(exam_code)
+        if catalog and catalog.get("loinc"):
+            unit = canonical_unit(data_point.get("unit")) if isinstance(data_point, dict) else None
+            entry = (
+                catalog["loinc"],
+                catalog.get("label") or exam_code or param_key,
+                unit or "",
+                unit or "",
+            )
+        elif exam_code:
+            unit = canonical_unit(data_point.get("unit")) if isinstance(data_point, dict) else None
+            entry = (
+                exam_code,
+                (catalog or {}).get("label") or exam_code,
+                unit or "",
+                unit or "",
+            )
+            code_system = "urn:ruggylab:exam-code"
+        else:
+            return None
 
-    loinc_code, display, ucum_code, ucum_label = entry
-    raw_value = data_point.get("value")
-    if raw_value is None:
-        return None
+    loinc_code, display, default_ucum_code, default_ucum_label = entry
+    raw_value = data_point.get("value") if isinstance(data_point, dict) else data_point
+    source_unit = data_point.get("unit") if isinstance(data_point, dict) else None
+    unit = canonical_unit(source_unit) or default_ucum_code
+    status_value = data_point.get("status", "NORMAL") if isinstance(data_point, dict) else "NORMAL"
 
     obs = FHIRObservation(
         id=f"obs-{param_key.lower().replace('_', '-')}",
         status="final",
         category=[_OBS_CATEGORY],
         code=FHIRCodeableConcept(
-            coding=[FHIRCoding(system=_LOINC_SYSTEM, code=loinc_code, display=display)],
+            coding=[FHIRCoding(system=code_system, code=loinc_code, display=display)],
             text=display,
         ),
         subject=FHIRReference(reference=subject_ref),
         effectiveDateTime=effective_dt,
-        valueQuantity=FHIRQuantity(
-            value=float(raw_value),
-            unit=ucum_label,
-            system=_UCUM_SYSTEM,
-            code=ucum_code,
-        ),
     )
+    if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool):
+        quantity_unit = unit or "1"
+        obs.valueQuantity = FHIRQuantity(
+            value=float(raw_value),
+            unit=quantity_unit or default_ucum_label,
+            system=_UCUM_SYSTEM,
+            code=quantity_unit,
+        )
+    elif raw_value is not None:
+        obs.valueString = str(raw_value)
+    else:
+        return None
+    if isinstance(data_point, dict) and data_point.get("ref_range"):
+        obs.referenceRange = [{"text": str(data_point["ref_range"])}]
 
     # Interpretation
-    status_str = str(data_point.get("status", "NORMAL")).upper()
+    status_str = str(status_value).upper()
     fhir_interp = _RUGGYLAB_STATUS_TO_FHIR.get(status_str)
     if fhir_interp:
         obs.interpretation = [
@@ -164,7 +214,7 @@ def _build_observation(
 def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
     """Convert a RuggyLab ``Result`` ORM object to a FHIR R4 DiagnosticReport.
 
-    The report embeds the patient demographics and every recognised CBC
+    The report embeds the patient demographics and every recognised laboratory
     parameter as contained Observation resources.
 
     Args:
@@ -217,10 +267,11 @@ def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
     obs_refs: list[FHIRReference] = []
 
     for param_key, data_point in data_points.items():
-        if not isinstance(data_point, dict):
-            # Some keys (e.g. "overall_flags", "malaria_ai") are not numeric
+        if param_key in {"overall_flags", "calibration", "manual_entry_by", "entry_timestamp"}:
             continue
-        obs = _build_observation(param_key, data_point, patient_ref, effective_dt)
+        obs = _build_observation(
+            param_key, data_point, patient_ref, effective_dt, result.exam_code
+        )
         if obs:
             contained.append(obs)
             obs_refs.append(FHIRReference(reference=f"#{obs.id}"))
@@ -247,6 +298,17 @@ def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
     dr_status = "final" if result.is_validated else "preliminary"
 
     # ---- Assemble the report -------------------------------------------
+    exam = exam_catalog_entry(result.exam_code) or {}
+    report_label = exam.get("label") or result.exam_code or "Résultat de laboratoire"
+    report_loinc = exam.get("loinc")
+    category_name = exam.get("category") or "Laboratory"
+    category_code = (
+        "HM"
+        if category_name in {"Hématologie", "Immuno-hématologie"}
+        else "MB"
+        if category_name in {"Microbiologie", "Parasitologie", "Sérologie"}
+        else "CH"
+    )
     report = FHIRDiagnosticReport(
         id=report_id,
         meta=FHIRMeta(
@@ -257,7 +319,7 @@ def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
             status="generated",
             div=(
                 f"<div xmlns='http://www.w3.org/1999/xhtml'>"
-                f"CBC DiagnosticReport — RuggyLab result #{result.id}"
+                f"{report_label} — RuggyLab result #{result.id}"
                 f"</div>"
             ),
         ),
@@ -269,8 +331,8 @@ def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
                 coding=[
                     FHIRCoding(
                         system=_CATEGORY_SYSTEM,
-                        code="HM",
-                        display="Hematology",
+                        code=category_code,
+                        display=category_name,
                     )
                 ]
             )
@@ -278,12 +340,12 @@ def build_diagnostic_report(result: Result) -> FHIRDiagnosticReport:
         code=FHIRCodeableConcept(
             coding=[
                 FHIRCoding(
-                    system=_LOINC_SYSTEM,
-                    code="58410-2",
-                    display="CBC panel - Blood by Automated count",
+                    system=_LOINC_SYSTEM if report_loinc else "urn:ruggylab:exam-code",
+                    code=report_loinc or result.exam_code or "LAB",
+                    display=report_label,
                 )
             ],
-            text="Numération Formule Sanguine (NFS/CBC)",
+            text=report_label,
         ),
         subject=FHIRReference(reference=patient_ref),
         effectiveDateTime=effective_dt,

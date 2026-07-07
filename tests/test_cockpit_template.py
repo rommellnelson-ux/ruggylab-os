@@ -102,6 +102,9 @@ class TestNewViewsPresent:
             'id="complianceTrendChart"',  # courbe de tendance conformité
             'id="samplePatientSearch"',  # saisie patient par IPP/nom (labo réel)
             'id="resultSampleBarcode"',  # saisie échantillon par code-barres
+            'id="resultPrescriptionHint"',  # formulaire piloté par prescription
+            "/api/v1/results/entry-context/",  # examens prescrits + machines compatibles
+            "function renderPrescribedResultFields",  # champs dynamiques par examen
             'id="sampleAspect"',  # aspect / qualité pré-analytique de l'échantillon
             'id="patientPhone"',  # téléphone patient
             'id="patientQuarter"',  # quartier / résidence (épidémio)

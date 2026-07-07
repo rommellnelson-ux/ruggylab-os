@@ -28,6 +28,7 @@
     let token = "";
     let currentView = "dashboard";
     let _currentRole = null;
+    let _navMode = storage.getItem("ruggylab_nav_mode") || "technician";
     // Perf single-page : éviter de re-télécharger une vue déjà chargée
     // récemment lors d'une simple navigation. Les mutations rafraîchissent via
     // leurs loaders dédiés (loadSamples/loadResults…) et le bouton ↻ force.
@@ -40,8 +41,9 @@
     const errorHandler = {
       handle: (error, context = '') => {
         console.error(`Error in ${context}:`, error);
-        log(`Erreur: ${error.message || error}`);
-        showToast(`Une erreur est survenue: ${error.message || 'Erreur inconnue'}`, 'error');
+        const message = humanizeApiError(error);
+        log(`Erreur: ${message}`);
+        showToast(message, 'error');
       },
       
       async safeExecute(fn, context = '') {
@@ -286,6 +288,26 @@
         setTimeout(() => toast.remove(), 300);
       }, duration);
     }
+    function humanizeApiError(error, fallback = "Action impossible pour le moment") {
+      const raw = String(error?.message || error || "").trim();
+      const lower = raw.toLowerCase();
+      if (lower.includes("rate limit") || lower.includes("too many") || lower.includes("trop de requ")) {
+        return "Trop de rafraîchissements. Patientez quelques secondes puis réessayez.";
+      }
+      if (lower.includes("unauthorized") || lower.includes("session expir")) {
+        return "Session expirée. Reconnectez-vous pour continuer.";
+      }
+      if (lower.includes("forbidden")) {
+        return "Action réservée à un profil autorisé.";
+      }
+      if (lower.includes("not found")) {
+        return "Élément introuvable ou déjà modifié.";
+      }
+      if (lower.includes("failed to fetch") || lower.includes("network")) {
+        return "Connexion au serveur indisponible. Vérifiez le réseau puis réessayez.";
+      }
+      return raw || fallback;
+    }
     
     // Keyboard shortcuts and accessibility improvements
     const keyboard = {
@@ -357,9 +379,11 @@
         helpBtn.style.cssText = 'width: 32px; height: 32px; padding: 0; font-weight: bold;';
         
         const actions = document.querySelector('.topbar .actions');
-        if (actions) {
+      if (actions) {
           actions.insertBefore(helpBtn, actions.firstChild);
         }
+        helpBtn.setAttribute('aria-label', 'Raccourcis clavier');
+        helpBtn.setAttribute('title', 'Raccourcis clavier (F1)');
       },
       
       showHelp: () => {
@@ -450,7 +474,7 @@
     let examCatalogCache = null;
     const resultTemplates = {
       dh36: [
-        ["WBC", "GB", "6.1"], ["RBC", "GR", "4.7"], ["HGB", "Hb g/L", "132"], ["HCT", "Ht %", "40"],
+        ["WBC", "GB G/L", "6.1"], ["RBC", "GR T/L", "4.7"], ["HGB", "Hb g/dL", "13.2"], ["HCT", "Ht %", "40"],
         ["MCV", "VGM fL", "86"], ["MCH", "TCMH pg", "29"], ["MCHC", "CCMH g/L", "330"], ["PLT", "Plaquettes", "250"]
       ],
       precis: [
@@ -493,7 +517,8 @@
       try { payload = JSON.parse(text); } catch {}
       if (!response.ok) { 
         log(payload); 
-        throw new Error(response.statusText); 
+        const detail = payload?.detail || payload?.message || response.statusText;
+        throw new Error(humanizeApiError(detail, response.statusText || "Erreur serveur")); 
       }
       return payload;
     }
@@ -674,7 +699,14 @@
       updateTubeGuide();
     }
     function renderResultTemplate() {
-      const fields = resultTemplates[$("resultTemplate").value] || resultTemplates.manual;
+      if (!$("resultTemplate")) {
+        if ($("dataPoints")) $("dataPoints").innerHTML = "";
+        return;
+      }
+      const template = $("resultTemplate").value;
+      const fields = resultTemplates[template] || resultTemplates.manual;
+      const examByTemplate = { dh36: "NFS", precis: "", urine: "", manual: "" };
+      if ($("resultExamCode")) $("resultExamCode").value = examByTemplate[template] || "";
       const container = $("dataPoints") || $("resultFields");
       if (!container) return;
       container.innerHTML = fields.map(([key, label, value]) => `
@@ -683,6 +715,48 @@
           <input data-result-key="${key}" value="${value}" />
         </div>
       `).join("");
+    }
+
+    let _resultEntryContext = null;
+    function _selectedEntryExam() {
+      const code = $("resultExamCode")?.value || "";
+      return (_resultEntryContext?.exams || []).find((exam) => exam.exam_code === code) || null;
+    }
+    function renderPrescribedResultFields() {
+      const exam = _selectedEntryExam();
+      const container = $("dataPoints");
+      const equipment = $("resultEquipmentId");
+      if (!container || !equipment) return;
+      if (!exam) {
+        container.innerHTML = "";
+        equipment.innerHTML = '<option value="">— Aucun examen sélectionné —</option>';
+        return;
+      }
+      const compatible = new Set(exam.compatible_equipment_ids || []);
+      equipment.innerHTML = '<option value="">— Saisie manuelle tracée —</option>' +
+        (_resultEntryContext?.equipment || [])
+          .filter((item) => compatible.has(item.id))
+          .map((item) => `<option value="${item.id}">${security.escapeHtml(item.name)}${item.type ? " · " + security.escapeHtml(item.type) : ""}</option>`)
+          .join("");
+      container.innerHTML = (exam.fields || []).map((field) => {
+        const unit = field.unit || "";
+        const ref = field.reference_range ? ` · Réf. ${security.escapeHtml(field.reference_range)}` : "";
+        const label = `${security.escapeHtml(field.label || field.key)}${unit ? " (" + security.escapeHtml(unit) + ")" : ""}${ref}`;
+        if (field.kind === "choice" || field.kind === "qualitative") {
+          return `<div><label>${label}</label><select data-result-key="${security.escapeHtml(field.key)}" data-result-unit="${security.escapeHtml(unit)}">` +
+            (field.options || []).map((option) => `<option value="${security.escapeHtml(option)}">${security.escapeHtml(option)}</option>`).join("") +
+            '</select></div>';
+        }
+        if (field.kind === "text") {
+          return `<div><label>${label}</label><input data-result-key="${security.escapeHtml(field.key)}" data-result-unit="${security.escapeHtml(unit)}" type="text" /></div>`;
+        }
+        return `<div><label>${label}</label><input data-result-key="${security.escapeHtml(field.key)}" data-result-unit="${security.escapeHtml(unit)}" type="number" step="any" /></div>`;
+      }).join("");
+      const hint = $("resultPrescriptionHint");
+      if (hint) {
+        const machines = exam.compatible_equipment_ids?.length || 0;
+        hint.textContent = `${exam.exam_code} — ${exam.exam_label} · ${machines} machine(s) compatible(s) configurée(s).`;
+      }
     }
 
     async function login() {
@@ -789,7 +863,26 @@
       const target = "#/" + name;
       if (location.hash !== target) location.hash = target;
       closeSidebar();
+      restoreUxTabs(name);
       refreshCurrent();
+    }
+    const UX_TAB_DEFAULTS = { results: "entry", stocks: "reagents" };
+    function setUxTab(group, target, button = null) {
+      document.querySelectorAll(`[data-ux-tab-panel="${group}"]`).forEach((panel) => {
+        panel.classList.toggle("hidden", panel.dataset.uxPanel !== target);
+      });
+      document.querySelectorAll(`[data-ux-tab="${group}"]`).forEach((tab) => {
+        const active = tab.dataset.uxTarget === target;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      storage.setItem(`ruggylab_${group}_tab`, target);
+      button?.focus?.();
+    }
+    function restoreUxTabs(viewName) {
+      if (!UX_TAB_DEFAULTS[viewName]) return;
+      const target = storage.getItem(`ruggylab_${viewName}_tab`) || UX_TAB_DEFAULTS[viewName];
+      setUxTab(viewName, target);
     }
     // Routage par hash : restaure/navigue la vue depuis l'URL (#/results, #/patients…)
     function _navFromHash() {
@@ -1048,7 +1141,7 @@
         }
         showToast("Tableau de bord actualisé", "success");
       } catch (e) {
-        showToast("Erreur lors du chargement du dashboard", "error");
+        showToast(humanizeApiError(e, "Tableau de bord indisponible. Réessayez dans quelques secondes."), "error");
       } finally {
         if (btn) setLoading(btn, false);
       }
@@ -1071,13 +1164,17 @@
         ));
         setRows("patientsTable", rows);
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--rose);">Chargement impossible pour le moment</td></tr>';
         throw error;
       }
     }
     async function createPatient(btn) {
       return errorHandler.safeExecute(async () => {
         setLoading(btn, true);
+        if (!$("patientIpp").value.trim()) {
+          const generatedIpp = await generatePatientIpp();
+          if (!generatedIpp) throw new Error("Impossible de générer l’IPP patient");
+        }
         
         // Validate all fields
         const fields = {
@@ -1221,12 +1318,50 @@
       accountant: ["patients", "samples", "results", "epidemio", "epinotif", "machines", "imaging", "reports", "qc", "tat", "pharmacy", "prescription", "stocks", "lots", "equipments", "ai_training", "registre", "quality", "users", "audit"],
       admin: [],
     };
+    const TERRAIN_NAV_VIEWS = new Set(["dashboard", "worklist", "samples", "results", "stocks", "qc"]);
+    function _isTerrainNavButton(button) {
+      if (!button.dataset.view) return true;
+      if (button.dataset.view === "patients") return _currentRole === "admin" || _currentRole === "officer";
+      return TERRAIN_NAV_VIEWS.has(button.dataset.view);
+    }
+    function _syncNavSections() {
+      document.querySelectorAll(".nav-section").forEach((section) => {
+        let next = section.nextElementSibling;
+        let hasVisible = false;
+        while (next && !next.classList.contains("nav-section")) {
+          if (next.matches?.("button[data-view]") && next.style.display !== "none") {
+            hasVisible = true;
+            break;
+          }
+          next = next.nextElementSibling;
+        }
+        section.style.display = hasVisible ? "" : "none";
+      });
+    }
+    function setNavMode(mode) {
+      _navMode = mode === "full" ? "full" : "technician";
+      storage.setItem("ruggylab_nav_mode", _navMode);
+      document.querySelectorAll(".nav-mode button").forEach((button) => {
+        button.classList.toggle("active", button.id === (_navMode === "full" ? "navModeFull" : "navModeTechnician"));
+      });
+      applyRoleNavigation(_currentRole);
+      const active = document.querySelector(`.nav button[data-view="${currentView}"]`);
+      if (_navMode !== "full" && active && active.style.display === "none") {
+        showView("worklist");
+      }
+    }
     function applyRoleNavigation(role) {
       _currentRole = role;
       const hidden = ROLE_HIDDEN_VIEWS[role] || [];
       document.querySelectorAll('.nav button[data-view]').forEach((b) => {
-        b.style.display = hidden.includes(b.dataset.view) ? "none" : "";
+        const hiddenByRole = hidden.includes(b.dataset.view);
+        const hiddenByMode = _navMode !== "full" && !_isTerrainNavButton(b);
+        b.style.display = hiddenByRole || hiddenByMode ? "none" : "";
       });
+      document.querySelectorAll(".nav-mode button").forEach((button) => {
+        button.classList.toggle("active", button.id === (_navMode === "full" ? "navModeFull" : "navModeTechnician"));
+      });
+      _syncNavSections();
       // Si la vue courante n'est plus autorisée, revenir au tableau de bord
       if (hidden.includes(currentView)) showView("dashboard");
     }
@@ -1272,7 +1407,18 @@
         const s = await api(`/api/v1/samples/by-barcode/${encodeURIComponent(barcode)}`, { headers: headers(false) });
         $("resultSampleId").value = s.id;
         $("resultSampleSelected").textContent = `✓ Échantillon #${s.id} (${security.escapeHtml(barcode)})`;
+        _resultEntryContext = await api(`/api/v1/results/entry-context/${s.id}`, { headers: headers(false) });
+        const exams = _resultEntryContext.exams || [];
+        const examSelect = $("resultExamCode");
+        examSelect.innerHTML = exams.length
+          ? exams.map((exam) => `<option value="${security.escapeHtml(exam.exam_code)}">${security.escapeHtml(exam.exam_code)} — ${security.escapeHtml(exam.exam_label)}</option>`).join("")
+          : '<option value="">Aucun examen prescrit en attente</option>';
+        renderPrescribedResultFields();
+        if (!exams.length) {
+          $("resultPrescriptionHint").textContent = "Aucun examen en attente : vérifiez que la prescription est rattachée à cet échantillon.";
+        }
       } catch {
+        _resultEntryContext = null;
         $("resultSampleId").value = "";
         $("resultSampleSelected").textContent = "✗ Code-barres introuvable";
         showToast("Code-barres échantillon introuvable", "error");
@@ -1723,7 +1869,7 @@
     function _resultMatchesFilter(r) {
       if (_resultFilter === "pending") return r.is_critical && !r.critical_ack_at;
       if (_resultFilter === "critical") return r.is_critical;
-      if (_resultFilter === "unvalidated") return !r.is_validated;
+      if (_resultFilter === "unvalidated") return r.bio_review_status === "pending";
       if (_resultFilter === "auto") return r.is_auto_validated;
       return true;
     }
@@ -1801,7 +1947,7 @@
       _resultsViewCache = rowsData;
       const pendingCount = _resultsCache.filter((r) => r.is_critical && !r.critical_ack_at).length;
       const criticalCount = _resultsCache.filter((r) => r.is_critical).length;
-      const unvalidatedCount = _resultsCache.filter((r) => !r.is_validated).length;
+      const unvalidatedCount = _resultsCache.filter((r) => r.bio_review_status === "pending").length;
       if ($("resultsKpiPending")) $("resultsKpiPending").textContent = pendingCount;
       if ($("resultsKpiCritical")) $("resultsKpiCritical").textContent = criticalCount;
       if ($("resultsKpiUnvalidated")) $("resultsKpiUnvalidated").textContent = unvalidatedCount;
@@ -1880,9 +2026,90 @@
           if (item.patient) _resultPatientById[item.patient.id] = item.patient;
         });
         renderResultsTable();
+        await loadDeferredReviewQueue();
       } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--rose);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--rose);">Chargement impossible pour le moment</td></tr>';
         throw error;
+      }
+    }
+
+    async function generatePatientIpp(btn) {
+      if (btn) setLoading(btn, true);
+      try {
+        const generated = await api("/api/v1/patients/generate-ipp", { headers: headers(false) });
+        $("patientIpp").value = generated.ipp_unique_id;
+        $("patientIpp").classList.remove("error-input");
+        return generated.ipp_unique_id;
+      } catch {
+        showToast("Impossible de générer l’IPP", "error");
+        return null;
+      } finally {
+        if (btn) setLoading(btn, false);
+      }
+    }
+    async function loadDeferredReviewQueue() {
+      const panel = $('deferredReviewPanel');
+      if (!panel) return;
+      if (!(_currentRole === 'officer' || _currentRole === 'admin')) {
+        panel.style.display = 'none';
+        return;
+      }
+      panel.style.display = '';
+      const tbody = $('deferredReviewTable').querySelector('tbody');
+      try {
+        const data = await api('/api/v1/results/review-queue?limit=100', {
+          headers: headers(false),
+        });
+        $('deferredReviewHint').textContent =
+          `${data.total} résultat(s) valide(s) restant à revoir en interne.`;
+        const rows = (data.items || []).map((item) => {
+          const result = item.result;
+          const patient = item.patient || {};
+          const patientName = [patient.first_name, patient.last_name].filter(Boolean).join(' ');
+          const priority = result.is_critical
+            ? '<span class="pill bad">Critique</span>'
+            : '<span class="pill ok">Routine</span>';
+          return row(
+            `<td><input class="deferred-review-check" type="checkbox" value="${result.id}" /></td>` +
+            `<td><strong>#${result.id}</strong></td>` +
+            `<td>${security.escapeHtml(patientName || '—')}</td>` +
+            `<td>${security.escapeHtml(result.exam_code || '—')}</td>` +
+            `<td>${security.escapeHtml(String(item.waiting_hours))} h</td>` +
+            `<td>${priority}</td>`
+          );
+        });
+        setRows('deferredReviewTable', rows);
+        $('deferredReviewSelectAll').checked = false;
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">File indisponible.</td></tr>';
+      }
+    }
+    function toggleDeferredReviewSelection(checked) {
+      document.querySelectorAll('.deferred-review-check').forEach((box) => {
+        box.checked = checked;
+      });
+    }
+    async function reviewSelectedResults(btn) {
+      const resultIds = Array.from(
+        document.querySelectorAll('.deferred-review-check:checked')
+      ).map((box) => Number(box.value));
+      if (!resultIds.length) {
+        showToast('Sélectionnez au moins un résultat', 'error');
+        return;
+      }
+      setLoading(btn, true);
+      try {
+        const response = await api('/api/v1/results/review-batch', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ result_ids: resultIds }),
+        });
+        showToast(`${response.reviewed.length} résultat(s) marqué(s) comme revu(s)`, 'success');
+        await loadResults();
+      } catch (e) {
+        showToast(e.message || 'Revue groupée impossible', 'error');
+      } finally {
+        setLoading(btn, false);
       }
     }
     function _csvCell(value) {
@@ -2021,7 +2248,7 @@
         const valueText = _resultValuePreview(raw);
         const status = raw && typeof raw === "object" && raw.status ? String(raw.status) : "";
         const isCritical = Boolean(raw && typeof raw === "object" && raw.is_critical);
-        const unit = "";
+        const unit = raw && typeof raw === "object" && raw.unit ? " " + String(raw.unit) : "";
         const badge = isCritical
           ? '<span class="pill bad">Critique</span>'
           : status && status !== "N"
@@ -2145,6 +2372,7 @@
     }
     async function openResultDetail(resultId) {
       try {
+        setUxTab("results", "review");
         let detail = null;
         try { detail = await api('/api/v1/results/' + resultId + '/detail', { headers: headers(false) }); } catch {}
         const result = detail?.result || await api('/api/v1/results/' + resultId, { headers: headers(false) });
@@ -2172,7 +2400,10 @@
             : _resultStatusBadge('À prendre en charge')
           : '<span class="pill ok">Non critique</span>';
         $('resultDetailValidation').innerHTML = result.is_validated
-          ? '<span class="pill ok">Validé</span>'
+          ? '<span class="pill ok">Validé</span>' +
+            (result.bio_review_status === 'pending'
+              ? ' <span class="pill" style="background:var(--amber);color:#fff;">Revue interne en attente</span>'
+              : ' <span class="pill ok">Revu</span>')
           : '<span class="pill" style="background:var(--amber);color:#fff;">Non validé</span>';
         $('resultDetailValues').innerHTML = _resultValueDetailRows(result.data_points || {});
         $('resultDetailBioref').innerHTML = _renderBiorefDetail(bioref);
@@ -2192,6 +2423,13 @@
           ackBtn.style.display = result.is_critical && !result.critical_ack_at ? '' : 'none';
           ackBtn.textContent = 'Prendre en charge';
         }
+        const validateBtn = $('resultDetailValidateBtn');
+        if (validateBtn) {
+          validateBtn.style.display =
+            result.bio_review_status === 'pending' && (_currentRole === 'officer' || _currentRole === 'admin')
+              ? ''
+              : 'none';
+        }
         $('resultDetailPanel').style.display = 'block';
         $('resultDetailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (e) {
@@ -2207,6 +2445,24 @@
       if (!_selectedResultDetail?.result?.id) return;
       await ackCritical(_selectedResultDetail.result.id, btn);
       await openResultDetail(_selectedResultDetail.result.id);
+    }
+    async function validateResultFromDetail(btn) {
+      if (!_selectedResultDetail?.result?.id) return;
+      setLoading(btn, true);
+      try {
+        const resultId = _selectedResultDetail.result.id;
+        await api(`/api/v1/results/${resultId}/validate`, {
+          method: 'POST',
+          headers: headers(),
+        });
+        showToast('Revue biologique interne enregistrée', 'success');
+        await loadResults();
+        await openResultDetail(resultId);
+      } catch (e) {
+        showToast(e.message || 'Validation biologique impossible', 'error');
+      } finally {
+        setLoading(btn, false);
+      }
     }
     function useDetailedResult() {
       if (!_selectedResultDetail?.result?.id) return;
@@ -2240,12 +2496,15 @@
     }
     function templateDataPoints() {
       const values = {};
-      document.querySelectorAll("#dataPoints input[data-result-key], #resultFields input[data-result-key]")
+      document.querySelectorAll("#dataPoints [data-result-key], #resultFields [data-result-key]")
         .forEach((input) => {
           const raw = input.value.trim();
           if (raw === "") return;
           const numeric = Number(raw);
-          values[input.dataset.resultKey] = Number.isNaN(numeric) ? raw : numeric;
+          values[input.dataset.resultKey] = {
+            value: Number.isNaN(numeric) ? raw : numeric,
+            unit: input.dataset.resultUnit || null
+          };
         });
       return values;
     }
@@ -2265,7 +2524,7 @@
         }
         
         // Validate result fields
-        const resultFields = document.querySelectorAll("#dataPoints input[data-result-key]");
+        const resultFields = document.querySelectorAll('#dataPoints input[type="number"][data-result-key]');
         let hasResultErrors = false;
         
         resultFields.forEach(input => {
@@ -2281,19 +2540,23 @@
         if (hasResultErrors) {
           throw new Error('Les valeurs des résultats doivent être numériques');
         }
+        if (!$("resultExamCode")?.value) {
+          throw new Error("Aucun examen prescrit sélectionné pour cet échantillon");
+        }
         
         const body = { 
           sample_id: Number(security.sanitizeNumber($("resultSampleId").value)), 
           equipment_id: $("resultEquipmentId").value ? Number(security.sanitizeNumber($("resultEquipmentId").value)) : null, 
           data_points: templateDataPoints(), 
-          is_critical: false 
+          is_critical: false,
+          exam_code: $("resultExamCode")?.value || null
         };
         
         await perfMonitor.measureAsync('createResult', () =>
           api("/api/v1/results", { method: "POST", headers: headers(), body: JSON.stringify(body) })
         );
         
-        showToast("Résultat créé et validé avec succès", "success");
+        showToast("Résultat validé — ajouté à la file de revue interne", "success");
         await loadResults();
       }, 'createResult').finally(() => setLoading(btn, false));
     }
@@ -2982,7 +3245,7 @@
       setLoading(btn, true);
       try {
         await api(`/api/v1/reports/results/${$("reportResultId").value}/sign`, { method: "POST", headers: headers(), body: JSON.stringify({ signature_meaning: "Validation par l'officier de garde." }) });
-        showToast("Résultat signé et validé avec succès", "success");
+        showToast("Compte-rendu signé et publié selon son statut actuel", "success");
       } catch (e) {
         showToast("Erreur lors de la signature", "error");
       } finally {
@@ -5391,6 +5654,7 @@ window.onload=renderLabels;
 
     // ── Correction / ré-analyse résultat ─────────────────────────────────────
     function openAmendPanel(resultId, dataPoints) {
+      setUxTab("results", "rules");
       $('amendResultId').value = resultId;
       $('amendResultLabel').textContent = 'Résultat #' + resultId;
       $('amendDataPoints').value = JSON.stringify(dataPoints, null, 2);

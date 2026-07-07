@@ -32,6 +32,17 @@ def exam_catalog(
     return EXAM_CATALOG
 
 
+@router.get("/catalog-audit")
+def exam_catalog_audit(
+    current_user: User = Depends(require_officer),
+) -> dict:
+    """État de complétude et de validation locale des fiches du catalogue."""
+    del current_user
+    from app.services.exam_catalog import audit_exam_catalog
+
+    return audit_exam_catalog()
+
+
 @router.get("/catalog/{exam_code}")
 def exam_catalog_detail(
     exam_code: str,

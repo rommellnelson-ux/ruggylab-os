@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models.ruggylab_os import ReferenceRange
 from app.services.critical_checker import _extract_numeric
+from app.services.units import convert_value
 
 # Facteur de seuil « très anormal »
 _HH_FACTOR = 1.30
@@ -73,6 +74,10 @@ def compute_flags(
             continue
         ref = range_map.get(key.upper())
         if ref is None:
+            continue
+        source_unit = raw.get("unit") if isinstance(raw, dict) else None
+        value, compatible = convert_value(value, source_unit, getattr(ref, "unit", None))
+        if not compatible:
             continue
 
         lo = ref.low_normal

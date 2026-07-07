@@ -151,6 +151,20 @@ def test_fhir_export_contains_observations(client):
     assert wbc_obs["valueQuantity"]["value"] == pytest.approx(7.2)
 
 
+def test_fhir_export_preserves_ucum_source_unit(client):
+    headers = _auth(client)
+    pid = _create_patient(client, headers)
+    sid = _create_sample(client, headers, pid)
+    payload = dict(NFS_DATA_POINTS)
+    payload["HGB"] = {"value": 132, "unit": "g/L", "status": "NORMAL"}
+    rid = _create_result(client, headers, sid, payload)
+
+    doc = client.get(f"/api/v1/results/{rid}/fhir", headers=headers).json()
+    hgb = next(item for item in doc["contained"] if item.get("id") == "obs-hgb")
+    assert hgb["valueQuantity"]["value"] == 132
+    assert hgb["valueQuantity"]["code"] == "g/L"
+
+
 def test_fhir_export_contains_patient(client):
     """Patient demographics must be embedded as a contained Patient resource."""
     headers = _auth(client)
@@ -257,13 +271,12 @@ def test_fhir_export_404_for_unknown_result(client):
     assert resp.status_code == 404
 
 
-def test_fhir_export_preliminary_when_unvalidated(client):
-    """A result that has not been validated must have status 'preliminary'."""
+def test_fhir_export_is_final_while_biological_review_is_pending(client):
+    """La revue interne différée ne rend pas le résultat patient provisoire."""
     headers = _auth(client)
     pid = _create_patient(client, headers)
     sid = _create_sample(client, headers, pid)
 
-    # Direct DB insert to skip the is_validated=True default in the endpoint
     resp = client.post(
         "/api/v1/results",
         headers=headers,
@@ -272,6 +285,5 @@ def test_fhir_export_preliminary_when_unvalidated(client):
     assert resp.status_code == 201
     rid = resp.json()["id"]
 
-    # The create endpoint always sets is_validated=True, so this tests "final"
     doc = client.get(f"/api/v1/results/{rid}/fhir", headers=headers).json()
     assert doc["status"] == "final"

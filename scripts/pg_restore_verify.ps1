@@ -56,6 +56,15 @@ function Get-EnvValue([string]$Key, [string]$Default) {
 
 $PgUser = Get-EnvValue "POSTGRES_USER" "ruggylab"
 
+# Les identifiants sont interpolés dans des commandes SQL/CLI : refuser toute
+# valeur qui pourrait viser une autre base ou injecter une instruction.
+if ($ScratchDb -notmatch '^[a-zA-Z_][a-zA-Z0-9_]{0,62}$') {
+    throw "ScratchDb invalide : utiliser uniquement lettres, chiffres et underscore (63 caractères max)."
+}
+if ($ScratchDb -in @("postgres", "template0", "template1", $PgUser, "ruggylab")) {
+    throw "ScratchDb '$ScratchDb' est réservé ou pourrait être une base réelle."
+}
+
 # Helper : exécute du SQL dans la base scratch et renvoie une valeur scalaire (-tA).
 function Invoke-Psql([string]$Sql, [string]$Db = $ScratchDb) {
     $out = & docker compose exec -T $ComposeService psql -U $PgUser -d $Db -tA -c $Sql
@@ -99,7 +108,8 @@ try {
         Step "Intégrité SHA-256" ($expected -ieq $actual) "attendu=$expected actuel=$actual"
         if ($Failed) { throw "Empreinte SHA-256 non concordante — dump corrompu." }
     } else {
-        Step "Intégrité SHA-256" $true "(pas de sidecar .sha256 — contrôle ignoré)"
+        Step "Intégrité SHA-256" $false "sidecar obligatoire introuvable : $shaSidecar"
+        throw "Empreinte SHA-256 absente — sauvegarde non vérifiable."
     }
 
     # ── Déchiffrement éventuel ─────────────────────────────────────────────────
@@ -124,10 +134,11 @@ try {
     $InContainer = "/tmp/ruggylab-restore-$Stamp.dump"
     & docker compose cp $RestoreSource "${ComposeService}:$InContainer"
     if ($LASTEXITCODE -ne 0) { throw "Copie du dump dans le conteneur échouée." }
-    & docker compose exec -T $ComposeService pg_restore -U $PgUser -d $ScratchDb --no-owner --no-privileges $InContainer
-    # pg_restore peut renvoyer un code non nul sur warnings bénins ; on valide via les contrôles suivants.
+    & docker compose exec -T $ComposeService pg_restore -U $PgUser -d $ScratchDb --no-owner --no-privileges --exit-on-error $InContainer
+    $restoreExitCode = $LASTEXITCODE
     & docker compose exec -T $ComposeService rm -f $InContainer | Out-Null
-    Step "Restauration pg_restore" $true "dump appliqué (validation par contrôles ci-dessous)"
+    if ($restoreExitCode -ne 0) { throw "pg_restore a échoué (code $restoreExitCode)." }
+    Step "Restauration pg_restore" $true "dump appliqué sans erreur"
 
     # ── 3. Schéma ──────────────────────────────────────────────────────────────
     $tableCount = [int](Invoke-Psql "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")

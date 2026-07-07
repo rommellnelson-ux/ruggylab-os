@@ -80,6 +80,14 @@ def submit_precis_expert_results(
         validator_id=current_user.id,
         is_validated=True,
         is_critical=is_panic,
+        exam_code="POCT",
+        registered_at=sample.collection_date or sample.received_date or analysis_date,
+        collected_at=sample.collection_date,
+        received_at=sample.received_date,
+        analysis_finished_at=analysis_date,
+        tech_validated_at=analysis_date,
+        bio_validated_at=analysis_date,
+        bio_review_status="pending",
     )
     sample.status = "Termine"
     db.add(new_result)
@@ -95,7 +103,7 @@ def submit_precis_expert_results(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
-                "message": "Stock reactif insuffisant pour valider ce resultat.",
+                "message": "Stock reactif insuffisant pour enregistrer ce resultat.",
                 "items": [item.__dict__ for item in exc.items],
             },
         ) from exc
