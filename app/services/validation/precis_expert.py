@@ -42,9 +42,9 @@ class PrecisExpertValidator:
     ) -> RuggylabJSONPoint:
         status = calculate_status(value, low, high)
         is_critical = False
-        if critical_low is not None and value < critical_low:
+        if critical_low is not None and value <= critical_low:
             is_critical = True
-        if critical_high is not None and value > critical_high:
+        if critical_high is not None and value >= critical_high:
             is_critical = True
         if is_critical:
             self.is_overall_critical = True

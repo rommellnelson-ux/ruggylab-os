@@ -232,7 +232,9 @@ class TestTatDashboard:
             headers=hdrs,
             json={"exam_code": "NFS", "label": "NFS", "target_minutes": 60},
         )
-        _make_result(client, hdrs, exam_code="NFS")
+        result = _make_result(client, hdrs, exam_code="NFS")
+        validated = client.post(f"/api/v1/results/{result['id']}/validate", headers=hdrs)
+        assert validated.status_code == 200
         d = client.get("/api/v1/tat/dashboard?days=30", headers=hdrs).json()
         for key in (
             "total_measured",

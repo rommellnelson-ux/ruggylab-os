@@ -1,0 +1,2 @@
+campagne_id,date_heure,version_ruggylab,site,technicien_code,role,anciennete_mois,scenario_id,poste_appareil,duree_secondes,statut,aide_nombre,erreurs_nombre,erreur_critique,attendu,obtenu,contournement,risque_patient,gravite,frequence,commentaire_technicien,observation_factuelle,anomalie_id,responsable,date_cible,decision
+UAT-EXEMPLE,2026-07-01T09:00:00+00:00,A_COMPLETER,Site pilote,TECH-01,technician,12,UAT-T01,Poste accueil,120,reussi_sans_aide,0,0,non,Patient unique et prescription NFS plus GLYC,A_COMPLETER,aucun,aucun,faible,rare,A_COMPLETER,A_COMPLETER,,,,

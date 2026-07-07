@@ -46,6 +46,9 @@ class ResultRead(ResultBase):
     received_at: dt.datetime | None = None
     analysis_finished_at: dt.datetime | None = None
     bio_validated_at: dt.datetime | None = None
+    bio_review_status: str = "pending"
+    bio_reviewed_at: dt.datetime | None = None
+    bio_reviewed_by_id: int | None = None
     # Interprétation bioref complémentaire (unification des vocabulaires)
     bioref_status: str | None = None
     bioref_comment: str | None = None
@@ -75,6 +78,29 @@ class CriticalAckBatchRequest(BaseModel):
 class CriticalAckBatchResponse(BaseModel):
     acknowledged: list[int] = Field(default_factory=list)
     skipped: dict[int, str] = Field(default_factory=dict)
+
+
+class DeferredReviewBatchRequest(BaseModel):
+    result_ids: list[int] = Field(..., min_length=1, max_length=100)
+
+
+class DeferredReviewBatchResponse(BaseModel):
+    reviewed: list[int] = Field(default_factory=list)
+    skipped: dict[int, str] = Field(default_factory=dict)
+
+
+class DeferredReviewItem(BaseModel):
+    result: ResultRead
+    sample: SampleRead | None = None
+    patient: PatientRead | None = None
+    waiting_hours: float
+
+
+class DeferredReviewQueueResponse(BaseModel):
+    items: list[DeferredReviewItem] = Field(default_factory=list)
+    total: int
+    skip: int
+    limit: int
 
 
 class ResultClinicalAuditEvent(BaseModel):

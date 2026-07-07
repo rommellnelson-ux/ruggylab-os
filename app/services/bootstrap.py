@@ -16,6 +16,7 @@ def init_db() -> None:
     try:
         Base.metadata.create_all(bind=db_session.engine)
         _seed_first_superuser()
+        _seed_clinical_reference_data()
     except SQLAlchemyError as exc:
         logger.warning("Database initialization skipped: %s", exc)
 
@@ -42,5 +43,27 @@ def _seed_first_superuser() -> None:
         db.add(user)
         db.commit()
         logger.info("Seeded initial admin user: %s", settings.FIRST_SUPERUSER)
+    finally:
+        db.close()
+
+
+def _seed_clinical_reference_data() -> None:
+    """Charge les référentiels livrés, sans écraser les adaptations locales."""
+    if settings.TESTING:
+        return
+
+    from app.services.bioref_service import seed_bioref
+    from app.services.code_mapping_service import seed_mappings
+
+    db: Session = db_session.SessionLocal()
+    try:
+        created_ranges = seed_bioref(db)
+        created_mappings = seed_mappings(db)
+        if created_ranges or created_mappings:
+            logger.info(
+                "Seeded clinical reference data: %s ranges, %s mappings",
+                created_ranges,
+                created_mappings,
+            )
     finally:
         db.close()

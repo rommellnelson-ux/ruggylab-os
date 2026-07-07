@@ -39,9 +39,9 @@ def interpret_value(value: float | None, ref: BiologicalReferenceRange) -> str:
     """
     if value is None:
         return ref.normal_text or "N/A"
-    if ref.critical_low is not None and value < ref.critical_low:
+    if ref.critical_low is not None and value <= ref.critical_low:
         return "CRITIQUE BAS"
-    if ref.critical_high is not None and value > ref.critical_high:
+    if ref.critical_high is not None and value >= ref.critical_high:
         return "CRITIQUE HAUT"
     if ref.lower_limit is not None and value < ref.lower_limit:
         return "BAS"
@@ -91,8 +91,9 @@ def find_reference(
 
     candidates = [r for r in rows if _matches(r)]
     if not candidates:
-        # repli : ignorer l'âge si aucune tranche ne correspond
-        candidates = [r for r in rows if r.sex in ("ALL", norm_sex)] or rows
+        # Ne jamais appliquer silencieusement une plage d'un autre sexe ou une
+        # plage adulte à un enfant. L'absence de plage est plus sûre qu'un faux OK.
+        return None
     # Préfère une référence sexe-spécifique à une référence générique
     candidates.sort(key=lambda r: 0 if r.sex == norm_sex and norm_sex != "ALL" else 1)
     return candidates[0]
@@ -129,6 +130,7 @@ def interpret(
 def seed_bioref(db: Session) -> int:
     """Insère les valeurs de référence absentes. Retourne le nombre créé (idempotent)."""
     created = 0
+    changed = False
     for spec in BIOREF_SEED:
         exists = (
             db.query(BiologicalReferenceRange)
@@ -141,9 +143,21 @@ def seed_bioref(db: Session) -> int:
             .first()
         )
         if exists:
+            # Migration non destructive des anciens libellés vers UCUM.
+            legacy_units = {
+                "G/L",
+                "T/L",
+                "UI/L",
+                "IU/L",
+                "mL/min/1,73m²",
+                "mL/min/1,73m2",
+            }
+            if exists.unit in legacy_units and exists.unit != spec["unit"]:
+                exists.unit = spec["unit"]
+                changed = True
             continue
         db.add(BiologicalReferenceRange(**spec))
         created += 1
-    if created:
+    if created or changed:
         db.commit()
     return created

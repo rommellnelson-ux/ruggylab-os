@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.services.exam_catalog import (
     EXAM_BY_CODE,
     EXAM_CATALOG,
+    audit_exam_catalog,
     exam_catalog_entry,
     resolve_exam_code,
 )
@@ -67,6 +68,16 @@ class TestExamCatalog:
         assert crp is not None
         assert crp["preanalytics"]["bench"] == "Biochimie"
         assert crp["technical_sheet"]["qc_requirements"]
+        assert crp["technical_sheet"]["validation_status"] == "needs_local_validation"
+        assert crp["technical_sheet"]["local_document_ref"] is None
+
+    def test_catalog_audit_does_not_claim_unapproved_sops_are_validated(self):
+        audit = audit_exam_catalog()
+        assert audit["total_exams"] == len(EXAM_CATALOG)
+        assert audit["workflow_sheets_present"] == len(EXAM_CATALOG)
+        assert audit["locally_validated"] == 0
+        assert audit["pending_local_validation"] == len(EXAM_CATALOG)
+        assert audit["issues"] == []
 
 
 class TestCatalogEndpoint:
@@ -91,6 +102,12 @@ class TestCatalogEndpoint:
         hdrs = _auth(client)
         r = client.get("/api/v1/tat/catalog/UNKNOWN", headers=hdrs)
         assert r.status_code == 404
+
+    def test_catalog_audit_requires_officer_and_reports_pending_validation(self, client):
+        hdrs = _auth(client)
+        r = client.get("/api/v1/tat/catalog-audit", headers=hdrs)
+        assert r.status_code == 200
+        assert r.json()["pending_local_validation"] == len(EXAM_CATALOG)
 
     def test_seed_uses_catalog(self, client):
         hdrs = _auth(client)

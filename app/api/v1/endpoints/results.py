@@ -1,4 +1,5 @@
 import contextlib
+import datetime as dt
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,6 +16,10 @@ from app.schemas.patient import PatientRead
 from app.schemas.result import (
     CriticalAckBatchRequest,
     CriticalAckBatchResponse,
+    DeferredReviewBatchRequest,
+    DeferredReviewBatchResponse,
+    DeferredReviewItem,
+    DeferredReviewQueueResponse,
     ResultAmend,
     ResultClinicalAuditEvent,
     ResultCockpitItem,
@@ -33,12 +38,28 @@ from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.patient_access import (
     apply_result_patient_scope,
+    can_access_patient,
     can_access_result,
 )
 from app.services.reference_checker import compute_flags
+from app.services.result_entry import (
+    build_result_entry_context,
+    equipment_supports_exam,
+    validate_prescribed_exam,
+    validate_result_payload,
+)
 from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
+
+
+def _infer_exam_code(data_points: dict) -> str | None:
+    """Déduit les panels évidents quand une saisie manuelle omet le code examen."""
+    analytes = {str(key).upper() for key in data_points}
+    nfs_markers = {"WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT"}
+    if len(analytes & nfs_markers) >= 3:
+        return "NFS"
+    return None
 
 
 def _get_accessible_result_or_error(db: Session, result_id: int, user: User) -> Result:
@@ -156,6 +177,26 @@ def list_results_cockpit(
     ]
 
 
+@router.get("/entry-context/{sample_id}")
+def get_result_entry_context(
+    sample_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Examens prescrits encore attendus et machines compatibles."""
+    sample = (
+        db.query(Sample)
+        .options(joinedload(Sample.patient))
+        .filter(Sample.id == sample_id)
+        .first()
+    )
+    if not sample:
+        raise HTTPException(status_code=404, detail="Échantillon introuvable.")
+    if sample.patient and not can_access_patient(current_user, sample.patient):
+        raise HTTPException(status_code=403, detail="Échantillon hors de votre périmètre.")
+    return build_result_entry_context(db, sample)
+
+
 @router.patch("/ack-critical-batch", response_model=CriticalAckBatchResponse)
 def ack_critical_batch(
     payload: CriticalAckBatchRequest,
@@ -198,6 +239,106 @@ def ack_critical_batch(
 
     db.commit()
     return CriticalAckBatchResponse(acknowledged=acknowledged, skipped=skipped)
+
+
+@router.get("/review-queue", response_model=DeferredReviewQueueResponse)
+def deferred_biological_review_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+) -> DeferredReviewQueueResponse:
+    """File interne des résultats valides restant à revoir par le biologiste."""
+    base = (
+        db.query(Result)
+        .options(joinedload(Result.sample).joinedload(Sample.patient))
+        .filter(Result.bio_review_status == "pending")
+    )
+    query = apply_result_patient_scope(base, current_user)
+    total = query.with_entities(func.count(Result.id)).scalar() or 0
+    results = (
+        query.order_by(Result.is_critical.desc(), Result.analysis_date.asc(), Result.id.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    now = utcnow_naive()
+    return DeferredReviewQueueResponse(
+        items=[
+            DeferredReviewItem(
+                result=ResultRead.model_validate(result),
+                sample=_sample_read(result.sample),
+                patient=_patient_read(result.sample),
+                waiting_hours=max(
+                    0.0,
+                    round((now - (result.analysis_date or now)).total_seconds() / 3600, 1),
+                ),
+            )
+            for result in results
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
+
+
+def _mark_biological_reviewed(
+    db: Session,
+    *,
+    result: Result,
+    current_user: User,
+    source: str,
+    reviewed_at: dt.datetime,
+) -> None:
+    result.bio_review_status = "reviewed"
+    result.bio_reviewed_at = reviewed_at
+    result.bio_reviewed_by_id = current_user.id
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="result.biological_review",
+        entity_type="result",
+        entity_id=str(result.id),
+        payload={"source": source, "reviewed_at": reviewed_at.isoformat()},
+    )
+
+
+@router.post("/review-batch", response_model=DeferredReviewBatchResponse)
+def review_results_batch(
+    payload: DeferredReviewBatchRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+) -> DeferredReviewBatchResponse:
+    """Solde en une fois plusieurs éléments de la file de revue différée."""
+    reviewed: list[int] = []
+    skipped: dict[int, str] = {}
+    unique_ids = list(dict.fromkeys(payload.result_ids))
+    results = db.query(Result).filter(Result.id.in_(unique_ids)).all()
+    result_by_id = {result.id: result for result in results}
+    now = utcnow_naive()
+
+    for result_id in unique_ids:
+        result = result_by_id.get(result_id)
+        if result is None:
+            skipped[result_id] = "introuvable"
+            continue
+        if not can_access_result(current_user, result):
+            skipped[result_id] = "hors périmètre"
+            continue
+        if result.bio_review_status == "reviewed":
+            skipped[result_id] = "déjà revu"
+            continue
+        _mark_biological_reviewed(
+            db,
+            result=result,
+            current_user=current_user,
+            source="batch",
+            reviewed_at=now,
+        )
+        reviewed.append(result.id)
+
+    db.commit()
+    return DeferredReviewBatchResponse(reviewed=reviewed, skipped=skipped)
 
 
 @router.get("/{result_id}", response_model=ResultRead)
@@ -388,6 +529,32 @@ def create_result(
             )
 
     result_data = payload.model_dump(exclude_none=True)
+    if not result_data.get("exam_code"):
+        inferred_exam_code = _infer_exam_code(payload.data_points)
+        if inferred_exam_code:
+            result_data["exam_code"] = inferred_exam_code
+    exam_code = result_data.get("exam_code")
+    if (
+        payload.equipment_id is not None
+        and exam_code
+        and not equipment_supports_exam(equipment, exam_code)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"L'équipement {equipment.name} n'est pas configuré pour l'examen {exam_code}.",
+        )
+    linked_order = None
+    if exam_code:
+        try:
+            linked_order = validate_prescribed_exam(db, sample.id, exam_code)
+            validate_result_payload(db, exam_code, payload.data_points, sample.patient)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+            ) from exc
+    # Politique d'effectif réduit : les procédures et contrôles techniques
+    # rendent le résultat immédiatement valide pour le patient. La revue du
+    # biologiste reste tracée séparément dans la file différée.
     result_data["validator_id"] = current_user.id
     result_data["is_validated"] = True
     # Auto-detect critical values against configured thresholds (OR with manual flag)
@@ -412,12 +579,18 @@ def create_result(
     # « Enregistrement » = point de départ du TAT (prélèvement par défaut)
     result_data.setdefault("registered_at", sample.collection_date or sample.received_date or now)
     result_data.setdefault("analysis_finished_at", analysis_dt)
-    # Le résultat est créé validé → validation biologique horodatée maintenant
     result_data["bio_validated_at"] = now
+    result_data["bio_review_status"] = "pending"
     result_data["tech_validated_at"] = now
     result = Result(**result_data)
     db.add(result)
     db.flush()
+    # Le référentiel canonique doit être appliqué avant l'auto-validation :
+    # ses flags et sa criticité font partie des garde-fous de validation.
+    with contextlib.suppress(Exception):
+        from app.services.code_mapping_service import apply_bioref_to_result
+
+        apply_bioref_to_result(db, result)
     try:
         consume_reagents_for_result(
             db,
@@ -429,20 +602,18 @@ def create_result(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
-                "message": "Stock reactif insuffisant pour valider ce resultat.",
+                "message": "Stock reactif insuffisant pour enregistrer ce resultat.",
                 "items": [item.__dict__ for item in exc.items],
             },
         ) from exc
     # Auto-validation ISO 15189 §5.8
     try_auto_validate(result, db)
-    # Interprétation bioref complémentaire (additive, ne touche pas flags/critique).
-    # Best-effort : ne doit jamais empêcher la création du résultat.
-    with contextlib.suppress(Exception):
-        from app.services.code_mapping_service import apply_bioref_to_result
-
-        apply_bioref_to_result(db, result)
     db.commit()
     db.refresh(result)
+    if linked_order is not None:
+        from app.services.exam_order_service import sync_order_progress
+
+        sync_order_progress(db, linked_order)
     # Push temps-réel : alerte immédiate si critique ou delta dépassé
     if result.is_critical or result.delta_exceeded:
         from app.services.notification_bus import publish_alert_event
@@ -465,6 +636,33 @@ def create_result(
             aspect=sample.aspect,
             message=_warn,
         )
+    return result
+
+
+@router.post("/{result_id}/validate", response_model=ResultRead)
+def validate_result_biologically(
+    result_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_officer),
+) -> Result:
+    """Marque comme effectuée la revue biologique interne différée."""
+    result = _get_accessible_result_or_error(db, result_id, current_user)
+    if result.bio_review_status == "reviewed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce résultat a déjà été revu biologiquement.",
+        )
+
+    now = utcnow_naive()
+    _mark_biological_reviewed(
+        db,
+        result=result,
+        current_user=current_user,
+        source="single",
+        reviewed_at=now,
+    )
+    db.commit()
+    db.refresh(result)
     return result
 
 
@@ -520,8 +718,18 @@ def amend_result(
     # Recalcul flags
     computed_flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
     result.flags = computed_flags if computed_flags else None
+    with contextlib.suppress(Exception):
+        from app.services.code_mapping_service import apply_bioref_to_result
+
+        apply_bioref_to_result(db, result)
 
     # Réinitialisation auto-validation (les données ont changé)
+    result.is_validated = True
+    result.validator_id = current_user.id
+    result.bio_validated_at = utcnow_naive()
+    result.bio_review_status = "pending"
+    result.bio_reviewed_at = None
+    result.bio_reviewed_by_id = None
     result.is_auto_validated = False
     result.auto_validated_at = None
 

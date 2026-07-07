@@ -24,6 +24,7 @@ from app.schemas.exam_order import (
 )
 from app.schemas.invoice import InvoiceFromOrder, InvoiceRead
 from app.services.accounting_service import balance_of, build_invoice_from_order, credit_of
+from app.services.exam_catalog import exam_catalog_entry, resolve_exam_code
 from app.services.exam_order_service import build_thread, sync_order_progress
 from app.services.order_report import build_order_report_pdf
 from app.services.patient_access import (
@@ -72,6 +73,19 @@ def create_exam_order(
         raise HTTPException(status_code=404, detail="Patient introuvable.")
     if not can_access_patient(current_user, patient):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
+    normalized_exams: list[tuple[str, str | None]] = []
+    seen: set[str] = set()
+    for requested in payload.exams:
+        code = resolve_exam_code(requested.exam_code)
+        if code is None:
+            raise HTTPException(
+                status_code=422, detail=f"Examen inconnu : {requested.exam_code}."
+            )
+        if code in seen:
+            raise HTTPException(status_code=422, detail=f"Examen dupliqué : {code}.")
+        seen.add(code)
+        catalog = exam_catalog_entry(code) or {}
+        normalized_exams.append((code, requested.exam_label or catalog.get("label")))
 
     order = ExamOrder(
         patient_id=payload.patient_id,
@@ -82,8 +96,8 @@ def create_exam_order(
         status="prescribed",
         created_by_id=current_user.id,
         items=[
-            ExamOrderItem(exam_code=e.exam_code.strip().upper(), exam_label=e.exam_label)
-            for e in payload.exams
+            ExamOrderItem(exam_code=code, exam_label=label)
+            for code, label in normalized_exams
         ],
     )
     db.add(order)
@@ -149,6 +163,11 @@ def collect_exam_order(
         sample = db.query(Sample).filter(Sample.barcode == payload.barcode).first()
     if not sample:
         raise HTTPException(status_code=404, detail="Échantillon introuvable.")
+    if sample.patient_id != order.patient_id:
+        raise HTTPException(
+            status_code=422,
+            detail="L'échantillon n'appartient pas au patient de cette prescription.",
+        )
 
     order.sample_id = sample.id
     db.commit()

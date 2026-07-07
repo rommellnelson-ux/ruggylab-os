@@ -387,6 +387,7 @@ def result_report_pdf(
     current_user: User = Depends(get_current_active_user),
 ) -> Response:
     result = _get_accessible_result_or_error(db, result_id, current_user)
+    _ensure_releasable_result(result)
     signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
     pdf_bytes = build_result_report_pdf(result, signature)
     return Response(

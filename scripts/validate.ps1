@@ -122,6 +122,15 @@ if (-not $SkipTests) {
             "tests/test_unit_services.py"
         )
 
+        Invoke-PytestBatch "Pytest integrations/operations terrain" @(
+            "tests/test_csa_plateau.py",
+            "tests/test_dhis2_gateway.py",
+            "tests/test_prescription_result_entry.py",
+            "tests/test_production_operations_config.py",
+            "tests/test_report_delivery_worker_script.py",
+            "tests/test_uat_technician_workflow.py"
+        )
+
         if ($IncludeOptionalTests) {
             Invoke-PytestBatch "Pytest optionnels E2E/ML" @(
                 "tests/test_e2e_basic.py",

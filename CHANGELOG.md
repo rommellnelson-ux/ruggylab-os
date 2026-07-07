@@ -6,6 +6,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 ## [Non publié]
 
 ### Ajouté
+- **Revue biologique différée** : les résultats conformes aux procédures
+  techniques sortent immédiatement valides pour le patient, tout en alimentant
+  une file interne priorisée. Les officiers et administrateurs peuvent solder
+  cette revue individuellement ou en lot, avec horodatage et audit.
 - **Workflow valeurs critiques** : prise en charge depuis la liste résultats,
   audit clinique ouvrable depuis une ligne, confirmation groupée avec contexte
   patient/échantillon, rapport conformité avec seuil cible, indicateur hors

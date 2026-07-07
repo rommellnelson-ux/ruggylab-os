@@ -165,6 +165,11 @@ class Result(Base):
     analysis_finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     tech_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     bio_validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    bio_review_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", index=True
+    )
+    bio_reviewed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    bio_reviewed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     released_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
 
     sample: Mapped["Sample"] = relationship(back_populates="results")
@@ -275,6 +280,130 @@ class AuditEvent(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
 
     user: Mapped["User | None"] = relationship(back_populates="audit_events")
+
+
+class Dhis2Mapping(Base):
+    """Correspondance versionnable entre un indicateur RuggyLab et DHIS2."""
+
+    __tablename__ = "dhis2_mappings"
+    __table_args__ = (
+        UniqueConstraint(
+            "internal_code",
+            "data_set_uid",
+            "org_unit_uid",
+            name="uq_dhis2_mapping_scope",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    internal_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    data_element_uid: Mapped[str] = mapped_column(String(20), nullable=False)
+    data_set_uid: Mapped[str] = mapped_column(String(20), nullable=False)
+    org_unit_uid: Mapped[str] = mapped_column(String(20), nullable=False)
+    category_option_combo_uid: Mapped[str | None] = mapped_column(String(20))
+    period_type: Mapped[str] = mapped_column(String(20), nullable=False, default="monthly")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    valid_from: Mapped[dt.date | None] = mapped_column(Date)
+    valid_to: Mapped[dt.date | None] = mapped_column(Date)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+
+
+class Dhis2ExportJob(Base):
+    """Snapshot agrégé sans donnée nominative, préparé avant tout envoi DHIS2."""
+
+    __tablename__ = "dhis2_export_jobs"
+    __table_args__ = (
+        UniqueConstraint(
+            "period",
+            "data_set_uid",
+            "org_unit_uid",
+            "payload_sha256",
+            name="uq_dhis2_export_idempotency",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    period: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    data_set_uid: Mapped[str] = mapped_column(String(20), nullable=False)
+    org_unit_uid: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="CALCULATED")
+    payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
+    )
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    validated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+    validated_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    created_by: Mapped["User | None"] = relationship(foreign_keys=[created_by_user_id])
+    validated_by: Mapped["User | None"] = relationship(foreign_keys=[validated_by_user_id])
+
+
+class CsaPatientLink(Base):
+    """Correspondance immuable entre identité CSA et patient RuggyLab."""
+
+    __tablename__ = "csa_patient_links"
+    __table_args__ = (
+        UniqueConstraint("source_system", "external_patient_id", name="uq_csa_external_patient"),
+        UniqueConstraint("source_system", "patient_id", name="uq_csa_ruggylab_patient"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_system: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="CSA_PLATEAU"
+    )
+    external_patient_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    external_dossier_no: Mapped[str | None] = mapped_column(String(100), index=True)
+    patient_id: Mapped[int] = mapped_column(ForeignKey("patients.id"), nullable=False, index=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+
+    patient: Mapped["Patient"] = relationship()
+
+
+class CsaExamMapping(Base):
+    __tablename__ = "csa_exam_mappings"
+    __table_args__ = (
+        UniqueConstraint(
+            "csa_exam_code",
+            "ruggylab_exam_code",
+            name="uq_csa_exam_mapping_pair",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    csa_exam_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    ruggylab_exam_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class CsaPrescriptionLink(Base):
+    __tablename__ = "csa_prescription_links"
+    __table_args__ = (
+        UniqueConstraint("external_prescription_id", name="uq_csa_external_prescription"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    external_prescription_id: Mapped[str] = mapped_column(
+        String(120), nullable=False, index=True
+    )
+    external_event_key: Mapped[str] = mapped_column(String(180), nullable=False)
+    exam_order_id: Mapped[int] = mapped_column(
+        ForeignKey("exam_orders.id"), nullable=False, index=True
+    )
+    payload_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    imported_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, default=utcnow_naive, nullable=False
+    )
+
+    exam_order: Mapped["ExamOrder"] = relationship()
 
 
 class StockMovement(Base):

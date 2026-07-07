@@ -85,6 +85,8 @@ class FHIRObservation(BaseModel):
     subject: FHIRReference | None = None
     effectiveDateTime: str | None = None
     valueQuantity: FHIRQuantity | None = None
+    valueString: str | None = None
+    valueCodeableConcept: FHIRCodeableConcept | None = None
     interpretation: list[FHIRCodeableConcept] = Field(default_factory=list)
     referenceRange: list[dict[str, Any]] = Field(default_factory=list)
     note: list[dict[str, str]] = Field(default_factory=list)

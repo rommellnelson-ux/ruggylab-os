@@ -171,13 +171,32 @@ class TestMappingResolution:
 
 
 class TestResultBiorefInterpretation:
-    def test_ge_result_interpreted_via_mal_ge(self, client):
+    def test_ge_rejects_unrelated_analyte(self, client):
         hdrs = _auth(client)
         _seed_all(client, hdrs)
-        r = _make_result(client, hdrs, exam_code="GE", data={"WBC": 5.0})
-        # GE sans valeur qualitative → MAL_GE → texte normal "Négatif"
-        assert r["bioref_status"] == "Négatif"
-        assert r["bioref_source"]
+        patient_id = client.post(
+            "/api/v1/patients",
+            headers=hdrs,
+            json={
+                "ipp_unique_id": f"CM-{_uid()}",
+                "first_name": "Map",
+                "last_name": "Mismatch",
+                "birth_date": "1980-01-01",
+                "sex": "M",
+            },
+        ).json()["id"]
+        sample_id = client.post(
+            "/api/v1/samples",
+            headers=hdrs,
+            json={"barcode": f"CM-{_uid()}", "patient_id": patient_id, "status": "Recu"},
+        ).json()["id"]
+        response = client.post(
+            "/api/v1/results",
+            headers=hdrs,
+            json={"sample_id": sample_id, "exam_code": "GE", "data_points": {"WBC": 5.0}},
+        )
+        assert response.status_code == 422
+        assert "incompatible" in response.json()["detail"]
 
     def test_ge_positive_qualitative(self, client):
         hdrs = _auth(client)
@@ -206,7 +225,7 @@ class TestResultBiorefInterpretation:
         # exam_code sans correspondance → pas d'interprétation bioref, flags inchangés
         r = _make_result(client, hdrs, exam_code="RAPIDX", data={"WBC": 5.0})
         assert r["bioref_status"] is None
-        assert r["is_validated"] is True  # comportement existant conservé
+        assert r["is_validated"] is True
 
     def test_no_exam_code_no_bioref(self, client):
         hdrs = _auth(client)

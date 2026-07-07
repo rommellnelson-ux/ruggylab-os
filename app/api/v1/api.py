@@ -14,8 +14,10 @@ from app.api.v1.endpoints.bulk_import import router as bulk_import_router
 from app.api.v1.endpoints.code_mappings import router as code_mappings_router
 from app.api.v1.endpoints.critical_alerts import router as critical_alerts_router
 from app.api.v1.endpoints.critical_ranges import router as critical_ranges_router
+from app.api.v1.endpoints.csa_plateau import router as csa_plateau_router
 from app.api.v1.endpoints.delta_check import router as delta_check_router
 from app.api.v1.endpoints.dh36 import router as dh36_router
+from app.api.v1.endpoints.dhis2 import router as dhis2_router
 from app.api.v1.endpoints.epi_notifications import router as epi_notifications_router
 from app.api.v1.endpoints.epidemiology import router as epidemiology_router
 from app.api.v1.endpoints.equipment_maintenance import router as equipment_maintenance_router
@@ -90,6 +92,7 @@ api_router.include_router(auto_validation_router, tags=["Auto-Validation"])
 api_router.include_router(results_poct_router, tags=["poct"], dependencies=_no_accountant)
 api_router.include_router(military_facilities_router, tags=["military-facilities"])
 api_router.include_router(dh36_router, tags=["dh36"], dependencies=_no_accountant)
+api_router.include_router(dhis2_router, tags=["DHIS2"], dependencies=_no_accountant)
 api_router.include_router(imaging_router, tags=["imaging"], dependencies=_no_accountant)
 api_router.include_router(operations_router, tags=["operations"])
 api_router.include_router(reports_router, tags=["reports"])
@@ -113,6 +116,7 @@ api_router.include_router(tariffs_router, tags=["Tarifs examens"])
 api_router.include_router(registre_router, tags=["Registre maître"], dependencies=_no_accountant)
 api_router.include_router(bioref_router, tags=["Référentiel biologique"])
 api_router.include_router(code_mappings_router, tags=["Unification vocabulaires"])
+api_router.include_router(csa_plateau_router, tags=["Interopérabilité CSA PLATEAU"])
 # Prescription d'examens (clinique) → interdite au comptable.
 api_router.include_router(
     exam_orders_router, tags=["Prescription d'examens"], dependencies=_no_accountant

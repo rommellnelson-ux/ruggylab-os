@@ -1178,10 +1178,10 @@
         <div id="patients" class="view band hidden">
           <div class="grid2">
             <div class="panel"><h3>Nouveau patient</h3><div class="form">
-              <div><label>IPP</label><input id="patientIpp" placeholder="IPP-..." /></div>
+              <div><label>IPP RuggyLab</label><div class="toolbar"><input id="patientIpp" placeholder="Généré automatiquement" /><button class="ghost" type="button" onclick="generatePatientIpp(this)">Générer</button></div></div>
               <div class="grid2"><div><label>Prenom</label><input id="patientFirst" /></div><div><label>Nom</label><input id="patientLast" /></div></div>
               <div class="grid2"><div><label>Naissance</label><input id="patientBirth" type="date" /></div><div><label>Sexe</label><select id="patientSex"><option>M</option><option>F</option></select></div></div>
-              <div class="grid2"><div><label>Grade</label><input id="patientRank" /></div><div><label>Unité / service</label><input id="patientUnit" placeholder="ex. hematologie (vide = partagé)" /></div></div>
+              <div class="grid2"><div><label>Grade</label><input id="patientRank" /></div><div><label>Service d’origine / structure demandeuse</label><input id="patientUnit" placeholder="ex. Urgences, Médecine, CSA Plateau (vide = partagé)" /></div></div>
               <div class="grid2"><div><label>Téléphone</label><input id="patientPhone" placeholder="+225 ..." /></div><div><label>Quartier / résidence</label><input id="patientQuarter" placeholder="ex. Abobo (épidémio)" /></div></div>
               <button onclick="createPatient(this)" aria-label="Créer un nouveau patient">Creer patient</button>
               <div id="patientCreated" class="notice hidden">
@@ -1283,7 +1283,7 @@
           <div class="result-command-bar" aria-label="Synthèse résultats">
             <div class="result-kpi"><strong id="resultsKpiPending">—</strong><span>Critiques à prendre en charge</span></div>
             <div class="result-kpi"><strong id="resultsKpiCritical">—</strong><span>Critiques chargées</span></div>
-            <div class="result-kpi"><strong id="resultsKpiUnvalidated">—</strong><span>Non validés</span></div>
+            <div class="result-kpi"><strong id="resultsKpiUnvalidated">—</strong><span>Revues biologiques en attente</span></div>
             <div class="result-kpi"><strong id="resultsKpiLoaded">—</strong><span>Résultats affichables</span></div>
           </div>
           <div class="grid2">
@@ -1298,9 +1298,10 @@
                 <div id="resultSampleSelected" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
               </div>
               <div><label>Équipement</label>
-                <select id="resultEquipmentId"><option value="">— Manuel / non spécifié —</option></select>
+                <select id="resultEquipmentId"><option value="">— Saisie manuelle tracée —</option></select>
               </div>
-              <div><label>Modèle de saisie</label><select id="resultTemplate" onchange="renderResultTemplate()"><option value="dh36">DH36</option><option value="precis">Precis Expert</option><option value="urine">Urine</option><option value="manual">Manuel</option></select></div>
+              <div><label>Examen prescrit à renseigner</label><select id="resultExamCode" onchange="renderPrescribedResultFields()"><option value="">Scannez d’abord l’échantillon</option></select></div>
+              <div id="resultPrescriptionHint" class="notice">Le formulaire sera construit depuis la prescription liée à l’échantillon.</div>
               <div id="dataPoints"></div>
               <button onclick="createResult(this)" aria-label="Créer un résultat validé">Créer un résultat validé</button>
               <button onclick="analyzeResultsWithAI()" class="primary" style="margin-top: 10px;">🤖 Analyser avec IA</button>
@@ -1317,7 +1318,7 @@
                 <button class="ghost active" data-result-filter="all" onclick="setResultFilter('all', this)">Tous</button>
                 <button class="ghost" data-result-filter="pending" onclick="setResultFilter('pending', this)">À prendre en charge</button>
                 <button class="ghost" data-result-filter="critical" onclick="setResultFilter('critical', this)">Critiques</button>
-                <button class="ghost" data-result-filter="unvalidated" onclick="setResultFilter('unvalidated', this)">Non validés</button>
+                <button class="ghost" data-result-filter="unvalidated" onclick="setResultFilter('unvalidated', this)">Revue en attente</button>
                 <button class="ghost" data-result-filter="auto" onclick="setResultFilter('auto', this)">Auto §5.8</button>
                 <input id="resultSearch" style="max-width:260px;" placeholder="Rechercher patient, IPP, code-barres…" oninput="setResultSearch(this.value)" />
                 <select id="resultSort" onchange="setResultSort(this.value)" aria-label="Trier les résultats">
@@ -1334,6 +1335,24 @@
               <table id="resultsTable" class="compact-mobile-table"><thead><tr><th>ID</th><th>Échantillon</th><th>Analyse</th><th>Critique</th><th>Alertes</th><th>Prise en charge</th><th>Validé</th><th>Auto §5.8</th><th></th></tr></thead><tbody></tbody></table>
             </div>
           </div>
+          <div id="deferredReviewPanel" class="panel" style="margin-top:12px;display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+              <div>
+                <h3 style="margin:0;">File de revue biologique différée</h3>
+                <p id="deferredReviewHint" style="font-size:12px;color:var(--muted);margin:4px 0 0;">
+                  Les résultats restent valides pour le patient pendant cette revue interne.
+                </p>
+              </div>
+              <div class="actions">
+                <button class="ghost" onclick="loadDeferredReviewQueue()">↻ Actualiser</button>
+                <button onclick="reviewSelectedResults(this)">Marquer la sélection comme revue</button>
+              </div>
+            </div>
+            <table id="deferredReviewTable" class="compact-mobile-table">
+              <thead><tr><th><input id="deferredReviewSelectAll" type="checkbox" onchange="toggleDeferredReviewSelection(this.checked)" /></th><th>Résultat</th><th>Patient</th><th>Examen</th><th>Attente</th><th>Priorité</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
           <div id="resultDetailPanel" class="panel" style="margin-top:12px;display:none;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
               <div>
@@ -1344,6 +1363,7 @@
               </div>
               <div class="actions">
                 <button id="resultDetailAckBtn" class="danger" onclick="ackCriticalFromDetail(this)">Prendre en charge</button>
+                <button id="resultDetailValidateBtn" onclick="validateResultFromDetail(this)">Marquer revue effectuée</button>
                 <button class="ghost" onclick="copyResultClinicalSummary()">Copier synthèse</button>
                 <button class="ghost" onclick="useDetailedResult()">Rapport</button>
                 <button class="ghost" onclick="openDetailedResultFhir()">FHIR</button>

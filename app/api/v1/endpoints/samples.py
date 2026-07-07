@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import Patient, Sample, User
+from app.models import ExamOrder, Patient, Sample, User
 from app.schemas.sample import SampleCreate, SampleRead, SampleUpdate
 
 router = APIRouter(prefix="/samples")
@@ -102,6 +102,24 @@ def create_sample(
     if not sample.lab_number:
         sample.lab_number = _next_lab_number(db)
     db.add(sample)
+    db.flush()
+    if sample.patient_id is not None:
+        open_orders = (
+            db.query(ExamOrder)
+            .filter(
+                ExamOrder.patient_id == sample.patient_id,
+                ExamOrder.sample_id.is_(None),
+                ExamOrder.status.in_(("prescribed", "collected", "in_progress")),
+            )
+            .order_by(ExamOrder.ordered_at.desc(), ExamOrder.id.desc())
+            .limit(2)
+            .all()
+        )
+        # Un seul bon ouvert : rattachement déterministe. S'il y en a plusieurs,
+        # aucune supposition silencieuse n'est faite.
+        if len(open_orders) == 1:
+            open_orders[0].sample_id = sample.id
+            open_orders[0].status = "collected"
     db.commit()
     db.refresh(sample)
     return sample
