@@ -94,8 +94,12 @@ def import_patients(db: Session, csv_text: str, *, dry_run: bool = False) -> dic
                     db.flush()  # déclenche les contraintes DB ici, dans le savepoint
             seen_ipp.add(ipp)
             created += 1
-        except (ValidationError, ValueError, IntegrityError, SQLAlchemyError) as exc:
+        except (ValidationError, ValueError) as exc:
+            # Message de validation métier : sûr à exposer.
             errors.append({"row": idx, "error": str(exc).replace("\n", " ")[:300]})
+        except (IntegrityError, SQLAlchemyError):
+            # Ne pas exposer le détail SQL/interne au client (fuite d'information).
+            errors.append({"row": idx, "error": "Ligne rejetée (erreur base de données)."})
 
     return _finalize(db, created=created, total=len(rows), errors=errors, dry_run=dry_run)
 
@@ -143,7 +147,11 @@ def import_reagents(db: Session, csv_text: str, *, dry_run: bool = False) -> dic
                     db.flush()
             seen_names.add(name)
             created += 1
-        except (ValidationError, ValueError, IntegrityError, SQLAlchemyError) as exc:
+        except (ValidationError, ValueError) as exc:
+            # Message de validation métier : sûr à exposer.
             errors.append({"row": idx, "error": str(exc).replace("\n", " ")[:300]})
+        except (IntegrityError, SQLAlchemyError):
+            # Ne pas exposer le détail SQL/interne au client (fuite d'information).
+            errors.append({"row": idx, "error": "Ligne rejetée (erreur base de données)."})
 
     return _finalize(db, created=created, total=len(rows), errors=errors, dry_run=dry_run)

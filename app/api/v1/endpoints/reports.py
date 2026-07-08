@@ -2,6 +2,7 @@ import csv
 import datetime as dt
 import json
 from datetime import UTC, datetime, timedelta
+from html import escape as html_escape
 from io import StringIO
 from typing import Literal, TypedDict
 
@@ -943,7 +944,8 @@ def compliance_html_report(
     generated = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     status_color = "#0f766e" if summary["status"] == "compliant" else "#b45309"
     rows = "".join(
-        f"<tr><td>{label}</td><td style='text-align:right'>{value}</td></tr>"
+        f"<tr><td>{html_escape(str(label))}</td>"
+        f"<td style='text-align:right'>{html_escape(str(value))}</td></tr>"
         for label, value in (
             ("Résultats (période)", summary["total_results"]),
             ("Validés", summary["validated_results"]),
@@ -968,8 +970,8 @@ def compliance_html_report(
  .meta{{color:#6b7280;font-size:13px;}}
 </style></head><body>
 <h1>Rapport de conformité — ISO 15189</h1>
-<p class="meta">Période : {summary["period_start"]} → {summary["period_end"]} ({days} jours) · Généré le {generated}</p>
-<p>Statut global : <span class="badge">{summary["status"].upper()}</span></p>
+<p class="meta">Période : {html_escape(str(summary["period_start"]))} → {html_escape(str(summary["period_end"]))} ({html_escape(str(days))} jours) · Généré le {html_escape(generated)}</p>
+<p>Statut global : <span class="badge">{html_escape(str(summary["status"]).upper())}</span></p>
 <table><tbody>{rows}</tbody></table>
 <p class="meta" style="margin-top:24px;">Document généré par RuggyLab OS — à viser par le responsable qualité.</p>
 </body></html>"""

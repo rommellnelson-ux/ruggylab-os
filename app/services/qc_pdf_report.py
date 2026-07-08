@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import math
+from html import escape as html_escape
 
 from sqlalchemy.orm import Session
 
@@ -227,7 +228,7 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
         obs_sd_s = f"{obs_sd:.3f}" if n > 0 else "—"
         summary_rows_html += (
             f"<tr style='background:{row_bg};'>"
-            f"<td>{ctrl.analyte}</td><td>{ctrl.level}</td>"
+            f"<td>{html_escape(str(ctrl.analyte))}</td><td>{html_escape(str(ctrl.level))}</td>"
             f"<td style='text-align:center;'>{n}</td>"
             f"<td style='text-align:center;'>{ctrl.target_mean:.3f}</td>"
             f"<td style='text-align:center;'>{ctrl.target_sd:.3f}</td>"
@@ -255,18 +256,18 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
             z = (r.value - ctrl.target_mean) / ctrl.target_sd if ctrl.target_sd > 0 else 0
             detail_rows += (
                 f"<tr style='background:{zbg};'>"
-                f"<td>{r.measured_at}</td>"
+                f"<td>{html_escape(str(r.measured_at))}</td>"
                 f"<td style='text-align:center;'>{r.value:.3f}</td>"
                 f"<td style='text-align:center;'>{z:+.2f}</td>"
-                f"<td>{', '.join(viols) or '—'}</td>"
-                f"<td>{r.operator or '—'}</td>"
+                f"<td>{html_escape(', '.join(viols)) or '—'}</td>"
+                f"<td>{html_escape(str(r.operator or '—'))}</td>"
                 "</tr>"
             )
 
         sections_html += f"""
         <div class="section" style="page-break-inside:avoid;margin-top:28px;">
-          <h3 style="margin:0 0 8px;color:#1e3a5f;">{ctrl.analyte} — {ctrl.level}
-            <small style="font-weight:normal;color:#6b7280;">(cible: {ctrl.target_mean} ± {ctrl.target_sd} {ctrl.unit})</small>
+          <h3 style="margin:0 0 8px;color:#1e3a5f;">{html_escape(str(ctrl.analyte))} — {html_escape(str(ctrl.level))}
+            <small style="font-weight:normal;color:#6b7280;">(cible: {ctrl.target_mean} ± {ctrl.target_sd} {html_escape(str(ctrl.unit))})</small>
           </h3>
           {svg}
           {"<table class='detail'><thead><tr><th>Date</th><th>Valeur</th><th>Z-score</th><th>Violations</th><th>Opérateur</th></tr></thead><tbody>" + detail_rows + "</tbody></table>" if n > 0 else "<p style='color:#9ca3af;font-style:italic;'>Aucun résultat ce mois.</p>"}
@@ -282,7 +283,7 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rapport QC — {month_name} {year}</title>
+  <title>Rapport QC — {html_escape(month_name)} {html_escape(str(year))}</title>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{ font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111; padding: 20px; }}
@@ -320,7 +321,7 @@ def build_qc_html_report(year: int, month: int, db: Session) -> str:
   </div>
 
   <h1>🏥 RuggyLab OS — Rapport Contrôle Qualité Analytique</h1>
-  <h2>Période : {month_name} {year} &nbsp;·&nbsp; Généré le {generated_at}</h2>
+  <h2>Période : {html_escape(month_name)} {html_escape(str(year))} &nbsp;·&nbsp; Généré le {html_escape(generated_at)}</h2>
 
   <div class="kpi">
     <div class="kpi-card"><div class="val">{total_controls}</div><div class="lbl">Contrôles actifs</div></div>

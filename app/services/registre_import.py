@@ -150,8 +150,12 @@ def import_registre_rows(
 
             created_patients += 1
             created_samples += 1
-        except (ValueError, IntegrityError, SQLAlchemyError) as exc:
+        except ValueError as exc:
+            # Message de validation métier : sûr à exposer.
             errors.append({"row": idx, "error": str(exc).replace("\n", " ")[:300]})
+        except (IntegrityError, SQLAlchemyError):
+            # Ne pas exposer le détail SQL/interne au client (fuite d'information).
+            errors.append({"row": idx, "error": "Ligne rejetée (erreur base de données)."})
 
     if not dry_run and created_patients:
         log_audit_event(
