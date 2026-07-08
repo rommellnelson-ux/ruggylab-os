@@ -1,10 +1,19 @@
-# docker-compose.override.yml – Local development overrides
-# Automatically merged by `docker compose up` (no extra flags needed).
+# docker-compose.dev.yml – Local development overrides
+#
+# ATTENTION : ce fichier n'est PLUS fusionné automatiquement (il s'appelait
+# docker-compose.override.yml, que Compose charge silencieusement — en production,
+# `docker compose up -d` annulait alors l'architecture : --reload, PROCESS_ROLE=all
+# dupliquant les singletons, ports réouverts). Usage explicite désormais :
+#
+#   Développement : docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   Production    : docker compose up -d          (docker-compose.yml seul)
+#
 # Do NOT commit secrets here; use a local .env file.
 
 services:
 
   app:
+    image: ruggylab-os:dev
     build:
       context: .
       target: runtime
@@ -32,6 +41,19 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-DevPassword123!}
       CACHE_BACKEND: ${CACHE_BACKEND:-memory}
+
+  # En dev, l'app (PROCESS_ROLE=all) assure aussi ces rôles ; on fixe seulement
+  # une image locale pour ne pas exiger RUGGYLAB_IMAGE (requis en production).
+  scheduler:
+    image: ruggylab-os:dev
+    profiles: ["workers"]   # optionnel en dev : docker compose --profile workers up
+
+  analyzer-gateway:
+    image: ruggylab-os:dev
+    profiles: ["workers"]
+
+  migrate:
+    image: ruggylab-os:dev
 
   postgres:
     # Expose PG on localhost so local tools (psql, DBeaver…) can connect

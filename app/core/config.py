@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # En prod multi-worker : app=web + un service scheduler + un service
     # analyzer-gateway (même image, commandes différentes). Cf. docker-compose.yml.
     PROCESS_ROLE: str = "all"
+    # Fichier de log applicatif. None (défaut) = stdout uniquement — indispensable
+    # en conteneur : l'utilisateur non-root ne peut pas créer /app/logs, et Docker
+    # assure de toute façon collecte et rotation. Sur un poste nu (Windows), mettre
+    # LOG_FILE=logs/app.log dans .env pour retrouver le fichier local.
+    LOG_FILE: str | None = None
     TESTING: bool = False
     # Validation non bloquante par défaut : un effectif réduit ne permet pas une
     # double validation quotidienne. La publication / le compte-rendu reste

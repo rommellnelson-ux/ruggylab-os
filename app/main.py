@@ -32,11 +32,13 @@ from app.utils.redis_rate_limiter import init_redis_client
 
 logger = logging.getLogger(__name__)
 
-# Initialize observability
+# Initialize observability.
+# log_file : None par défaut (stdout) — en conteneur non-root, écrire dans
+# /app/logs provoquait une PermissionError avant même le démarrage de FastAPI.
 configure_logging(
     level="INFO",
     json_logs=not settings.TESTING,
-    log_file=None if settings.TESTING else "logs/app.log",
+    log_file=None if settings.TESTING else settings.LOG_FILE,
 )
 
 # Les métriques Prometheus sont exposées via la route ASGI `/metrics` (voir

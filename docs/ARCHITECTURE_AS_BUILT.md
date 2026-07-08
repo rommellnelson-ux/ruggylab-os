@@ -65,10 +65,19 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 | `migrate` | ruggylab-os | run-once manuel (`--profile migrate`) | backend |
 
 - TLS : Caddy, CA interne par défaut (LAN sans Internet) ; ACME/certificats
-  fournis en option (`deploy/Caddyfile`). — **CONFIGURED** : la topologie est
-  validée par parsing YAML, **jamais exécutée sur un hôte Docker réel**.
-- Dev (`docker-compose.override.yml`) : app exposée sur `127.0.0.1:8000`,
-  rôle `all`, ports techniques liés à localhost uniquement.
+  fournis en option (`deploy/Caddyfile`). — **VERIFIED en CI** : le job
+  `docker-stack` construit l'image, démarre `docker-compose.yml` seul, vérifie
+  que **seuls 80/443 sont publiés**, que scheduler/gateway sont sains, et joue
+  le flux clinique **à travers le proxy TLS**. Reste à éprouver sur le serveur
+  physique du laboratoire (UNKNOWN hors CI).
+- Image : artefact immuable **obligatoire** (`RUGGYLAB_IMAGE=<tag précis>`,
+  le compose refuse de démarrer sans) ; la CI publie
+  `ghcr.io/<owner>/<repo>:<git-sha>` et `:<ref>` — chemin aligné sur le compose.
+- Dev (`docker-compose.dev.yml`) : chargé **explicitement uniquement**
+  (`-f docker-compose.yml -f docker-compose.dev.yml`). L'ancien nom
+  `docker-compose.override.yml` était fusionné silencieusement par Compose et
+  annulait l'architecture de production (`--reload`, rôle `all` dupliquant les
+  singletons, ports réouverts) — corrigé.
 
 ## 4. Données et migrations
 
@@ -157,14 +166,27 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 
 ## 11. Limitations connues / non implémenté
 
-- **Compose jamais exécuté en réel** : la machine de développement n'a pas
-  Docker ; chantier 2 validé par parsing uniquement. À éprouver : `docker
-  compose config && up -d`, puis `ss -lntp` (seuls 80/443).
-- **Image `latest`** : `docker-compose.yml` référence `:latest` alors que la CI
-  publie `:<git-sha>` — violation §10 à corriger (variable `RUGGYLAB_IMAGE_TAG`).
+- **Gouvernance clinique** : `REQUIRE_VALIDATION_FOR_RELEASE` vaut `true` en
+  production (compose) mais `false` par défaut dans le code (dev). Toute
+  publication « provisoire » exige une procédure écrite (rôle, motif, filigrane,
+  délai maximal) — non implémentée à ce jour (TARGET).
+- **Serveur physique non qualifié** : la stack tourne en CI (job `docker-stack`)
+  mais n'a jamais été démarrée sur le serveur cible du laboratoire (UPS, VLAN
+  automates, imprimantes) — UNKNOWN.
+- **Gateway automates non connectée à un automate réel** : IMPLEMENTED dans le
+  code, CONFIGURED dans compose (réseau bridge ≠ VLAN physique), NON VÉRIFIÉ
+  avec des trames DH36 réelles.
+- **Prometheus/Grafana « accès VPN/bastion »** : le réseau management existe,
+  mais aucun VPN/bastion n'est livré par le dépôt — TARGET (accès via
+  `docker exec` local en attendant).
+- **Confiance proxy** : `TRUSTED_PROXY_IPS=[]` par défaut et non configuré dans
+  compose → quotas par IP potentiellement mutualisés derrière Caddy — TARGET.
+- **Cardinalité métriques** : le label `endpoint` reçoit le chemin brut (IDs de
+  ressources inclus) au lieu du gabarit de route — violation §5 — TARGET (lot P1).
 - **Multi-worker non testé en intégration** (le gating par rôle est testé
-  unitairement).
-- `/docs`, `/openapi.json`, `/metrics` non restreints applicativement (§14).
+  unitairement ; `docker-stack` valide 1 exemplaire par rôle, pas le scaling).
+- `/docs`, `/openapi.json`, `/metrics` non restreints applicativement ni au
+  proxy (§14) — TARGET (lot P1).
 - Versionnement immuable des résultats validés (§20) : statuts de correction
   existent, pas de chaîne `version/previous_version_id` — TARGET.
 - FHIR : export partiel (« sous-ensemble FHIR R4 »), pas d'API FHIR complète.

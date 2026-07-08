@@ -61,7 +61,11 @@ def _check(label: str, condition: bool, detail: str = "") -> bool:
 
 def main() -> int:
     print(f"Smoke test RuggyLab OS sur {BASE_URL}\n")
-    client = httpx.Client(timeout=15.0)
+    # UAT_INSECURE_TLS=1 : accepte un certificat auto-signé (proxy Caddy en CA
+    # interne — cas du job CI docker-stack et des LAN sans Internet). Jamais
+    # nécessaire en HTTP ni avec un certificat public valide.
+    verify = not os.environ.get("UAT_INSECURE_TLS")
+    client = httpx.Client(timeout=15.0, verify=verify)
 
     # 1. Santé
     try:
