@@ -2,13 +2,38 @@
 # Override for local dev: docker-compose.override.yml (auto-loaded by Compose)
 # Run migrations manually: docker compose --profile migrate up migrate
 #
+# Réseau (§8/§9) : SEUL le reverse proxy `proxy` publie des ports (80/443). L'app,
+# PostgreSQL, Redis, Prometheus et Grafana n'exposent aucun port. Segmentation :
+#   frontend_net   : proxy, app
+#   backend_net    : app, scheduler, analyzer-gateway, postgres, redis, prometheus, migrate
+#   management_net : prometheus, grafana (accès VPN/bastion — jamais le VLAN clinique)
+#   analyzer_net   : analyzer-gateway (automates)
+#
 # Required environment variables (copy .env.example → .env and fill in):
 #   DATABASE_URL, SECRET_KEY, REDIS_URL, FIRST_SUPERUSER_PASSWORD
-#   POSTGRES_PASSWORD
+#   POSTGRES_PASSWORD, GRAFANA_PASSWORD, RUGGYLAB_DOMAIN
 
 services:
 
-  # ── Application ─────────────────────────────────────────────────────────────
+  # ── Reverse proxy TLS (SEUL service exposé) ──────────────────────────────────
+  proxy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      RUGGYLAB_DOMAIN: ${RUGGYLAB_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - frontend_net
+
+  # ── Application (rôle web) ───────────────────────────────────────────────────
   app:
     build:
       context: .
@@ -21,13 +46,16 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
       CACHE_BACKEND: redis
+      # Rôle web : sert l'API/UI + fan-out WebSocket ; ne lance NI la purge des
+      # jetons NI le listener DH36 (délégués aux services scheduler / gateway
+      # ci-dessous), pour éviter les duplications si l'app est scalée.
+      PROCESS_ROLE: web
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    # Pas de `ports:` — l'app n'est jointe que par le proxy (frontend_net).
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
@@ -39,7 +67,53 @@ services:
       - app_data:/app/data
       - app_models:/app/models
     networks:
-      - ruggylab
+      - frontend_net
+      - backend_net
+
+  # ── Scheduler (tâches planifiées, exemplaire unique) ─────────────────────────
+  # Même image que `app`, rôle scheduler : purge des jetons, etc. NE PAS scaler.
+  scheduler:
+    build:
+      context: .
+      target: runtime
+    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    restart: unless-stopped
+    command: ["python", "-m", "app.scheduler"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
+      SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      PROCESS_ROLE: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend_net
+
+  # ── Analyzer gateway (listener DH36, exemplaire unique — bind un port) ────────
+  analyzer-gateway:
+    build:
+      context: .
+      target: runtime
+    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    restart: unless-stopped
+    command: ["python", "-m", "app.analyzer_gateway"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
+      SECRET_KEY: ${SECRET_KEY}
+      PROCESS_ROLE: analyzer-gateway
+      ENABLE_DH36_LISTENER: "true"
+      # Écoute sur toutes les interfaces internes pour recevoir les trames automates.
+      DH36_LISTENER_HOST: 0.0.0.0
+    # Pour recevoir les automates du LAN, publier le port DH36 LIÉ à l'interface
+    # du VLAN automates uniquement, p.ex. :  ports: ["10.0.30.1:5001:5001"]
+    # (ne jamais publier sur 0.0.0.0 — cf. §8.1).
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - analyzer_net
+      - backend_net
 
   # ── PostgreSQL 16 ────────────────────────────────────────────────────────────
   postgres:
@@ -58,7 +132,7 @@ services:
       start_period: 20s
       retries: 5
     networks:
-      - ruggylab
+      - backend_net
 
   # ── Redis 7 ─────────────────────────────────────────────────────────────────
   redis:
@@ -74,9 +148,9 @@ services:
       start_period: 10s
       retries: 5
     networks:
-      - ruggylab
+      - backend_net
 
-  # ── Prometheus ───────────────────────────────────────────────────────────────
+  # ── Prometheus (management — non publié) ─────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
@@ -88,14 +162,14 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
-    ports:
-      - "9090:9090"
+    # Pas de `ports:` — accès via VPN/bastion uniquement (jamais le VLAN clinique).
     depends_on:
       - app
     networks:
-      - ruggylab
+      - backend_net       # pour scraper app:8000/metrics
+      - management_net    # pour Grafana / accès management
 
-  # ── Grafana ──────────────────────────────────────────────────────────────────
+  # ── Grafana (management — non publié) ────────────────────────────────────────
   grafana:
     image: grafana/grafana:11.0.0
     restart: unless-stopped
@@ -104,15 +178,13 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/ruggylab-os.json
-      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
+    # Pas de `ports:` — accès via VPN/bastion uniquement.
     depends_on:
       - prometheus
-    ports:
-      - "3000:3000"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
       interval: 30s
@@ -120,7 +192,7 @@ services:
       start_period: 30s
       retries: 3
     networks:
-      - ruggylab
+      - management_net
 
   # ── Migrations (run-once, manual) ────────────────────────────────────────────
   migrate:
@@ -139,7 +211,7 @@ services:
     profiles:
       - migrate
     networks:
-      - ruggylab
+      - backend_net
 
 # ── Named volumes ────────────────────────────────────────────────────────────
 volumes:
@@ -149,8 +221,16 @@ volumes:
   app_data:
   app_models:
   grafana_data:
+  caddy_data:
+  caddy_config:
 
-# ── Network ──────────────────────────────────────────────────────────────────
+# ── Networks (§8.2) ──────────────────────────────────────────────────────────
 networks:
-  ruggylab:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+  management_net:
+    driver: bridge
+  analyzer_net:
     driver: bridge

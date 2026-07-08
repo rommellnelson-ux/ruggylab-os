@@ -60,7 +60,7 @@ jobs:
         run: python -m detect_secrets.pre_commit_hook --baseline .secrets.baseline $(git ls-files)
 
   test-postgres:
-    name: Migrations and smoke test (PostgreSQL)
+    name: Migrations + flux clinique E2E (PostgreSQL)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -127,6 +127,38 @@ jobs:
               count = conn.execute(text("SELECT count(*) FROM users")).scalar()
           print(f"PostgreSQL smoke-test OK — {count} user(s) in DB")
           EOF
+
+      # ── Flux clinique complet sur PostgreSQL (bloquant) ──────────────────────
+      # patient → échantillon → prescription → rattachement → résultat → fil →
+      # cloisonnement comptable → facture → encaissement → synthèse.
+      # Réutilise scripts/uat_smoke.py (le « 15/15 » de la checklist go-live),
+      # exécuté ici contre une instance réelle adossée à PostgreSQL 16.
+      - name: Start application against PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_test
+          SECRET_KEY: ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+          CACHE_BACKEND: memory
+          ENABLE_DH36_LISTENER: "false"
+        run: |
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 --log-level warning > uvicorn-pg.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/v1/health && break || sleep 1
+          done
+
+      - name: Run clinical flow E2E (uat_smoke) against PostgreSQL
+        env:
+          UAT_BASE_URL: http://127.0.0.1:8000
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+        run: python -m scripts.uat_smoke
+
+      - name: Upload app log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uvicorn-pg-log
+          path: uvicorn-pg.log
+          if-no-files-found: ignore
 
   codeql:
     name: CodeQL security analysis
@@ -214,7 +246,9 @@ jobs:
     # Déploiement uniquement sur tag de version (vX.Y.Z) ou déclenchement manuel —
     # pas sur chaque commit poussé sur main.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    needs: [test, test-postgres, codeql]
+    # E2E bloquant : aucune image n'est publiée si le parcours navigateur (e2e)
+    # ou le flux clinique PostgreSQL (test-postgres) échoue.
+    needs: [test, test-postgres, codeql, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read

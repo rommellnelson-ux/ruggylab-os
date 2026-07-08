@@ -4,7 +4,17 @@ Prometheus metrics and monitoring for RuggyLab OS.
 Provides metrics for requests, database operations, and custom application metrics.
 """
 
-from prometheus_client import Counter, Gauge, Histogram, start_http_server
+import os
+
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
 
 class MetricsRegistry:
@@ -128,9 +138,20 @@ class MetricsRegistry:
     )
 
 
-def init_metrics_server(port: int = 8001) -> None:
-    """Start Prometheus metrics HTTP server."""
-    start_http_server(port)
+def render_latest() -> tuple[bytes, str]:
+    """Rend les métriques Prometheus au format texte, pour une route ``/metrics``.
+
+    Remplace l'ancien serveur HTTP secondaire (``start_http_server`` sur un port
+    dédié) qui, à l'import du module principal, entrait en conflit de port avec
+    plusieurs workers web. Compatible multi-worker : si ``PROMETHEUS_MULTIPROC_DIR``
+    est défini, agrège les métriques de tous les process (mode multiprocess
+    officiel de prometheus_client) ; sinon expose le registre du process courant.
+    """
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry), CONTENT_TYPE_LATEST
+    return generate_latest(), CONTENT_TYPE_LATEST
 
 
 def record_request_metrics(method: str, endpoint: str, status: int, duration: float) -> None:

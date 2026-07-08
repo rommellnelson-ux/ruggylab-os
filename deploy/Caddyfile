@@ -1,0 +1,42 @@
+# Caddyfile — reverse proxy TLS devant RuggyLab OS (§8/§9).
+#
+# Seul ce proxy est exposé au réseau utilisateur (80 → redirection 443). L'app,
+# PostgreSQL, Redis, Prometheus et Grafana ne publient AUCUN port.
+# Domaine via $RUGGYLAB_DOMAIN (défaut: localhost).
+
+{$RUGGYLAB_DOMAIN:localhost} {
+	encode gzip
+
+	# En-têtes de sécurité (complètent ceux posés par l'application).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Limite de taille des uploads (ajuster selon les besoins : images microscopie…).
+	request_body {
+		max_size 25MB
+	}
+
+	# Reverse proxy vers l'app. Caddy gère automatiquement l'upgrade WebSocket
+	# (notifications temps-réel) et transmet l'IP cliente réelle.
+	reverse_proxy app:8000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# TLS — CA interne par défaut (site unique sur LAN, sans Internet ; installer
+	# le certificat racine Caddy sur les postes clients). Alternatives :
+	#   - domaine public + Internet : supprimer la ligne `tls internal`
+	#     (Caddy obtient et renouvelle un certificat via ACME automatiquement) ;
+	#   - certificats fournis :
+	#       tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
+	tls internal
+}
+
+# Note : Prometheus et Grafana ne sont PAS routés par ce proxy public. Ils vivent
+# sur le réseau `management_net` et ne sont accessibles que via VPN / bastion
+# (voir docker-compose.override.yml pour l'exposition locale en dev).

@@ -53,6 +53,17 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str = DEFAULT_FIRST_SUPERUSER_PASSWORD
     FIRST_SUPERUSER_FULL_NAME: str = "RuggyLab Administrator"
     ENABLE_DH36_LISTENER: bool = True
+    # ── Rôle du process (séparation web / tâches de fond) ───────────────────────
+    # Détermine quelles tâches de fond ce process exécute, afin d'éviter les
+    # duplications quand plusieurs workers web tournent (listener DH36 qui bind un
+    # port, purge des jetons planifiée…). Valeurs :
+    #   "all"              : tout dans un seul process (dev / mono-poste) [défaut]
+    #   "web"              : API/UI + fan-out WebSocket, AUCUN singleton
+    #   "scheduler"        : tâches planifiées (purge des jetons)
+    #   "analyzer-gateway" : listener DH36 (un seul exemplaire — bind un port)
+    # En prod multi-worker : app=web + un service scheduler + un service
+    # analyzer-gateway (même image, commandes différentes). Cf. docker-compose.yml.
+    PROCESS_ROLE: str = "all"
     TESTING: bool = False
     # Validation non bloquante par défaut : un effectif réduit ne permet pas une
     # double validation quotidienne. La publication / le compte-rendu reste
@@ -151,6 +162,21 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    @property
+    def runs_web(self) -> bool:
+        """Ce process sert l'API/UI et le fan-out WebSocket."""
+        return self.PROCESS_ROLE in ("web", "all")
+
+    @property
+    def runs_scheduler(self) -> bool:
+        """Ce process exécute les tâches planifiées (purge des jetons…)."""
+        return self.PROCESS_ROLE in ("scheduler", "all")
+
+    @property
+    def runs_analyzer_gateway(self) -> bool:
+        """Ce process exécute le listener d'automates DH36 (exemplaire unique)."""
+        return self.PROCESS_ROLE in ("analyzer-gateway", "all")
 
     @property
     def has_default_secret_key(self) -> bool:

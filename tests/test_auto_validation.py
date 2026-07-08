@@ -275,6 +275,114 @@ class TestAutoValidationOnCreate:
         assert flag_val in ("H", "HH")
         assert result["is_auto_validated"] is False
 
+    def test_not_auto_validated_when_analyte_uncovered(self, client):
+        """Garde-fou couverture ISO 15189 §5.8 : un analyte numérique sans plage
+        de référence configurée empêche l'auto-validation, même si les autres
+        analytes du panel sont normaux."""
+        hdrs = _auth(client)
+        existing = client.get("/api/v1/auto-validation/config", headers=hdrs).json()
+        for c in existing:
+            client.delete(f"/api/v1/auto-validation/config/{c['id']}", headers=hdrs)
+
+        covered = f"COV{_uid()[:4].upper()}"
+        uncovered = f"UNC{_uid()[:4].upper()}"
+        _create_ref_range(client, hdrs, covered, 4.0, 11.0)  # uncovered a AUCUNE plage
+        _create_auto_config(
+            client,
+            hdrs,
+            require_all_flags_normal=True,
+            require_no_delta=False,
+            require_not_critical=False,
+        )
+        patient_id = _make_patient(client, hdrs)
+        sample_id = _make_sample(client, hdrs, patient_id)
+        # covered=7.0 → flag N ; uncovered=999.0 → aucun flag (plage absente)
+        result = _post_result(client, hdrs, sample_id, {covered: 7.0, uncovered: 999.0})
+        assert result["flags"].get(covered) == "N"
+        assert uncovered.upper() not in (result["flags"] or {})
+        # Analyte non contrôlé présent → abstention.
+        assert result["is_auto_validated"] is False
+
+    def test_most_recent_active_rule_wins(self, client):
+        """Avec plusieurs règles actives, la plus récente s'applique (déterministe)."""
+        hdrs = _auth(client)
+        existing = client.get("/api/v1/auto-validation/config", headers=hdrs).json()
+        for c in existing:
+            client.delete(f"/api/v1/auto-validation/config/{c['id']}", headers=hdrs)
+
+        # Règle 1 (ancienne) : bloque les résultats critiques.
+        _create_auto_config(
+            client,
+            hdrs,
+            require_all_flags_normal=False,
+            require_no_delta=False,
+            require_not_critical=True,
+        )
+        # Règle 2 (récente) : permissive (n'exige rien).
+        _create_auto_config(
+            client,
+            hdrs,
+            require_all_flags_normal=False,
+            require_no_delta=False,
+            require_not_critical=False,
+        )
+        # Résultat critique
+        r_cr = client.post(
+            "/api/v1/critical-ranges",
+            headers=hdrs,
+            json={"analyte": "WBC", "low_critical": None, "high_critical": 1.0, "unit": "unit"},
+        )
+        assert r_cr.status_code in (200, 201), r_cr.text
+        patient_id = _make_patient(client, hdrs)
+        sample_id = _make_sample(client, hdrs, patient_id)
+        result = _post_result(client, hdrs, sample_id, {"WBC": 50.0})
+        assert result["is_critical"] is True
+        # La règle récente (permissive) gagne → auto-validé malgré la criticité.
+        assert result["is_auto_validated"] is True
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Helpers de service (unitaires, sans DB)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class TestAutoValidatorHelpers:
+    def test_is_normal_flag_recognises_both_vocabularies(self):
+        from app.services.auto_validator import _is_normal_flag
+
+        # Vocabulaire court (compute_flags) et long (apply_bioref_to_result).
+        assert _is_normal_flag("N") is True
+        assert _is_normal_flag("NORMAL") is True
+        assert _is_normal_flag("négatif") is True
+        assert _is_normal_flag("H") is False
+        assert _is_normal_flag("HAUT") is False
+        assert _is_normal_flag("CRITIQUE BAS") is False
+        assert _is_normal_flag(None) is False
+
+    def test_uncovered_analytes_detects_missing_range(self):
+        from types import SimpleNamespace
+
+        from app.services.auto_validator import _uncovered_analytes
+
+        result = SimpleNamespace(
+            flags={"GLU": "N"},
+            data_points={"GLU": 5.0, "NA": 140.0, "manual_entry_by": "tech1"},
+        )
+        # NA est numérique mais absent des flags → non couvert ; la métadonnée
+        # manual_entry_by est ignorée.
+        assert _uncovered_analytes(result) == {"NA"}
+
+    def test_uncovered_analytes_empty_when_all_covered(self):
+        from types import SimpleNamespace
+
+        from app.services.auto_validator import _uncovered_analytes
+
+        result = SimpleNamespace(
+            flags={"GLU": "NORMAL", "NA": "HAUT"},
+            data_points={"glu": 5.0, "na": 140.0},
+        )
+        assert _uncovered_analytes(result) == set()
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Batch auto-validation via /run

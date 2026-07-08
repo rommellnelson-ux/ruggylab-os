@@ -10,6 +10,12 @@ services:
       target: runtime
     # Hot-reload: mount source code and run uvicorn with --reload
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # En dev, on accède à l'app directement sur localhost:8000 (on court-circuite
+    # le reverse proxy). En prod, seul le service `proxy` (80/443) est exposé.
+    ports:
+      - "127.0.0.1:8000:8000"
+    # En dev, l'app fait tout (mono-process) : pas besoin des services scheduler /
+    # analyzer-gateway. Stack minimale : `docker compose up app postgres redis`.
     volumes:
       # Live source mount – changes take effect without rebuilding the image
       - ./app:/app/app:ro
@@ -18,6 +24,8 @@ services:
       - ./data:/app/data
       - ./models:/app/models
     environment:
+      # En dev, l'app assure tous les rôles (web + scheduler + gateway).
+      PROCESS_ROLE: all
       # In dev, SQLite is fine; override with DATABASE_URL in your .env for PG
       DATABASE_URL: ${DATABASE_URL:-sqlite:///./ruggylab_os.db}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-NOT-for-production-use-32c}
