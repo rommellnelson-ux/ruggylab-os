@@ -89,6 +89,16 @@ RuggyLab OS follows a layered backend structure:
 
 In practice, this keeps request handling thin while making domain workflows easier to test and extend.
 
+At runtime, background work is separated from the web workers via `PROCESS_ROLE`
+(`web` / `scheduler` / `analyzer-gateway`, default `all` for single-process dev).
+In production (Docker Compose), only the Caddy reverse proxy publishes ports
+(80/443); the app, PostgreSQL, Redis, Prometheus and Grafana stay on internal
+networks.
+
+The authoritative description of the **system as actually built** (services,
+ports, migration head, verified vs. target status of each capability) lives in
+[docs/ARCHITECTURE_AS_BUILT.md](docs/ARCHITECTURE_AS_BUILT.md).
+
 ## Quick start
 
 ### Windows one-command setup
@@ -117,19 +127,25 @@ For a real workstation, edit `.env` before starting and set strong values for:
 
 ### Backups
 
-Create a local SQLite backup:
+**Development (SQLite)** — simple file copy of the local database:
 
 ```powershell
 .\scripts\backup.ps1
-```
-
-Restore from a backup:
-
-```powershell
 .\scripts\restore.ps1 -BackupPath .\backups\ruggylab_os-YYYYMMDD-HHMMSS.db
 ```
 
 The restore script creates a safety copy of the current database before replacing it.
+
+**Production (PostgreSQL)** — `pg_dump` with SHA-256 integrity, retention and a
+**verified restore** onto a scratch database (schema, Alembic head, accounts,
+volumes, smoke test — the only accepted proof that a backup is usable):
+
+```powershell
+.\scripts\pg_backup.ps1 -RetentionDays 14
+.\scripts\pg_restore_verify.ps1 -BackupFile backups\ruggylab_pg-YYYYMMDD-HHMMSS.dump
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §6 for the full procedure.
 
 ### 1. Create and activate a virtual environment
 

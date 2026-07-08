@@ -21,7 +21,8 @@
     Chemin du dump à vérifier (.dump ou .dump.enc). Si .enc, $env:BACKUP_PASSPHRASE requis.
 
 .PARAMETER ExpectedHead
-    Révision Alembic attendue (défaut: 20260623_0035).
+    Révision Alembic attendue (défaut: 20260625_0036 — à maintenir aligné sur le
+    head réel du dépôt à chaque nouvelle migration).
 
 .PARAMETER ScratchDb
     Nom de la base temporaire de vérification (défaut: ruggylab_verify).
@@ -34,7 +35,7 @@
 #>
 param(
     [Parameter(Mandatory = $true)][string]$BackupFile,
-    [string]$ExpectedHead = "20260623_0035",
+    [string]$ExpectedHead = "20260625_0036",
     [string]$ScratchDb = "ruggylab_verify",
     [string]$ComposeService = "postgres",
     [switch]$Keep
