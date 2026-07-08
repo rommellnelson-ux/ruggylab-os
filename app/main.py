@@ -18,7 +18,7 @@ from app.core.config import settings
 from app.core.health_check import HealthCheckService
 from app.core.logging_config import configure_logging
 from app.core.login_rate_limit import LoginRateLimitMiddleware
-from app.core.metrics import init_metrics_server
+from app.core.metrics import render_latest
 from app.core.middleware import PoweredByMiddleware
 from app.core.observability_middleware import ObservabilityMiddleware, RequestIDMiddleware
 from app.core.rate_limit import RateLimitMiddleware
@@ -39,13 +39,9 @@ configure_logging(
     log_file=None if settings.TESTING else "logs/app.log",
 )
 
-# Start metrics server (on different port from main app)
-if not settings.TESTING and settings.METRICS_SERVER_ENABLED:
-    try:
-        init_metrics_server(port=8001)
-        logger.info("Prometheus metrics server started on port 8001")
-    except Exception as exc:
-        logger.warning("Failed to start metrics server: %s", exc)
+# Les métriques Prometheus sont exposées via la route ASGI `/metrics` (voir
+# create_app), et non plus par un serveur HTTP secondaire à l'import : ce dernier
+# provoquait un conflit de port avec plusieurs workers web (cf. chantier runtime).
 
 # Initialize health check service
 _app_start_time = datetime.now(UTC)
@@ -72,9 +68,19 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     init_db()
     import asyncio
 
+    logger.info(
+        "Process role: %s (web=%s, scheduler=%s, analyzer-gateway=%s)",
+        settings.PROCESS_ROLE,
+        settings.runs_web,
+        settings.runs_scheduler,
+        settings.runs_analyzer_gateway,
+    )
+
+    # Listener DH36 : rôle analyzer-gateway uniquement (bind un port → exemplaire
+    # unique ; sinon plusieurs workers web se disputeraient le port).
     listener_task = None
     cleanup_task = None
-    if not settings.TESTING and settings.ENABLE_DH36_LISTENER:
+    if not settings.TESTING and settings.runs_analyzer_gateway and settings.ENABLE_DH36_LISTENER:
         listener = DH36Listener(
             host=settings.DH36_LISTENER_HOST,
             port=settings.DH36_LISTENER_PORT,
@@ -84,15 +90,19 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         except RuntimeError as exc:
             logger.warning("DH36 listener not started: %s", exc)
 
-    if not settings.TESTING:
+    # Purge des jetons : tâche planifiée → rôle scheduler uniquement (singleton ;
+    # inutile et redondant de la lancer dans chaque worker web).
+    if not settings.TESTING and settings.runs_scheduler:
         cleanup_task = asyncio.create_task(
             periodic_token_cleanup(interval_seconds=3600, keep_days=7)
         )
         logger.info("Periodic refresh-token cleanup task started (every 3600 s).")
 
-    # Fan-out Redis des notifications temps-réel (multi-worker), si configuré.
+    # Fan-out Redis des notifications temps-réel : rôle web uniquement, mais bien
+    # dans CHAQUE worker web (chacun sert ses propres clients WebSocket — ce n'est
+    # pas une duplication mais le mécanisme qui rend le multi-worker correct).
     notif_sub_task = None
-    if not settings.TESTING and settings.REDIS_URL:
+    if not settings.TESTING and settings.runs_web and settings.REDIS_URL:
         try:
             from app.services.redis_notification import (
                 enable_redis_fanout,
@@ -218,6 +228,12 @@ def create_app() -> FastAPI:
     async def metrics_summary() -> dict[str, Any]:
         """Get summary of application metrics."""
         return health_check_service.get_metrics_summary()
+
+    @fastapi_app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        """Exposition Prometheus (scrutée par monitoring/prometheus.yml : app:8000/metrics)."""
+        data, content_type = render_latest()
+        return Response(content=data, media_type=content_type)
 
     @fastapi_app.options("/{path_name:path}", include_in_schema=False)
     async def cors_preflight(path_name: str) -> Response:

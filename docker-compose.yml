@@ -21,6 +21,10 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
       CACHE_BACKEND: redis
+      # Rôle web : sert l'API/UI + fan-out WebSocket ; ne lance NI la purge des
+      # jetons NI le listener DH36 (délégués aux services scheduler / gateway
+      # ci-dessous), pour éviter les duplications si l'app est scalée.
+      PROCESS_ROLE: web
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,6 +42,48 @@ services:
     volumes:
       - app_data:/app/data
       - app_models:/app/models
+    networks:
+      - ruggylab
+
+  # ── Scheduler (tâches planifiées, exemplaire unique) ─────────────────────────
+  # Même image que `app`, rôle scheduler : purge des jetons, etc. NE PAS scaler.
+  scheduler:
+    build:
+      context: .
+      target: runtime
+    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    restart: unless-stopped
+    command: ["python", "-m", "app.scheduler"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
+      SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      PROCESS_ROLE: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ruggylab
+
+  # ── Analyzer gateway (listener DH36, exemplaire unique — bind un port) ────────
+  analyzer-gateway:
+    build:
+      context: .
+      target: runtime
+    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    restart: unless-stopped
+    command: ["python", "-m", "app.analyzer_gateway"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
+      SECRET_KEY: ${SECRET_KEY}
+      PROCESS_ROLE: analyzer-gateway
+      ENABLE_DH36_LISTENER: "true"
+      # Écoute sur toutes les interfaces du réseau interne (jamais publié hors du
+      # réseau `ruggylab`) pour recevoir les trames des automates.
+      DH36_LISTENER_HOST: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - ruggylab
 
