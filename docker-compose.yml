@@ -14,12 +14,21 @@
 #   DATABASE_URL, SECRET_KEY, REDIS_URL, FIRST_SUPERUSER_PASSWORD
 #   POSTGRES_PASSWORD, GRAFANA_PASSWORD, RUGGYLAB_DOMAIN
 
+# Rotation des logs Docker : borne l'espace disque consommé par les journaux de
+# conteneurs (sinon croissance illimitée → saturation du serveur du labo).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   # ── Reverse proxy TLS (SEUL service exposé) ──────────────────────────────────
   proxy:
     image: caddy:2.8-alpine
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -48,6 +57,15 @@ services:
     # Jamais `latest` en production (§10 des Instructions maîtres).
     image: ${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set (immutable tag, e.g. ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha>)}
     restart: unless-stopped
+    logging: *default-logging
+    # Limites de ressources (ajuster selon le serveur du labo) : bornent la
+    # consommation et évitent qu'un pic (campagne de dépistage) fasse tomber tout
+    # l'hôte par OOM. `docker compose up` applique bien deploy.resources.limits.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY}
@@ -96,17 +114,28 @@ services:
       target: runtime
     image: ${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}
     restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
     command: ["python", "-m", "app.scheduler"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       PROCESS_ROLE: scheduler
-    # Le HEALTHCHECK de l'image sonde HTTP:8000 (rôle web) ; ce process ne sert
-    # pas d'HTTP → on le neutralise pour éviter un `unhealthy` permanent.
-    # TODO(P1) : heartbeat dédié (fichier/DB horodaté par la boucle du scheduler).
+    # Healthcheck adapté au rôle : le process écrit un battement toutes les ~30 s
+    # (app/scheduler.py) ; on vérifie que le fichier a moins de 2 min. Remplace
+    # la sonde HTTP:8000 héritée de l'image (toujours KO pour ce rôle).
     healthcheck:
-      disable: true
+      test: ["CMD-SHELL",
+             "test -n \"$(find /tmp/ruggylab_scheduler.heartbeat -mmin -2 2>/dev/null)\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,6 +149,12 @@ services:
       target: runtime
     image: ${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}
     restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
     command: ["python", "-m", "app.analyzer_gateway"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
@@ -149,8 +184,14 @@ services:
 
   # ── PostgreSQL 16 ────────────────────────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.6-alpine   # version patch épinglée (§10 — pas de tag flottant)
     restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ruggylab}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
@@ -172,8 +213,14 @@ services:
   # dernier succès est surveillée par healthcheck (< 26 h). Les scripts
   # pg_backup.ps1 / pg_restore_verify.ps1 restent l'outillage manuel/vérification.
   db-backup:
-    image: postgres:16-alpine
+    image: postgres:16.6-alpine   # même version patch que le service postgres
     restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
     environment:
       PGHOST: postgres
       PGUSER: ${POSTGRES_USER:-ruggylab}
@@ -214,8 +261,14 @@ services:
 
   # ── Redis 7 ─────────────────────────────────────────────────────────────────
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine   # version mineure épinglée (§10)
     restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -230,8 +283,14 @@ services:
 
   # ── Prometheus (management — non publié) ─────────────────────────────────────
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.1.0   # §10 : fini `latest` en production
     restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -251,6 +310,12 @@ services:
   grafana:
     image: grafana/grafana:11.0.0
     restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD in .env}

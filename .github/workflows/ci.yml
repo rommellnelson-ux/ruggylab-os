@@ -316,13 +316,15 @@ jobs:
       - name: Assert role containers are healthy
         run: |
           docker compose ps
-          [ "$(docker inspect -f '{{.State.Status}}' "$(docker compose ps -q scheduler)")" = "running" ]
-          # Le healthcheck TCP de la gateway peut mettre ~1 min (start_period + interval)
-          for i in $(seq 1 30); do
-            gw=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q analyzer-gateway)")
-            [ "$gw" = "healthy" ] && break || sleep 3
+          # scheduler (heartbeat) et analyzer-gateway (sonde TCP DH36) doivent
+          # devenir healthy — ~1 min (start_period + interval) chacun.
+          for svc in scheduler analyzer-gateway; do
+            for i in $(seq 1 30); do
+              st=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q $svc)")
+              [ "$st" = "healthy" ] && break || sleep 3
+            done
+            [ "$st" = "healthy" ] || { echo "::error::$svc = $st"; docker compose logs --tail 50 "$svc"; exit 1; }
           done
-          [ "$gw" = "healthy" ] || { docker compose logs --tail 50 analyzer-gateway; exit 1; }
 
       - name: Clinical flow through the TLS proxy
         env:
