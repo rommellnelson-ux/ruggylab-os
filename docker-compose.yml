@@ -32,7 +32,11 @@ services:
     depends_on:
       - app
     networks:
-      - frontend_net
+      # IP statique : TRUSTED_PROXY_IPS (app) compare l'IP directe du pair à une
+      # liste exacte — sans IP fixe, X-Forwarded-For ne serait jamais honoré et
+      # tous les postes du LAN partageraient les quotas de l'IP du proxy.
+      frontend_net:
+        ipv4_address: 172.28.117.10
 
   # ── Application (rôle web) ───────────────────────────────────────────────────
   app:
@@ -54,6 +58,10 @@ services:
       # sans validation. Ne passer à false qu'avec une procédure « provisoire »
       # documentée (rôle, motif, filigrane, file d'attente, délai maximal).
       REQUIRE_VALIDATION_FOR_RELEASE: ${REQUIRE_VALIDATION_FOR_RELEASE:-true}
+      # X-Forwarded-For n'est honoré que si l'IP directe du pair figure ici :
+      # l'IP statique du proxy Caddy (cf. service proxy). Sans cela, les quotas
+      # par IP seraient mutualisés entre tous les postes du laboratoire.
+      TRUSTED_PROXY_IPS: '["172.28.117.10"]'
       # Rôle web : sert l'API/UI + fan-out WebSocket ; ne lance NI la purge des
       # jetons NI le listener DH36 (délégués aux services scheduler / gateway
       # ci-dessous), pour éviter les duplications si l'app est scalée.
@@ -156,6 +164,52 @@ services:
     networks:
       - backend_net
 
+  # ── Sauvegarde PostgreSQL automatisée (§28 — l'automatisation est LIVRÉE) ───
+  # pg_dump format custom + SHA-256 + rétention, vers un répertoire hôte que
+  # l'exploitation doit copier HORS-SITE (disque chiffré / NAS). La fraîcheur du
+  # dernier succès est surveillée par healthcheck (< 26 h). Les scripts
+  # pg_backup.ps1 / pg_restore_verify.ps1 restent l'outillage manuel/vérification.
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-ruggylab}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      PGDATABASE: ${POSTGRES_DB:-ruggylab}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          ts=$$(date +%Y%m%d-%H%M%S)
+          f=/backups/ruggylab_pg-$$ts.dump
+          if pg_dump -Fc -f "$$f"; then
+            sha256sum "$$f" > "$$f.sha256"
+            date -u +%Y-%m-%dT%H:%M:%SZ > /backups/last_success.txt
+            echo "backup OK: $$f"
+            find /backups -name 'ruggylab_pg-*' -mtime +"$$BACKUP_RETENTION_DAYS" -delete
+          else
+            echo "backup FAILED at $$ts" >&2
+          fi
+          sleep "$$BACKUP_INTERVAL_SECONDS"
+        done
+    healthcheck:
+      # unhealthy si aucun dump réussi depuis ~26 h (1560 min)
+      test: ["CMD-SHELL", "test -n \"$$(find /backups/last_success.txt -mmin -1560 2>/dev/null)\""]
+      interval: 5m
+      timeout: 10s
+      start_period: 2m
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend_net
+
   # ── Redis 7 ─────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -252,6 +306,10 @@ volumes:
 networks:
   frontend_net:
     driver: bridge
+    # Sous-réseau fixe pour donner une IP stable au proxy (cf. TRUSTED_PROXY_IPS).
+    ipam:
+      config:
+        - subnet: 172.28.117.0/24
   backend_net:
     driver: bridge
   management_net:

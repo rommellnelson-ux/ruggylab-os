@@ -46,6 +46,16 @@ docker compose --profile migrate run --rm migrate  # alembic upgrade head (run-o
 docker compose up -d                          # proxy + app + workers + supervision
 ```
 
+> **Verrou de migration** : l'application refuse de démarrer si le schéma de la
+> base n'est pas au head Alembic embarqué dans l'image (message explicite ;
+> échappatoire de diagnostic : `SKIP_MIGRATION_CHECK=1`). Toujours exécuter le
+> service `migrate` avant `up -d`.
+>
+> **Chemins techniques bloqués au proxy** : `/metrics`, `/docs`, `/redoc` et
+> `/openapi.json` renvoient 404 côté utilisateurs (Prometheus scrape
+> `app:8000/metrics` par le réseau interne). Pour consulter la doc API, utiliser
+> l'environnement de développement.
+>
 > **Production = `docker-compose.yml` seul.** Les surcharges de développement
 > vivent dans `docker-compose.dev.yml` et ne sont **jamais** chargées
 > implicitement (l'ancien nom `docker-compose.override.yml` était fusionné en
@@ -101,8 +111,16 @@ UAT_BASE_URL=https://votre-domaine python -m scripts.uat_smoke
 
 ## 6. Sauvegarde & restauration
 
-**Production (PostgreSQL)** — `pg_dump` format custom, empreinte SHA-256, rétention,
-marqueur de dernier succès :
+**Automatisée (livrée par la stack)** — le service `db-backup` du compose fait un
+`pg_dump -Fc` + SHA-256 toutes les `BACKUP_INTERVAL_SECONDS` (défaut : quotidien)
+vers `BACKUP_HOST_DIR` (défaut `./backups`), avec rétention
+`BACKUP_RETENTION_DAYS` (défaut 14 j). Son healthcheck passe `unhealthy` si aucun
+dump réussi depuis ~26 h — à surveiller. **La copie hors-site du répertoire reste
+une tâche d'exploitation** (disque chiffré / NAS), et une sauvegarde n'est
+« vérifiée » qu'après `pg_restore_verify.ps1` (verdict `SUCCÈS`).
+
+**Manuelle / vérification (PowerShell)** — `pg_dump` format custom, empreinte
+SHA-256, rétention, marqueur de dernier succès :
 
 ```powershell
 # Sauvegarde PostgreSQL — planifier en tâche récurrente (chiffrement optionnel)

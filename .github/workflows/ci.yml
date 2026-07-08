@@ -290,6 +290,29 @@ jobs:
             echo "::error::Ports publiés hors du proxy :"; echo "$leaked"; exit 1
           fi
 
+      - name: Assert technical paths are blocked at the proxy (§14)
+        run: |
+          for p in /metrics /docs /openapi.json /redoc; do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' "https://localhost$p")
+            if [ "$code" != "404" ]; then
+              echo "::error::$p renvoie $code via le proxy (attendu 404)"; exit 1
+            fi
+          done
+
+      - name: Assert Prometheus can still scrape app metrics internally
+        run: |
+          docker compose exec -T prometheus wget -qO- http://app:8000/metrics | head -1
+
+      - name: Assert automated backup produced a verified dump
+        run: |
+          for i in $(seq 1 30); do
+            docker compose exec -T db-backup sh -c 'ls /backups/ruggylab_pg-*.dump' > /dev/null 2>&1 && break || sleep 2
+          done
+          docker compose exec -T db-backup sh -c '
+            f=$(ls -t /backups/ruggylab_pg-*.dump | head -1) &&
+            sha256sum -c "$f.sha256" &&
+            cat /backups/last_success.txt'
+
       - name: Assert role containers are healthy
         run: |
           docker compose ps

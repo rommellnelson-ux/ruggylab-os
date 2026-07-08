@@ -21,6 +21,12 @@
 		max_size 25MB
 	}
 
+	# §14 : les chemins techniques ne sont JAMAIS servis aux utilisateurs du LAN.
+	# Prometheus scrape directement app:8000/metrics par le réseau backend ; la
+	# doc API (/docs, /redoc, /openapi.json) s'utilise en dev, pas en production.
+	@internal path /metrics /docs /docs/* /openapi.json /redoc /redoc/*
+	respond @internal 404
+
 	# Reverse proxy vers l'app. Caddy gère automatiquement l'upgrade WebSocket
 	# (notifications temps-réel) et transmet l'IP cliente réelle.
 	reverse_proxy app:8000 {
