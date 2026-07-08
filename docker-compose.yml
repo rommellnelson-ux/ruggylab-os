@@ -54,10 +54,12 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
       CACHE_BACKEND: redis
-      # Gouvernance clinique : en production, un compte-rendu ne peut être publié
-      # sans validation. Ne passer à false qu'avec une procédure « provisoire »
-      # documentée (rôle, motif, filigrane, file d'attente, délai maximal).
-      REQUIRE_VALIDATION_FOR_RELEASE: ${REQUIRE_VALIDATION_FOR_RELEASE:-true}
+      # Gouvernance clinique — DÉCISION 2026-07-08 (responsable labo) : false, les
+      # comptes-rendus sortent sans validation biologique obligatoire (pas de
+      # biologiste validateur en poste ; valeurs critiques toujours acquittées).
+      # À basculer à true dès l'arrivée de ce personnel. Cf. .env.example et
+      # docs/ARCHITECTURE_AS_BUILT.md §11.
+      REQUIRE_VALIDATION_FOR_RELEASE: ${REQUIRE_VALIDATION_FOR_RELEASE:-false}
       # X-Forwarded-For n'est honoré que si l'IP directe du pair figure ici :
       # l'IP statique du proxy Caddy (cf. service proxy). Sans cela, les quotas
       # par IP seraient mutualisés entre tous les postes du laboratoire.
