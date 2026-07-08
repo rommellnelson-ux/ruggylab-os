@@ -34,8 +34,11 @@ def test_security_headers_are_present(tmp_path: Path) -> None:
     assert "X-XSS-Protection" in response.headers
 
 
-def test_login_rate_limit_blocks_after_limit(tmp_path: Path) -> None:
+def test_login_rate_limit_blocks_after_limit(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
     database_path = tmp_path / "test_ruggylab_login_rate_limit.db"
+    # TESTING=False pour activer le rate limiting, mais le schéma vient de
+    # create_all (pas d'alembic_version) : on débraye le verrou de migration.
+    monkeypatch.setenv("SKIP_MIGRATION_CHECK", "1")
     settings.TESTING = False
     settings.ENABLE_DH36_LISTENER = False
     settings.SECRET_KEY = "StrongSecretKeyValue1234567890Secure"

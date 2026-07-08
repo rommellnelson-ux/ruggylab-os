@@ -1,4 +1,5 @@
 import logging
+import os
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -13,6 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 def init_db() -> None:
+    # Verrou de migration : hors tests, refuser de servir une base dont le schéma
+    # n'est pas au head Alembic embarqué (le service `migrate` est manuel — sans
+    # ce verrou, l'omettre démarre l'app sur un schéma ancien). L'échec est
+    # volontairement fatal : il remonte au lifespan et empêche le démarrage.
+    if not settings.TESTING and os.getenv("SKIP_MIGRATION_CHECK") != "1":
+        from app.db.migration_guard import assert_migrations_up_to_date
+
+        assert_migrations_up_to_date(db_session.engine)
+
     try:
         Base.metadata.create_all(bind=db_session.engine)
         _seed_first_superuser()

@@ -15,6 +15,20 @@ from app.core.metrics import record_error, record_request_metrics
 logger = get_logger(__name__)
 
 
+def _endpoint_label(request: Request) -> str:
+    """Label Prometheus : le GABARIT de route, jamais le chemin brut.
+
+    `/api/v1/patients/8472` créerait une série métrique par patient (explosion
+    de cardinalité) et placerait des identifiants de ressources dans Prometheus
+    (interdit — §5 : aucune donnée patient dans les labels). On publie donc
+    `/api/v1/patients/{patient_id}` ; les requêtes sans route (404…) sont
+    agrégées sous "unmatched". Le chemin brut reste disponible dans les logs.
+    """
+    route = request.scope.get("route")
+    path_template = getattr(route, "path", None)
+    return path_template if isinstance(path_template, str) else "unmatched"
+
+
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     """Middleware for logging, metrics, and tracing of HTTP requests."""
 
@@ -45,10 +59,10 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             duration = time.time() - start_time
 
-            # Record metrics
+            # Record metrics (label = gabarit de route, cf. _endpoint_label)
             record_request_metrics(
                 method=request.method,
-                endpoint=request.url.path,
+                endpoint=_endpoint_label(request),
                 status=response.status_code,
                 duration=duration,
             )
@@ -80,10 +94,10 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 duration_ms=duration * 1000,
             )
 
-            # Record error metric
+            # Record error metric (label = gabarit de route, cf. _endpoint_label)
             record_error(
                 error_type=type(exc).__name__,
-                endpoint=request.url.path,
+                endpoint=_endpoint_label(request),
             )
 
             raise

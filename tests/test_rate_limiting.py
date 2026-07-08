@@ -8,8 +8,11 @@ from app.db.base import Base
 from app.main import create_app
 
 
-def test_rate_limiting_blocks_after_limit(tmp_path: Path) -> None:
+def test_rate_limiting_blocks_after_limit(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
     database_path = tmp_path / "test_ruggylab_rate_limit.db"
+    # TESTING=False pour activer le rate limiting, mais le schéma vient de
+    # create_all (pas d'alembic_version) : on débraye le verrou de migration.
+    monkeypatch.setenv("SKIP_MIGRATION_CHECK", "1")
     settings.TESTING = False
     settings.ENABLE_DH36_LISTENER = False
     settings.SECRET_KEY = "VeryStrongSecretKeyValue1234567890Secure"

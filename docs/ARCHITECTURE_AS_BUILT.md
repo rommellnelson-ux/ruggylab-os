@@ -124,8 +124,10 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
   verdict SUCCÈS + contre-test négatif documentés le 2026-06-25) ; le wrapper
   `docker compose exec/cp` est CONFIGURED (émulé lors de la vérification, pas
   encore exécuté avec un vrai démon Docker).
-- Copie hors-site, planification quotidienne : **procédure documentée
-  (DEPLOYMENT.md §6), exécution = responsabilité exploitation** — CONFIGURED.
+- Planification quotidienne : **livrée** — service compose `db-backup`
+  (`pg_dump -Fc` + SHA-256, rétention, healthcheck de fraîcheur < 26 h) ;
+  production d'un dump vérifiée en CI (`docker-stack`). La **copie hors-site**
+  du répertoire reste une tâche d'exploitation — CONFIGURED.
 - Dev SQLite : `scripts/backup.ps1` / `restore.ps1` (simple copie de fichier —
   jamais pour la production).
 
@@ -179,14 +181,18 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - **Prometheus/Grafana « accès VPN/bastion »** : le réseau management existe,
   mais aucun VPN/bastion n'est livré par le dépôt — TARGET (accès via
   `docker exec` local en attendant).
-- **Confiance proxy** : `TRUSTED_PROXY_IPS=[]` par défaut et non configuré dans
-  compose → quotas par IP potentiellement mutualisés derrière Caddy — TARGET.
-- **Cardinalité métriques** : le label `endpoint` reçoit le chemin brut (IDs de
-  ressources inclus) au lieu du gabarit de route — violation §5 — TARGET (lot P1).
 - **Multi-worker non testé en intégration** (le gating par rôle est testé
   unitairement ; `docker-stack` valide 1 exemplaire par rôle, pas le scaling).
-- `/docs`, `/openapi.json`, `/metrics` non restreints applicativement ni au
-  proxy (§14) — TARGET (lot P1).
+- **Heartbeat scheduler absent** : son healthcheck est neutralisé (`disable`) ;
+  un heartbeat horodaté reste à implémenter — TARGET.
+- `/docs`, `/openapi.json`, `/metrics`, `/redoc` : **bloqués au proxy (404,
+  VERIFIED en CI)** ; côté app ils restent servis sur le réseau backend (choix :
+  Prometheus y scrape `/metrics`). Restriction applicative fine (§14) — TARGET.
+- Corrigés par le lot P1 (VERIFIED en CI via `docker-stack` et tests) :
+  confiance proxy (`TRUSTED_PROXY_IPS` = IP statique de Caddy), cardinalité
+  métriques (label = gabarit de route, « unmatched » pour les 404), verrou de
+  migration au démarrage, sauvegarde automatisée (`db-backup` + healthcheck de
+  fraîcheur < 26 h).
 - Versionnement immuable des résultats validés (§20) : statuts de correction
   existent, pas de chaîne `version/previous_version_id` — TARGET.
 - FHIR : export partiel (« sous-ensemble FHIR R4 »), pas d'API FHIR complète.
