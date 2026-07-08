@@ -10,7 +10,9 @@ PowerShell fournis). Pour les tests métier sans installation, voir [UAT.md](UAT
 ## 1. Pré-requis
 
 - Docker + Docker Compose (recommandé) — ou Python 3.13 + PostgreSQL 16 + Redis 7.
-- Un nom de domaine + TLS (reverse proxy : Caddy/Nginx/Traefik) devant l'app.
+- Un nom de domaine (ou nom d'hôte LAN). Le reverse proxy TLS **Caddy est intégré**
+  au compose (service `proxy`, seul service exposé : 80→443) ; pas besoin d'en
+  installer un séparément.
 - Secrets générés (voir [SECRETS_MANAGEMENT.md](SECRETS_MANAGEMENT.md)).
 
 ## 2. Configuration (.env)
@@ -25,6 +27,7 @@ DATABASE_URL=postgresql+psycopg://ruggylab:<POSTGRES_PASSWORD>@postgres:5432/rug
 REDIS_URL=redis://redis:6379/0
 CACHE_BACKEND=redis
 GRAFANA_PASSWORD=<mot de passe Grafana>
+RUGGYLAB_DOMAIN=<domaine ou nom d'hôte servi par le proxy, ex. labo.exemple.ci>
 ```
 
 Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
@@ -32,10 +35,20 @@ Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48)
 ## 3. Démarrage (Docker Compose)
 
 ```bash
-docker compose up -d postgres redis        # dépendances
+docker compose up -d postgres redis          # dépendances
 docker compose --profile migrate up migrate  # alembic upgrade head (run-once)
-docker compose up -d app prometheus grafana  # application + supervision
+docker compose up -d                         # proxy + app + workers + supervision
 ```
+
+L'accès utilisateur se fait **uniquement** via `https://$RUGGYLAB_DOMAIN` (le proxy
+Caddy termine le TLS et redirige 80→443). Aucun autre port n'est publié : app,
+PostgreSQL, Redis, Prometheus et Grafana ne sont joignables que sur les réseaux
+internes. Prometheus/Grafana s'atteignent via VPN/bastion (voir §8/9 des
+Instructions maîtres et `deploy/Caddyfile`).
+
+> TLS : par défaut le proxy utilise une **CA interne** (site LAN sans Internet —
+> installer le certificat racine Caddy sur les postes). Pour un domaine public,
+> voir les options ACME/certificats dans `deploy/Caddyfile`.
 
 Sans Docker (Windows) : voir `scripts/install.ps1` et `scripts/start.ps1`.
 
@@ -64,7 +77,7 @@ UAT_BASE_URL=https://votre-domaine python -m scripts.uat_smoke
 - [ ] **Mot de passe admin changé** dès la 1re connexion (le défaut de test est refusé par le contrôle).
 - [ ] Référentiels initialisés : `bioref/seed-defaults`, `tariffs/seed-defaults` (prix ajustés), cibles TAT.
 - [ ] Comptes nominatifs créés par rôle (technician/officer/accountant) ; pas de comptes partagés.
-- [ ] TLS actif devant l'app ; ports internes (5432/6379/9090) non exposés publiquement.
+- [ ] Proxy Caddy actif (TLS) ; **seuls 80/443 publiés**. app (8000), PostgreSQL (5432), Redis (6379), Prometheus (9090), Grafana (3000) non exposés — `docker compose ps` / `ss -lntp` pour vérifier.
 - [ ] **Sauvegarde testée** : `scripts/pg_backup.ps1` puis **restauration vérifiée** `scripts/pg_restore_verify.ps1` → verdict `SUCCÈS` sur base scratch (§6).
 - [ ] Supervision : Prometheus/Grafana accessibles, alertes configurées (voir [observability.md](observability.md)).
 - [ ] Audit activé et consultable (rôle admin).
