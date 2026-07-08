@@ -66,7 +66,9 @@ class Settings(BaseSettings):
     PROCESS_ROLE: str = "all"
     # Fichier de battement du process scheduler : réécrit toutes les ~30 s, il
     # permet au healthcheck compose de sonder la fraîcheur (cf. app/scheduler.py).
-    SCHEDULER_HEARTBEAT_FILE: str = "/tmp/ruggylab_scheduler.heartbeat"  # noqa: S108
+    # /tmp est le seul emplacement toujours inscriptible par l'utilisateur non-root
+    # du conteneur ; simple marqueur de vivacité, aucune donnée sensible.
+    SCHEDULER_HEARTBEAT_FILE: str = "/tmp/ruggylab_scheduler.heartbeat"  # noqa: S108  # nosec B108
     # Fichier de log applicatif. None (défaut) = stdout uniquement — indispensable
     # en conteneur : l'utilisateur non-root ne peut pas créer /app/logs, et Docker
     # assure de toute façon collecte et rotation. Sur un poste nu (Windows), mettre
