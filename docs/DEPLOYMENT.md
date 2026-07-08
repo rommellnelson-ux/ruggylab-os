@@ -32,9 +32,11 @@ RUGGYLAB_DOMAIN=<domaine ou nom d'hôte servi par le proxy, ex. labo.exemple.ci>
 RUGGYLAB_IMAGE=ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha ou vX.Y.Z>
 ```
 
-> `REQUIRE_VALIDATION_FOR_RELEASE` vaut `true` par défaut en production (aucun
-> compte-rendu publié sans validation biologique). Ne le désactiver qu'avec une
-> procédure « provisoire » écrite et approuvée.
+> **Gouvernance clinique — décision du 2026-07-08 (responsable du laboratoire) :**
+> `REQUIRE_VALIDATION_FOR_RELEASE=false`. Les comptes-rendus sont libérés **sans
+> validation biologique obligatoire**, faute d'un biologiste validateur en poste ;
+> les valeurs critiques restent acquittées. Cette valeur **doit passer à `true`
+> dès l'arrivée de ce personnel** (validation stricte avant libération/signature).
 
 Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 

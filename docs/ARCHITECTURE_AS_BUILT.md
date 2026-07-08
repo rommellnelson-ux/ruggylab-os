@@ -168,10 +168,14 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 
 ## 11. Limitations connues / non implémenté
 
-- **Gouvernance clinique** : `REQUIRE_VALIDATION_FOR_RELEASE` vaut `true` en
-  production (compose) mais `false` par défaut dans le code (dev). Toute
-  publication « provisoire » exige une procédure écrite (rôle, motif, filigrane,
-  délai maximal) — non implémentée à ce jour (TARGET).
+- **Gouvernance clinique — RISQUE ASSUMÉ** : `REQUIRE_VALIDATION_FOR_RELEASE=false`
+  en production (compose et `.env.example`). **Décision explicite du responsable
+  du laboratoire (2026-07-08)** : les comptes-rendus sont libérés sans validation
+  biologique obligatoire, faute d'un biologiste validateur en poste ; les valeurs
+  critiques restent acquittées. **Condition de réversibilité : basculer à `true`
+  dès l'affectation d'un biologiste validateur.** La procédure « provisoire »
+  formelle (rôle, motif, filigrane, file d'attente, délai maximal — §22) n'est
+  pas implémentée à ce jour (TARGET).
 - **Serveur physique non qualifié** : la stack tourne en CI (job `docker-stack`)
   mais n'a jamais été démarrée sur le serveur cible du laboratoire (UPS, VLAN
   automates, imprimantes) — UNKNOWN.
