@@ -241,14 +241,88 @@ jobs:
           path: artifacts/e2e/
           if-no-files-found: ignore
 
+  docker-stack:
+    name: Stack Docker production (compose réel)
+    # Démarre la VRAIE stack de production (image runtime + docker-compose.yml
+    # seul, sans fichier dev) et vérifie ce que les tests unitaires ne voient
+    # pas : démarrage du conteneur non-root, healthchecks par rôle, seuls 80/443
+    # publiés, flux clinique à travers le proxy TLS.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build production image
+        run: docker build -t ruggylab-os:ci .
+
+      - name: Create production .env
+        run: |
+          cat > .env <<'EOF'
+          RUGGYLAB_IMAGE=ruggylab-os:ci
+          SECRET_KEY=ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
+          POSTGRES_PASSWORD=ci_pg_password_123
+          DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
+          GRAFANA_PASSWORD=ci_grafana_password_123
+          RUGGYLAB_DOMAIN=localhost
+          EOF
+
+      - name: Start dependencies and run migrations
+        run: |
+          docker compose up -d postgres redis
+          docker compose --profile migrate run --rm migrate
+
+      - name: Start full production stack
+        run: docker compose up -d
+
+      - name: Wait for app through TLS proxy
+        run: |
+          for i in $(seq 1 60); do
+            curl -skf https://localhost/api/v1/health > /dev/null && break || sleep 2
+          done
+          curl -skf https://localhost/api/v1/health
+
+      - name: Assert only the proxy publishes ports
+        run: |
+          docker ps --format '{{.Names}}\t{{.Ports}}'
+          leaked=$(docker ps --format '{{.Names}}\t{{.Ports}}' | grep -v proxy | grep -- '->' || true)
+          if [ -n "$leaked" ]; then
+            echo "::error::Ports publiés hors du proxy :"; echo "$leaked"; exit 1
+          fi
+
+      - name: Assert role containers are healthy
+        run: |
+          docker compose ps
+          [ "$(docker inspect -f '{{.State.Status}}' "$(docker compose ps -q scheduler)")" = "running" ]
+          # Le healthcheck TCP de la gateway peut mettre ~1 min (start_period + interval)
+          for i in $(seq 1 30); do
+            gw=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q analyzer-gateway)")
+            [ "$gw" = "healthy" ] && break || sleep 3
+          done
+          [ "$gw" = "healthy" ] || { docker compose logs --tail 50 analyzer-gateway; exit 1; }
+
+      - name: Clinical flow through the TLS proxy
+        env:
+          UAT_BASE_URL: https://localhost
+          UAT_INSECURE_TLS: "1"
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+        run: |
+          pip install httpx
+          python -m scripts.uat_smoke
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
+
   deploy:
     name: Build and publish Docker image
     # Déploiement uniquement sur tag de version (vX.Y.Z) ou déclenchement manuel —
     # pas sur chaque commit poussé sur main.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    # E2E bloquant : aucune image n'est publiée si le parcours navigateur (e2e)
-    # ou le flux clinique PostgreSQL (test-postgres) échoue.
-    needs: [test, test-postgres, codeql, e2e]
+    # E2E bloquant : aucune image n'est publiée si le parcours navigateur (e2e),
+    # le flux clinique PostgreSQL (test-postgres) ou la stack Docker de
+    # production (docker-stack) échoue.
+    needs: [test, test-postgres, codeql, e2e, docker-stack]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -272,7 +346,13 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}/ruggylab-os:${{ github.sha }}
+          # Chemin aligné sur docker-compose (ghcr.io/<owner>/<repo>:<tag>).
+          # L'ancien motif ghcr.io/<owner>/<repo>/ruggylab-os:<sha> doublait le
+          # nom du dépôt : l'image publiée n'était jamais celle attendue.
+          # Déploiement : RUGGYLAB_IMAGE=ghcr.io/${{ github.repository }}:<sha|vX.Y.Z>
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
           labels: |
             org.opencontainers.image.title=RuggyLab OS
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

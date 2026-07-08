@@ -46,9 +46,11 @@ COPY --chown=ruggylab:ruggylab app/       ./app/
 COPY --chown=ruggylab:ruggylab alembic/   ./alembic/
 COPY --chown=ruggylab:ruggylab alembic.ini .
 
-# Runtime directories (must exist before USER switch)
-RUN mkdir -p data microscopy models backups && \
-    chown -R ruggylab:ruggylab data microscopy models backups
+# Runtime directories (must exist before USER switch).
+# `logs` inclus par précaution : le défaut journalise sur stdout (LOG_FILE=None),
+# mais un opérateur peut définir LOG_FILE=logs/app.log sans casser le non-root.
+RUN mkdir -p data microscopy models backups logs && \
+    chown -R ruggylab:ruggylab data microscopy models backups logs
 
 # Drop privileges
 USER ruggylab

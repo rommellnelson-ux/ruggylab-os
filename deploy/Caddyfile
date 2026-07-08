@@ -39,4 +39,4 @@
 
 # Note : Prometheus et Grafana ne sont PAS routés par ce proxy public. Ils vivent
 # sur le réseau `management_net` et ne sont accessibles que via VPN / bastion
-# (voir docker-compose.override.yml pour l'exposition locale en dev).
+# (voir docker-compose.dev.yml pour l'exposition locale en dev).

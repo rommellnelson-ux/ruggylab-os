@@ -1,5 +1,6 @@
 # docker-compose.yml – Production configuration
-# Override for local dev: docker-compose.override.yml (auto-loaded by Compose)
+# Dev local : docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# (AUCUN fichier n'est fusionné implicitement — production = ce fichier seul)
 # Run migrations manually: docker compose --profile migrate up migrate
 #
 # Réseau (§8/§9) : SEUL le reverse proxy `proxy` publie des ports (80/443). L'app,
@@ -38,7 +39,10 @@ services:
     build:
       context: .
       target: runtime
-    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    # Artefact immuable exigé : chaque déploiement désigne un tag précis
+    # (ex. RUGGYLAB_IMAGE=ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha>).
+    # Jamais `latest` en production (§10 des Instructions maîtres).
+    image: ${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set (immutable tag, e.g. ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha>)}
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
@@ -46,6 +50,10 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
       CACHE_BACKEND: redis
+      # Gouvernance clinique : en production, un compte-rendu ne peut être publié
+      # sans validation. Ne passer à false qu'avec une procédure « provisoire »
+      # documentée (rôle, motif, filigrane, file d'attente, délai maximal).
+      REQUIRE_VALIDATION_FOR_RELEASE: ${REQUIRE_VALIDATION_FOR_RELEASE:-true}
       # Rôle web : sert l'API/UI + fan-out WebSocket ; ne lance NI la purge des
       # jetons NI le listener DH36 (délégués aux services scheduler / gateway
       # ci-dessous), pour éviter les duplications si l'app est scalée.
@@ -76,7 +84,7 @@ services:
     build:
       context: .
       target: runtime
-    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    image: ${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}
     restart: unless-stopped
     command: ["python", "-m", "app.scheduler"]
     environment:
@@ -84,6 +92,11 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       PROCESS_ROLE: scheduler
+    # Le HEALTHCHECK de l'image sonde HTTP:8000 (rôle web) ; ce process ne sert
+    # pas d'HTTP → on le neutralise pour éviter un `unhealthy` permanent.
+    # TODO(P1) : heartbeat dédié (fichier/DB horodaté par la boucle du scheduler).
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +108,7 @@ services:
     build:
       context: .
       target: runtime
-    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    image: ${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}
     restart: unless-stopped
     command: ["python", "-m", "app.analyzer_gateway"]
     environment:
@@ -105,6 +118,15 @@ services:
       ENABLE_DH36_LISTENER: "true"
       # Écoute sur toutes les interfaces internes pour recevoir les trames automates.
       DH36_LISTENER_HOST: 0.0.0.0
+    # Healthcheck adapté au rôle : le listener DH36 doit accepter une connexion
+    # TCP (remplace la sonde HTTP:8000 héritée de l'image, toujours KO ici).
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import socket; socket.create_connection(('127.0.0.1', 5001), timeout=3).close()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     # Pour recevoir les automates du LAN, publier le port DH36 LIÉ à l'interface
     # du VLAN automates uniquement, p.ex. :  ports: ["10.0.30.1:5001:5001"]
     # (ne jamais publier sur 0.0.0.0 — cf. §8.1).
@@ -199,8 +221,10 @@ services:
     build:
       context: .
       target: runtime
-    image: ghcr.io/rommellnelson-ux/ruggylab-os:latest
+    image: ${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}
     command: ["alembic", "upgrade", "head"]
+    healthcheck:
+      disable: true   # run-once : la sonde HTTP de l'image n'a pas de sens ici
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY:-placeholder-only-needed-at-import-time}

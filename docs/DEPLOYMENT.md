@@ -28,17 +28,32 @@ REDIS_URL=redis://redis:6379/0
 CACHE_BACKEND=redis
 GRAFANA_PASSWORD=<mot de passe Grafana>
 RUGGYLAB_DOMAIN=<domaine ou nom d'hôte servi par le proxy, ex. labo.exemple.ci>
+# Artefact immuable : TOUJOURS un tag précis publié par la CI, jamais `latest`.
+RUGGYLAB_IMAGE=ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha ou vX.Y.Z>
 ```
+
+> `REQUIRE_VALIDATION_FOR_RELEASE` vaut `true` par défaut en production (aucun
+> compte-rendu publié sans validation biologique). Ne le désactiver qu'avec une
+> procédure « provisoire » écrite et approuvée.
 
 Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 
 ## 3. Démarrage (Docker Compose)
 
 ```bash
-docker compose up -d postgres redis          # dépendances
-docker compose --profile migrate up migrate  # alembic upgrade head (run-once)
-docker compose up -d                         # proxy + app + workers + supervision
+docker compose up -d postgres redis           # dépendances
+docker compose --profile migrate run --rm migrate  # alembic upgrade head (run-once)
+docker compose up -d                          # proxy + app + workers + supervision
 ```
+
+> **Production = `docker-compose.yml` seul.** Les surcharges de développement
+> vivent dans `docker-compose.dev.yml` et ne sont **jamais** chargées
+> implicitement (l'ancien nom `docker-compose.override.yml` était fusionné en
+> silence par Compose et annulait l'architecture de production : `--reload`,
+> rôle `all` dupliquant les singletons, ports techniques réouverts).
+>
+> Développement local :
+> `docker compose -f docker-compose.yml -f docker-compose.dev.yml up`
 
 L'accès utilisateur se fait **uniquement** via `https://$RUGGYLAB_DOMAIN` (le proxy
 Caddy termine le TLS et redirige 80→443). Aucun autre port n'est publié : app,
