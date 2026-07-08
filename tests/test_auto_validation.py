@@ -303,7 +303,6 @@ class TestAutoValidationOnCreate:
         # Analyte non contrôlé présent → abstention.
         assert result["is_auto_validated"] is False
 
-
     def test_most_recent_active_rule_wins(self, client):
         """Avec plusieurs règles actives, la plus récente s'applique (déterministe)."""
         hdrs = _auth(client)
@@ -313,12 +312,18 @@ class TestAutoValidationOnCreate:
 
         # Règle 1 (ancienne) : bloque les résultats critiques.
         _create_auto_config(
-            client, hdrs, require_all_flags_normal=False, require_no_delta=False,
+            client,
+            hdrs,
+            require_all_flags_normal=False,
+            require_no_delta=False,
             require_not_critical=True,
         )
         # Règle 2 (récente) : permissive (n'exige rien).
         _create_auto_config(
-            client, hdrs, require_all_flags_normal=False, require_no_delta=False,
+            client,
+            hdrs,
+            require_all_flags_normal=False,
+            require_no_delta=False,
             require_not_critical=False,
         )
         # Résultat critique
