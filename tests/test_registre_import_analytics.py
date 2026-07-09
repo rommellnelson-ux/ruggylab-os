@@ -171,6 +171,31 @@ class TestRegistreImport:
         after = client.get("/api/v1/patients?limit=100", headers=hdrs).json()["meta"]["total"]
         assert after == before + 3
 
+    def test_imported_sample_does_not_poison_listings(self, client):
+        """Régression : un échantillon importé (statut hors liste blanche) ne
+        doit pas faire échouer (500) GET /samples ni /results/cockpit.
+
+        Auparavant, le statut « Importé (historique) » n'était pas dans
+        ALLOWED_SAMPLE_STATUSES : SampleRead levait une ValidationError et une
+        seule ligne empoisonnait toute la collection.
+        """
+        hdrs = _auth(client)
+        imported = client.post(
+            "/api/v1/registre/import",
+            headers=hdrs,
+            json={"rows": SAMPLE_ROWS, "dry_run": False, "confirm": True},
+        )
+        assert imported.status_code == 200, imported.text
+        assert imported.json()["created_samples"] == 3
+
+        samples = client.get("/api/v1/samples", headers=hdrs)
+        assert samples.status_code == 200, samples.text
+        statuses = {s["status"] for s in samples.json()}
+        assert "Importé (historique)" in statuses
+
+        cockpit = client.get("/api/v1/results/cockpit?limit=100", headers=hdrs)
+        assert cockpit.status_code == 200, cockpit.text
+
     def test_import_estimates_birth_from_age(self, client):
         hdrs = _auth(client)
         r = client.post(

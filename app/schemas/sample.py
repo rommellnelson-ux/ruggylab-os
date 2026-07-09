@@ -3,7 +3,13 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+# Statuts que l'utilisateur peut poser via l'API (create/update) — miroir du
+# sélecteur du cockpit. Source de vérité du chemin d'écriture.
 ALLOWED_SAMPLE_STATUSES = {"Recu", "En cours", "Termine", "Annule"}
+# Statuts posés uniquement par des services internes (import registre papier,
+# seed de démonstration) via l'ORM, hors validation d'entrée. Ils sont
+# légitimes en base ; la lecture doit les tolérer sans jamais renvoyer 500.
+SYSTEM_SAMPLE_STATUSES = {"Importé (historique)", "Démo"}
 # Aspect pré-analytique : qualité de l'échantillon (≠ statut workflow).
 ALLOWED_SAMPLE_ASPECTS = {
     "conforme",
@@ -101,3 +107,13 @@ class SampleRead(SampleBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str | None) -> str | None:
+        # Défense en profondeur : la lecture ne valide PAS le statut contre la
+        # liste blanche. Un statut inattendu (import registre, seed, migration)
+        # ne doit jamais faire échouer la sérialisation de toute la collection
+        # — une seule ligne « empoisonnait » GET /samples et /results/cockpit.
+        # La contrainte stricte reste sur l'écriture (SampleCreate/SampleUpdate).
+        return value
