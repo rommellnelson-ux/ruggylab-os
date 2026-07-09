@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # En prod multi-worker : app=web + un service scheduler + un service
     # analyzer-gateway (même image, commandes différentes). Cf. docker-compose.yml.
     PROCESS_ROLE: str = "all"
+    # Fichier de battement du process scheduler : réécrit toutes les ~30 s, il
+    # permet au healthcheck compose de sonder la fraîcheur (cf. app/scheduler.py).
+    # /tmp est le seul emplacement toujours inscriptible par l'utilisateur non-root
+    # du conteneur ; simple marqueur de vivacité, aucune donnée sensible.
+    SCHEDULER_HEARTBEAT_FILE: str = "/tmp/ruggylab_scheduler.heartbeat"  # noqa: S108  # nosec B108
     # Fichier de log applicatif. None (défaut) = stdout uniquement — indispensable
     # en conteneur : l'utilisateur non-root ne peut pas créer /app/logs, et Docker
     # assure de toute façon collecte et rotation. Sur un poste nu (Windows), mettre
@@ -149,6 +154,27 @@ class Settings(BaseSettings):
     ANALYZER_ALLOWED_IPS: list[str] = []
     ANALYZER_HMAC_SECRET: str | None = None
     ANALYZER_SIGNATURE_MAX_SKEW_SECONDS: int = 300
+
+    # Listener TCP « aveugle » (capture brute des trames automates -> Redis).
+    # Filet de sécurité avant parseur (Dymind DH36, manuel d'interfaçage en
+    # attente) : les trames sont archivées telles quelles dans une liste Redis.
+    # Cf. app/services/interfacing/raw_tcp_listener.py. Requiert REDIS_URL.
+    ANALYZER_RAW_LISTENER_ENABLED: bool = True
+    ANALYZER_RAW_LISTENER_HOST: str = "127.0.0.1"  # jamais 0.0.0.0 par défaut (cf. DH36)
+    ANALYZER_RAW_LISTENER_PORT: int = 9000
+    ANALYZER_RAW_ACK_MODE: str = "ack"  # "ack" (ACK 0x06) | "silent" | "close"
+    # Un listener par automate (routage par port, cf. services/analyzers/registry).
+    # Hématologie = Dymind DH36, Biochimie = Dymind, Immuno = Anbio Bioscann.
+    ANALYZER_HEMATOLOGY_ENABLED: bool = True
+    ANALYZER_HEMATOLOGY_PORT: int = 9000
+    ANALYZER_BIOCHEMISTRY_ENABLED: bool = True
+    ANALYZER_BIOCHEMISTRY_PORT: int = 9001
+    ANALYZER_IMMUNO_ENABLED: bool = True
+    ANALYZER_IMMUNO_PORT: int = 9002
+    ANALYZER_RAW_QUEUE_KEY: str = "raw_analyzer_frames"
+    ANALYZER_RAW_QUEUE_MAXLEN: int = 100_000
+    ANALYZER_RAW_MAX_FRAME_BYTES: int = 1_048_576
+    ANALYZER_RAW_IDLE_TIMEOUT_SECONDS: float = 300.0
 
     # Trusted reverse-proxy IPs.
     # X-Forwarded-For is only trusted when the direct client IP is in this list.
