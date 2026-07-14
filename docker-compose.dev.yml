@@ -8,6 +8,10 @@
 #   Développement : docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #   Production    : docker compose up -d          (docker-compose.yml seul)
 #
+# Le dev tourne sur PostgreSQL par défaut (parité avec la prod ; démarre
+# postgres avant l'app). Repli SQLite zéro-dépendance :
+#   DATABASE_URL=sqlite:///./ruggylab_os.db docker compose -f ... -f ... up app
+#
 # Do NOT commit secrets here; use a local .env file.
 
 services:
@@ -35,8 +39,14 @@ services:
     environment:
       # En dev, l'app assure tous les rôles (web + scheduler + gateway).
       PROCESS_ROLE: all
-      # In dev, SQLite is fine; override with DATABASE_URL in your .env for PG
-      DATABASE_URL: ${DATABASE_URL:-sqlite:///./ruggylab_os.db}
+      # PARITÉ DEV/PROD : le dev tourne sur PostgreSQL par défaut (le vrai moteur),
+      # ce qui expose immédiatement les divergences SQLite↔PG (enums, contraintes,
+      # JSON) — c'est ce qui aurait attrapé le bug userrole avant la CI.
+      # Repli SQLite (zéro dépendance) : DATABASE_URL=sqlite:///./ruggylab_os.db
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:${POSTGRES_PASSWORD:-devpass}@postgres:5432/ruggylab}  # pragma: allowlist secret
+      # Le schéma dev vient de create_all (pas d'étape migrate manuelle) : on
+      # débraye le verrou de migration, réservé à la production.
+      SKIP_MIGRATION_CHECK: "1"
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-NOT-for-production-use-32c}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-DevPassword123!}
@@ -56,6 +66,10 @@ services:
     image: ruggylab-os:dev
 
   postgres:
+    # Mot de passe par défaut en dev (la prod l'exige via `:?`) : parité sans
+    # imposer un .env pour un simple `up`.
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
     # Expose PG on localhost so local tools (psql, DBeaver…) can connect
     ports:
       - "127.0.0.1:5432:5432"
