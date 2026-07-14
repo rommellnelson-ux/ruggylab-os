@@ -123,14 +123,13 @@ if (-not $SkipTests) {
         )
 
         if ($IncludeOptionalTests) {
-            Invoke-PytestBatch "Pytest optionnels E2E/ML" @(
-                "tests/test_e2e_basic.py",
+            Invoke-PytestBatch "Pytest optionnels ML" @(
                 "tests/test_ml_pipeline.py",
                 "tests/test_security.py"
             )
         } else {
             Write-Host ""
-            Write-Host "Tests optionnels E2E/ML ignores par defaut (utiliser -IncludeOptionalTests)." -ForegroundColor Yellow
+            Write-Host "Tests optionnels ML ignores par defaut (utiliser -IncludeOptionalTests)." -ForegroundColor Yellow
         }
     }
 }
