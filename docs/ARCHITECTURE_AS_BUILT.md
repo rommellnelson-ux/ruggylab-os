@@ -162,9 +162,13 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
   IMPLEMENTED + tests (`test_auto_validation.py`). **La présence de cette
   fonction ne vaut pas conformité ISO 15189** (preuves organisationnelles
   requises).
-- Moteur d'interprétation **unique** : décision documentée de **ne pas** fusionner
-  les moteurs existants (`docs/INTERPRETATION.md` — risque clinique jugé
-  supérieur au gain) ; divergence assumée avec §21 des Instructions maîtres.
+- Moteur d'interprétation **unique (§21) — DÉCISION CONFIRMÉE (2026-07, responsable
+  du projet) : NE PAS unifier.** `ReferenceRange`/`CriticalRange` reste le moteur
+  officiel, `bioref` la couche d'aide (cf. `docs/INTERPRETATION.md`, section
+  « Décision d'architecture (figée) »). L'unification totale a été écartée : gain
+  surtout esthétique pour un risque clinique réel (migration du moteur de
+  validation). **Divergence assumée et close** avec le §21 des Instructions
+  maîtres — ce n'est donc PAS une limitation ouverte mais un choix arrêté.
 
 ## 11. Limitations connues / non implémenté
 
