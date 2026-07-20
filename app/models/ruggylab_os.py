@@ -131,6 +131,10 @@ class Result(Base):
     data_points: Mapped[dict] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
     )
+    # Discriminateur de nature du résultat (Flux 3) : distingue les résultats
+    # chiffrés des résultats qualitatifs/textuels sans dépendre des clés JSONB.
+    # "quantitative" | "qualitative" | "poct" | "analyzer" ; None pour l'historique.
+    result_type: Mapped[str | None] = mapped_column(String(30), index=True)
     image_url: Mapped[str | None] = mapped_column(String(255))
     validator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

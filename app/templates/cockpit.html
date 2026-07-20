@@ -1616,9 +1616,11 @@
               <label>Message HL7 brut</label><textarea id="hl7Message"></textarea>
               <button onclick="ingestDh36(this)">Traiter message DH36</button>
             </div></div>
-            <div class="panel"><h3>Precis Expert</h3><div class="form">
+            <div class="panel"><h3>Precis Expert (POCT)</h3><div class="form">
               <div class="grid2"><div><label>Barcode</label><input id="poctBarcode" /></div><div><label>Serie appareil</label><input id="poctSerial" /></div></div>
-              <div class="grid3"><div><label>Glucose</label><input id="poctGlucose" value="0.45" /></div><div><label>Cholesterol</label><input id="poctChol" value="1.8" /></div><div><label>Acide urique</label><input id="poctUa" value="50" /></div></div>
+              <div class="grid3"><div><label>Glucose (g/L)</label><input id="poctGlucose" placeholder="—" /></div><div><label>Cholesterol (g/L)</label><input id="poctChol" placeholder="—" /></div><div><label>Acide urique (mg/L)</label><input id="poctUa" placeholder="—" /></div></div>
+              <div class="grid2"><div><label>Lactate (mmol/L)</label><input id="poctLac" placeholder="—" /></div><div><label>Corps cetoniques (mmol/L)</label><input id="poctKet" placeholder="—" /></div></div>
+              <p class="hint" style="font-size:11px;color:var(--muted);margin:4px 0 0;">Seuls les parametres renseignes sont enregistres — aucune valeur n'est inventee.</p>
               <button onclick="submitPoct(this)">Valider POCT</button>
             </div></div>
           </div>
