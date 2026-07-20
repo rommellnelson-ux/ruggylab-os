@@ -67,3 +67,7 @@ officiel** et **`bioref` comme couche d'aide**. Une unification totale (bioref
 source unique) a été écartée : gain surtout esthétique pour un risque clinique
 réel (migration du moteur de validation). Le cloisonnement reste donc clair et
 testé en l'état.
+
+Les conditions dans lesquelles les `flags` du moteur officiel autorisent une
+auto-validation §5.8 sont détaillées dans
+[`AUTOVALIDATION_5_8.md`](AUTOVALIDATION_5_8.md).
