@@ -17,3 +17,12 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    # Les Actions sont épinglées par SHA de commit (§11 supply-chain, PR #66).
+    # On laisse dependabot proposer les mises à jour mineures/patch — qui portent
+    # les correctifs de sécurité et mettent à jour SHA + commentaire ensemble —
+    # mais PAS les montées de version MAJEURE : elles changent le comportement
+    # des workflows et doivent être décidées et validées à la main, pas subies
+    # (elles se rouvraient en boucle après chaque modification des workflows).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
