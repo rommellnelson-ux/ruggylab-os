@@ -60,9 +60,7 @@ def _get_accessible_order_or_404(db: Session, order_id: int, user: User) -> Exam
     return order
 
 
-def _get_locked_accessible_order_or_404(
-    db: Session, order_id: int, user: User
-) -> ExamOrder:
+def _get_locked_accessible_order_or_404(db: Session, order_id: int, user: User) -> ExamOrder:
     """Verrouille la prescription avant tout contrôle de rattachement."""
     order = (
         db.query(ExamOrder)

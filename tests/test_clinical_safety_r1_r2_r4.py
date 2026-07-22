@@ -469,7 +469,9 @@ def test_r2_cross_unit_technician_is_rejected_before_all_effects(client, monkeyp
     with SessionLocal() as db:
         before_results = db.query(Result).count()
         before_movements = db.query(StockMovement).count()
-        before_audits = db.query(AuditEvent).filter(AuditEvent.event_type == "stock.consume").count()
+        before_audits = (
+            db.query(AuditEvent).filter(AuditEvent.event_type == "stock.consume").count()
+        )
         before_stock = db.get(Reagent, reagent["id"]).current_stock
 
     response = client.post(
@@ -531,9 +533,7 @@ def test_r2_accountant_is_forbidden_before_all_effects(
     client, monkeypatch, accountant_unit: str
 ) -> None:
     admin = _auth(client)
-    accountant = _user(
-        client, admin, role="accountant", unit=accountant_unit, prefix="accountant"
-    )
+    accountant = _user(client, admin, role="accountant", unit=accountant_unit, prefix="accountant")
     _, sample_id = _result_target(client, admin, unit="UNIT-A")
     equipment = client.post(
         "/api/v1/equipments",
@@ -564,7 +564,9 @@ def test_r2_accountant_is_forbidden_before_all_effects(
     with SessionLocal() as db:
         before_results = db.query(Result).count()
         before_movements = db.query(StockMovement).count()
-        before_audits = db.query(AuditEvent).filter(AuditEvent.event_type == "stock.consume").count()
+        before_audits = (
+            db.query(AuditEvent).filter(AuditEvent.event_type == "stock.consume").count()
+        )
         before_stock = db.get(Reagent, reagent["id"]).current_stock
 
     clinical_lookups: list[type] = []
@@ -572,9 +574,7 @@ def test_r2_accountant_is_forbidden_before_all_effects(
 
     def track_clinical_queries(self, *entities, **kwargs):
         if any(entity in {Sample, Equipment} for entity in entities):
-            clinical_lookups.extend(
-                entity for entity in entities if entity in {Sample, Equipment}
-            )
+            clinical_lookups.extend(entity for entity in entities if entity in {Sample, Equipment})
         return original_query(self, *entities, **kwargs)
 
     monkeypatch.setattr(Session, "query", track_clinical_queries)
@@ -654,9 +654,7 @@ def _report_state(result_id: int) -> tuple[int, int, int, int, int]:
 def _report_artifacts(result_id: int) -> dict[str, object]:
     """Relit les artefacts dans une session indépendante de la requête."""
     with SessionLocal() as db:
-        signature = (
-            db.query(ReportSignature).filter(ReportSignature.result_id == result_id).one()
-        )
+        signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).one()
         snapshot = db.query(ReportSnapshot).filter(ReportSnapshot.result_id == result_id).one()
         outbox = (
             db.query(ReportDeliveryOutbox)
@@ -730,9 +728,7 @@ def test_r4_sign_persists_signature_snapshot_outbox_and_both_audits(client) -> N
     assert _report_state(result_id) == (1, 1, 1, 1, 1)
 
 
-def test_r4_snapshot_failure_rolls_back_everything_and_retry_succeeds(
-    client, monkeypatch
-) -> None:
+def test_r4_snapshot_failure_rolls_back_everything_and_retry_succeeds(client, monkeypatch) -> None:
     headers = _auth(client)
     result_id = _signable_result(client, headers)
     with monkeypatch.context() as patch:
@@ -792,9 +788,7 @@ def test_r4_audit_failure_rolls_back_and_retry_succeeds(
     assert _report_state(result_id) == (1, 1, 1, 1, 1)
 
 
-def test_r4_outbox_flush_failure_rolls_back_and_retry_succeeds(
-    client, monkeypatch
-) -> None:
+def test_r4_outbox_flush_failure_rolls_back_and_retry_succeeds(client, monkeypatch) -> None:
     headers = _auth(client)
     result_id = _signable_result(client, headers)
     original_flush = Session.flush

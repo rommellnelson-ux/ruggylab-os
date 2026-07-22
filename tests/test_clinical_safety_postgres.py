@@ -47,12 +47,8 @@ def test_r1_competing_sample_attachments_are_serialized() -> None:
             birth_date=dt.date(1990, 1, 1),
             sex="F",
         )
-        first_sample = Sample(
-            barcode=f"SAFETY-PG-A-{suffix}", patient=patient, status="Recu"
-        )
-        second_sample = Sample(
-            barcode=f"SAFETY-PG-B-{suffix}", patient=patient, status="Recu"
-        )
+        first_sample = Sample(barcode=f"SAFETY-PG-A-{suffix}", patient=patient, status="Recu")
+        second_sample = Sample(barcode=f"SAFETY-PG-B-{suffix}", patient=patient, status="Recu")
         order = ExamOrder(
             patient=patient,
             created_by_id=None,
@@ -102,10 +98,7 @@ def test_r1_competing_sample_attachments_are_serialized() -> None:
         user_a = session_a.get(User, user_id)
         assert user_a is not None
         locked_order = (
-            session_a.query(ExamOrder)
-            .filter(ExamOrder.id == order_id)
-            .with_for_update()
-            .one()
+            session_a.query(ExamOrder).filter(ExamOrder.id == order_id).with_for_update().one()
         )
         assert locked_order.sample_id is None
 
