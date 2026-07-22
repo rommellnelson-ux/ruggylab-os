@@ -409,7 +409,7 @@ def sign_result_report(
     payload: ReportSignatureCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_officer),
-) -> ReportSignature:
+) -> ReportSignatureRead:
     result = _get_accessible_result_or_error(db, result_id, current_user)
     _ensure_releasable_result(result)
 
@@ -420,24 +420,39 @@ def sign_result_report(
             detail="Rapport deja signe pour ce resultat.",
         )
 
-    signature = (
-        reissue_report_signature(
+    try:
+        signature = (
+            reissue_report_signature(
+                db,
+                signature=existing,
+                result=result,
+                user=current_user,
+                signature_meaning=payload.signature_meaning,
+                commit=False,
+            )
+            if existing
+            else create_report_signature(
+                db,
+                result=result,
+                user=current_user,
+                signature_meaning=payload.signature_meaning,
+                commit=False,
+            )
+        )
+        release_result_report(
             db,
-            signature=existing,
             result=result,
             user=current_user,
-            signature_meaning=payload.signature_meaning,
+            signature=signature,
+            commit=False,
         )
-        if existing
-        else create_report_signature(
-            db,
-            result=result,
-            user=current_user,
-            signature_meaning=payload.signature_meaning,
-        )
-    )
-    release_result_report(db, result=result, user=current_user, signature=signature)
-    return signature
+        db.flush()
+        response = ReportSignatureRead.model_validate(signature)
+        db.commit()
+        return response
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get(
