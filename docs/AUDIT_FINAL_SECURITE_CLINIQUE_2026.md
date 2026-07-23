@@ -23,7 +23,7 @@ notamment :
 - des gardes insuffisantes dans la vérification des restaurations.
 
 À l'issue des corrections, aucun P0 ouvert n'est connu. Cette formulation ne
-constitue pas une preuve d'absence. Huit P1 restent **escaladés**, car leur
+constitue pas une preuve d'absence. Huit P1 initiaux restent **escaladés**, car leur
 traitement impose une règle clinique, une politique métier, un nouveau contrat
 d'idempotence ou une migration susceptible de rencontrer des données
 historiques :
@@ -36,6 +36,11 @@ historiques :
 6. autorité et sémantique des ressources FHIR pharmacie au statut `completed`.
 7. MFA des comptes privilégiés et procédure de récupération ;
 8. chaîne immuable de versions des résultats amendés.
+
+La qualification d'intégration postérieure a ajouté `PR80-CLIN-01`, un neuvième
+P1 distinct des décisions D1 à D8 : les sémantiques de validation et de criticité
+des nouveaux flux qualitatif/POCT nécessitent une approbation clinique avant la
+fusion de la PR #80.
 
 Le registre détaillé est
 [`AUDIT_RISK_REGISTER_2026.md`](AUDIT_RISK_REGISTER_2026.md).
@@ -57,8 +62,12 @@ Le périmètre inspecté couvre :
 - authentification, révocation, rôles, unités et WebSocket ;
 - audit, migrations, sauvegarde, restauration, Docker et CI.
 
-Les valeurs critiques, intervalles de référence, unités, règles
-d'auto-validation et règles diagnostiques n'ont pas été modifiés.
+Les lots correctifs #85 à #99 n'ont pas modifié les valeurs critiques,
+intervalles de référence, unités ou règles d'auto-validation préexistantes. Cette
+affirmation ne couvrait pas suffisamment le commit d'acquisition initial :
+`submit_qualitative_result` introduit une règle positif→critique et une validation
+automatique, tandis que le flux POCT générique réutilise le catalogue Precis
+Expert. Ces sémantiques sont escaladées sous `PR80-CLIN-01`.
 
 ## 3. Méthode
 
@@ -176,7 +185,7 @@ Le head Alembic audité est `20260723_0038`.
 | État | P0 | P1 | P2 | P3 |
 |---|---:|---:|---:|---:|
 | Corrigé et fusionné | 1 | 15 | 1 | 0 |
-| Escaladé / décision humaine | 0 | 8 | 1 | 0 |
+| Escaladé / décision humaine | 0 | 9 | 1 | 0 |
 | Ouvert technique | 0 | 0 | 1 | 3 |
 | Accepté explicitement | 0 | 1 | 0 | 0 |
 
@@ -220,6 +229,10 @@ la transversalité change, le test doit être rouvert.
 - **ACQ-OPEN-01** — POCT et résultats qualitatifs créent un nouveau `Result` à
   chaque appel sans identifiant d'acquisition. Dédupliquer par seul échantillon
   serait potentiellement faux.
+- **PR80-CLIN-01** — la route qualitative marque toute parasitologie positive
+  critique et validée ; le flux POCT générique applique le catalogue central à
+  tout modèle/série enregistré. Les protections RBAC, unité, annulation et audit
+  sont présentes, mais l'approbation clinique de la portée n'a pas été trouvée.
 - **ACQ-OPEN-02** — le listener TCP acquitte après `_store_frame`, même si Redis
   a échoué et que la trame n'est que dans un tampon mémoire borné.
 - **IMG-OPEN-01** — le fallback paludisme est explicitement non clinique mais
@@ -248,8 +261,9 @@ la transversalité change, le test doit être rouvert.
 - **AUTH-OPEN-03, P3** — aucune route de récupération de compte n'a été trouvée
   par la recherche statique ; l'absence fonctionnelle doit être confirmée par le
   responsable d'exploitation.
-- **CI-OPEN-01, P3** — deux actions GitHub ciblent encore Node.js 20 et sont
-  forcées par le runner sur Node.js 24.
+- **CI-OPEN-01, P3** — corrigé par la PR #100 : `setup-node` et
+  `upload-artifact` v6 épinglés par SHA, Playwright Node.js 24 et CI des PR vers
+  la branche d'intégration.
 
 ## 9. Décisions humaines
 
@@ -421,7 +435,7 @@ documentées de qualification :
 
 Avant toute mise en service :
 
-1. arbitrer D1 à D8 et implémenter les décisions dans des lots séparés ;
+1. arbitrer `PR80-CLIN-01` avant fusion, puis D1 à D8 dans des lots séparés ;
 2. désactiver l'écriture clinique du fallback paludisme ;
 3. inventorier les numéros de laboratoire historiques avant toute contrainte ;
 4. qualifier serveur, stockage, UPS, réseau automates et imprimantes ;
