@@ -92,9 +92,9 @@ def compute_tat_dashboard(
     query = db.query(Result)
     if user is not None:
         query = apply_result_patient_scope(query, user)
-    results = (
-        query.filter(Result.bio_validated_at.isnot(None), Result.bio_validated_at >= cutoff).all()
-    )
+    results = query.filter(
+        Result.bio_validated_at.isnot(None), Result.bio_validated_at >= cutoff
+    ).all()
 
     # Pré-chargement des noms de techniciens (validateurs)
     validator_ids = {r.validator_id for r in results if r.validator_id}

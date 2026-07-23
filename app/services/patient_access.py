@@ -91,7 +91,9 @@ def apply_result_patient_scope(
         query = query.outerjoin(Sample, Result.sample_id == Sample.id).outerjoin(
             Patient, Sample.patient_id == Patient.id
         )
-    return query.filter(or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit))
+    return query.filter(
+        or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit)
+    )
 
 
 def can_access_order(user: User, order: ExamOrder) -> bool:

@@ -230,10 +230,7 @@ def test_unit_technician_tat_access_and_dashboard_are_scoped(client: TestClient)
         assert response.status_code == 200, response.text
 
     technician, _ = _user(client, admin, role="technician", unit="hematologie")
-    assert (
-        client.get(f"/api/v1/tat/results/{other['id']}", headers=technician).status_code
-        == 403
-    )
+    assert client.get(f"/api/v1/tat/results/{other['id']}", headers=technician).status_code == 403
     denied_update = client.patch(
         f"/api/v1/tat/results/{other['id']}",
         headers=technician,
@@ -262,9 +259,7 @@ def test_websocket_suppresses_other_unit_critical_event(client: TestClient) -> N
         received = websocket.receive_json()
 
         assert received.get("type") != "critical_value_alert"
-        assert other["id"] not in {
-            row["result_id"] for row in received.get("criticals", [])
-        }
+        assert other["id"] not in {row["result_id"] for row in received.get("criticals", [])}
 
 
 def test_open_websocket_closes_after_access_token_logout(client: TestClient) -> None:
