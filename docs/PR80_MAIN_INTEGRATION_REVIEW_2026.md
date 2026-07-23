@@ -207,7 +207,7 @@ Run : `30032100788`, head `8562262`, succès.
 La stack Docker a construit l'image et qualifié compose. Le job de publication
 GHCR était correctement skippé : aucune image n'a été publiée par cette CI.
 
-Résultat principal : **1 308 tests réussis, 15 skips, 11 warnings**.  
+Résultat principal : **1 308 tests réussis, 15 skips, 11 warnings**.<br>
 Résultat PostgreSQL dédié : **11 tests réussis**.
 
 ## 8. Inventaire des 15 skips

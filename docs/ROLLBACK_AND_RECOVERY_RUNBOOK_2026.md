@@ -216,8 +216,8 @@ Ne pas baisser les exigences d'authentification pour accélérer un rollback.
 - runbook mis à jour ;
 - décision de réouverture signée.
 
-Verdict : _______________________________________  
-SHA/digest final : _______________________________  
-Perte de données : oui / non / inconnue  
-Effets externes ambigus : oui / non  
+Verdict : _______________________________________<br>
+SHA/digest final : _______________________________<br>
+Perte de données : oui / non / inconnue<br>
+Effets externes ambigus : oui / non<br>
 Signatures : ____________________________________

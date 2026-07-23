@@ -166,7 +166,7 @@ Producteur de la clé, format, namespace, durée de vie et réponse HTTP au reje
 - [ ] Option C
 - [ ] Refus / étude complémentaire
 
-Responsables : intégration, laboratoire, fabricants POCT.  
+Responsables : intégration, laboratoire, fabricants POCT.<br>
 Date et justification : ______________________________
 
 ## D3 — Durabilité de l'ACK TCP brut
@@ -208,7 +208,7 @@ un parc hétérogène seulement si chaque profil est homologué.
 
 ### Coût, complexité et réversibilité
 
-A : faible coût, complexité faible, mais dépend du comportement instrument.  
+A : faible coût, complexité faible, mais dépend du comportement instrument.<br>
 B/C : coût et complexité élevés ; rollback vers A possible en gardant l'outbox
 pour finir son replay.
 
@@ -237,7 +237,7 @@ requise et temps maximal d'ACK.
 - [ ] Option C
 - [ ] Refus / étude fabricant
 
-Responsables : laboratoire, biomédical, réseau, intégration.  
+Responsables : laboratoire, biomédical, réseau, intégration.<br>
 Date et justification : ______________________________
 
 ## D4 — Fallback paludisme
@@ -312,7 +312,7 @@ traitement des sorties historiques non réelles.
 - [ ] Option C — dérogation clinique formelle
 - [ ] Refus / suspension de la fonction
 
-Responsables : biologiste, direction, qualité, responsable ML.  
+Responsables : biologiste, direction, qualité, responsable ML.<br>
 Date et justification : ______________________________
 
 ## D5 — Visibilité MADO
@@ -378,7 +378,7 @@ Source de l'unité, visibilité locale/district, cas anonymes et rôle transvers
 - [ ] Option C en complément
 - [ ] Refus / étude réglementaire
 
-Responsables : épidémiologie, DPO/sécurité, direction médicale.  
+Responsables : épidémiologie, DPO/sécurité, direction médicale.<br>
 Date et justification : ______________________________
 
 ## D6 — FHIR pharmacie
@@ -450,7 +450,7 @@ Rôles, source persistée, profil partenaire et événement exact autorisant
 - [ ] Option C
 - [ ] Refus / étude partenaire
 
-Responsables : pharmacie, interopérabilité, sécurité, partenaire FHIR.  
+Responsables : pharmacie, interopérabilité, sécurité, partenaire FHIR.<br>
 Date et justification : ______________________________
 
 ## D7 — MFA des comptes privilégiés
@@ -520,7 +520,7 @@ date d'enforcement.
 - [ ] Option C
 - [ ] Refus / étude IAM
 
-Responsables : sécurité, exploitation, direction, qualité.  
+Responsables : sécurité, exploitation, direction, qualité.<br>
 Date et justification : ______________________________
 
 ## D8 — Version immuable des résultats
@@ -590,7 +590,7 @@ droits SQL.
 - [ ] Option C
 - [ ] Refus / étude d'architecture
 
-Responsables : biologiste, qualité, architecture, base de données.  
+Responsables : biologiste, qualité, architecture, base de données.<br>
 Date et justification : ______________________________
 
 ## Validation globale
@@ -601,5 +601,5 @@ Date et justification : ______________________________
 - [ ] Chaque implémentation aura sa PR, ses tests PostgreSQL et son rollback.
 - [ ] Aucun arbitrage n'est considéré comme déployé par le seul fait de signer ce document.
 
-Approbateurs : _______________________________________  
+Approbateurs : _______________________________________<br>
 Date : ______________________________________________
