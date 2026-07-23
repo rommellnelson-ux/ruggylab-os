@@ -9,10 +9,23 @@ from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models import Patient, Sample, User
 from app.schemas.sample import SampleCreate, SampleRead, SampleUpdate
+from app.services.patient_access import (
+    apply_sample_patient_scope,
+    can_access_patient,
+    can_access_sample,
+)
 
 router = APIRouter(prefix="/samples")
 
 _LAB_NUMBER_LOCK_NAMESPACE = 0x524C4E55
+
+
+def _ensure_sample_access(sample: Sample, user: User) -> None:
+    if not can_access_sample(user, sample):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès à l'échantillon hors de votre périmètre.",
+        )
 
 
 def _lock_lab_number_sequence(db: Session, year: int) -> None:
@@ -51,8 +64,9 @@ def _next_lab_number(db: Session) -> str:
 def list_samples(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ) -> list[Sample]:
-    del current_user
-    return db.query(Sample).order_by(Sample.id.desc()).all()
+    query = apply_sample_patient_scope(db.query(Sample), current_user)
+    samples: list[Sample] = query.order_by(Sample.id.desc()).all()
+    return samples
 
 
 @router.get("/quality-summary")
@@ -65,8 +79,11 @@ def sample_quality_summary(
     Le taux d'hémolyse / de non-conformité est un indicateur reconnu de la qualité
     du prélèvement (formation des préleveurs).
     """
-    del current_user
-    rows = db.query(Sample.aspect, func.count(Sample.id)).group_by(Sample.aspect).all()
+    query = apply_sample_patient_scope(
+        db.query(Sample.aspect, func.count(Sample.id)),
+        current_user,
+    )
+    rows = query.group_by(Sample.aspect).all()
     by_aspect = {(aspect or "non_renseigne"): count for aspect, count in rows}
     total = sum(by_aspect.values())
     qualified = sum(c for a, c in by_aspect.items() if a not in ("non_renseigne",))
@@ -91,13 +108,13 @@ def get_sample_by_barcode(
     current_user: User = Depends(get_current_active_user),
 ) -> Sample:
     """Résout un échantillon par son code-barres (saisie/scan en salle)."""
-    del current_user
     sample = db.query(Sample).filter(Sample.barcode == barcode).first()
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Aucun échantillon pour le code-barres {barcode}.",
         )
+    _ensure_sample_access(sample, current_user)
     return sample
 
 
@@ -107,7 +124,6 @@ def create_sample(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Sample:
-    del current_user
     existing = db.query(Sample).filter(Sample.barcode == payload.barcode).first()
     if existing:
         raise HTTPException(
@@ -121,6 +137,11 @@ def create_sample(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Patient introuvable pour l'identifiant {payload.patient_id}.",
+            )
+        if not can_access_patient(current_user, patient):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès au dossier patient hors de votre périmètre.",
             )
 
     sample_data = payload.model_dump(exclude_none=True)
@@ -141,13 +162,13 @@ def update_sample(
     current_user: User = Depends(get_current_active_user),
 ) -> Sample:
     """Partial update — statut (Recu → En cours → Termine / Annule) et/ou aspect."""
-    del current_user
     sample = db.query(Sample).filter(Sample.id == sample_id).first()
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Echantillon introuvable.",
         )
+    _ensure_sample_access(sample, current_user)
     if payload.status is not None:
         sample.status = payload.status
     if payload.aspect is not None:

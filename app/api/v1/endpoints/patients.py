@@ -9,7 +9,7 @@ from app.models import Patient, User
 from app.schemas.pagination import PaginationMeta, PatientListResponse
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.services.audit import log_audit_event
-from app.services.patient_access import apply_patient_scope, can_access_patient
+from app.services.patient_access import apply_patient_scope, can_access_patient, can_access_unit
 from app.services.patient_history import build_patient_fhir_bundle, build_patient_history
 
 router = APIRouter(prefix="/patients")
@@ -135,7 +135,11 @@ def create_patient(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Patient:
-    del current_user
+    if not can_access_unit(current_user, payload.unit):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Création de patient hors de votre périmètre d'unité.",
+        )
     existing = db.query(Patient).filter(Patient.ipp_unique_id == payload.ipp_unique_id).first()
     if existing:
         raise HTTPException(
