@@ -350,7 +350,7 @@ class TestAutoValidatorHelpers:
     def test_is_normal_flag_recognises_both_vocabularies(self):
         from app.services.auto_validator import _is_normal_flag
 
-        # Vocabulaire court (compute_flags) et long (apply_bioref_to_result).
+        # Vocabulaire court officiel et formes longues acceptées défensivement.
         assert _is_normal_flag("N") is True
         assert _is_normal_flag("NORMAL") is True
         assert _is_normal_flag("négatif") is True
