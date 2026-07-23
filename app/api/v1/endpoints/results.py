@@ -366,8 +366,18 @@ def get_result_fhir(
     result = _get_accessible_result_or_error(db, result_id, current_user)
 
     report = build_diagnostic_report(result)
+    content = report.model_dump(exclude_none=True)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="result.fhir.export",
+        entity_type="result",
+        entity_id=str(result_id),
+        payload={"resource_type": "DiagnosticReport"},
+    )
+    db.commit()
     return JSONResponse(
-        content=report.model_dump(exclude_none=True),
+        content=content,
         media_type="application/fhir+json",
     )
 

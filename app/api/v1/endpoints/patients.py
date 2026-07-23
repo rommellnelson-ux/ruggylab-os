@@ -114,7 +114,7 @@ def get_patient_fhir_bundle(
         event_type="patient.fhir.export",
         entity_type="patient",
         entity_id=str(patient_id),
-        payload={"ipp": patient.ipp_unique_id, "resource_count": bundle.get("total", 0)},
+        payload={"resource_count": bundle.get("total", 0)},
     )
     db.commit()
     return JSONResponse(content=bundle, media_type="application/fhir+json")
