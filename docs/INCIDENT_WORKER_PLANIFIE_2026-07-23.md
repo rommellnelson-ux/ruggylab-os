@@ -18,11 +18,15 @@ travail ne sont plus compatibles :
 
 Le `LastTaskResult=2` observé au début de l'enquête est donc expliqué avec un
 niveau de confiance élevé par l'échec d'analyse des arguments. Depuis, les
-déclenchements automatiques ont produit d'autres codes ; au dernier contrôle
-lecture seule, la tâche était `Ready`, aucun processus worker correspondant
-n'était actif et le résultat était `0x00041306` après une exécution interrompue.
-L'historique opérationnel du Planificateur est désactivé, ce qui empêche
-d'attribuer cette interruption à une personne ou à un mécanisme précis.
+déclenchements automatiques ont produit d'autres codes. Une tentative automatique
+observée entre 22:32:53 et 22:42:53 UTC est restée pendante jusqu'à la limite
+d'exécution de dix minutes. Les deux PID visibles formaient une seule chaîne :
+le lanceur de la venv était le parent de l'interpréteur Python réel. Une
+occurrence intermédiaire a été refusée avec `0x800710E0`, résultat cohérent avec
+`IgnoreNew`. Après la limite, la tâche était `Ready`, sans processus correspondant
+et avec `0xC000013A`. L'historique opérationnel du Planificateur est désactivé ;
+le point exact où l'exécution est restée pendante et son initiateur de terminaison
+ne sont donc pas prouvés.
 
 **Décision : ne pas redémarrer ni réenregistrer la tâche en l'état.**
 
@@ -39,6 +43,8 @@ d'attribuer cette interruption à une personne ou à un mécanisme précis.
 | 23 juillet 2026 | `LastTaskResult=2`, tâche prête, 47 exécutions manquées dans un état antérieur. | `Get-ScheduledTaskInfo`. |
 | 23 juillet 2026 | Un déclenchement automatique est observé sans action de l'auditeur ; la tâche reste active jusqu'à sa limite de dix minutes. | État tâche/processus. |
 | 23 juillet 2026 22:21:41 UTC | Tâche `Ready`, aucun worker actif, résultat `0x00041306`, 13 exécutions manquées. | Dernier contrôle lecture seule de cette mission. |
+| 23 juillet 2026 22:38:35 UTC | Tâche `Running` ; un lanceur venv et son interpréteur enfant exécutent la même commande depuis 22:32:53/22:33:27. Une occurrence est refusée avec `0x800710E0` et `IgnoreNew`. | `Get-ScheduledTaskInfo`, relation `ParentProcessId`. |
+| 23 juillet 2026 22:44:43 UTC | Tâche revenue `Ready`, aucun worker actif, résultat `0xC000013A` après la fenêtre de dix minutes, prochaine tentative automatique annoncée à 22:47:52. | Contrôle lecture seule après la limite d'exécution. |
 
 Les horodatages décrivent les preuves disponibles ; ils ne prouvent pas que le
 worker a fonctionné sans interruption avant le 8 juillet.
@@ -49,6 +55,12 @@ Deux processus Python ont été terminés par erreur lors d'une investigation
 antérieure. Les PID ne sont pas repris ici car ils ne sont plus actifs et ne
 constituent pas un identifiant durable. La présence simultanée de deux PID ne
 prouve pas deux instances métier : l'un pouvait être le lanceur de l'autre.
+
+Ce mécanisme a été confirmé lors de la tentative de 22:32:53 : le processus de
+la venv était le parent direct de l'interpréteur Python système. Deux PID
+n'étaient donc qu'une seule exécution logique. Aucun second worker indépendant
+n'a été observé. Cette conclusion reste ponctuelle et n'exclut pas un autre
+mécanisme sur un environnement non inspecté.
 
 La tâche est configurée avec `MultipleInstances=IgnoreNew`, ce qui réduit le
 risque de deux instances issues de cette tâche. Cela n'exclut pas un worker lancé
@@ -87,6 +99,11 @@ notification interne.
 5. Le journal n'a plus été alimenté après le changement de branche du checkout.
 6. Docker n'était pas actif pendant l'enquête ; aucun conteneur doublon n'a été
    trouvé. Cette observation ponctuelle n'est pas une garantie durable.
+7. Une tentative automatique a créé une chaîne lanceur/interpréteur unique,
+   est restée pendante jusqu'à la limite de dix minutes puis a disparu sans
+   intervention de l'auditeur.
+8. Le refus `0x800710E0` pendant cette fenêtre est cohérent avec le couple
+   `Running`/`IgnoreNew` ; il ne démontre pas l'état de la file d'outbox.
 
 ## Impact probable
 
@@ -122,6 +139,11 @@ remise en service mal contrôlée peut également :
 - utiliser un checkout mutable et une venv qui ne correspondent pas au SHA
   qualifié ;
 - masquer l'échec faute d'historique de tâche et de journal compatible.
+
+Les déclenchements automatiques restant actifs, une nouvelle tentative pendante
+peut apparaître sans redémarrage manuel. Il ne faut ni lancer un passage
+supplémentaire ni modifier l'instance en cours sans l'autorisation et les
+contrôles décrits ci-dessous.
 
 ## Commandes de vérification en lecture seule
 
@@ -208,8 +230,12 @@ l'autorisation explicite de modifier/redémarrer la tâche.
 
 La cause la plus probable du code `2` est confirmée statiquement : incompatibilité
 entre l'action installée et l'interface CLI courante. Le backlog et l'impact réel
-ne sont pas connus. Aucun doublon actif n'a été observé au dernier contrôle, mais
-l'absence ponctuelle de processus ne garantit pas l'absence d'un autre mécanisme.
+ne sont pas connus. La paire de PID observée était une seule chaîne
+lanceur/interpréteur, pas deux workers indépendants. Elle est restée pendante
+jusqu'à la limite de dix minutes avant de disparaître. Aucun doublon indépendant
+n'a été observé, mais l'absence ponctuelle de processus ne garantit pas l'absence
+d'un autre mécanisme. Le prochain déclenchement automatique peut reproduire le
+cycle tant que la définition installée reste active et incompatible.
 
 Autorisation exacte attendue :
 
