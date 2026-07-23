@@ -47,6 +47,11 @@ class User(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Version de sécurité incorporée aux JWT. Toute modification sensible du
+    # compte l'incrémente afin d'invalider immédiatement les sessions antérieures.
+    auth_version: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     # Unité / service de rattachement (cloisonnement RBAC des dossiers patient).
     # NULL = agent transversal (accès à tous les dossiers).
     unit: Mapped[str | None] = mapped_column(String(100))
