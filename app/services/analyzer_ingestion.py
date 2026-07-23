@@ -9,7 +9,7 @@ import json
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import AuditEvent, Result, Sample
+from app.models import AuditEvent, Result
 from app.schemas.analyzer import AnalyzerResultIngest
 from app.services.audit import log_audit_event
 from app.services.auto_validator import try_auto_validate
@@ -17,6 +17,11 @@ from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.reference_checker import compute_flags
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+)
 from app.utils.datetime_utils import utcnow_naive
 
 
@@ -90,11 +95,15 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
             "message": "Message automate deja integre.",
         }
 
-    sample = db.query(Sample).filter(Sample.barcode == payload.sample_barcode).first()
+    sample = lock_sample_by_barcode(db, payload.sample_barcode)
     if sample is None:
         raise AnalyzerIngestionError(
             f"Echantillon introuvable pour le code-barres {payload.sample_barcode}."
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise AnalyzerIngestionError(str(exc)) from exc
 
     patient = sample.patient
     patient_id = patient.id if patient else None

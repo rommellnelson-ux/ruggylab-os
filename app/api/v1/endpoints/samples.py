@@ -7,13 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import Patient, Sample, User
+from app.models import Patient, Result, Sample, User
 from app.schemas.sample import SampleCreate, SampleRead, SampleUpdate
 from app.services.patient_access import (
     apply_sample_patient_scope,
     can_access_patient,
     can_access_sample,
 )
+from app.services.sample_workflow import CANCELLED_SAMPLE_STATUS, lock_sample_by_id
 
 router = APIRouter(prefix="/samples")
 
@@ -162,7 +163,7 @@ def update_sample(
     current_user: User = Depends(get_current_active_user),
 ) -> Sample:
     """Partial update — statut (Recu → En cours → Termine / Annule) et/ou aspect."""
-    sample = db.query(Sample).filter(Sample.id == sample_id).first()
+    sample = lock_sample_by_id(db, sample_id)
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -170,6 +171,20 @@ def update_sample(
         )
     _ensure_sample_access(sample, current_user)
     if payload.status is not None:
+        if sample.status == CANCELLED_SAMPLE_STATUS and payload.status != CANCELLED_SAMPLE_STATUS:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Un échantillon annulé ne peut pas être réactivé.",
+            )
+        if (
+            payload.status == CANCELLED_SAMPLE_STATUS
+            and sample.status != CANCELLED_SAMPLE_STATUS
+            and db.query(Result.id).filter(Result.sample_id == sample.id).first() is not None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Un échantillon portant déjà un résultat ne peut pas être annulé.",
+            )
         sample.status = payload.status
     if payload.aspect is not None:
         sample.aspect = payload.aspect

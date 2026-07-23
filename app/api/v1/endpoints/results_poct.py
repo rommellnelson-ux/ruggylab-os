@@ -23,6 +23,11 @@ from app.schemas.precis_expert import PrecisExpertManualInput
 from app.services.audit import log_audit_event
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.patient_access import can_access_patient
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+)
 from app.services.validation.poct_reference import POCT_ANALYTES, build_poct_point
 from app.services.validation.precis_expert import PrecisExpertValidator
 
@@ -37,7 +42,7 @@ def _resolve_sample_and_patient(
     db: Session, *, barcode: str, current_user: User
 ) -> tuple[Sample, Patient]:
     """Résout l'échantillon et son patient, avec contrôle de périmètre."""
-    sample = db.query(Sample).filter(Sample.barcode == barcode).first()
+    sample = lock_sample_by_barcode(db, barcode)
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -54,6 +59,13 @@ def _resolve_sample_and_patient(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès refusé : dossier hors de votre périmètre.",
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     return sample, patient
 
 
