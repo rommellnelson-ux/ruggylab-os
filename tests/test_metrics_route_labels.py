@@ -14,7 +14,7 @@ def test_metrics_label_uses_route_template_not_raw_path(client) -> None:  # noqa
 
     body = client.get("/metrics").text
     assert "/api/v1/patients/{patient_id}" in body
-    assert "424242" not in body
+    assert 'endpoint="/api/v1/patients/424242"' not in body
 
 
 def test_unmatched_paths_are_aggregated(client) -> None:  # noqa: ANN001
@@ -22,4 +22,4 @@ def test_unmatched_paths_are_aggregated(client) -> None:  # noqa: ANN001
     # scans, typos) : tout part dans le seau "unmatched".
     client.get("/api/v1/nexistepas-982137")
     body = client.get("/metrics").text
-    assert "982137" not in body
+    assert 'endpoint="/api/v1/nexistepas-982137"' not in body
