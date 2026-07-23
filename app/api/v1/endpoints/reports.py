@@ -4,13 +4,13 @@ import json
 from datetime import UTC, datetime, timedelta
 from html import escape as html_escape
 from io import StringIO
-from typing import Literal, TypedDict
+from typing import Literal, TypedDict, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user, require_admin, require_officer
+from app.api.deps import forbid_accountant, get_current_active_user, require_admin, require_officer
 from app.core.config import settings
 from app.db.session import get_db
 from app.models import (
@@ -50,7 +50,7 @@ from app.schemas.reports import (
     StockDashboardResponse,
 )
 from app.services.audit import log_audit_event
-from app.services.patient_access import can_access_result
+from app.services.patient_access import apply_result_patient_scope, can_access_result
 from app.services.qc_pdf_report import build_qc_html_report
 from app.services.report_signing import (
     build_result_report_pdf,
@@ -213,13 +213,17 @@ def _epidemiology_results(
     *,
     start_date: datetime,
     end_date: datetime,
+    user: User,
 ) -> list[Result]:
-    return (
-        db.query(Result)
-        .filter(Result.analysis_date >= start_date)
-        .filter(Result.analysis_date <= end_date)
-        .order_by(Result.analysis_date.desc())
-        .all()
+    query = apply_result_patient_scope(db.query(Result), user)
+    return cast(
+        list[Result],
+        (
+            query.filter(Result.analysis_date >= start_date)
+            .filter(Result.analysis_date <= end_date)
+            .order_by(Result.analysis_date.desc())
+            .all()
+        ),
     )
 
 
@@ -296,33 +300,33 @@ def _build_epidemiology_summary(
 )
 def epidemiology_summary(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
     days: int = Query(default=30, ge=1, le=366),
 ) -> EpidemiologySummaryResponse:
-    del current_user
     end_date = datetime.now(UTC).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    results = _epidemiology_results(db, start_date=start_date, end_date=end_date)
+    results = _epidemiology_results(
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        user=current_user,
+    )
     return _build_epidemiology_summary(results, start_date=start_date, end_date=end_date)
 
 
 @router.get("/epidemiology-export.csv")
 def epidemiology_export_csv(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
     days: int = Query(default=30, ge=1, le=366),
 ) -> Response:
-    del current_user
     end_date = datetime.now(UTC).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    results = (
-        db.query(Result)
-        .join(Sample, Sample.id == Result.sample_id)
-        .join(Patient, Patient.id == Sample.patient_id, isouter=True)
-        .filter(Result.analysis_date >= start_date)
-        .filter(Result.analysis_date <= end_date)
-        .order_by(Result.analysis_date.desc())
-        .all()
+    results = _epidemiology_results(
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        user=current_user,
     )
 
     output = StringIO()
@@ -385,7 +389,7 @@ def epidemiology_export_csv(
 def result_report_pdf(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
 ) -> Response:
     result = _get_accessible_result_or_error(db, result_id, current_user)
     signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
@@ -462,7 +466,7 @@ def sign_result_report(
 def get_result_report_signature(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
 ) -> ReportSignature:
     _get_accessible_result_or_error(db, result_id, current_user)
     signature = db.query(ReportSignature).filter(ReportSignature.result_id == result_id).first()
@@ -506,7 +510,7 @@ def release_result_report_endpoint(
 def list_result_report_snapshots(
     result_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
 ) -> list[ReportSnapshot]:
     _get_accessible_result_or_error(db, result_id, current_user)
     return (
@@ -521,7 +525,7 @@ def list_result_report_snapshots(
 def report_snapshot_pdf(
     snapshot_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
 ) -> Response:
     snapshot = _get_accessible_snapshot_or_error(db, snapshot_id, current_user)
     return Response(
@@ -1004,11 +1008,17 @@ def _critical_compliance_rows(
     db: Session,
     start_date: datetime,
     end_date: datetime,
+    user: User,
     target_minutes: int = DEFAULT_CRITICAL_ACK_TARGET_MINUTES,
     exam_code: str | None = None,
     unit: str | None = None,
 ) -> list[dict]:
-    query = db.query(Result).filter(
+    query = (
+        db.query(Result)
+        .outerjoin(Sample, Sample.id == Result.sample_id)
+        .outerjoin(Patient, Patient.id == Sample.patient_id)
+    )
+    query = apply_result_patient_scope(query, user, patient_joined=True).filter(
         Result.is_critical.is_(True),
         Result.analysis_date >= start_date,
         Result.analysis_date <= end_date,
@@ -1016,9 +1026,6 @@ def _critical_compliance_rows(
     if exam_code:
         query = query.filter(func.upper(Result.exam_code) == exam_code.upper())
     if unit:
-        query = query.join(Sample, Sample.id == Result.sample_id).join(
-            Patient, Patient.id == Sample.patient_id
-        )
         query = query.filter(func.upper(Patient.unit) == unit.upper())
     results = query.order_by(Result.analysis_date.desc(), Result.id.desc()).all()
     user_ids = {result.critical_ack_by_id for result in results if result.critical_ack_by_id}
@@ -1101,17 +1108,24 @@ def _critical_compliance_breakdown(rows: list[dict], field: str) -> list[dict]:
 @router.get("/critical-compliance")
 def critical_compliance_report(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
     days: int = Query(default=30, ge=1, le=366),
     target_minutes: int = Query(default=DEFAULT_CRITICAL_ACK_TARGET_MINUTES, ge=1, le=1440),
     exam_code: str | None = Query(default=None, min_length=1, max_length=50),
     unit: str | None = Query(default=None, min_length=1, max_length=100),
 ) -> dict:
     """Rapport conformité des valeurs critiques : attente, délai, taux de prise en charge."""
-    del current_user
     end_date = datetime.now(UTC).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    rows = _critical_compliance_rows(db, start_date, end_date, target_minutes, exam_code, unit)
+    rows = _critical_compliance_rows(
+        db,
+        start_date,
+        end_date,
+        current_user,
+        target_minutes,
+        exam_code,
+        unit,
+    )
     handled = [row for row in rows if row["critical_ack_at"]]
     pending = [row for row in rows if not row["critical_ack_at"]]
     late = [row for row in rows if row["compliance_status"] == "hors_delai"]
@@ -1149,17 +1163,24 @@ def critical_compliance_report(
 @router.get("/critical-compliance/export.csv")
 def critical_compliance_export_csv(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
     days: int = Query(default=30, ge=1, le=366),
     target_minutes: int = Query(default=DEFAULT_CRITICAL_ACK_TARGET_MINUTES, ge=1, le=1440),
     exam_code: str | None = Query(default=None, min_length=1, max_length=50),
     unit: str | None = Query(default=None, min_length=1, max_length=100),
 ) -> Response:
     """Export CSV du rapport conformité des valeurs critiques."""
-    del current_user
     end_date = datetime.now(UTC).replace(tzinfo=None)
     start_date = end_date - timedelta(days=days)
-    rows = _critical_compliance_rows(db, start_date, end_date, target_minutes, exam_code, unit)
+    rows = _critical_compliance_rows(
+        db,
+        start_date,
+        end_date,
+        current_user,
+        target_minutes,
+        exam_code,
+        unit,
+    )
     output = StringIO()
     writer = csv.writer(output)
     columns = [
