@@ -149,6 +149,15 @@ def create_patient(
 
     patient = Patient(**payload.model_dump())
     db.add(patient)
+    db.flush()
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="patient.create",
+        entity_type="patient",
+        entity_id=str(patient.id),
+        payload={"unit": patient.unit},
+    )
     db.commit()
     db.refresh(patient)
     return patient
