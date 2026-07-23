@@ -383,9 +383,11 @@ jobs:
           # L'ancien motif ghcr.io/<owner>/<repo>/ruggylab-os:<sha> doublait le
           # nom du dépôt : l'image publiée n'était jamais celle attendue.
           # Déploiement : RUGGYLAB_IMAGE=ghcr.io/${{ github.repository }}:<sha|vX.Y.Z>
+          # Une branche peut contenir "/" (interdit dans un tag OCI) : les
+          # déclenchements manuels sur branche publient donc uniquement le SHA.
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}:{1}', github.repository, github.ref_name) || '' }}
           labels: |
             org.opencontainers.image.title=RuggyLab OS
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
