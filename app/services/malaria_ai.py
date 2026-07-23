@@ -181,9 +181,8 @@ class MobileNetV2Classifier:
                 return self._onnx_predict(image_url)
             except Exception as exc:
                 logger.warning(
-                    "ONNX inference failed for '%s': %s — using fallback.",
-                    image_url,
-                    exc,
+                    "ONNX inference failed (%s); using fallback.",
+                    type(exc).__name__,
                 )
 
         return self._heuristic_predict(image_url)
@@ -255,7 +254,7 @@ def enqueue_malaria_analysis(
         event_type="malaria.analysis.enqueue",
         entity_type="malaria_analysis_job",
         entity_id=str(job.id),
-        payload={"result_id": result.id, "image_url": result.image_url},
+        payload={"result_id": result.id},
     )
     db.commit()
     db.refresh(job)
@@ -311,7 +310,7 @@ def process_malaria_job(db: Session, *, job_id: int) -> MalariaAnalysisJob | Non
         )
     except Exception as exc:  # pragma: no cover - defensive inference boundary
         job.status = "failed"
-        job.error_message = str(exc)
+        job.error_message = type(exc).__name__
         job.completed_at = utcnow_naive()
         log_audit_event(
             db,
@@ -319,7 +318,7 @@ def process_malaria_job(db: Session, *, job_id: int) -> MalariaAnalysisJob | Non
             event_type="malaria.analysis.fail",
             entity_type="malaria_analysis_job",
             entity_id=str(job.id),
-            payload={"result_id": job.result_id, "error": str(exc)},
+            payload={"result_id": job.result_id, "error_type": type(exc).__name__},
         )
 
     db.commit()
