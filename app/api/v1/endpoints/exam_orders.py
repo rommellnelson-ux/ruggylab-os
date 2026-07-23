@@ -24,6 +24,7 @@ from app.schemas.exam_order import (
 )
 from app.schemas.invoice import InvoiceFromOrder, InvoiceRead
 from app.services.accounting_service import balance_of, build_invoice_from_order, credit_of
+from app.services.audit import log_audit_event
 from app.services.exam_order_service import build_thread, sync_order_progress
 from app.services.order_report import build_order_report_pdf
 from app.services.patient_access import (
@@ -54,6 +55,24 @@ def _get_order_or_404(db: Session, order_id: int) -> ExamOrder:
 def _get_accessible_order_or_404(db: Session, order_id: int, user: User) -> ExamOrder:
     """Charge la prescription en refusant (403) celles hors du périmètre unité."""
     order = _get_order_or_404(db, order_id)
+    if not can_access_order(user, order):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
+    return order
+
+
+def _get_locked_accessible_order_or_404(db: Session, order_id: int, user: User) -> ExamOrder:
+    """Verrouille la prescription avant tout contrôle de rattachement."""
+    order = (
+        db.query(ExamOrder)
+        .options(selectinload(ExamOrder.items))
+        .filter(ExamOrder.id == order_id)
+        .with_for_update()
+        .first()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prescription introuvable."
+        )
     if not can_access_order(user, order):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
     return order
@@ -138,7 +157,7 @@ def collect_exam_order(
     current_user: User = Depends(get_current_active_user),
 ) -> ExamOrderThread:
     """Rattache l'échantillon prélevé (par id ou code-barres) et synchronise."""
-    order = _get_accessible_order_or_404(db, order_id, current_user)
+    order = _get_locked_accessible_order_or_404(db, order_id, current_user)
     if payload.sample_id is None and not payload.barcode:
         raise HTTPException(status_code=422, detail="Fournir sample_id ou barcode.")
 
@@ -150,9 +169,47 @@ def collect_exam_order(
     if not sample:
         raise HTTPException(status_code=404, detail="Échantillon introuvable.")
 
+    if sample.patient_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Un échantillon sans patient ne peut pas être rattaché à cette prescription.",
+        )
+    if sample.patient_id != order.patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="L'échantillon et la prescription doivent appartenir au même patient.",
+        )
+
+    if order.status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette prescription ne peut plus être collectée.",
+        )
+    if order.status == "completed":
+        if order.sample_id == sample.id:
+            return build_thread(db, order, synchronize=False)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette prescription ne peut plus être collectée.",
+        )
+    if order.sample_id is not None:
+        if order.sample_id == sample.id:
+            return build_thread(db, order, synchronize=False)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette prescription est déjà rattachée à un autre échantillon.",
+        )
     order.sample_id = sample.id
-    db.commit()
-    return build_thread(db, order)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="exam_order.collect",
+        entity_type="exam_order",
+        entity_id=str(order.id),
+        payload={"sample_id": sample.id, "patient_id": order.patient_id},
+    )
+    sync_order_progress(db, order)
+    return build_thread(db, order, synchronize=False)
 
 
 @router.patch("/{order_id}", response_model=ExamOrderRead)
