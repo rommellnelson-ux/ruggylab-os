@@ -3,6 +3,7 @@ import hashlib
 from dataclasses import dataclass
 
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import DH36InboundMessage, Equipment, Patient, Result, Sample, User
@@ -64,6 +65,29 @@ def _reject(
     return DH36IngestionOutcome(message=message)
 
 
+def _duplicate_outcome(
+    db: Session,
+    message: DH36InboundMessage,
+    *,
+    user: User | None,
+) -> DH36IngestionOutcome:
+    log_audit_event(
+        db,
+        user=user,
+        event_type="dh36.message.duplicate",
+        entity_type="dh36_inbound_message",
+        entity_id=str(message.id),
+        payload={
+            "sample_barcode": message.sample_barcode,
+            "message_control_id": message.message_control_id,
+            "result_id": message.result_id,
+        },
+    )
+    db.commit()
+    db.refresh(message)
+    return DH36IngestionOutcome(message=message, duplicate=True)
+
+
 def ingest_dh36_message(
     db: Session,
     *,
@@ -87,21 +111,7 @@ def ingest_dh36_message(
         )
     existing = duplicate_query.first()
     if existing:
-        log_audit_event(
-            db,
-            user=user,
-            event_type="dh36.message.duplicate",
-            entity_type="dh36_inbound_message",
-            entity_id=str(existing.id),
-            payload={
-                "sample_barcode": existing.sample_barcode,
-                "message_control_id": existing.message_control_id,
-                "result_id": existing.result_id,
-            },
-        )
-        db.commit()
-        db.refresh(existing)
-        return DH36IngestionOutcome(message=existing, duplicate=True)
+        return _duplicate_outcome(db, existing, user=user)
 
     message = DH36InboundMessage(
         raw_hash=message_hash,
@@ -112,7 +122,14 @@ def ingest_dh36_message(
         raw_message=raw_message.strip(),
     )
     db.add(message)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        existing = duplicate_query.first()
+        if existing is not None:
+            return _duplicate_outcome(db, existing, user=user)
+        raise
 
     if not message.sample_barcode:
         return _reject(
@@ -184,7 +201,6 @@ def ingest_dh36_message(
         is_validated=True,
         is_critical=is_panic,
     )
-    sample.status = "Termine"
     db.add(result)
     db.flush()
 
@@ -206,6 +222,7 @@ def ingest_dh36_message(
             user=user,
         )
 
+    sample.status = "Termine"
     message.status = "processed"
     message.result_id = result.id
     message.processed_at = utcnow_naive()
