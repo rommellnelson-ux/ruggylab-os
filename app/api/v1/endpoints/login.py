@@ -46,12 +46,7 @@ def login_access_token(
     db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Token:
-    user = (
-        db.query(User)
-        .filter(User.username == form_data.username)
-        .with_for_update()
-        .first()
-    )
+    user = db.query(User).filter(User.username == form_data.username).with_for_update().first()
     authenticated = bool(user and verify_password(form_data.password, user.hashed_password))
     record_auth_attempt(authenticated)
 
@@ -90,10 +85,7 @@ def refresh_access_token(payload: RefreshRequest, db: Session = Depends(get_db))
     # révocation globale sans créer d'interblocage.
     user = db.query(User).filter(User.id == db_token.user_id).with_for_update().first()
     db_token = (
-        db.query(RefreshToken)
-        .filter(RefreshToken.id == db_token.id)
-        .with_for_update()
-        .first()
+        db.query(RefreshToken).filter(RefreshToken.id == db_token.id).with_for_update().first()
     )
 
     if not db_token or not db_token.is_valid:
