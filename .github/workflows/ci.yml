@@ -122,6 +122,7 @@ jobs:
           tests/test_lab_numbering_r5_postgres.py
           tests/test_preanalytic_cancelled_sample_postgres.py
           tests/test_quality_transaction_postgres.py
+          tests/test_finance_transaction_postgres.py
 
       - name: Smoke-test app startup against PostgreSQL
         env:
