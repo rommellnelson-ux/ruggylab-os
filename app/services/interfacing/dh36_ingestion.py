@@ -10,6 +10,7 @@ from app.models import DH36InboundMessage, Equipment, Patient, Result, Sample, U
 from app.services.audit import log_audit_event
 from app.services.interfacing.dymind_dh36 import DH36Parser
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
+from app.services.sample_workflow import CancelledSampleError, ensure_sample_processable
 from app.services.validation.med_logic import validate_nfs_parameters
 from app.utils.datetime_utils import utcnow_naive
 
@@ -149,6 +150,10 @@ def ingest_dh36_message(
             reason=f"Code-barres inconnu: {message.sample_barcode}.",
             user=user,
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        return _reject(db, message, reason=str(exc), user=user)
 
     patient = db.query(Patient).filter(Patient.id == sample.patient_id).first()
     if not patient:

@@ -37,6 +37,11 @@ from app.services.patient_access import (
     can_access_result,
 )
 from app.services.reference_checker import compute_flags
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_id,
+)
 from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
@@ -373,7 +378,7 @@ def create_result(
     db: Session = Depends(get_db),
     current_user: User = Depends(forbid_accountant),
 ) -> Result:
-    sample = db.query(Sample).filter(Sample.id == payload.sample_id).first()
+    sample = lock_sample_by_id(db, payload.sample_id)
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -385,6 +390,13 @@ def create_result(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès au patient hors de votre périmètre.",
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     if payload.equipment_id is not None:
         equipment = db.query(Equipment).filter(Equipment.id == payload.equipment_id).first()

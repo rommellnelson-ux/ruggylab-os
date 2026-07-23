@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import ExamOrder, ExamOrderItem, Invoice, Patient, Result, Sample, User
+from app.models import ExamOrder, ExamOrderItem, Invoice, Patient, Result, User
 from app.schemas.exam_order import (
     ORDER_STATUSES,
     PRIORITIES,
@@ -31,6 +31,12 @@ from app.services.patient_access import (
     apply_order_patient_scope,
     can_access_order,
     can_access_patient,
+)
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+    lock_sample_by_id,
 )
 
 _OUT_OF_SCOPE = "Accès refusé : prescription hors de votre périmètre."
@@ -163,11 +169,16 @@ def collect_exam_order(
 
     sample = None
     if payload.sample_id is not None:
-        sample = db.query(Sample).filter(Sample.id == payload.sample_id).first()
+        sample = lock_sample_by_id(db, payload.sample_id)
     elif payload.barcode:
-        sample = db.query(Sample).filter(Sample.barcode == payload.barcode).first()
+        sample = lock_sample_by_barcode(db, payload.barcode)
     if not sample:
         raise HTTPException(status_code=404, detail="Échantillon introuvable.")
+    if payload.barcode and sample.barcode != payload.barcode:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="sample_id et barcode désignent des échantillons différents.",
+        )
 
     if sample.patient_id is None:
         raise HTTPException(
@@ -179,6 +190,13 @@ def collect_exam_order(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="L'échantillon et la prescription doivent appartenir au même patient.",
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     if order.status == "cancelled":
         raise HTTPException(

@@ -15,10 +15,15 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import Patient, Result, Sample, User
+from app.models import Patient, Result, User
 from app.schemas.qualitative import QualitativeResultResponse, QualitativeResultSubmission
 from app.services.audit import log_audit_event
 from app.services.patient_access import can_access_patient
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+)
 
 router = APIRouter(prefix="/results/qualitative")
 
@@ -33,7 +38,7 @@ def submit_qualitative_result(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> dict[str, Any]:
-    sample = db.query(Sample).filter(Sample.barcode == payload.sample_barcode).first()
+    sample = lock_sample_by_barcode(db, payload.sample_barcode)
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -51,6 +56,13 @@ def submit_qualitative_result(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès refusé : dossier hors de votre périmètre.",
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     findings = payload.findings
     # Une parasitologie positive est une valeur d'alerte clinique (p. ex.
