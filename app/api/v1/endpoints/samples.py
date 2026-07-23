@@ -1,7 +1,8 @@
 import datetime as dt
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
@@ -11,14 +12,39 @@ from app.schemas.sample import SampleCreate, SampleRead, SampleUpdate
 
 router = APIRouter(prefix="/samples")
 
+_LAB_NUMBER_LOCK_NAMESPACE = 0x524C4E55
+
+
+def _lock_lab_number_sequence(db: Session, year: int) -> None:
+    """Sérialise l'allocation annuelle pendant la transaction PostgreSQL."""
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    db.execute(select(func.pg_advisory_xact_lock(_LAB_NUMBER_LOCK_NAMESPACE, year)))
+
 
 def _next_lab_number(db: Session) -> str:
     """N° de laboratoire lisible, séquence annuelle : AAAA-NNNNNN."""
-    prefix = f"{dt.datetime.now(dt.UTC).year}-"
-    count = (
-        db.query(func.count(Sample.id)).filter(Sample.lab_number.like(f"{prefix}%")).scalar() or 0
+    year = dt.datetime.now(dt.UTC).year
+    prefix = f"{year}-"
+    _lock_lab_number_sequence(db, year)
+    pattern = re.compile(rf"{year}-(\d{{6}})")
+    existing_numbers = (
+        db.query(Sample.lab_number).filter(Sample.lab_number.like(f"{prefix}%")).all()
     )
-    return f"{prefix}{count + 1:06d}"
+    highest = max(
+        (
+            int(match.group(1))
+            for (value,) in existing_numbers
+            if value is not None and (match := pattern.fullmatch(value))
+        ),
+        default=0,
+    )
+    if highest >= 999_999:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"La séquence des numéros de laboratoire {year} est épuisée.",
+        )
+    return f"{prefix}{highest + 1:06d}"
 
 
 @router.get("", response_model=list[SampleRead])
