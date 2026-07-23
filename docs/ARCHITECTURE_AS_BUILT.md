@@ -143,7 +143,9 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 | Ingestion DH36 : HMAC, anti-rejeu, identités par appareil | TARGET (§15) |
 | MFA (TOTP/WebAuthn) pour comptes privilégiés | TARGET (P1) |
 | Audit append-only (table `audit_events` existante, non immuable) | IMPLEMENTED / TARGET durcissement |
-| SBOM, signature d'images, pin des Actions par SHA | TARGET (P1) |
+| Scopes OAuth | DECLARATIF : aucune route scopée ; les rôles DB font autorité |
+| Pin des Actions par SHA et runtime Node 24 | VERIFIED (CI, PR #100) |
+| SBOM et signature d'images | TARGET (P1) |
 
 ## 9. Interfaçage automates
 
@@ -161,7 +163,7 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - Auto-validation (§5.8 ISO 15189) : configuration versionnée + garde-fous —
   IMPLEMENTED + tests (`test_auto_validation.py`). **La présence de cette
   fonction ne vaut pas conformité ISO 15189** (preuves organisationnelles
-  requises).
+  requises). Traçabilité : `docs/AUTOVALIDATION_5_8.md`.
 - Moteur d'interprétation **unique (§21) — DÉCISION CONFIRMÉE (2026-07, responsable
   du projet) : NE PAS unifier.** `ReferenceRange`/`CriticalRange` reste le moteur
   officiel, `bioref` la couche d'aide (cf. `docs/INTERPRETATION.md`, section
@@ -186,6 +188,18 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - **Gateway automates non connectée à un automate réel** : IMPLEMENTED dans le
   code, CONFIGURED dans compose (réseau bridge ≠ VLAN physique), NON VÉRIFIÉ
   avec des trames DH36 réelles.
+- **Flux qualitatif/POCT à approuver cliniquement (`PR80-CLIN-01`)** : la
+  parasitologie positive est classée critique et validée ; le flux POCT générique
+  applique le catalogue central à un modèle/série enregistré. Protections
+  techniques présentes, portée clinique non homologuée dans les preuves
+  disponibles — décision requise avant fusion/pilote.
+- **Fallback paludisme non clinique** : les tests du modèle réel sont absents de
+  la CI standard ; toute écriture clinique doit rester fail-closed tant que D4
+  n'est pas décidée et le modèle qualifié.
+- **Worker Windows local incompatible** : la tâche observée passe un argument
+  absent de la CLI courante et pointe vers un checkout mutable. Elle ne doit pas
+  être utilisée comme preuve du rôle outbox préproduction ; voir
+  `docs/INCIDENT_WORKER_PLANIFIE_2026-07-23.md`.
 - **Prometheus/Grafana « accès VPN/bastion »** : le réseau management existe,
   mais aucun VPN/bastion n'est livré par le dépôt — TARGET (accès via
   `docker exec` local en attendant).
@@ -212,3 +226,7 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - Secrets : `docs/SECRETS_MANAGEMENT.md` · Observabilité : `docs/observability.md`
 - Exploitation/formation, mode dégradé, UPS : `docs/LIVRABLES_FORMATION_EXPLOITATION.md`
 - Décision moteur d'interprétation : `docs/INTERPRETATION.md`
+- Garde-fous auto-validation : `docs/AUTOVALIDATION_5_8.md`
+- Revue d'intégration PR #80 : `docs/PR80_MAIN_INTEGRATION_REVIEW_2026.md`
+- Qualification préproduction : `docs/PREPRODUCTION_QUALIFICATION_PLAN_2026.md`
+- Rollback et reprise : `docs/ROLLBACK_AND_RECOVERY_RUNBOOK_2026.md`
