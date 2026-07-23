@@ -109,7 +109,7 @@ jobs:
           alembic downgrade base
           alembic upgrade head
 
-      - name: Verify clinical and analyzer locking on PostgreSQL
+      - name: Verify clinical, analyzer, and laboratory-number locking on PostgreSQL
         env:
           DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_test
           SECRET_KEY: ci-secret-key-minimum-32-characters-long
@@ -119,6 +119,7 @@ jobs:
           python -m pytest -q
           tests/test_clinical_safety_postgres.py
           tests/test_analyzer_idempotency_r6_postgres.py
+          tests/test_lab_numbering_r5_postgres.py
 
       - name: Smoke-test app startup against PostgreSQL
         env:
