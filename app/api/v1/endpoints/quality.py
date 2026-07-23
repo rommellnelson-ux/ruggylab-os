@@ -37,8 +37,16 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
-def _get_nc_or_404(db: Session, nc_id: int) -> NonConformity:
-    nc = db.query(NonConformity).filter(NonConformity.id == nc_id).first()
+def _get_nc_or_404(
+    db: Session,
+    nc_id: int,
+    *,
+    for_update: bool = False,
+) -> NonConformity:
+    query = db.query(NonConformity).filter(NonConformity.id == nc_id)
+    if for_update:
+        query = query.with_for_update()
+    nc = query.first()
     if not nc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Non-conformité introuvable."
@@ -158,7 +166,7 @@ def transition_non_conformity(
     current_user: User = Depends(require_officer),
 ) -> NonConformity:
     """Fait évoluer le statut d'une NC selon le workflow (réservé officier)."""
-    nc = _get_nc_or_404(db, nc_id)
+    nc = _get_nc_or_404(db, nc_id, for_update=True)
     old_status = nc.status
     target = payload.status
     if target == old_status:
@@ -226,10 +234,17 @@ def update_corrective_action(
     current_user: User = Depends(require_officer),
 ) -> CorrectiveAction:
     """Met à jour le statut / l'efficacité d'une action (réservé officier)."""
-    action = db.query(CorrectiveAction).filter(CorrectiveAction.id == action_id).first()
+    action = (
+        db.query(CorrectiveAction)
+        .filter(CorrectiveAction.id == action_id)
+        .with_for_update()
+        .first()
+    )
     if not action:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action introuvable.")
     data = payload.model_dump(exclude_none=True)
+    old_status = action.status
+    old_effectiveness_checked = action.effectiveness_checked
     if "status" in data:
         action.status = data["status"]
         if data["status"] == "done" and action.completed_at is None:
@@ -238,6 +253,21 @@ def update_corrective_action(
         action.effectiveness_checked = data["effectiveness_checked"]
     if "effectiveness_notes" in data:
         action.effectiveness_notes = data["effectiveness_notes"]
+    if data:
+        log_audit_event(
+            db,
+            user=current_user,
+            event_type="quality.capa.update",
+            entity_type="corrective_action",
+            entity_id=str(action.id),
+            payload={
+                "fields": sorted(data),
+                "old_status": old_status,
+                "new_status": action.status,
+                "old_effectiveness_checked": old_effectiveness_checked,
+                "new_effectiveness_checked": action.effectiveness_checked,
+            },
+        )
     db.commit()
     db.refresh(action)
     return action
