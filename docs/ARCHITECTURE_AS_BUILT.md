@@ -5,8 +5,8 @@
 > l'architecture, les ports, les migrations ou les procédures.
 
 - **Version applicative** : 0.1.0
-- **Head Alembic** : `20260625_0036` (36 migrations, chaîne linéaire)
-- **Dernière mise à jour** : 2026-07-08 (post PR #55)
+- **Head Alembic** : `20260723_0038` (chaîne linéaire)
+- **Dernière mise à jour** : 2026-07-23 (post audit sécurité clinique, PR #98)
 - **Périmètre** : mono-site, LAN de laboratoire, fonctionnement sans Internet
 
 ## Statuts utilisés
@@ -81,7 +81,7 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 
 ## 4. Données et migrations
 
-- Chaîne Alembic linéaire jusqu'à `20260625_0036` — **VERIFIED** : `upgrade head`
+- Chaîne Alembic linéaire jusqu'à `20260723_0038` — **VERIFIED** : `upgrade head`
   \+ idempotence (`downgrade base` → `upgrade head`) exécutés sur PostgreSQL 16
   à chaque CI.
 - Enum `userrole` : valeurs minuscules partout (modèle `values_callable`,
