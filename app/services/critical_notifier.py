@@ -13,8 +13,9 @@ from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
-from app.models import Result
+from app.models import Result, User
 from app.models.ruggylab_os import NotifConfig
+from app.services.patient_access import apply_result_patient_scope
 from app.utils.datetime_utils import utcnow_naive
 from app.utils.url_safety import is_safe_external_url
 
@@ -41,14 +42,18 @@ def _send_webhook(url: str, payload: dict) -> bool:
         return False
 
 
-def get_pending_criticals(db: Session, delay_minutes: int = 30) -> list[dict]:
+def get_pending_criticals(
+    db: Session,
+    delay_minutes: int = 30,
+    *,
+    user: User | None = None,
+) -> list[dict]:
     """Retourne tous les résultats critiques non-acquittés avec le délai écoulé."""
+    query = db.query(Result)
+    if user is not None:
+        query = apply_result_patient_scope(query, user)
     unacked = (
-        db.query(Result)
-        .filter(
-            Result.is_critical.is_(True),
-            Result.critical_ack_at.is_(None),
-        )
+        query.filter(Result.is_critical.is_(True), Result.critical_ack_at.is_(None))
         .order_by(Result.analysis_date.asc())
         .all()
     )

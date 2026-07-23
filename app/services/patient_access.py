@@ -73,18 +73,25 @@ def can_access_result(user: User, result: Result) -> bool:
     return patient.unit is None or patient.unit == user.unit
 
 
-def apply_result_patient_scope(query: Any, user: User) -> Any:
+def apply_result_patient_scope(
+    query: Any,
+    user: User,
+    *,
+    patient_joined: bool = False,
+) -> Any:
     """Restreint une requête ``Result`` au périmètre patient autorisé pour ``user``.
 
     Inclut les résultats sans patient rattaché (pas de PII à cloisonner).
+    ``patient_joined`` évite de répéter les jointures pour les rapports qui les
+    ont déjà établies afin de sélectionner des colonnes patient.
     """
     if _is_unrestricted(user):
         return query
-    return (
-        query.outerjoin(Sample, Result.sample_id == Sample.id)
-        .outerjoin(Patient, Sample.patient_id == Patient.id)
-        .filter(or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit))
-    )
+    if not patient_joined:
+        query = query.outerjoin(Sample, Result.sample_id == Sample.id).outerjoin(
+            Patient, Sample.patient_id == Patient.id
+        )
+    return query.filter(or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit))
 
 
 def can_access_order(user: User, order: ExamOrder) -> bool:
