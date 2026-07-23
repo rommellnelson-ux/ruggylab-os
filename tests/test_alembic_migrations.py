@@ -64,6 +64,7 @@ def test_migrations_upgrade_head(tmp_path, dummy):
     assert "patients" in tables
     assert "results" in tables
     assert "refresh_tokens" in tables
+    assert "auth_version" in {column["name"] for column in insp.get_columns("users")}
 
 
 def test_migrations_downgrade_base(tmp_path):
