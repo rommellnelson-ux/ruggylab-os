@@ -83,8 +83,9 @@ Reverse proxy TLS  ──►  Application FastAPI (uvicorn, :8000)
 - **Onduleurs (UPS)** sur serveur **et** postes critiques (corruption = perte).
 - **Internet de secours 4G** pour MADO + backup hors-site ; le LAN reste
   autonome (le labo fonctionne **sans** Internet).
-- **Sauvegarde** quotidienne (`scripts/backup.ps1`) + restauration **testée**
-  (`restore.ps1`) ; copie hors-site hebdomadaire.
+- **Sauvegarde PostgreSQL** quotidienne (`scripts/pg_backup.ps1`) + restauration
+  **vérifiée sur base scratch** (`scripts/pg_restore_verify.ps1`) ; copie hors-site
+  hebdomadaire.
 - **Mode dégradé** documenté : registre/cahier papier puis ressaisie.
 
 ### 3.4 Pistes de haute disponibilité (à arbitrer)

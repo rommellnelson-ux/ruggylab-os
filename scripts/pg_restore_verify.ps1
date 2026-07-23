@@ -21,7 +21,7 @@
     Chemin du dump à vérifier (.dump ou .dump.enc). Si .enc, $env:BACKUP_PASSPHRASE requis.
 
 .PARAMETER ExpectedHead
-    Révision Alembic attendue (défaut: 20260625_0036 — à maintenir aligné sur le
+    Révision Alembic attendue (défaut: 20260708_0037 — à maintenir aligné sur le
     head réel du dépôt à chaque nouvelle migration).
 
 .PARAMETER ScratchDb
@@ -35,7 +35,7 @@
 #>
 param(
     [Parameter(Mandatory = $true)][string]$BackupFile,
-    [string]$ExpectedHead = "20260625_0036",
+    [string]$ExpectedHead = "20260708_0037",
     [string]$ScratchDb = "ruggylab_verify",
     [string]$ComposeService = "postgres",
     [switch]$Keep
@@ -56,6 +56,24 @@ function Get-EnvValue([string]$Key, [string]$Default) {
 }
 
 $PgUser = Get-EnvValue "POSTGRES_USER" "ruggylab"
+$PgDb = Get-EnvValue "POSTGRES_DB" "ruggylab"
+
+function Assert-SafeScratchDatabase(
+    [string]$DatabaseName,
+    [string]$ProductionDatabase
+) {
+    if ($DatabaseName -notmatch '^ruggylab_verify(?:_[a-z0-9]+)?$') {
+        throw "Nom de base scratch refusé : utiliser ruggylab_verify ou ruggylab_verify_<suffixe>."
+    }
+    $ProtectedDatabases = @("postgres", "template0", "template1", $ProductionDatabase)
+    if ($ProtectedDatabases -contains $DatabaseName) {
+        throw "Base scratch refusée : '$DatabaseName' est une base protégée."
+    }
+}
+
+# Cette garde précède toute commande DROP/CREATE et interdit de cibler la base
+# configurée de l'application ou une base système.
+Assert-SafeScratchDatabase $ScratchDb $PgDb
 
 # Helper : exécute du SQL dans la base scratch et renvoie une valeur scalaire (-tA).
 function Invoke-Psql([string]$Sql, [string]$Db = $ScratchDb) {
@@ -70,6 +88,7 @@ $Stamp      = Get-Date -Format "yyyyMMdd-HHmmss"
 $ReportPath = Join-Path "artifacts" "restore-verify-$Stamp.txt"
 $Report = [System.Collections.Generic.List[string]]::new()
 $Failed = $false
+$ScratchCreated = $false
 function Step([string]$Name, [bool]$Ok, [string]$Detail) {
     $tag = if ($Ok) { "PASS" } else { "FAIL"; }
     $line = "[{0}] {1} — {2}" -f $tag, $Name, $Detail
@@ -100,7 +119,8 @@ try {
         Step "Intégrité SHA-256" ($expected -ieq $actual) "attendu=$expected actuel=$actual"
         if ($Failed) { throw "Empreinte SHA-256 non concordante — dump corrompu." }
     } else {
-        Step "Intégrité SHA-256" $true "(pas de sidecar .sha256 — contrôle ignoré)"
+        Step "Intégrité SHA-256" $false "Empreinte SHA-256 absente : sidecar requis."
+        throw "Empreinte SHA-256 absente — sauvegarde non vérifiable."
     }
 
     # ── Déchiffrement éventuel ─────────────────────────────────────────────────
@@ -116,8 +136,10 @@ try {
 
     # ── 1. Base vierge ────────────────────────────────────────────────────────
     & docker compose exec -T $ComposeService psql -U $PgUser -d postgres -c "DROP DATABASE IF EXISTS $ScratchDb;" | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Suppression de l'ancienne base scratch échouée." }
     & docker compose exec -T $ComposeService psql -U $PgUser -d postgres -c "CREATE DATABASE $ScratchDb;" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "Création de la base scratch échouée." }
+    $ScratchCreated = $true
     Step "Base vierge préparée" $true "DATABASE $ScratchDb créée"
 
     # ── 2. Restauration ───────────────────────────────────────────────────────
@@ -125,9 +147,10 @@ try {
     $InContainer = "/tmp/ruggylab-restore-$Stamp.dump"
     & docker compose cp $RestoreSource "${ComposeService}:$InContainer"
     if ($LASTEXITCODE -ne 0) { throw "Copie du dump dans le conteneur échouée." }
-    & docker compose exec -T $ComposeService pg_restore -U $PgUser -d $ScratchDb --no-owner --no-privileges $InContainer
-    # pg_restore peut renvoyer un code non nul sur warnings bénins ; on valide via les contrôles suivants.
+    & docker compose exec -T $ComposeService pg_restore -U $PgUser -d $ScratchDb --no-owner --no-privileges --exit-on-error $InContainer
+    $RestoreExitCode = $LASTEXITCODE
     & docker compose exec -T $ComposeService rm -f $InContainer | Out-Null
+    if ($RestoreExitCode -ne 0) { throw "pg_restore a échoué (code $RestoreExitCode)." }
     Step "Restauration pg_restore" $true "dump appliqué (validation par contrôles ci-dessous)"
 
     # ── 3. Schéma ──────────────────────────────────────────────────────────────
@@ -157,13 +180,16 @@ try {
 } finally {
     # ── Nettoyage ──────────────────────────────────────────────────────────────
     if ($TempPlain -and (Test-Path $TempPlain)) { Remove-Item $TempPlain -Force }
-    if (-not $Keep) {
+    if ($ScratchCreated -and -not $Keep) {
         try {
             & docker compose exec -T $ComposeService psql -U $PgUser -d postgres -c "DROP DATABASE IF EXISTS $ScratchDb;" | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "DROP DATABASE a échoué." }
             $Report.Add("[INFO] Base scratch $ScratchDb supprimée.")
         } catch { $Report.Add("[WARN] Échec suppression base scratch : $($_.Exception.Message)") }
-    } else {
+    } elseif ($ScratchCreated) {
         $Report.Add("[INFO] Base scratch $ScratchDb conservée (-Keep).")
+    } else {
+        $Report.Add("[INFO] Aucune base scratch créée par cette exécution.")
     }
 
     $Report.Add("".PadRight(60, '-'))
