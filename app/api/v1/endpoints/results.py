@@ -459,6 +459,19 @@ def create_result(
         from app.services.code_mapping_service import apply_bioref_to_result
 
         apply_bioref_to_result(db, result)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="result.create",
+        entity_type="result",
+        entity_id=str(result.id),
+        payload={
+            "sample_id": result.sample_id,
+            "exam_code": result.exam_code,
+            "is_critical": result.is_critical,
+            "is_auto_validated": result.is_auto_validated,
+        },
+    )
     db.commit()
     db.refresh(result)
     # Push temps-réel : alerte immédiate si critique ou delta dépassé

@@ -9,6 +9,7 @@ from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models import Patient, Result, Sample, User
 from app.schemas.sample import SampleCreate, SampleRead, SampleUpdate
+from app.services.audit import log_audit_event
 from app.services.patient_access import (
     apply_sample_patient_scope,
     can_access_patient,
@@ -150,6 +151,15 @@ def create_sample(
     if not sample.lab_number:
         sample.lab_number = _next_lab_number(db)
     db.add(sample)
+    db.flush()
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="sample.create",
+        entity_type="sample",
+        entity_id=str(sample.id),
+        payload={"patient_id": sample.patient_id, "status": sample.status},
+    )
     db.commit()
     db.refresh(sample)
     return sample
@@ -170,6 +180,9 @@ def update_sample(
             detail="Echantillon introuvable.",
         )
     _ensure_sample_access(sample, current_user)
+    old_status = sample.status
+    old_aspect = sample.aspect
+    updated_fields: list[str] = []
     if payload.status is not None:
         if sample.status == CANCELLED_SAMPLE_STATUS and payload.status != CANCELLED_SAMPLE_STATUS:
             raise HTTPException(
@@ -186,8 +199,25 @@ def update_sample(
                 detail="Un échantillon portant déjà un résultat ne peut pas être annulé.",
             )
         sample.status = payload.status
+        updated_fields.append("status")
     if payload.aspect is not None:
         sample.aspect = payload.aspect
+        updated_fields.append("aspect")
+    if updated_fields:
+        log_audit_event(
+            db,
+            user=current_user,
+            event_type="sample.update",
+            entity_type="sample",
+            entity_id=str(sample.id),
+            payload={
+                "fields": sorted(updated_fields),
+                "old_status": old_status,
+                "new_status": sample.status,
+                "old_aspect": old_aspect,
+                "new_aspect": sample.aspect,
+            },
+        )
     db.commit()
     db.refresh(sample)
     return sample

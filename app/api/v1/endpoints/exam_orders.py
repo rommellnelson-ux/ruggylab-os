@@ -112,6 +112,19 @@ def create_exam_order(
         ],
     )
     db.add(order)
+    db.flush()
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="exam_order.create",
+        entity_type="exam_order",
+        entity_id=str(order.id),
+        payload={
+            "patient_id": order.patient_id,
+            "priority": order.priority,
+            "item_count": len(order.items),
+        },
+    )
     db.commit()
     db.refresh(order)
     return order
@@ -240,14 +253,21 @@ def update_exam_order_status(
     if payload.status not in ORDER_STATUSES:
         raise HTTPException(status_code=422, detail=f"Statut invalide : {payload.status}.")
     order = _get_accessible_order_or_404(db, order_id, current_user)
+    old_status = order.status
+    order.status = payload.status
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="exam_order.status.update",
+        entity_type="exam_order",
+        entity_id=str(order.id),
+        payload={"old_status": old_status, "requested_status": payload.status},
+    )
+    db.commit()
     if payload.status == "cancelled":
-        order.status = "cancelled"
-        db.commit()
         db.refresh(order)
         return order
     # Pour les autres statuts, on laisse la dérivation automatique faire foi.
-    order.status = payload.status
-    db.commit()
     return sync_order_progress(db, order)
 
 
