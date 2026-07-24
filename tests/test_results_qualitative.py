@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import uuid
 
+from app.db.session import SessionLocal
+from app.models import Result, Sample
+
 
 def _auth(client) -> dict[str, str]:
     token = client.post(
@@ -34,7 +37,7 @@ def _sample(client, admin) -> str:
     return barcode
 
 
-def test_positive_parasitology_is_critical(client) -> None:
+def test_positive_parasitology_stays_pending_and_non_critical(client) -> None:
     admin = _auth(client)
     barcode = _sample(client, admin)
     r = client.post(
@@ -52,8 +55,18 @@ def test_positive_parasitology_is_critical(client) -> None:
     )
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["is_critical"] is True
+    assert body["is_critical"] is False
+    assert body["is_validated"] is False
     assert body["result_id"] > 0
+    with SessionLocal() as db:
+        result = db.get(Result, body["result_id"])
+        assert result is not None
+        assert result.is_validated is False
+        assert result.validator_id is None
+        assert result.is_critical is False
+        sample = db.get(Sample, result.sample_id)
+        assert sample is not None
+        assert sample.status == "Recu"
 
 
 def test_negative_result_not_critical(client) -> None:
@@ -70,6 +83,7 @@ def test_negative_result_not_critical(client) -> None:
     )
     assert r.status_code == 201, r.text
     assert r.json()["is_critical"] is False
+    assert r.json()["is_validated"] is False
 
 
 def test_negative_with_observations_is_rejected(client) -> None:

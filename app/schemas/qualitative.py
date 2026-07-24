@@ -75,4 +75,5 @@ class QualitativeResultResponse(BaseModel):
     message: str
     result_id: int
     is_critical: bool
+    is_validated: bool
     image_url: str | None = None

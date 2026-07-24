@@ -333,8 +333,8 @@ jobs:
       - name: Assert role containers are healthy
         run: |
           docker compose ps
-          # scheduler (heartbeat) et analyzer-gateway (sonde TCP DH36) doivent
-          # devenir healthy — ~1 min (start_period + interval) chacun.
+          # scheduler et analyzer-gateway utilisent chacun un heartbeat. Les
+          # interfaces d'équipement restent désactivées pendant ce smoke test.
           for svc in scheduler analyzer-gateway; do
             for i in $(seq 1 30); do
               st=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q $svc)")

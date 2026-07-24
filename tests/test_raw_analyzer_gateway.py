@@ -209,10 +209,16 @@ def test_listener_rejects_ip_outside_allowlist() -> None:
 # ── Registry & Factory ────────────────────────────────────────────────────────
 
 
-def test_enabled_bindings_default_ports_are_distinct() -> None:
+def test_explicitly_enabled_bindings_default_ports_are_distinct() -> None:
     from app.core.config import Settings
 
-    bindings = enabled_bindings(Settings())
+    bindings = enabled_bindings(
+        Settings(
+            ANALYZER_HEMATOLOGY_ENABLED=True,
+            ANALYZER_BIOCHEMISTRY_ENABLED=True,
+            ANALYZER_IMMUNO_ENABLED=True,
+        )
+    )
     kinds = {b.kind for b in bindings}
     ports = [b.port for b in bindings]
     assert kinds == {AnalyzerKind.HEMATOLOGY, AnalyzerKind.BIOCHEMISTRY, AnalyzerKind.IMMUNO}
@@ -223,9 +229,23 @@ def test_enabled_bindings_default_ports_are_distinct() -> None:
 def test_enabled_bindings_detects_port_collision() -> None:
     from app.core.config import Settings
 
-    settings = Settings(ANALYZER_BIOCHEMISTRY_PORT=9000)  # collision avec hémato
+    settings = Settings(
+        ANALYZER_HEMATOLOGY_ENABLED=True,
+        ANALYZER_BIOCHEMISTRY_ENABLED=True,
+        ANALYZER_BIOCHEMISTRY_PORT=9000,
+    )
     with pytest.raises(ValueError, match="port"):
         enabled_bindings(settings)
+
+
+def test_equipment_bindings_are_disabled_by_default() -> None:
+    from app.core.config import Settings
+
+    settings = Settings()
+    assert enabled_bindings(settings) == []
+    assert settings.ENABLE_DH36_LISTENER is False
+    assert settings.ENABLE_DH36_INGESTION is False
+    assert settings.ANALYZER_RAW_LISTENER_ENABLED is False
 
 
 def test_factory_returns_parser_per_kind() -> None:

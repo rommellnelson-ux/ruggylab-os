@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import Equipment, MalariaAnalysisJob, Result, User
+from app.models import MalariaAnalysisJob, Result, User
 from app.schemas.malaria import MalariaAnalysisRead
 from app.services.audit import log_audit_event
 from app.services.imaging.capture_service import MicroscopeCaptureService
@@ -53,12 +53,13 @@ def trigger_microscope_capture(
     except CancelledSampleError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
-    equipment = db.query(Equipment).filter(Equipment.name == "Magnus Theia-i").first()
     image_path = microscope_service.reserve_image_path(sample_barcode)
 
     new_result = Result(
         sample_id=sample.id,
-        equipment_id=equipment.id if equipment else None,
+        # Aucune association automatique par nom approximatif : l'équipement
+        # réel et son éventuel dispositif d'imagerie ne sont pas qualifiés.
+        equipment_id=None,
         data_points={},
         image_url=image_path,
         validator_id=current_user.id,
