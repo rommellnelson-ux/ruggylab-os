@@ -15,6 +15,7 @@ from app.models import (
     AuditEvent,
     DH36InboundMessage,
     Equipment,
+    EquipmentDocument,
     EquipmentInterface,
     EquipmentQualification,
 )
@@ -617,6 +618,88 @@ def test_mass_assignment_is_rejected(client, path_suffix: str, payload: dict) ->
     admin = _admin(client)
     response = client.post(f"/api/v1/equipments{path_suffix}", headers=admin, json=payload)
     assert response.status_code == 422
+
+
+def test_patch_rejects_null_for_required_fields_without_effect(client) -> None:
+    admin = _admin(client)
+    equipment_id, interface_id = _create_equipment_and_interface(client, admin)
+    document = client.post(
+        f"/api/v1/equipments/{equipment_id}/documents",
+        headers=admin,
+        json={
+            "document_title": "Synthetic required fields",
+            "document_type": "test-evidence",
+        },
+    )
+    assert document.status_code == 201
+    qualification = client.post(
+        f"/api/v1/equipments/{equipment_id}/qualifications",
+        headers=admin,
+        json={
+            "equipment_interface_id": interface_id,
+            "scope_description": "Synthetic original scope",
+        },
+    )
+    assert qualification.status_code == 201
+    document_id = document.json()["id"]
+    qualification_id = qualification.json()["id"]
+    cases = [
+        (f"/api/v1/equipments/{equipment_id}", {"name": None}),
+        (f"/api/v1/equipments/{equipment_id}", {"clinical_use": None}),
+        (f"/api/v1/equipments/interfaces/{interface_id}", {"interface_type": None}),
+        (f"/api/v1/equipments/interfaces/{interface_id}", {"direction": None}),
+        (f"/api/v1/equipments/interfaces/{interface_id}", {"archived": None}),
+        (
+            f"/api/v1/equipments/qualifications/{qualification_id}",
+            {"scope_description": None},
+        ),
+        (f"/api/v1/equipments/documents/{document_id}", {"document_title": None}),
+        (f"/api/v1/equipments/documents/{document_id}", {"document_type": None}),
+        (
+            f"/api/v1/equipments/documents/{document_id}",
+            {"physical_copy_available": None},
+        ),
+        (
+            f"/api/v1/equipments/documents/{document_id}",
+            {"digital_copy_available": None},
+        ),
+        (
+            f"/api/v1/equipments/documents/{document_id}",
+            {"contains_connectivity_section": None},
+        ),
+        (
+            f"/api/v1/equipments/documents/{document_id}",
+            {"contains_protocol_specification": None},
+        ),
+    ]
+    audit_before = _db_scalar_count(AuditEvent, AuditEvent.event_type.like("equipment.%"))
+
+    for path, payload in cases:
+        response = client.patch(path, headers=admin, json=payload)
+        assert response.status_code == 422, (path, response.text)
+
+    assert _db_scalar_count(AuditEvent, AuditEvent.event_type.like("equipment.%")) == audit_before
+    with db_session.SessionLocal() as db:
+        equipment = db.get(Equipment, equipment_id)
+        interface = db.get(EquipmentInterface, interface_id)
+        stored_document = db.get(EquipmentDocument, document_id)
+        stored_qualification = db.get(EquipmentQualification, qualification_id)
+        assert equipment is not None
+        assert equipment.name == "Synthetic analyzer"
+        assert equipment.clinical_use is True
+        assert interface is not None
+        assert interface.interface_type == "file_import"
+        assert interface.direction == "inbound"
+        assert interface.archived is False
+        assert stored_document is not None
+        assert stored_document.document_title == "Synthetic required fields"
+        assert stored_document.document_type == "test-evidence"
+        assert stored_document.physical_copy_available is False
+        assert stored_document.digital_copy_available is False
+        assert stored_document.contains_connectivity_section is False
+        assert stored_document.contains_protocol_specification is False
+        assert stored_qualification is not None
+        assert stored_qualification.scope_description == "Synthetic original scope"
 
 
 def test_free_text_action_reason_is_rejected_without_audit(client) -> None:

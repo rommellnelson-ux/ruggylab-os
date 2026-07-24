@@ -100,6 +100,12 @@ def _reject_sensitive_reference(value: str | None) -> str | None:
     return normalized
 
 
+def _reject_null_update(value: object) -> object:
+    if value is None:
+        raise ValueError("This required field cannot be set to null")
+    return value
+
+
 class EquipmentBase(_EquipmentInputModel):
     name: str = Field(..., min_length=1, max_length=100)
     serial_number: str | None = Field(default=None, max_length=100)
@@ -147,6 +153,7 @@ class EquipmentIdentityUpdate(_EquipmentInputModel):
             raise ValueError("last_calibration cannot be in the future")
         return self
 
+    _validate_required_fields = field_validator("name", "clinical_use")(_reject_null_update)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -207,6 +214,11 @@ class EquipmentInterfaceUpdate(_EquipmentInputModel):
     archived: bool | None = None
 
     _validate_reference = field_validator("endpoint_reference")(_reject_sensitive_reference)
+    _validate_required_fields = field_validator(
+        "interface_type",
+        "direction",
+        "archived",
+    )(_reject_null_update)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -254,6 +266,7 @@ class EquipmentQualificationDraftUpdate(_EquipmentInputModel):
 
     _validate_decision = field_validator("decision_reference")(_reject_sensitive_reference)
     _validate_evidence = field_validator("evidence_reference")(_reject_sensitive_reference)
+    _validate_scope = field_validator("scope_description")(_reject_null_update)
     model_config = ConfigDict(extra="forbid")
 
 
@@ -392,6 +405,14 @@ class EquipmentDocumentUpdate(_EquipmentInputModel):
     archive: bool | None = None
 
     _validate_storage = field_validator("storage_reference")(_reject_sensitive_reference)
+    _validate_required_fields = field_validator(
+        "document_title",
+        "document_type",
+        "physical_copy_available",
+        "digital_copy_available",
+        "contains_connectivity_section",
+        "contains_protocol_specification",
+    )(_reject_null_update)
     model_config = ConfigDict(extra="forbid")
 
 
