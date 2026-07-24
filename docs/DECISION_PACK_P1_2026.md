@@ -244,17 +244,19 @@ Date et justification : ______________________________
 
 ### État actuel et preuve
 
-`malaria_ai._heuristic_predict` est explicitement non clinique.
-`process_malaria_job` peut néanmoins écrire un résultat `malaria_ai` et
-positionner `is_critical`. Trois tests ONNX et le module PyTorch ne s'exécutent
-pas dans la CI standard faute de dépendances optionnelles ; l'inférence réelle
-et le modèle homologué ne sont donc pas qualifiés par cette CI.
+L'option A a été implémentée par la PR #107. L'heuristique a été supprimée.
+Lorsque le modèle est absent ou que l'inférence échoue, le job échoue
+explicitement. Même lorsqu'une inférence est fournie, `process_malaria_job` ne
+modifie plus `Result`, sa criticité ou sa validation.
+
+La CI #107 `30056391313` est verte. Les tests ONNX restent dépendants d'un
+runtime/modèle optionnel ; l'inférence réelle et le modèle homologué ne sont
+donc pas qualifiés cliniquement.
 
 ### Scénario de risque
 
-Le modèle réel est absent. Une heuristique influencée par le chemin/nom de
-l'image produit une sortie qui entre dans le résultat clinique ou le circuit
-critique.
+Une régression réintroduit une sortie de démonstration dans le résultat clinique,
+ou un modèle non validé est présenté comme une aide clinique.
 
 ### Impacts
 
@@ -262,8 +264,8 @@ critique.
 - **Sécurité :** intégrité clinique ; le chemin d'image ne doit pas influencer
   un verdict.
 - **Opérationnel :** confusion entre démonstration et dispositif qualifié.
-- **Historique :** repérer toute ligne `malaria_ai` avec
-  `real_inference=false` sur copie autorisée avant décision.
+- **Historique :** repérer, sur copie autorisée, toute ligne produite par
+  l'ancien fallback avant décision de reprise.
 - **Migration :** pas nécessaire pour bloquer ; une séparation démonstration
   peut exiger un nouveau modèle/table.
 
@@ -273,14 +275,13 @@ critique.
   qualifié n'est pas chargé.
 - **B — Démonstration séparée.** Stockage non clinique, non libérable, non
   critique, visiblement étiqueté.
-- **C — Maintien avec validation humaine.** L'heuristique écrit puis exige une
-  revue. Cette option reste inacceptable en exploitation car la donnée entre
-  déjà dans le cycle clinique.
+- **C — Maintien historique avec validation humaine.** Rejetée : une donnée de
+  démonstration ne doit pas entrer dans le cycle clinique.
 
 ### Recommandation
 
-A pour tout profil d'exploitation. B uniquement pour un environnement de
-démonstration isolé.
+Option A retenue et implémentée pour tout profil d'exploitation. Une éventuelle
+option B nécessite un stockage séparé et une décision ultérieure.
 
 ### Coût, complexité et réversibilité
 
