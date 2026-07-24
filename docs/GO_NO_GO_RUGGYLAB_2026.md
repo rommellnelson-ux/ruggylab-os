@@ -14,10 +14,11 @@ Le lot #107 a corrigé et qualifié les comportements PR80-CLIN-01 :
 - le microscope n'est plus associé automatiquement par nom approximatif.
 
 Ces corrections lèvent les scénarios dangereux du code, mais ne constituent
-pas une homologation des appareils réels. Aucun protocole LIS n'est confirmé,
-le modèle `Equipment` ne peut pas encore porter une qualification versionnée et
-les décisions humaines restent ouvertes. Le parc est donc **NON ACTIVABLE EN
-CLINIQUE**.
+pas une homologation des appareils réels. Le registre normalisé autorisé par
+EQUIP-DEC-01/EQUIP-RBAC-01 peut porter une qualification versionnée, mais
+aucune qualification, interface, méthode ou preuve réelle n'est créée par la
+migration. Aucun protocole LIS n'est confirmé. Le parc reste donc
+**NON ACTIVABLE EN CLINIQUE**.
 
 ## Référence de qualification
 
@@ -56,7 +57,7 @@ CLINIQUE**.
 | PIL-08 | Référentiels cliniques | Bloquant | Sources, versions et signatures. | Biologiste | Avant pilote |
 | PIL-09 | Réception synthétique | Bloquant | UAT complète sans données réelles. | Qualité | Avant pilote |
 | PIL-10 | Worker/outbox | Bloquant pour diffusion | Instance unique, CLI alignée, passage supervisé. | Exploitation | Avant diffusion |
-| PIL-11 | Registre Equipment | Bloquant appareils | Décision A/B, migration additive autorisée, données inconnues laissées nulles et interfaces désactivées. | Architecture + biomédical + qualité | Avant homologation |
+| PIL-11 | Registre Equipment | Capacité logicielle créée ; commissioning bloquant | Migration 0039 additive, RBAC/audits/readiness testés ; saisie et signature appareil par appareil restent requises. | Architecture + biomédical + qualité | Avant homologation |
 | PIL-12 | DH36 réel | Bloquant interface | Manuel/protocole/firmware, mapping et commissioning signés. | Biomédical/intégration | Avant activation |
 | PIL-13 | Dymind biochimie | Bloquant interface | Modèle exact et protocole propres, sans réutilisation DH36. | Biomédical/intégration | Avant activation |
 | PIL-14 | Coagulation | Bloquant interface | Plaque, manuel, modèle, tests et éventuel protocole séparés. | Biomédical | Avant développement |
@@ -104,7 +105,8 @@ CLINIQUE**.
 | FIN-OPEN-01 | Annulation d'une facture avec plan BNPL actif. |
 | AUTH-OPEN-03 | Récupération de compte. |
 | AUD-OPEN-01 | Droits/immutabilité/rétention des audits. |
-| EQUIP-DEC-01 | Choisir A (colonnes Equipment) ou B (sous-registres normalisés, recommandé) avant migration. |
+| EQUIP-DEC-01 | Option B autorisée ; aucune qualification réelle créée. |
+| EQUIP-RBAC-01 | Option 2 autorisée : ADMIN technique/activation, OFFICER ou ADMIN clinique/suspension/désactivation. |
 
 Les options détaillées se trouvent dans
 [`DECISION_PACK_P1_2026.md`](DECISION_PACK_P1_2026.md).
@@ -118,7 +120,8 @@ Les options détaillées se trouvent dans
 - [x] D4 explicitement fail-closed dans le code.
 - [ ] Revue humaine de #107 et du dossier appareil terminée.
 - [ ] CI finale verte sur le SHA incluant le présent dossier.
-- [ ] Décision Equipment A/B enregistrée ; aucune migration implicite.
+- [x] Décision Equipment B et RBAC option 2 enregistrées ; migration explicite
+      sans interface ou qualification préremplie.
 - [ ] Aucun appareil ni interface déclaré homologué ou activé.
 - [ ] Méthode de fusion : merge commit pour préserver #85 à #99 et les lots
       correctifs.

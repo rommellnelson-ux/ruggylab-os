@@ -15,10 +15,23 @@ from fastapi import HTTPException
 import app.services.analyzer_ingestion as analyzer_ingestion_service
 from app.api.v1.endpoints.samples import update_sample
 from app.db.session import SessionLocal, engine
-from app.models import AuditEvent, Patient, Result, Sample, User, UserRole
+from app.models import (
+    AuditEvent,
+    Equipment,
+    EquipmentApprovedAnalyte,
+    EquipmentDocument,
+    EquipmentInterface,
+    EquipmentQualification,
+    Patient,
+    Result,
+    Sample,
+    User,
+    UserRole,
+)
 from app.schemas.analyzer import AnalyzerResultIngest
 from app.schemas.sample import SampleUpdate
 from app.services.analyzer_ingestion import analyzer_idempotency_key, ingest_analyzer_result
+from tests.equipment_registry_testkit import register_synthetic_qualified_equipment
 
 pytestmark = pytest.mark.skipif(
     engine.dialect.name != "postgresql",
@@ -48,11 +61,20 @@ def test_result_and_cancellation_are_serialized(monkeypatch: pytest.MonkeyPatch)
             status="Recu",
         )
         setup.add_all([user, patient, sample])
-        setup.commit()
+        setup.flush()
+        equipment, interface, qualification = register_synthetic_qualified_equipment(
+            setup,
+            asset_identifier=f"preanalytic-analyzer-{suffix}",
+            analyte_codes={"SYNTHETIC"},
+            actor=user,
+        )
         user_id = user.id
         patient_id = patient.id
         sample_id = sample.id
         barcode = sample.barcode
+        equipment_id = equipment.id
+        interface_id = interface.id
+        qualification_id = qualification.id
 
     payload = AnalyzerResultIngest(
         analyzer_id=f"preanalytic-analyzer-{suffix}",
@@ -136,6 +158,21 @@ def test_result_and_cancellation_are_serialized(monkeypatch: pytest.MonkeyPatch)
             stored_patient = cleanup.get(Patient, patient_id)
             if stored_patient is not None:
                 cleanup.delete(stored_patient)
+            cleanup.query(EquipmentApprovedAnalyte).filter(
+                EquipmentApprovedAnalyte.qualification_id == qualification_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentQualification).filter(
+                EquipmentQualification.id == qualification_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentDocument).filter(
+                EquipmentDocument.equipment_id == equipment_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentInterface).filter(EquipmentInterface.id == interface_id).delete(
+                synchronize_session=False
+            )
+            cleanup.query(Equipment).filter(Equipment.id == equipment_id).delete(
+                synchronize_session=False
+            )
             stored_user = cleanup.get(User, user_id)
             if stored_user is not None:
                 cleanup.delete(stored_user)

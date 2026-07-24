@@ -152,7 +152,8 @@ Les principaux agrégats persistés sont :
 - factures, paiements et plans BNPL ;
 - événements d'audit et notifications épidémiologiques.
 
-Le head Alembic audité est `20260723_0038`.
+Le head Alembic courant est `20260724_0039`; l'audit historique antérieur
+portait sur `20260723_0038`.
 
 Le modèle `Equipment` reste minimal et ne porte pas les éléments nécessaires à
 une homologation versionnée (protocole, driver, méthodes, analytes, unités,

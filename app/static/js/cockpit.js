@@ -4438,13 +4438,22 @@
       loadingStates.showSkeleton(tbody, 5);
       try {
         const data = await api('/api/v1/equipments', { headers: headers(false) });
+        const readinessLabels = {
+          unqualified: 'NON QUALIFIÉ',
+          documentation_missing: 'DOCUMENTATION MANQUANTE',
+          technical_testing: 'TEST TECHNIQUE',
+          clinical_approval_required: 'APPROBATION CLINIQUE REQUISE',
+          suspended: 'SUSPENDU',
+          qualified_disabled: 'QUALIFIÉ MAIS DÉSACTIVÉ',
+          enabled: 'ACTIVÉ',
+        };
         setRows('equipmentsTable', data.map(e => row(
           `<td>${e.id}</td>` +
           `<td><strong>${security.escapeHtml(e.name)}</strong></td>` +
-          `<td>${security.escapeHtml(e.type || '—')}</td>` +
-          `<td>${security.escapeHtml(e.serial_number || '—')}</td>` +
+          `<td>${security.escapeHtml(e.device_family || e.type || '—')}</td>` +
           `<td>${security.escapeHtml(e.location || '—')}</td>` +
-          `<td>${e.last_calibration || '—'}</td>`
+          `<td><span class="pill">${security.escapeHtml(readinessLabels[e.readiness_status] || 'NON QUALIFIÉ')}</span></td>` +
+          `<td>${security.escapeHtml((e.missing_condition_categories || []).join(', ') || '—')}</td>`
         )));
       } catch {
         if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur chargement équipements</td></tr>';

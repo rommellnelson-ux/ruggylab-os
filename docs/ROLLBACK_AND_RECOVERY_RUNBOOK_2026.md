@@ -120,7 +120,7 @@ son tag mutable ; une nouvelle décision est nécessaire pour la réactiver.
 
 ### 8.2 Garde-fous
 
-- head attendu de la PR #80 : `20260723_0038` ;
+- head attendu de la PR #80 : `20260724_0039` ;
 - chaîne linéaire vérifiée ;
 - ne jamais utiliser `downgrade base` sur un environnement avec données ;
 - ne jamais supprimer une colonne/table porteuse d'historique sans export et

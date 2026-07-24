@@ -1,6 +1,7 @@
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models import AuditEvent, ReportDeliveryOutbox, Result
+from app.models import AuditEvent, Equipment, ReportDeliveryOutbox, Result
+from tests.equipment_registry_testkit import register_synthetic_qualified_equipment
 
 
 def _login(client, username: str = "admin", password: str = "change_me_admin_password") -> str:
@@ -14,6 +15,18 @@ def _login(client, username: str = "admin", password: str = "change_me_admin_pas
 
 def _auth_headers(client) -> dict[str, str]:
     return {"Authorization": f"Bearer {_login(client)}"}
+
+
+def _qualify_synthetic_dh36(equipment_id: int) -> None:
+    with SessionLocal() as db:
+        equipment = db.get(Equipment, equipment_id)
+        assert equipment is not None
+        register_synthetic_qualified_equipment(
+            db,
+            equipment=equipment,
+            asset_identifier=f"synthetic-dh36-{equipment_id}",
+            analyte_codes={"WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT"},
+        )
 
 
 def _create_patient_sample_equipment(client) -> None:
@@ -533,6 +546,7 @@ def test_dh36_ingestion_creates_validated_result_and_is_idempotent(client) -> No
             "type": "Automate",
         },
     ).json()
+    _qualify_synthetic_dh36(equipment["id"])
     reagent = client.post(
         "/api/v1/reagents",
         headers=headers,
@@ -625,7 +639,7 @@ def test_dh36_ingestion_is_fail_closed_when_not_qualified(client) -> None:
 
 def test_dh36_ingestion_rejects_unknown_barcode(client) -> None:
     headers = _auth_headers(client)
-    client.post(
+    equipment_response = client.post(
         "/api/v1/equipments",
         headers=headers,
         json={
@@ -634,6 +648,7 @@ def test_dh36_ingestion_rejects_unknown_barcode(client) -> None:
             "type": "Automate",
         },
     )
+    _qualify_synthetic_dh36(equipment_response.json()["id"])
 
     response = client.post(
         "/api/v1/dh36/ingest",

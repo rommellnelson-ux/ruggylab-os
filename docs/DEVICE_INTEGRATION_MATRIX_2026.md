@@ -30,6 +30,8 @@ pas que l'appareil a échoué à une qualification.
 | Routes POCT / Precix | Refus contrôlé avant création de résultat, seuil, stock ou audit de succès | Désactivées jusqu'au registre qualifiable |
 | Résultat qualitatif | Créé non validé, non critique, sans clôture implicite de l'échantillon | Revue biologique requise |
 | Analyse paludisme | Aucun fallback heuristique ; sortie non clinique sur le job uniquement | Aucun effet sur `Result` |
+| Registre Equipment | Identité, interfaces, qualifications, analytes et documents normalisés ; aucune donnée réelle préremplie | Capacité de future homologation uniquement |
+| Readiness/activation | Snapshot exact, preuve, périmètre et RBAC contrôlés à chaque usage | Aucun listener ou port démarré |
 
 ## Séquence minimale avant activation
 
@@ -37,3 +39,6 @@ Identification exacte → document de communication → profil versionné →
 simulateur/trames synthétiques → mapping analytes/unités → tests d'erreur et de
 rejeu → homologation clinique → approbation nominative → activation limitée au
 site et à l'appareil.
+
+La migration `20260724_0039` ne change aucun statut des appareils listés :
+ils restent tous **NON QUALIFIÉS / NON ACTIVABLES EN CLINIQUE**.

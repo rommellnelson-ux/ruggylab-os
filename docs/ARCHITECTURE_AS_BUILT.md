@@ -5,7 +5,7 @@
 > l'architecture, les ports, les migrations ou les procédures.
 
 - **Version applicative** : 0.1.0
-- **Head Alembic** : `20260723_0038` (chaîne linéaire)
+- **Head Alembic** : `20260724_0039` (chaîne linéaire)
 - **Dernière mise à jour** : 2026-07-24 (fail-closed appareils, PR #107)
 - **Périmètre** : mono-site, LAN de laboratoire, fonctionnement sans Internet
 
@@ -81,7 +81,7 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 
 ## 4. Données et migrations
 
-- Chaîne Alembic linéaire jusqu'à `20260723_0038` — **VERIFIED** : `upgrade head`
+- Chaîne Alembic linéaire jusqu'à `20260724_0039` — **VERIFIED** : `upgrade head`
   \+ idempotence (`downgrade base` → `upgrade head`) exécutés sur PostgreSQL 16
   à chaque CI.
 - Enum `userrole` : valeurs minuscules partout (modèle `values_callable`,
@@ -203,9 +203,10 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - **Paludisme fail-closed** : aucun fallback heuristique ; modèle absent ou
   erreur = échec explicite ; une éventuelle inférence ne modifie pas `Result`.
   Le modèle réel et son usage clinique restent non qualifiés.
-- **Registre Equipment insuffisant** : le modèle ne porte pas protocole,
-  driver, qualification, méthodes, analytes, unités, activation ou version de
-  configuration. Décision de migration A/B requise, aucune migration incluse.
+- **Registre Equipment normalisé** : identité nullable, interfaces,
+  qualifications, analytes et documents sont portés par la révision 0039. Le
+  service central vérifie snapshot, preuve, périmètre et RBAC à l'activation et
+  à l'ingestion. Aucune donnée réelle n'est préremplie ; commissioning requis.
 - **Worker Windows local incompatible** : la tâche observée passe un argument
   absent de la CLI courante et pointe vers un checkout mutable. Elle ne doit pas
   être utilisée comme preuve du rôle outbox préproduction ; voir
@@ -231,7 +232,23 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - FHIR : export partiel (« sous-ensemble FHIR R4 »), pas d'API FHIR complète.
 - HL7 v2 ADT/ORM/ORU génériques, multisite, PRA : PLANNED (P1/P2).
 
-## 12. Références
+## 12. Registre Equipment
+
+La révision `20260724_0039` ajoute les tables `equipment_interfaces`,
+`equipment_qualifications`, `equipment_approved_analytes` et
+`equipment_documents`. Une migration ne crée aucune interface, qualification,
+méthode, unité, analyte ou preuve.
+
+`app.services.equipment_registry` porte la seule transition d'activation et
+ajoute l'audit avant le commit. Les mutations techniques et l'activation
+utilisent `require_admin`; l'approbation, la suspension et la désactivation
+utilisent `require_officer`. Approbation et activation sont deux actes
+distincts, sans exigence actuelle de deux personnes.
+
+L'activation du registre ne démarre aucun listener. Tous les appareils réels
+restent **NON QUALIFIÉS / NON ACTIVABLES EN CLINIQUE**.
+
+## 13. Références
 
 - Déploiement, sauvegarde, rollback : `docs/DEPLOYMENT.md`
 - Secrets : `docs/SECRETS_MANAGEMENT.md` · Observabilité : `docs/observability.md`
@@ -244,3 +261,6 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - Parc équipements : `docs/DEVICE_CONNECTIVITY_INVENTORY_2026.md`
 - Matrice d'intégration : `docs/DEVICE_INTEGRATION_MATRIX_2026.md`
 - Décision de registre : `docs/DEVICE_EQUIPMENT_REGISTRY_DECISION_2026.md`
+- Architecture du registre : `docs/EQUIPMENT_REGISTRY_ARCHITECTURE_2026.md`
+- Dictionnaire : `docs/EQUIPMENT_REGISTRY_DATA_DICTIONARY_2026.md`
+- Workflow : `docs/EQUIPMENT_QUALIFICATION_WORKFLOW_2026.md`

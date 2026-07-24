@@ -11,6 +11,8 @@ import uuid
 import pytest
 
 from app.core.config import settings
+from app.db.session import SessionLocal
+from tests.equipment_registry_testkit import register_synthetic_qualified_equipment
 
 
 def _uid() -> str:
@@ -44,6 +46,12 @@ def _sample(client, headers: dict[str, str]) -> str:
         json={"barcode": barcode, "patient_id": patient["id"], "status": "Recu"},
     )
     assert response.status_code == 201, response.text
+    with SessionLocal() as db:
+        register_synthetic_qualified_equipment(
+            db,
+            asset_identifier="astm-unit-test",
+            analyte_codes={"HGB"},
+        )
     return barcode
 
 

@@ -15,6 +15,11 @@ from app.services.audit import log_audit_event
 from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
+from app.services.equipment_registry import (
+    EquipmentRegistryError,
+    assert_analytes_authorized,
+    find_usable_analyzer_equipment,
+)
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.reference_checker import compute_flags
 from app.services.sample_workflow import (
@@ -95,6 +100,18 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
             "message": "Message automate deja integre.",
         }
 
+    try:
+        equipment, interface = find_usable_analyzer_equipment(
+            db, asset_identifier=payload.analyzer_id
+        )
+        assert_analytes_authorized(
+            db,
+            interface=interface,
+            analyte_codes=set(payload.data_points),
+        )
+    except EquipmentRegistryError as exc:
+        raise AnalyzerIngestionError(str(exc)) from exc
+
     sample = lock_sample_by_barcode(db, payload.sample_barcode)
     if sample is None:
         raise AnalyzerIngestionError(
@@ -116,6 +133,7 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
     flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
     result = Result(
         sample_id=sample.id,
+        equipment_id=equipment.id,
         analysis_date=analysis_date,
         data_points=payload.data_points,
         is_validated=True,

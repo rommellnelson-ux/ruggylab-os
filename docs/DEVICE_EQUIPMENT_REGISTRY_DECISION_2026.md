@@ -1,5 +1,11 @@
 # DÉCISION ÉQUIPEMENT — registre d'homologation
 
+## Statut
+
+**Option B autorisée par EQUIP-DEC-01.** EQUIP-RBAC-01 option 2 autorise la
+séparation technique et clinique. L'implémentation additive correspond à la
+migration `20260724_0039`.
+
 ## Appareils concernés
 
 Tous les équipements analytiques et POCT ; en priorité DH36, Dymind biochimie,
@@ -71,12 +77,9 @@ traçabilité médicale et empêche qu'un booléen isolé active un profil incom
 - Masquer les numéros de série dans les exports et documents.
 - Exiger une revue humaine appareil par appareil avant enrichissement.
 
-## Autorisation exacte attendue
+## Effet de la décision
 
-Autoriser ou refuser la conception détaillée puis l'implémentation d'une
-migration additive selon :
-
-- **A** — colonnes principalement intégrées à `equipments` ;
-- **B** — identité additive et sous-registres normalisés, recommandée.
-
-Aucune migration n'est incluse dans le présent dossier.
+La décision autorise la capacité logicielle de documenter et contrôler une
+future homologation. Elle n'autorise ni connexion, pilote, protocole inventé,
+qualification réelle, activation clinique, déploiement ou fusion de la PR #80
+vers `main`. Aucun appareil réel n'est qualifié par la migration.
