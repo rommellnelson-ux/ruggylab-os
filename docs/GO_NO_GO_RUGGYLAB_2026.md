@@ -41,7 +41,8 @@ migration. Aucun protocole LIS n'est confirmé. Le parc reste donc
   CI cumulative PR #80 `30078281184` verte : 1 311 tests réussis, 15 skips,
   PostgreSQL, Docker, CodeQL et Playwright réussis.
 - Registre Equipment : PR #110, fusion `e71d57013abea71377fcce5ea68a7f2a0c5125ed`.
-- Référence cumulative courante : PR #80 au head
+- Référence applicative qualifiée avant le présent dossier documentaire :
+  PR #80 au head
   `e71d57013abea71377fcce5ea68a7f2a0c5125ed`, CI `30089902694` verte :
   1 345 tests réussis, 17 skips, PostgreSQL 16 (13 tests), Alembic 0039,
   Docker, CodeQL et Playwright réussis ; aucune image publiée.

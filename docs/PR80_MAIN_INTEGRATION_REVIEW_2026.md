@@ -3,10 +3,12 @@
 ## 1. Résumé exécutif
 
 La PR #80 regroupe l'acquisition, les lots correctifs et les dossiers de
-qualification successifs. Son head courant qualifié est
+qualification successifs. Son head applicatif qualifié avant le dossier
+documentaire #123 est
 `e71d57013abea71377fcce5ea68a7f2a0c5125ed`. Elle reste ouverte vers `main`,
 sans conflit technique connu, sans revue bloquante et sans autorisation de
-fusion ou de déploiement.
+fusion ou de déploiement. La PR #123 ne modifie que la gouvernance et exige sa
+propre CI avant intégration.
 
 La CI cumulative courante `30089902694` est verte sur ce SHA. La CI initiale
 `30032100788` reste une référence historique du head `8562262`. La revue
@@ -42,7 +44,7 @@ valent homologation ou commissioning des appareils réels.
 | Dossier parc réel / commissioning | PR #108, CI `30057335660`, fusion `4c7fa35b` |
 | Qualification cumulative du contenu | Head `4c7fa35b`, CI PR #80 `30078281184`, succès |
 | Registre Equipment | PR #110, fusion `e71d57013abea71377fcce5ea68a7f2a0c5125ed` |
-| Qualification cumulative courante | Head `e71d570`, CI PR #80 `30089902694`, succès |
+| Qualification cumulative applicative avant #123 | Head `e71d570`, CI PR #80 `30089902694`, succès |
 
 La référence normative finale reste le head courant de la PR #80 ; tout commit
 de preuve ultérieur doit à son tour obtenir une CI cumulative verte.

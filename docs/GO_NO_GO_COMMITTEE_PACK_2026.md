@@ -8,7 +8,8 @@
 
 La PR
 [#80](https://github.com/rommellnelson-ux/ruggylab-os/pull/80) est ouverte
-de `feat/acquisition-3-flux` vers `main`. Son head de référence est
+de `feat/acquisition-3-flux` vers `main`. Le head applicatif qualifié avant le
+présent dossier documentaire est
 `e71d57013abea71377fcce5ea68a7f2a0c5125ed`. La CI cumulative
 `30089902694` est verte sur ce SHA.
 
@@ -60,15 +61,21 @@ une autre. À la date de ce dossier :
 | Élément | Référence |
 |---|---|
 | PR d'intégration | #80, ouverte, non fusionnée, base `main` |
-| Head PR #80 | `e71d57013abea71377fcce5ea68a7f2a0c5125ed` |
+| Head applicatif qualifié avant ce dossier | `e71d57013abea71377fcce5ea68a7f2a0c5125ed` |
 | PR Equipment | #110, fusionnée dans `feat/acquisition-3-flux` |
+| PR documentaire de gouvernance | #123, à fusionner uniquement après CI et revue favorables |
 | Head Alembic | `20260724_0039`, parent `20260723_0038` |
-| CI cumulative | `30089902694`, succès |
+| CI cumulative applicative | `30089902694`, succès |
 | Description PR #80 | Actualisée pour le head et le NO-GO courants |
 | Publication d'image | Skippée par la condition tag/manuelle ; aucune publication par ce run |
 
 L'état GitHub `CLEAN` ou `mergeable` indique seulement l'absence de conflit
 technique connu. Il ne constitue pas une approbation.
+
+Après intégration du présent dossier, le nouveau head documentaire de la PR #80
+et sa CI cumulative doivent être reportés dans la description GitHub. Le SHA
+`e71d570` reste la référence du contenu applicatif inchangé par cette PR
+strictement documentaire.
 
 ## 3. État technique
 
