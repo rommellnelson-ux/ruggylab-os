@@ -1,44 +1,75 @@
-# Profil appareil — Dymind Semi-auto Chemistry Analyzer
+# Fiche de commissioning — Dymind Semi-auto Chemistry Analyzer
 
-## Identité
+## 1. Identité confirmée
 
-| Champ | État |
-|---|---|
-| Fabricant | Dymind |
-| Type | Semi-auto Chemistry Analyzer |
-| Modèle | Inconnu ; non visible sur la couverture fournie |
-| Famille | Biochimie / spectrophotométrie semi-automatique |
-| Document | `Operator's Manual` |
+- Fabricant : Dymind.
+- Type communiqué : `Semi-auto Chemistry Analyzer`.
+- Fonction : biochimie ou spectrophotométrie semi-automatique.
+- Ce profil est distinct du DH36 et de l'appareil de coagulation.
 
-Ce profil est distinct du Dymind DH36 et de l'appareil de coagulation annoncé.
-Une fusion ultérieure exige une preuve physique et documentaire.
+## 2. Informations inconnues
 
-## Connectivité
+- modèle exact, plaque, identifiant d'actif, série expurgée et firmware ;
+- configuration, révision et accessoires ;
+- connectivité ou capacité d'export ;
+- méthodes, longueurs d'onde, unités, réactifs, calibration et CQ.
 
-Aucun protocole, sens de transmission ou port n'est confirmé pour cet appareil.
-Il ne faut pas conclure à une transmission automatique depuis sa fonction
-semi-automatique.
+## 3. Documents disponibles
 
-## Logiciel RuggyLab
+Un `Operator's Manual` Dymind a été observé ; le modèle n'est pas visible sur la
+couverture communiquée.
 
-`app.services.analyzers.dymind_biochemistry.DymindBiochemistryParser` est un
-stub : `protocol="unknown"` et parsing non implémenté. Le parseur DH36, les
-codes, messages et unités d'hématologie sont interdits pour ce profil.
+## 4. Documents manquants
 
-## À relever
+- plaque et modèle exact ;
+- spécifications produit et manuel applicable ;
+- chapitres communication, RS-232, USB, Ethernet, LIS, export ou PC ;
+- méthodes cinétique/end point/two point, unités et longueurs d'onde ;
+- calibration, contrôle qualité et maintenance.
 
-Modèle, firmware, spécifications produit, communication/RS-232/USB/Ethernet/LIS,
-impression/export/PC, programmation des essais, unités, calibration, CQ,
-absorbance, longueurs d'onde et méthodes cinétique/end point/two point.
+## 5. Connecteurs observés
 
-## Tests nécessaires
+Aucun connecteur n'est attribué avec certitude à cet appareil.
 
-Tests synthétiques propres au protocole documenté : framing, mapping
-méthodes/analytes/unités, valeurs absentes, doublons, ordre, ACK/NAK, panne,
-reprise et absence d'écriture partielle.
+## 6. Protocole confirmé ou inconnu
 
-## Statut
+**Inconnu.** La fonction semi-automatique ne démontre aucune transmission.
 
-- appareil réel et fonction biochimie confirmés ;
-- modèle exact et protocole LIS inconnus ;
-- **NON QUALIFIÉ — ACTIVATION AUTOMATIQUE INTERDITE**.
+## 7. Driver RuggyLab
+
+`DymindBiochemistryParser` est un stub avec protocole inconnu. Le parseur, les
+codes et les unités du DH36 sont interdits pour ce profil.
+
+## 8. État du registre Equipment
+
+Aucun appareil réel n'est enregistré. Le modèle exact doit être confirmé avant
+toute identité ou interface, qui resterait désactivée.
+
+## 9. Qualification technique
+
+Impossible avant identification du modèle et obtention de la documentation
+applicable.
+
+## 10. Qualification clinique
+
+Non commencée. Aucune méthode, longueur d'onde, unité, réactif, calibration ou
+CQ n'est approuvé.
+
+## 11. Tests synthétiques requis
+
+Après documentation : framing/export, mapping analytes-méthodes-unités, valeur
+absente, code inconnu, doublon, ordre, ACK/NAK éventuel, panne, reprise et
+absence d'écriture partielle.
+
+## 12. Tests réels requis
+
+Après autorisation : identité, méthodes, calibration, CQ, répétabilité,
+corrélation, export éventuel et vérification qu'aucun profil DH36 n'est
+réutilisé.
+
+## 13. Statut final
+
+**NON IDENTIFIÉ**
+
+Le modèle exact reste inconnu ; toute activation ou réutilisation du profil DH36
+est interdite.

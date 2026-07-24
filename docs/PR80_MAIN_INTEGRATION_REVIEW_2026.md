@@ -2,12 +2,16 @@
 
 ## 1. Résumé exécutif
 
-La PR #80 regroupe l'acquisition, quatorze lots correctifs #85 à #98 et le lot
-documentaire #99. Le head initial qualifié `8562262` est fusionnable avec
-`main@e96b63c`, sans conflit, revue « Changes requested », discussion non
-résolue, fichier `.env` ni head Alembic concurrent.
+La PR #80 regroupe l'acquisition, les lots correctifs et les dossiers de
+qualification successifs. Son head applicatif qualifié avant le dossier
+documentaire #123 est
+`e71d57013abea71377fcce5ea68a7f2a0c5125ed`. Elle reste ouverte vers `main`,
+sans conflit technique connu, sans revue bloquante et sans autorisation de
+fusion ou de déploiement. La PR #123 ne modifie que la gouvernance et exige sa
+propre CI avant intégration.
 
-La CI cumulative initiale `30032100788` est verte sur ce SHA. La revue
+La CI cumulative courante `30089902694` est verte sur ce SHA. La CI initiale
+`30032100788` reste une référence historique du head `8562262`. La revue
 indépendante confirme les invariants transactionnels, RBAC, préanalytiques,
 d'audit, de qualité, finance, imagerie, FHIR et authentification corrigés.
 
@@ -19,10 +23,10 @@ Quatre résiduels techniques ont été ouverts en lots séparés :
 - PR #101 : Pillow 12.3.0 après 20 avis `pip-audit` sur 12.2.0 ; CI
   `30047965217` verte et aucun avis connu.
 
-La contradiction clinique initiale a été corrigée par la PR #107 et qualifiée
-par toutes les barrières CI. Le verdict reste néanmoins **NO-GO temporaire** :
-la correction fail-closed ne vaut pas homologation des appareils réels et le
-registre `Equipment` ne porte pas encore une qualification versionnée.
+La contradiction clinique initiale a été corrigée par la PR #107. Le registre
+`Equipment` versionné a ensuite été intégré par la PR #110. Le verdict reste
+néanmoins **NO-GO** : ni les corrections fail-closed, ni le registre logiciel ne
+valent homologation ou commissioning des appareils réels.
 
 ## 2. Références exactes
 
@@ -39,6 +43,8 @@ registre `Equipment` ne porte pas encore une qualification versionnée.
 | Lot fail-closed appareils/clinique | PR #107, CI `30056391313`, fusion `631396d` |
 | Dossier parc réel / commissioning | PR #108, CI `30057335660`, fusion `4c7fa35b` |
 | Qualification cumulative du contenu | Head `4c7fa35b`, CI PR #80 `30078281184`, succès |
+| Registre Equipment | PR #110, fusion `e71d57013abea71377fcce5ea68a7f2a0c5125ed` |
+| Qualification cumulative applicative avant #123 | Head `e71d570`, CI PR #80 `30089902694`, succès |
 
 La référence normative finale reste le head courant de la PR #80 ; tout commit
 de preuve ultérieur doit à son tour obtenir une CI cumulative verte.
@@ -124,7 +130,7 @@ interdit toute conclusion sur les doublons historiques ou valeurs incompatibles.
 | RBAC patient/unité | Confirmé | Patients, samples, results, alertes, rapports, TAT, WebSocket. |
 | PRE Annule terminal | Confirmé | Verrou et invariant sur tous les producteurs examinés. |
 | AUD audit atomique | Confirmé | Audit avant commit et rollback testé. |
-| OPS restauration scratch | Confirmé statiquement/CI | Allowlist, checksum, échec fatal, head 0038. |
+| OPS restauration scratch | Confirmé statiquement/CI | Allowlist, checksum, échec fatal, head 0039. |
 | QMS NC/CAPA | Confirmé | `FOR UPDATE` et audit atomique. |
 | FIN facture/BNPL | Confirmé pour concurrence | Verrous et transaction unique. |
 | IMG | Confirmé | Annulation et déduplication. |
@@ -309,7 +315,7 @@ il pointe vers un checkout mutable et sa CLI est incompatible.
 |---|---|---|
 | PR80-CLIN-01 | P1 clinique, corrigé techniquement | Revue clinique humaine encore requise ; aucun flux réactivé. |
 | D4 fallback paludisme | P1 clinique, corrigé techniquement | Modèle réel et usage clinique restent non homologués. |
-| EQUIP-DEC-01 | P1 intégrité/gouvernance | Choix A/B et migration additive requis avant homologation appareil. |
+| EQUIP-OPEN-01/02 | P1/P2 clinique, intégrité/gouvernance | Registre présent ; commissioning réel et décision de protection SQL restent ouverts. |
 | Protocoles appareil inconnus | P1 clinique/intégrité | Tous les appareils restent non activables en clinique. |
 | D1/D2/D3 | P1 intégrité | Bloquent les interfaces concernées avant pilote. |
 | D5/D6/D7/D8 | P1 | Bloquent le périmètre concerné avant production. |
@@ -321,7 +327,8 @@ il pointe vers un checkout mutable et sa CLI est incompatible.
 Autorisation attendue :
 
 1. revue humaine de la correction PR80-CLIN-01 et du dossier appareils ;
-2. décision Equipment A/B, sans migration dans le présent lot ;
+2. commissioning et approbation appareil par appareil selon EQUIP-OPEN-01,
+   sans nouvelle migration dans le présent lot ;
 3. après CI finale verte du SHA documentaire, autorisation explicite de fusionner #80 par merge
    commit, sans déploiement ;
 4. autorisation séparée pour toute modification/redémarrage du worker.

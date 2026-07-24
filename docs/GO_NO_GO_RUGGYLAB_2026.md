@@ -40,6 +40,12 @@ migration. Aucun protocole LIS n'est confirmé. Le parc reste donc
 - Contenu code + dossier qualifié : `4c7fa35b913037983c77e21f7510ac3a1717970f`,
   CI cumulative PR #80 `30078281184` verte : 1 311 tests réussis, 15 skips,
   PostgreSQL, Docker, CodeQL et Playwright réussis.
+- Registre Equipment : PR #110, fusion `e71d57013abea71377fcce5ea68a7f2a0c5125ed`.
+- Référence applicative qualifiée avant le présent dossier documentaire :
+  PR #80 au head
+  `e71d57013abea71377fcce5ea68a7f2a0c5125ed`, CI `30089902694` verte :
+  1 345 tests réussis, 17 skips, PostgreSQL 16 (13 tests), Alembic 0039,
+  Docker, CodeQL et Playwright réussis ; aucune image publiée.
 - Référence normative finale : le head courant de la PR #80. Toute modification
   postérieure, y compris de preuve, exige une nouvelle CI verte.
 
@@ -110,19 +116,22 @@ migration. Aucun protocole LIS n'est confirmé. Le parc reste donc
 
 Les options détaillées se trouvent dans
 [`DECISION_PACK_P1_2026.md`](DECISION_PACK_P1_2026.md).
+Le registre des issues et les quatre décisions indépendantes du comité se
+trouvent dans
+[`GO_NO_GO_COMMITTEE_PACK_2026.md`](GO_NO_GO_COMMITTEE_PACK_2026.md).
 
 ## Critères de passage au GO AVEC CONDITIONS pour PR #80
 
-- [ ] CI finale verte sur le head exact.
-- [ ] Aucun commentaire/revue bloquante.
-- [ ] Pillow corrigé et `pip-audit` contrôlé.
+- [x] CI finale verte sur le head exact `e71d570`.
+- [x] Aucun commentaire ou revue bloquante observé sur la PR #80.
+- [x] Pillow corrigé et `pip-audit` contrôlé.
 - [x] Correction PR80-CLIN-01 fusionnée dans la branche feature et CI verte.
 - [x] D4 explicitement fail-closed dans le code.
 - [ ] Revue humaine de #107 et du dossier appareil terminée.
-- [ ] CI finale verte sur le SHA incluant le présent dossier.
+- [ ] CI finale verte sur le SHA incluant le présent dossier documentaire.
 - [x] Décision Equipment B et RBAC option 2 enregistrées ; migration explicite
       sans interface ou qualification préremplie.
-- [ ] Aucun appareil ni interface déclaré homologué ou activé.
+- [x] Aucun appareil ni interface déclaré homologué ou activé.
 - [ ] Méthode de fusion : merge commit pour préserver #85 à #99 et les lots
       correctifs.
 - [ ] Aucun déploiement déclenché par la fusion.
