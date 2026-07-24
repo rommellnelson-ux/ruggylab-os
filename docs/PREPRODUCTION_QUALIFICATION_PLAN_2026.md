@@ -40,8 +40,11 @@ réelles.
 
 - [ ] Les décisions D1 à D8 ont un propriétaire et les décisions bloquantes pour
       le périmètre sont signées.
-- [ ] Le point `PR80-CLIN-01` sur la validation/criticité des nouveaux flux est
-      arbitré par l'autorité clinique.
+- [x] Le comportement dangereux de `PR80-CLIN-01` est corrigé techniquement :
+      qualitatif non validé/non critique, POCT fail-closed et paludisme sans
+      mutation clinique (PR #107, CI verte).
+- [ ] L'autorité clinique confirme le workflow cible et toute future règle de
+      validation/criticité avant réactivation.
 - [ ] Le fallback paludisme est fail-closed pour toute écriture clinique.
 - [ ] Le SHA, l'image, les migrations et le dossier documentaire sont gelés.
 - [ ] L'environnement est formellement identifié « préproduction ».
@@ -126,10 +129,15 @@ réelles.
 | DEV-01 | Imprimantes | Imprimer étiquette/rapport synthétique. | Exemplaire barré TEST. | Lisible et bon format. |
 | DEV-02 | Codes-barres | Générer, imprimer, rescanner. | Journal synthétique. | Zéro substitution. |
 | DEV-03 | Scanners | Tester formats et erreurs. | Matrice. | Entrée exacte. |
-| DEV-04 | Microscope | Capture synthétique et permissions. | Fichier test. | Aucun chemin arbitraire. |
-| DEV-05 | Automates | Simulateur puis appareil. | PV biomédical. | Mapping, unités et idempotence approuvés. |
+| DEV-04 | Microscope Magnus Epiled Theia-I MLXi | Image synthétique, observation humaine et permissions ; aucun résultat automatique. | Fichier test + PV. | Aucun chemin arbitraire, résultat, criticité ou validation automatique. |
+| DEV-05 | Dymind DH36 | Manuel puis simulateur/trames synthétiques ; appareil réel seulement après autorisation. | PV biomédical. | Protocole, mapping, unités, ACK/retry et idempotence approuvés. |
 | DEV-06 | Navigateurs | Versions supportées. | Matrice. | Flux critiques utilisables. |
 | DEV-07 | Affichage/clavier | Résolution, accents, pavé numérique. | Checklist utilisateur. | Aucune ambiguïté de saisie. |
+| DEV-08 | Dymind biochimie semi-auto | Identifier le modèle ; tests propres au manuel de communication. | Profil + PV. | Aucun parseur/mapping DH36 réutilisé. |
+| DEV-09 | Appareil de coagulation | Identifier plaque, marque, modèle et manuel avant test. | Fiche d'identité. | Appareil distinct tant qu'aucune preuve de combinaison. |
+| DEV-10 | Anbio / BIOSCANN CHEM 100 | Confirmer rôle RS-232/USB-B puis simulateur. | Profil + PV. | Driver dédié, protocole et unités confirmés. |
+| DEV-11 | Precix / ProCheck Expert | Profil exact, cinq analytes fermés et saisie synthétique supervisée. | Homologation méthode/appareil. | Non validé par défaut, aucune valeur/seuil/unité fabriqués. |
+| DEV-12 | ZJZD-III et centrifugeuse 80-2 | Qualification de fonctionnement, maintenance et métrologie. | Fiches équipement. | Aucun driver ni flux de résultat. |
 
 ### 4.7 Utilisateurs et sécurité
 
@@ -154,9 +162,9 @@ réelles.
 | CLN-05 | Validation biologique | Avec et sans exigence de validation. | Décision signée. | Mode provisoire explicitement gouverné. |
 | CLN-06 | Critiques | Acquittement, délai, escalade. | Exercice. | Traçabilité complète. |
 | CLN-07 | Rapports | Signature, version, correction. | PDF synthétiques. | Snapshot et outbox cohérents. |
-| CLN-08 | Qualitatif | Catégorie/organisme/criticité/validateur. | Matrice signée. | Règle PR80-CLIN-01 approuvée. |
-| CLN-09 | POCT | Appareil, méthode, analyte, unité. | Homologation. | Catalogue applicable à l'appareil. |
-| CLN-10 | Paludisme | Modèle absent/réel. | Rapport ML/clinique. | Zéro écriture heuristique en exploitation. |
+| CLN-08 | Qualitatif | Catégorie/organisme/criticité/validateur. | Matrice signée. | Non validé et non critique sans règle approuvée. |
+| CLN-09 | POCT | Appareil, méthode, analyte, unité. | Homologation. | Refus tant que le profil précis n'est pas qualifiable. |
+| CLN-10 | Paludisme | Modèle absent/réel. | Rapport ML/clinique. | Échec explicite sans modèle ; aucune mutation de résultat même avec inférence. |
 
 ## 5. Tests de réception bout en bout
 
@@ -204,6 +212,9 @@ La qualification est recevable seulement si :
 - registre des écarts/NC/CAPA ;
 - décisions D1 à D8 ;
 - décision PR80-CLIN-01 ;
+- inventaire de connectivité, matrice d'intégration, registre des manuels et
+  checklist de commissioning des appareils ;
+- décision Equipment A/B avant toute migration d'homologation ;
 - checklist d'acceptation opérationnelle ;
 - runbook rollback/recovery ;
 - procès-verbal Go/No-Go.

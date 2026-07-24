@@ -2,31 +2,22 @@
 
 ## Verdict préparatoire
 
-**NO-GO temporaire pour fusion de la PR #80 et pour pilote clinique.**
+**NO-GO maintenu pour la fusion de la PR #80 et pour tout pilote clinique.**
 
-La CI et les protections techniques corrigées sont solides, mais une règle
-clinique nouvelle des flux d'acquisition n'est pas couverte par une décision
-humaine :
+Le lot #107 a corrigé et qualifié les comportements PR80-CLIN-01 :
 
-- `submit_qualitative_result` marque tout résultat positif de catégorie
-  `parasitology` comme critique ;
-- la même route positionne `is_validated=True` et `validator_id` sur
-  l'utilisateur actif non comptable ;
-- le flux POCT générique applique le catalogue Precis Expert à tout couple
-  modèle/série d'équipement enregistré sans prouver l'homologation de la méthode.
+- le qualitatif est non validé et non critique sans règle approuvée ;
+- les routes POCT/Precix refusent toute saisie avant résultat, stock, seuil ou
+  audit de succès tant qu'un profil appareil n'est pas qualifiable ;
+- le fallback paludisme est supprimé et aucune inférence ne modifie `Result` ;
+- DH36 et les listeners appareil sont désactivés par défaut ;
+- le microscope n'est plus associé automatiquement par nom approximatif.
 
-Ces comportements sont testés comme code, mais aucune approbation biologique de
-leur portée n'a été trouvée. Le rapport d'audit affirmait par ailleurs qu'aucune
-règle critique/diagnostique n'avait été modifiée, formulation trop large au
-regard du diff d'acquisition.
-
-Le verdict peut devenir **GO AVEC CONDITIONS pour la fusion technique**, sans
-déploiement, lorsque l'autorité clinique :
-
-1. approuve exactement ces sémantiques ; ou
-2. ordonne leur restriction/correction dans une PR dédiée et qualifiée.
-
-Le pilote et la production conservent leurs propres barrières ci-dessous.
+Ces corrections lèvent les scénarios dangereux du code, mais ne constituent
+pas une homologation des appareils réels. Aucun protocole LIS n'est confirmé,
+le modèle `Equipment` ne peut pas encore porter une qualification versionnée et
+les décisions humaines restent ouvertes. Le parc est donc **NON ACTIVABLE EN
+CLINIQUE**.
 
 ## Référence de qualification
 
@@ -36,6 +27,8 @@ Le pilote et la production conservent leurs propres barrières ci-dessous.
 - Head après correctifs techniques : `f938030274045d61169e422f94819723b849c04f`.
 - CI PR #80 après correctifs : run `30048611087`, verte.
 - Documentation auto-validation : PR #104, CI `30048739217`, fusion `5f8b652`.
+- Fail-closed interfaces/POCT/qualitatif/paludisme : PR #107, head `66c4ecf`,
+  CI `30056391313` verte, fusion feature `631396d`.
 - Correctifs techniques :
   - PR #102 — formatage Ruff documentaire ;
   - PR #100 — Actions et Playwright Node 24 ;
@@ -48,8 +41,8 @@ Le pilote et la production conservent leurs propres barrières ci-dessous.
 
 | ID | Barrière | État | Preuve attendue | Responsable | Échéance |
 |---|---|---|---|---|---|
-| PIL-01 | Décision PR80-CLIN-01 sur qualitatif/POCT | Bloquant | Matrice signée catégorie, rôle, validation, criticité, appareil/méthode. | Biologiste + qualité | Avant fusion/pilote |
-| PIL-02 | D4 fallback paludisme fail-closed | Bloquant | Test modèle absent : aucune écriture clinique. | Biologiste + ML | Avant pilote |
+| PIL-01 | PR80-CLIN-01 corrigé techniquement ; workflow cible à signer | Bloquant gouvernance | Revue PR #107 et matrice signée catégorie, rôle, validation, criticité, appareil/méthode. | Biologiste + qualité | Avant fusion/pilote |
+| PIL-02 | D4 fail-closed implémenté ; modèle réel non homologué | Bloquant pour activation ML | Tests modèle absent/réel : aucune mutation clinique ; validation scientifique. | Biologiste + ML | Avant pilote |
 | PIL-03 | D2 idempotence POCT/qualitatif | Bloquant pour ces flux | Clé d'acquisition et tests PostgreSQL de rejeu. | Intégration | Avant activation flux |
 | PIL-04 | D3 ACK TCP durable | Bloquant pour TCP brut | Contrat instrument + test panne/reprise. | Biomédical/intégration | Avant listener réel |
 | PIL-05 | D1 numéros explicites | Bloquant si import/HIS | Inventaire synthétique/copie autorisée et décision. | Laboratoire/DBA | Avant reprise |
@@ -58,6 +51,13 @@ Le pilote et la production conservent leurs propres barrières ci-dessous.
 | PIL-08 | Référentiels cliniques | Bloquant | Sources, versions et signatures. | Biologiste | Avant pilote |
 | PIL-09 | Réception synthétique | Bloquant | UAT complète sans données réelles. | Qualité | Avant pilote |
 | PIL-10 | Worker/outbox | Bloquant pour diffusion | Instance unique, CLI alignée, passage supervisé. | Exploitation | Avant diffusion |
+| PIL-11 | Registre Equipment | Bloquant appareils | Décision A/B, migration additive autorisée, données inconnues laissées nulles et interfaces désactivées. | Architecture + biomédical + qualité | Avant homologation |
+| PIL-12 | DH36 réel | Bloquant interface | Manuel/protocole/firmware, mapping et commissioning signés. | Biomédical/intégration | Avant activation |
+| PIL-13 | Dymind biochimie | Bloquant interface | Modèle exact et protocole propres, sans réutilisation DH36. | Biomédical/intégration | Avant activation |
+| PIL-14 | Coagulation | Bloquant interface | Plaque, manuel, modèle, tests et éventuel protocole séparés. | Biomédical | Avant développement |
+| PIL-15 | BIOSCANN CHEM 100 | Bloquant interface | Rôle RS-232/USB-B et format constructeur confirmés. | Biomédical/intégration | Avant driver |
+| PIL-16 | Precix / ProCheck Expert | Bloquant POCT | Profil exact, unités/méthodes/CQ et catalogue homologués ; USB documenté. | Biologiste + POCT | Avant saisie/USB |
+| PIL-17 | Microscope Magnus | Bloquant automatisation | Workflow humain supervisé ; aucune association ou décision automatique. | Biologiste + qualité | Avant usage intégré |
 
 ## Barrières avant production
 
@@ -87,7 +87,7 @@ Le pilote et la production conservent leurs propres barrières ci-dessous.
 
 | Décision | Choix attendu |
 |---|---|
-| PR80-CLIN-01 | Approuver ou restreindre validation/criticité qualitatif et catalogue POCT générique. |
+| PR80-CLIN-01 | Confirmer la correction fail-closed #107 et définir séparément tout futur workflow clinique. |
 | D1 | Autorité et portée du numéro de laboratoire. |
 | D2 | Clé d'idempotence d'acquisition. |
 | D3 | Contrat ACK/retry et stockage durable. |
@@ -99,6 +99,7 @@ Le pilote et la production conservent leurs propres barrières ci-dessous.
 | FIN-OPEN-01 | Annulation d'une facture avec plan BNPL actif. |
 | AUTH-OPEN-03 | Récupération de compte. |
 | AUD-OPEN-01 | Droits/immutabilité/rétention des audits. |
+| EQUIP-DEC-01 | Choisir A (colonnes Equipment) ou B (sous-registres normalisés, recommandé) avant migration. |
 
 Les options détaillées se trouvent dans
 [`DECISION_PACK_P1_2026.md`](DECISION_PACK_P1_2026.md).
@@ -108,8 +109,12 @@ Les options détaillées se trouvent dans
 - [ ] CI finale verte sur le head exact.
 - [ ] Aucun commentaire/revue bloquante.
 - [ ] Pillow corrigé et `pip-audit` contrôlé.
-- [ ] PR80-CLIN-01 signée ou correction fusionnée.
-- [ ] D4 explicitement bloquée dans tout profil clinique.
+- [x] Correction PR80-CLIN-01 fusionnée dans la branche feature et CI verte.
+- [x] D4 explicitement fail-closed dans le code.
+- [ ] Revue humaine de #107 et du dossier appareil terminée.
+- [ ] CI finale verte sur le SHA incluant le présent dossier.
+- [ ] Décision Equipment A/B enregistrée ; aucune migration implicite.
+- [ ] Aucun appareil ni interface déclaré homologué ou activé.
 - [ ] Méthode de fusion : merge commit pour préserver #85 à #99 et les lots
       correctifs.
 - [ ] Aucun déploiement déclenché par la fusion.

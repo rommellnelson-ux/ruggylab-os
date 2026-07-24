@@ -102,6 +102,32 @@ Preuves : ______________________________________
 
 Preuves : ______________________________________
 
+## Parc analytique réel
+
+Pour chaque ligne, un statut non qualifié signifie **NON ACTIVABLE EN
+CLINIQUE**, et non « échec ».
+
+| Appareil | Modèle exact | Manuel opérateur | Manuel LIS | Protocole | Driver | Test synthétique | Test réel | Homologation / activation |
+|---|---|---|---|---|---|---|---|---|
+| Dymind hématologie | DH36 | [ ] confirmé | [ ] obtenu | [ ] confirmé | Historique/stub, désactivé | [ ] | [ ] autorisé | [ ] |
+| Dymind biochimie | [ ] à relever | [x] disponible | [ ] obtenu | [ ] confirmé | Stub, désactivé | [ ] | [ ] autorisé | [ ] |
+| Coagulation | [ ] à identifier | [ ] obtenu | [ ] obtenu | [ ] confirmé | Aucun qualifié | [ ] | [ ] autorisé | [ ] |
+| Anbio / BIOSCANN | CHEM 100 | [x] Operation Manual v1.0 | [ ] obtenu | [ ] confirmé | Stub, désactivé | [ ] | [ ] autorisé | [ ] |
+| Precix / ProCheck Expert | [ ] plaque à normaliser | Documentation commerciale | [ ] USB documenté | [ ] confirmé | Aucun USB | [ ] | [ ] autorisé | [ ] |
+| Microscope Magnus | Epiled Theia-I MLXi | [ ] inventorié | Sans objet tant qu'aucune interface | Non démontré | Aucun | [ ] image | [ ] autorisé | Lecture humaine seulement |
+| ZJZD-III | ZJZD-III | [x] Instruction Manual | Sans objet | Sans objet | Aucun requis | Qualification fonctionnement | [ ] | Équipement manuel |
+| Centrifugeuse | 80-2 | [x] disponible | Sans objet | Sans objet | Aucun requis | Qualification/métrologie | [ ] | Équipement manuel |
+
+- [ ] Les connecteurs sont attribués à un appareil précis par une preuve.
+- [ ] Aucun protocole n'est déduit de la seule forme d'un port.
+- [ ] Tous les flags d'interface restent désactivés avant homologation.
+- [ ] Le profil versionné lie appareil, site, protocole, driver, firmware,
+      méthodes, analytes, unités et approbation.
+- [ ] La checklist `DEVICE_COMMISSIONING_CHECKLIST_2026.md` est signée.
+- [ ] La décision de registre Equipment A ou B est approuvée avant migration.
+
+Preuves : ______________________________________
+
 ## Comptes, rôles et unités
 
 - [ ] Comptes nominatifs uniquement ; break-glass séparé et contrôlé.
@@ -123,9 +149,12 @@ Preuves : ______________________________________
 - [ ] Le mode provisoire sans biologiste est explicitement accepté, limité et daté.
 - [ ] La libération avec/sans validation suit la décision de gouvernance.
 - [ ] Rapports, corrections et historique sont compréhensibles.
-- [ ] La règle qualitative positif→critique et `is_validated` est approuvée ou corrigée.
-- [ ] Le catalogue POCT est homologué par appareil/méthode.
-- [ ] Le fallback paludisme n'écrit aucune donnée clinique en exploitation.
+- [x] Le qualitatif reste non validé et non critique sans règle approuvée.
+- [x] Le POCT/Precix est refusé avant résultat, stock et audit de succès tant
+      qu'aucun profil appareil/méthode n'est qualifiable.
+- [x] Le paludisme échoue sans modèle et ne modifie jamais le résultat clinique.
+- [ ] Le catalogue Precix/ProCheck est homologué par appareil, méthode et unité
+      avant toute réactivation.
 - [ ] D1 à D8 sont signées ou hors périmètre avec contrôle compensatoire.
 
 Preuves : ______________________________________
@@ -169,7 +198,8 @@ Preuves : ______________________________________
 - [ ] Ruff lint et format.
 - [ ] mypy.
 - [ ] Bandit.
-- [ ] Suite complète : 1 308 tests attendus sur le head qualifié.
+- [ ] Suite complète : nombre collecté et résultat consignés sur le head qualifié
+      (le volume évolue ; ne pas figer l'ancienne valeur de 1 308).
 - [ ] Onze tests PostgreSQL exécutés dans le job PostgreSQL.
 - [ ] Upgrade/downgrade/upgrade Alembic.
 - [ ] Smoke et UAT PostgreSQL.

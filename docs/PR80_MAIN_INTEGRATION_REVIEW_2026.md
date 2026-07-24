@@ -19,10 +19,10 @@ Quatre résiduels techniques ont été ouverts en lots séparés :
 - PR #101 : Pillow 12.3.0 après 20 avis `pip-audit` sur 12.2.0 ; CI
   `30047965217` verte et aucun avis connu.
 
-Une contradiction clinique empêche toutefois de recommander la fusion sans
-arbitrage : les nouveaux flux qualitatif/POCT introduisent des sémantiques de
-validation et de criticité non approuvées dans les preuves trouvées. Le verdict
-préparatoire est donc **NO-GO temporaire**.
+La contradiction clinique initiale a été corrigée par la PR #107 et qualifiée
+par toutes les barrières CI. Le verdict reste néanmoins **NO-GO temporaire** :
+la correction fail-closed ne vaut pas homologation des appareils réels et le
+registre `Equipment` ne porte pas encore une qualification versionnée.
 
 ## 2. Références exactes
 
@@ -36,6 +36,7 @@ préparatoire est donc **NO-GO temporaire**.
 | Head applicatif après correctifs techniques | `f938030274045d61169e422f94819723b849c04f` |
 | CI PR #80 après correctifs | `30048611087`, succès sur `f938030` |
 | Lot auto-validation | PR #104, CI `30048739217`, fusion `5f8b652` |
+| Lot fail-closed appareils/clinique | PR #107, CI `30056391313`, fusion `631396d` |
 
 Le commit unique de `main` absent du head initial est un changement
 `.github/dependabot.yml` (`e96b63c`), antérieur de quelques minutes au commit
@@ -139,57 +140,41 @@ l'absence absolue de secret ou vulnérabilité ; le diff et les chemins ont auss
 - rapports signés par snapshot versionné ;
 - audit FHIR résultat ;
 - bioref additif, sans modification de `flags`/`is_critical` ;
-- fallback ML identifié comme non réel dans les métadonnées.
+- paludisme fail-closed et aucune mutation de résultat par l'inférence.
 
-### 6.2 PR80-CLIN-01 — décision bloquante
+### 6.2 PR80-CLIN-01 — corrigé techniquement, gouvernance ouverte
 
-**Criticité : P1. Nature : clinique, intégrité et gouvernance. Confiance :
-élevée sur le code, faible sur l'intention clinique.**
+**Ancienne criticité : P1 clinique/intégrité. État : scénario dangereux
+corrigé dans #107 ; homologation clinique non acquise.**
 
-Preuves :
+Preuves au head fusionné `631396d` :
 
-- `app/api/v1/endpoints/results_qualitative.py:submit_qualitative_result`
-  marque `is_critical` lorsque la catégorie est `parasitology` et le résultat
-  positif ;
-- la même fonction renseigne `validator_id` et `is_validated=True` pour tout
-  utilisateur actif non comptable ayant accès au patient ;
-- `tests/test_results_qualitative.py:test_positive_parasitology_is_critical`
-  impose cette sémantique mais les tests utilisent uniquement un administrateur ;
-- `app/api/v1/endpoints/results_poct.py:submit_poct_batch` accepte un
-  `device_model` correspondant à un équipement enregistré, puis applique le
-  catalogue POCT central issu du Precis Expert sans vérifier le type/méthode ;
-- le rapport d'audit initial affirme globalement qu'aucune règle critique ou
-  diagnostique n'a été modifiée.
+- `submit_qualitative_result` crée un résultat non validé, sans validateur,
+  non critique et sans clôture implicite de l'échantillon ;
+- `submit_poct_batch` et le contrat Precix historique refusent tout équipement
+  avant création de résultat, calcul de seuil, stock ou audit de succès ;
+- `MobileNetV2Classifier` ne possède plus de fallback heuristique et
+  `process_malaria_job` ne modifie jamais `Result` ;
+- l'ingestion DH36 et tous les listeners sont désactivés par défaut ;
+- l'association automatique du microscope par nom approximatif est supprimée ;
+- tests ciblés locaux : 122 réussis, 3 skips ONNX ;
+- CI #107 `30056391313` : suite principale, PostgreSQL, compose, CodeQL et
+  Playwright réussis.
 
-Scénarios plausibles :
+Décisions encore nécessaires : workflow qualitatif futur, profil
+Precix/ProCheck, méthodes/unités/seuils approuvés, modèle paludisme validé et
+registre Equipment versionné. Jusqu'alors, les interfaces restent fail-closed.
 
-- faux classement critique et fatigue d'alerte pour une parasitologie positive
-  qui n'est pas définie comme critique par la politique locale ;
-- sens clinique ambigu de `is_validated=True` si un technicien saisit le résultat ;
-- interprétation d'un appareil/méthode POCT non homologué avec un catalogue qui
-  ne lui appartient pas.
+### 6.3 Inventaire réel et connectivité
 
-Protections présentes :
+L'inventaire distingue désormais DH36, Dymind biochimie semi-auto, coagulation
+non identifiée, Anbio/BIOSCANN CHEM 100, Precix/ProCheck Expert, microscope
+Magnus, ZJZD-III et centrifugeuse 80-2. Aucun protocole LIS n'est confirmé.
 
-- utilisateur authentifié ;
-- comptable refusé globalement ;
-- contrôle patient/unité ;
-- verrou et refus échantillon annulé ;
-- vocabulaire fermé des analytes POCT ;
-- équipement modèle/série enregistré ;
-- transaction, audit et stock atomiques.
-
-Tests nécessaires :
-
-- matrice rôle/unité/validateur ;
-- matrice catégorie/organisme/densité/criticité signée ;
-- équipement de type différent et méthode/unité ;
-- approval explicite de l'autorité clinique ;
-- non-régression alertes, validation et rapports.
-
-Décision attendue : approuver exactement ces sémantiques ou ordonner une
-restriction/correction dédiée. Aucun seuil ou comportement n'est modifié par ce
-rapport.
+Les ports observés ne sont pas interprétés comme preuve d'HL7, ASTM, TCP ou
+export. Les statuts et tests sont décrits dans
+`DEVICE_INTEGRATION_MATRIX_2026.md` et
+`DEVICE_COMMISSIONING_CHECKLIST_2026.md`.
 
 ## 7. CI cumulative initiale
 
@@ -280,6 +265,7 @@ Traitement réalisé :
 - deux nouvelles colonnes/migrations, dont `auth_version` ;
 - rôles de processus web/scheduler/gateway et stack production qualifiés ;
 - nouveaux flux POCT/qualitatif/TCP ;
+- interfaces appareil désactivées par défaut et POCT fail-closed ;
 - outbox de rapports et worker dédié ;
 - procédures de backup/restauration renforcées ;
 - Actions CI sous Node 24 ;
@@ -315,8 +301,10 @@ il pointe vers un checkout mutable et sa CLI est incompatible.
 
 | Risque | Niveau | Effet sur décision |
 |---|---|---|
-| PR80-CLIN-01 | P1 clinique | Bloque la fusion tant que non arbitré. |
-| D4 fallback paludisme | P1 clinique | Bloque tout profil clinique ML. |
+| PR80-CLIN-01 | P1 clinique, corrigé techniquement | Revue clinique humaine encore requise ; aucun flux réactivé. |
+| D4 fallback paludisme | P1 clinique, corrigé techniquement | Modèle réel et usage clinique restent non homologués. |
+| EQUIP-DEC-01 | P1 intégrité/gouvernance | Choix A/B et migration additive requis avant homologation appareil. |
+| Protocoles appareil inconnus | P1 clinique/intégrité | Tous les appareils restent non activables en clinique. |
 | D1/D2/D3 | P1 intégrité | Bloquent les interfaces concernées avant pilote. |
 | D5/D6/D7/D8 | P1 | Bloquent le périmètre concerné avant production. |
 | Worker local | P1 exploitation | Bloque la diffusion via cette tâche. |
@@ -326,8 +314,8 @@ il pointe vers un checkout mutable et sa CLI est incompatible.
 
 Autorisation attendue :
 
-1. décision clinique sur PR80-CLIN-01 ;
-2. confirmation D4 fail-closed ;
-3. après CI finale verte, autorisation explicite de fusionner #80 par merge
+1. revue humaine de la correction PR80-CLIN-01 et du dossier appareils ;
+2. décision Equipment A/B, sans migration dans le présent lot ;
+3. après CI finale verte du SHA documentaire, autorisation explicite de fusionner #80 par merge
    commit, sans déploiement ;
 4. autorisation séparée pour toute modification/redémarrage du worker.

@@ -23,24 +23,29 @@ notamment :
 - des gardes insuffisantes dans la vérification des restaurations.
 
 À l'issue des corrections, aucun P0 ouvert n'est connu. Cette formulation ne
-constitue pas une preuve d'absence. Huit P1 initiaux restent **escaladés**, car leur
-traitement impose une règle clinique, une politique métier, un nouveau contrat
-d'idempotence ou une migration susceptible de rencontrer des données
+constitue pas une preuve d'absence. Sept P1 initiaux restent **escaladés**, car
+leur traitement impose une règle clinique, une politique métier, un nouveau
+contrat d'idempotence ou une migration susceptible de rencontrer des données
 historiques :
 
 1. unicité des numéros de laboratoire fournis explicitement ;
 2. idempotence des saisies POCT et qualitatives ;
 3. acquittement du flux TCP brut lorsque Redis est indisponible ;
-4. emploi du fallback paludisme non clinique ;
-5. visibilité des notifications épidémiologiques non rattachables à une unité ;
-6. autorité et sémantique des ressources FHIR pharmacie au statut `completed`.
-7. MFA des comptes privilégiés et procédure de récupération ;
-8. chaîne immuable de versions des résultats amendés.
+4. visibilité des notifications épidémiologiques non rattachables à une unité ;
+5. autorité et sémantique des ressources FHIR pharmacie au statut `completed` ;
+6. MFA des comptes privilégiés et procédure de récupération ;
+7. chaîne immuable de versions des résultats amendés.
 
-La qualification d'intégration postérieure a ajouté `PR80-CLIN-01`, un neuvième
-P1 distinct des décisions D1 à D8 : les sémantiques de validation et de criticité
-des nouveaux flux qualitatif/POCT nécessitent une approbation clinique avant la
-fusion de la PR #80.
+Le risque D4 du fallback paludisme est corrigé techniquement par #107. La
+validation scientifique et réglementaire d'un éventuel modèle réel reste
+nécessaire avant activation, mais aucun fallback ne produit plus de donnée
+clinique.
+
+La qualification d'intégration postérieure a ajouté `PR80-CLIN-01`. Son scénario
+dangereux a été corrigé par la PR #107 : qualitatif non validé/non critique,
+POCT fail-closed et paludisme sans fallback ni mutation de résultat. La CI
+`30056391313` est verte. L'approbation du workflow futur et l'homologation des
+appareils restent des décisions humaines avant toute activation.
 
 Le registre détaillé est
 [`AUDIT_RISK_REGISTER_2026.md`](AUDIT_RISK_REGISTER_2026.md).
@@ -120,7 +125,7 @@ FastAPI app.main:create_app
        ├─ bootstrap DB
        ├─ fan-out Redis pour les workers web
        ├─ purge des jetons pour le rôle scheduler
-       └─ DH36 pour le rôle analyzer-gateway
+       └─ DH36 seulement si explicitement activé ; désactivé par défaut
         │
         ▼
 Dépendances auth/RBAC → schémas Pydantic → endpoints/services
@@ -148,6 +153,11 @@ Les principaux agrégats persistés sont :
 - événements d'audit et notifications épidémiologiques.
 
 Le head Alembic audité est `20260723_0038`.
+
+Le modèle `Equipment` reste minimal et ne porte pas les éléments nécessaires à
+une homologation versionnée (protocole, driver, méthodes, analytes, unités,
+approbation et activation). Aucune migration n'a été créée ; la décision A/B
+est documentée séparément.
 
 ## 5. Modèle de menaces
 
@@ -213,6 +223,8 @@ pas les risques impossibles à observer sans qualification réelle du laboratoir
 | FHIR-01 | P1 | Exports FHIR cliniques audités avant délivrance, payload d'audit minimisé. |
 | AUTH-01 | P1 | Sessions antérieures invalidées après mot de passe ou changement d'activation. |
 | DOC-01 | P2 | Head Alembic du vérificateur de restauration maintenu par un test statique. |
+| PR80-CLIN-01 | P1 | Qualitatif non validé/non critique et POCT fail-closed avant tout effet. PR #107. |
+| IMG-OPEN-01 | P1 | Fallback paludisme supprimé ; inférence sans mutation de `Result`. PR #107. |
 
 R3, « amendement hors unité », n'a pas été confirmé comme contournement du
 modèle courant : la route est limitée à `require_officer` et les OFFICER/ADMIN
@@ -229,14 +241,8 @@ la transversalité change, le test doit être rouvert.
 - **ACQ-OPEN-01** — POCT et résultats qualitatifs créent un nouveau `Result` à
   chaque appel sans identifiant d'acquisition. Dédupliquer par seul échantillon
   serait potentiellement faux.
-- **PR80-CLIN-01** — la route qualitative marque toute parasitologie positive
-  critique et validée ; le flux POCT générique applique le catalogue central à
-  tout modèle/série enregistré. Les protections RBAC, unité, annulation et audit
-  sont présentes, mais l'approbation clinique de la portée n'a pas été trouvée.
 - **ACQ-OPEN-02** — le listener TCP acquitte après `_store_frame`, même si Redis
   a échoué et que la trame n'est que dans un tampon mémoire borné.
-- **IMG-OPEN-01** — le fallback paludisme est explicitement non clinique mais
-  écrit `malaria_ai` dans le résultat et peut positionner `is_critical`.
 - **EPI-OPEN-01** — une notification MADO peut contenir `patient_label`,
   `residence_quarter` et `sample_barcode` sans unité persistée ; la liste est
   globale pour tout utilisateur clinique actif.
@@ -248,6 +254,10 @@ la transversalité change, le test doit être rouvert.
 - **RESULT-OPEN-01** — les amendements modifient la ligne `Result` en place. Les
   audits et snapshots préservent une trace, mais il n'existe pas de chaîne
   relationnelle immuable `version/previous_version_id`.
+- **EQUIP-OPEN-01** — `Equipment` ne peut pas représenter une qualification
+  versionnée ni borner protocole, driver, méthodes, analytes, unités et
+  activation. Toutes les interfaces sont désactivées ; une migration additive
+  A/B et une reprise humaine sont requises avant homologation.
 
 ### P2/P3
 
@@ -299,13 +309,12 @@ la transversalité change, le test doit être rouvert.
 
 ### D4 — Fallback paludisme
 
-- Problème : une heuristique non clinique modifie un résultat et son caractère
-  critique.
-- Option A : interdire toute écriture clinique lorsque le vrai modèle est absent.
-- Option B : conserver une sortie démonstration séparée, impossible à valider ou
-  libérer.
-- Recommandation : A en exploitation ; B uniquement dans un profil démonstration.
-- Décision attendue : profils autorisés et statut réglementaire du modèle.
+- État : option A implémentée et qualifiée par #107.
+- Modèle absent ou inférence impossible : échec explicite.
+- Même avec une inférence simulée réelle, aucune mutation de `Result`, validation
+  ou criticité.
+- Décision restante : statut scientifique/réglementaire, jeu de validation,
+  performances et profil autorisé d'un éventuel modèle réel.
 
 ### D5 — Notifications MADO
 
@@ -435,18 +444,21 @@ documentées de qualification :
 
 Avant toute mise en service :
 
-1. arbitrer `PR80-CLIN-01` avant fusion, puis D1 à D8 dans des lots séparés ;
-2. désactiver l'écriture clinique du fallback paludisme ;
-3. inventorier les numéros de laboratoire historiques avant toute contrainte ;
-4. qualifier serveur, stockage, UPS, réseau automates et imprimantes ;
-5. exécuter une sauvegarde puis une restauration vérifiée sur l'environnement
+1. faire approuver la correction fail-closed de `PR80-CLIN-01`, puis traiter les
+   décisions encore ouvertes dans des lots séparés ;
+2. conserver le paludisme fail-closed tant qu'aucun modèle n'est homologué ;
+3. choisir le modèle de registre Equipment A/B avant toute migration ou
+   activation d'interface ;
+4. inventorier les numéros de laboratoire historiques avant toute contrainte ;
+5. qualifier serveur, stockage, UPS, réseau automates et imprimantes ;
+6. exécuter une sauvegarde puis une restauration vérifiée sur l'environnement
    cible, avec copie hors site ;
-6. confirmer les rôles transversaux et la visibilité MADO ;
-7. mettre en place MFA pour les comptes privilégiés ;
-8. restreindre les droits SQL applicatifs sur `audit_events` et définir
+7. confirmer les rôles transversaux et la visibilité MADO ;
+8. mettre en place MFA pour les comptes privilégiés ;
+9. restreindre les droits SQL applicatifs sur `audit_events` et définir
    rétention/export/scellement ;
-9. activer la validation biologique obligatoire dès qu'un validateur est nommé ;
-10. conserver les images et déploiements par SHA immuable.
+10. activer la validation biologique obligatoire dès qu'un validateur est nommé ;
+11. conserver les images et déploiements par SHA immuable.
 
 ## 16. Plan d'audit périodique
 
