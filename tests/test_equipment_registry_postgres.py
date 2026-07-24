@@ -95,7 +95,7 @@ def test_qualification_version_allocation_is_serialized_per_equipment() -> None:
         )
         setup.add(actor)
         setup.flush()
-        equipment, interface, first = register_synthetic_qualified_equipment(
+        equipment, _interface, first = register_synthetic_qualified_equipment(
             setup,
             asset_identifier=f"pg-version-asset-{marker}",
             analyte_codes={"SYNTHETIC"},
@@ -103,17 +103,25 @@ def test_qualification_version_allocation_is_serialized_per_equipment() -> None:
         )
         actor_id = actor.id
         equipment_id = equipment.id
-        interface_id = interface.id
         first_id = first.id
 
     with db_session.SessionLocal() as setup:
         actor = setup.get(User, actor_id)
         assert actor is not None
+        second_interface = create_interface(
+            setup,
+            equipment_id=equipment_id,
+            payload=EquipmentInterfaceCreate(
+                interface_type="file_import",
+                direction="inbound",
+            ),
+            user=actor,
+        )
         second = create_qualification_draft(
             setup,
             equipment_id=equipment_id,
             payload=EquipmentQualificationDraftCreate(
-                equipment_interface_id=interface_id,
+                equipment_interface_id=second_interface.id,
                 scope_description="SYNTHETIC TEST ONLY second source version",
             ),
             user=actor,

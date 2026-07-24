@@ -42,7 +42,9 @@ effectuer cette transition.
 
 L'allocation d'une nouvelle version verrouille la ligne `Equipment` : deux
 versions concurrentes du même équipement reçoivent ainsi des numéros distincts
-et ordonnés sous PostgreSQL.
+et ordonnés sous PostgreSQL. La création générique d'un brouillon est refusée si
+l'interface possède déjà un historique ; seule l'action explicite
+`new-version` peut alors remplacer la qualification courante.
 
 L'activation du registre ne démarre aucun listener, n'ouvre aucun port et ne
 modifie aucune machine. Le démarrage opérationnel demeure un acte de

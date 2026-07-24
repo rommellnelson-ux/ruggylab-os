@@ -480,6 +480,16 @@ def create_qualification_draft(
             "L'interface ne correspond pas a cet equipement.",
             http_status=422,
         )
+    existing_qualification = (
+        db.query(EquipmentQualification.id)
+        .filter(EquipmentQualification.equipment_interface_id == interface.id)
+        .first()
+    )
+    if existing_qualification is not None:
+        raise EquipmentRegistryError(
+            "qualification_version_required",
+            "Cette interface possede deja une qualification; creez une nouvelle version.",
+        )
     _validate_document_ids(db, equipment_id=equipment_id, document_ids=payload.document_ids)
     current_version = (
         db.query(func.max(EquipmentQualification.version))

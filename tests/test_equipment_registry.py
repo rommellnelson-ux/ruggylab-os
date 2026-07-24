@@ -455,6 +455,29 @@ def test_approved_qualification_is_immutable_and_new_version_preserves_history(
         assert db.query(EquipmentQualification).count() == 2
 
 
+def test_second_root_draft_cannot_replace_the_effective_qualification(client) -> None:
+    admin = _admin(client)
+    equipment_id, interface_id, _qualification_id = _create_complete_qualification(
+        client, admin, enable=True
+    )
+
+    duplicate_root = client.post(
+        f"/api/v1/equipments/{equipment_id}/qualifications",
+        headers=admin,
+        json={
+            "equipment_interface_id": interface_id,
+            "scope_description": "Synthetic conflicting root draft",
+        },
+    )
+
+    assert duplicate_root.status_code == 409
+    assert duplicate_root.json()["detail"]["code"] == "qualification_version_required"
+    readiness = client.get(f"/api/v1/equipments/{equipment_id}/readiness", headers=admin)
+    assert readiness.status_code == 200
+    assert readiness.json()[0]["readiness_status"] == "enabled"
+    assert readiness.json()[0]["enabled"] is True
+
+
 def test_document_referenced_by_submitted_qualification_is_immutable(client) -> None:
     admin = _admin(client)
     equipment_id, _interface_id, _qualification_id = _create_complete_qualification(client, admin)

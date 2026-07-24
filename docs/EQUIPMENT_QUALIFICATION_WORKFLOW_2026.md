@@ -27,7 +27,10 @@ qualifié mais désactivé ──► activé
 
 Une nouvelle version lie `superseded_by_id`, désactive l'interface si besoin et
 repart de `unqualified`. L'ancienne approbation reste visible mais n'est plus
-utilisable.
+utilisable. Une interface qui possède déjà une qualification ne peut pas
+recevoir un second brouillon racine : elle doit passer par l'action explicite
+« nouvelle version ». Le premier brouillon d'une autre interface du même
+équipement reste possible.
 
 ## Construction du dossier
 
