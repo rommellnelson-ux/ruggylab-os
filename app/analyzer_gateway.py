@@ -20,11 +20,22 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
+from pathlib import Path
 
 from app.core.config import settings
 from app.core.logging_config import configure_logging
 
 logger = logging.getLogger(__name__)
+
+
+async def _heartbeat_loop(path: str, interval_seconds: int = 30) -> None:
+    """Atteste la vie du process même si toutes les interfaces sont désactivées."""
+    heartbeat = Path(path)
+    while True:
+        with contextlib.suppress(OSError):
+            heartbeat.write_text(str(int(time.time())), encoding="ascii")
+        await asyncio.sleep(interval_seconds)
 
 
 async def _run() -> None:
@@ -81,9 +92,18 @@ async def _run() -> None:
                 "de sécurité Redis est requis (ANALYZER_RAW_LISTENER_ENABLED=true)."
             )
 
-    if not tasks:
-        logger.warning("Analyzer gateway: aucun listener activé, arrêt.")
-        return
+    listener_count = len(tasks)
+    if listener_count == 0:
+        logger.warning(
+            "Analyzer gateway: aucune interface qualifiée ; process vivant en mode désactivé."
+        )
+
+    tasks.append(
+        asyncio.create_task(
+            _heartbeat_loop(settings.ANALYZER_GATEWAY_HEARTBEAT_FILE),
+            name="analyzer-gateway-heartbeat",
+        )
+    )
 
     done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
     for task in pending:

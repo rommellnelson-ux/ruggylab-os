@@ -13,6 +13,7 @@ from app.api.v1.endpoints import imaging as imaging_endpoint
 from app.db.session import SessionLocal
 from app.models import AuditEvent, Result
 from app.services import malaria_ai
+from app.services.malaria_ai import MalariaPrediction
 
 
 class _SampleData(TypedDict):
@@ -198,3 +199,45 @@ def test_malaria_audits_omit_image_path_and_raw_inference_error(
             "error_type": "RuntimeError",
         }
         assert "synthetic-sensitive-imaging-location" not in (failure_event.payload or "")
+
+
+def test_malaria_prediction_never_mutates_clinical_result(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    headers = _auth(client)
+    sample = _sample(client, headers)
+    capture_response = client.post(
+        "/api/v1/imaging/capture-microscope",
+        headers=headers,
+        json={"sample_barcode": sample["barcode"]},
+    )
+    assert capture_response.status_code == 201, capture_response.text
+    result_id = int(capture_response.json()["result_id"])
+    enqueue_response = client.post(
+        f"/api/v1/imaging/malaria/analyze/{result_id}",
+        headers=headers,
+    )
+    assert enqueue_response.status_code == 202, enqueue_response.text
+    job_id = int(enqueue_response.json()["id"])
+
+    monkeypatch.setattr(
+        malaria_ai.classifier,
+        "predict",
+        lambda _image_url: MalariaPrediction(label="positive", confidence=0.99),
+    )
+    process_response = client.post(
+        f"/api/v1/imaging/malaria/jobs/{job_id}/process",
+        headers=headers,
+    )
+    assert process_response.status_code == 200, process_response.text
+    assert process_response.json()["status"] == "completed"
+    assert process_response.json()["clinical_use"] == "non_clinical"
+    assert process_response.json()["result_mutated"] is False
+
+    with SessionLocal() as db:
+        result = db.get(Result, result_id)
+        assert result is not None
+        assert result.data_points == {}
+        assert result.is_critical is False
+        assert result.is_validated is False

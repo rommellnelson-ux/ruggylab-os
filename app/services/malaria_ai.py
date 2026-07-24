@@ -26,11 +26,11 @@ on a machine with GPU/CPU:
         --data-dir data/malaria_cells \\
         --output-path models/malaria_mobilenetv2/model.onnx
 
-Graceful degradation
---------------------
-If ``onnxruntime`` is not installed OR the model file is absent,
-``MobileNetV2Classifier`` logs a warning and falls back to the
-deterministic hash-based heuristic (still marked ⚠️ NON-CLINICAL).
+Fail-closed behaviour
+---------------------
+If ``onnxruntime`` is not installed, the model file is absent or inference
+fails, no prediction is produced. A prediction from a real model remains a
+non-clinical aid stored on the analysis job and never mutates ``Result``.
 
 Clinical disclaimer
 -------------------
@@ -42,7 +42,6 @@ authors accept no liability for clinical outcomes.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from dataclasses import dataclass
@@ -74,6 +73,10 @@ _LABELS = ["negative", "positive"]
 class MalariaPrediction:
     label: str
     confidence: float
+
+
+class ClinicalModelUnavailableError(RuntimeError):
+    """Le modèle clinique qualifié n'est pas disponible ou exploitable."""
 
 
 def _softmax(x: np.ndarray) -> np.ndarray:
@@ -110,8 +113,8 @@ def _preprocess_image(image_path: str) -> np.ndarray:
 class MobileNetV2Classifier:
     """ONNX Runtime inference wrapper for a fine-tuned MobileNetV2 model.
 
-    When the model file or ``onnxruntime`` package is unavailable, the
-    classifier degrades gracefully to the hash-based stub and logs a warning.
+    When the model file or ``onnxruntime`` package is unavailable, prediction
+    fails closed. No heuristic is exposed through the public API.
     """
 
     def __init__(self, model_path: str) -> None:
@@ -125,9 +128,7 @@ class MobileNetV2Classifier:
         """Attempt to load the ONNX model into an ONNX Runtime session."""
         if not os.path.isfile(self.model_path):
             logger.warning(
-                "Malaria ONNX model not found at '%s'. "
-                "Run scripts/build_malaria_model.py to generate it. "
-                "Falling back to heuristic stub.",
+                "Malaria ONNX model not found at '%s'. Clinical inference remains disabled.",
                 self.model_path,
             )
             return
@@ -151,13 +152,12 @@ class MobileNetV2Classifier:
             )
         except ImportError:
             logger.warning(
-                "onnxruntime not installed — pip install onnxruntime-cpu. "
-                "Falling back to heuristic stub.",
+                "onnxruntime not installed; clinical inference remains disabled.",
             )
         except Exception as exc:
             logger.warning(
-                "Failed to load malaria ONNX model: %s. Falling back to heuristic stub.",
-                exc,
+                "Failed to load malaria ONNX model (%s); clinical inference remains disabled.",
+                type(exc).__name__,
             )
 
     # ------------------------------------------------------------------
@@ -168,24 +168,19 @@ class MobileNetV2Classifier:
         """Classify a cell image as positive or negative for malaria.
 
         Args:
-            image_url: Local filesystem path to the cell image, OR any
-                       string identifier when the real model is unavailable
-                       (the stub uses the string as a seed).
+            image_url: Local filesystem path to the cell image.
 
         Returns:
             ``MalariaPrediction`` with ``label`` ("positive"/"negative") and
             ``confidence`` in [0, 1].
         """
-        if self._session is not None and os.path.isfile(image_url):
-            try:
-                return self._onnx_predict(image_url)
-            except Exception as exc:
-                logger.warning(
-                    "ONNX inference failed (%s); using fallback.",
-                    type(exc).__name__,
-                )
-
-        return self._heuristic_predict(image_url)
+        if self._session is None or not os.path.isfile(image_url):
+            raise ClinicalModelUnavailableError("Qualified malaria model unavailable.")
+        try:
+            return self._onnx_predict(image_url)
+        except Exception as exc:
+            logger.warning("ONNX inference failed closed (%s).", type(exc).__name__)
+            raise ClinicalModelUnavailableError("Qualified malaria inference failed.") from exc
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -202,21 +197,6 @@ class MobileNetV2Classifier:
             label=_LABELS[idx],
             confidence=round(float(probs[idx]), 4),
         )
-
-    @staticmethod
-    def _heuristic_predict(image_url: str) -> MalariaPrediction:
-        """Deterministic hash-based stub — ⚠️ NON-CLINICAL, demo only."""
-        lowered = image_url.lower()
-        if "positive" in lowered or "palud" in lowered or "malaria" in lowered:
-            return MalariaPrediction(label="positive", confidence=0.91)
-        if "negative" in lowered:
-            return MalariaPrediction(label="negative", confidence=0.89)
-
-        digest = hashlib.sha256(image_url.encode("utf-8")).hexdigest()
-        score = int(digest[:8], 16) / 0xFFFF_FFFF
-        if score >= 0.5:
-            return MalariaPrediction(label="positive", confidence=round(0.70 + score * 0.20, 4))
-        return MalariaPrediction(label="negative", confidence=round(0.70 + (1 - score) * 0.20, 4))
 
     @property
     def is_real_model(self) -> bool:
@@ -284,17 +264,6 @@ def process_malaria_job(db: Session, *, job_id: int) -> MalariaAnalysisJob | Non
         job.status = "completed"
         job.completed_at = utcnow_naive()
         job.error_message = None
-        result = job.result
-        data_points = dict(result.data_points or {})
-        data_points["malaria_ai"] = {
-            "label": prediction.label,
-            "confidence": prediction.confidence,
-            "model": job.model_name,
-            "job_id": job.id,
-            "real_inference": classifier.is_real_model,
-        }
-        result.data_points = data_points
-        result.is_critical = result.is_critical or prediction.label == "positive"
         log_audit_event(
             db,
             user=job.requested_by,
@@ -305,7 +274,8 @@ def process_malaria_job(db: Session, *, job_id: int) -> MalariaAnalysisJob | Non
                 "result_id": job.result_id,
                 "prediction_label": prediction.label,
                 "confidence": prediction.confidence,
-                "real_inference": classifier.is_real_model,
+                "clinical_use": False,
+                "result_mutated": False,
             },
         )
     except Exception as exc:  # pragma: no cover - defensive inference boundary

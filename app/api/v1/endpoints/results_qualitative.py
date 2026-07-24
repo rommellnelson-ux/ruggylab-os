@@ -65,10 +65,10 @@ def submit_qualitative_result(
         ) from exc
 
     findings = payload.findings
-    # Une parasitologie positive est une valeur d'alerte clinique (p. ex.
-    # Plasmodium à l'examen direct) : on la marque critique pour la prise en
-    # charge, comme les valeurs paniques chiffrées.
-    is_critical = payload.category == "parasitology" and not findings.is_negative
+    # Aucune règle approuvée ne permet de transformer une observation
+    # qualitative en valeur critique. La saisie reste donc en attente d'une
+    # validation biologique distincte.
+    is_critical = False
 
     data_points = {
         "category": payload.category,
@@ -86,11 +86,10 @@ def submit_qualitative_result(
         result_type="qualitative",
         exam_code=payload.exam_code,
         image_url=payload.image_url,
-        validator_id=current_user.id,
-        is_validated=True,
+        validator_id=None,
+        is_validated=False,
         is_critical=is_critical,
     )
-    sample.status = "Termine"
     db.add(new_result)
     db.flush()
     log_audit_event(
@@ -105,6 +104,7 @@ def submit_qualitative_result(
             "is_negative": findings.is_negative,
             "observation_count": len(findings.observations),
             "is_critical": is_critical,
+            "is_validated": False,
         },
     )
     db.commit()
@@ -115,5 +115,6 @@ def submit_qualitative_result(
         "message": f"Resultat qualitatif ({payload.category}) enregistre pour {sample.barcode}.",
         "result_id": new_result.id,
         "is_critical": is_critical,
+        "is_validated": False,
         "image_url": new_result.image_url,
     }
