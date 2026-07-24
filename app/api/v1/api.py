@@ -46,6 +46,7 @@ from app.api.v1.endpoints.registre import router as registre_router
 from app.api.v1.endpoints.reports import router as reports_router
 from app.api.v1.endpoints.results import router as results_router
 from app.api.v1.endpoints.results_poct import router as results_poct_router
+from app.api.v1.endpoints.results_qualitative import router as results_qualitative_router
 from app.api.v1.endpoints.samples import router as samples_router
 from app.api.v1.endpoints.stats import router as stats_router
 from app.api.v1.endpoints.stock_notifications import router as stock_notifications_router
@@ -88,6 +89,9 @@ api_router.include_router(analyzer_router, tags=["Ingestion automates"])
 api_router.include_router(worklist_router, tags=["File de travail"], dependencies=_no_accountant)
 api_router.include_router(auto_validation_router, tags=["Auto-Validation"])
 api_router.include_router(results_poct_router, tags=["poct"], dependencies=_no_accountant)
+api_router.include_router(
+    results_qualitative_router, tags=["Résultats qualitatifs"], dependencies=_no_accountant
+)
 api_router.include_router(military_facilities_router, tags=["military-facilities"])
 api_router.include_router(dh36_router, tags=["dh36"], dependencies=_no_accountant)
 api_router.include_router(imaging_router, tags=["imaging"], dependencies=_no_accountant)
@@ -108,7 +112,7 @@ api_router.include_router(bnpl_router, tags=["BNPL CMU"])
 api_router.include_router(notifications_router, tags=["Notifications temps-réel"])
 api_router.include_router(bulk_import_router, tags=["Import en lot"], dependencies=_no_accountant)
 api_router.include_router(quality_router, tags=["Qualité NC/CAPA"])
-api_router.include_router(tat_router, tags=["Suivi TAT"])
+api_router.include_router(tat_router, tags=["Suivi TAT"], dependencies=_no_accountant)
 api_router.include_router(tariffs_router, tags=["Tarifs examens"])
 api_router.include_router(registre_router, tags=["Registre maître"], dependencies=_no_accountant)
 api_router.include_router(bioref_router, tags=["Référentiel biologique"])

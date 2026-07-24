@@ -71,8 +71,15 @@ sont résolus automatiquement : le service tente `test_code`, puis `test_code_H`
 3. Ajouter une correspondance, soit par l'API/interface admin, soit dans
    `code_mapping_data.py` :
    ```python
-   _m("MONCODE", exam="MONEXAM", test="MONTEST", analyte="MONANALYTE",
-      label="Mon examen", category="Biochimie", unit="g/L")
+   _m(
+       "MONCODE",
+       exam="MONEXAM",
+       test="MONTEST",
+       analyte="MONANALYTE",
+       label="Mon examen",
+       category="Biochimie",
+       unit="g/L",
+   )
    ```
 4. Recharger les correspondances : `POST /code-mappings/seed-defaults` (idempotent).
 

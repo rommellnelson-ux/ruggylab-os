@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.db.session import get_db
-from app.models import Equipment, MalariaAnalysisJob, Result, Sample, User
+from app.models import MalariaAnalysisJob, Result, User
 from app.schemas.malaria import MalariaAnalysisRead
 from app.services.audit import log_audit_event
 from app.services.imaging.capture_service import MicroscopeCaptureService
@@ -16,6 +16,11 @@ from app.services.malaria_ai import (
     process_malaria_job_background,
 )
 from app.services.patient_access import can_access_patient, can_access_result
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+)
 
 router = APIRouter(prefix="/imaging")
 microscope_service = MicroscopeCaptureService(storage_dir=settings.MICROSCOPY_STORAGE_DIR)
@@ -35,7 +40,7 @@ def trigger_microscope_capture(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> dict[str, Any]:
-    sample = db.query(Sample).filter(Sample.barcode == sample_barcode).first()
+    sample = lock_sample_by_barcode(db, sample_barcode)
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -43,13 +48,18 @@ def trigger_microscope_capture(
         )
     if sample.patient is not None and not can_access_patient(current_user, sample.patient):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
-    equipment = db.query(Equipment).filter(Equipment.name == "Magnus Theia-i").first()
     image_path = microscope_service.reserve_image_path(sample_barcode)
 
     new_result = Result(
         sample_id=sample.id,
-        equipment_id=equipment.id if equipment else None,
+        # Aucune association automatique par nom approximatif : l'équipement
+        # réel et son éventuel dispositif d'imagerie ne sont pas qualifiés.
+        equipment_id=None,
         data_points={},
         image_url=image_path,
         validator_id=current_user.id,
@@ -64,7 +74,7 @@ def trigger_microscope_capture(
         event_type="imaging.capture.reserve",
         entity_type="result",
         entity_id=str(new_result.id),
-        payload={"sample_barcode": sample_barcode, "image_url": image_path},
+        payload={"sample_id": sample.id},
     )
     db.commit()
     db.refresh(new_result)
@@ -88,7 +98,7 @@ def submit_malaria_analysis(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> MalariaAnalysisJob:
-    result = db.query(Result).filter(Result.id == result_id).first()
+    result = db.query(Result).filter(Result.id == result_id).with_for_update().first()
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -1,5 +1,9 @@
 # Moteurs d'interprétation biologique — rôles et autorité
 
+Les garde-fous de couverture, le déterminisme et la traçabilité du mécanisme
+d'auto-validation sont décrits dans
+[`AUTOVALIDATION_5_8.md`](AUTOVALIDATION_5_8.md).
+
 RuggyLab OS comporte **trois référentiels** d'interprétation. Ils sont
 volontairement **distincts et complémentaires** : ce document fixe lequel fait
 **autorité** sur le verdict d'un résultat, pour éviter toute ambiguïté.

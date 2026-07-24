@@ -5,7 +5,7 @@ on:
     branches: [ main ]
     tags: [ 'v*.*.*' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, feat/acquisition-3-flux ]
   workflow_dispatch:
 
 permissions:
@@ -109,6 +109,24 @@ jobs:
           alembic downgrade base
           alembic upgrade head
 
+      - name: Verify clinical, analyzer, and laboratory-number locking on PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_test
+          SECRET_KEY: ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+          TESTING: "true"
+        run: >
+          python -m pytest -q
+          tests/test_clinical_safety_postgres.py
+          tests/test_analyzer_idempotency_r6_postgres.py
+          tests/test_lab_numbering_r5_postgres.py
+          tests/test_preanalytic_cancelled_sample_postgres.py
+          tests/test_quality_transaction_postgres.py
+          tests/test_finance_transaction_postgres.py
+          tests/test_imaging_transaction_postgres.py
+          tests/test_auth_session_postgres.py
+          tests/test_equipment_registry_postgres.py
+
       - name: Smoke-test app startup against PostgreSQL
         env:
           DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_test
@@ -154,7 +172,7 @@ jobs:
 
       - name: Upload app log on failure
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: uvicorn-pg-log
           path: uvicorn-pg.log
@@ -205,9 +223,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install Playwright (chromium)
         run: |
@@ -235,7 +253,7 @@ jobs:
 
       - name: Upload E2E screenshots
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: e2e-screenshots
           path: artifacts/e2e/
@@ -316,8 +334,8 @@ jobs:
       - name: Assert role containers are healthy
         run: |
           docker compose ps
-          # scheduler (heartbeat) et analyzer-gateway (sonde TCP DH36) doivent
-          # devenir healthy — ~1 min (start_period + interval) chacun.
+          # scheduler et analyzer-gateway utilisent chacun un heartbeat. Les
+          # interfaces d'équipement restent désactivées pendant ce smoke test.
           for svc in scheduler analyzer-gateway; do
             for i in $(seq 1 30); do
               st=$(docker inspect -f '{{.State.Health.Status}}' "$(docker compose ps -q $svc)")
@@ -375,9 +393,11 @@ jobs:
           # L'ancien motif ghcr.io/<owner>/<repo>/ruggylab-os:<sha> doublait le
           # nom du dépôt : l'image publiée n'était jamais celle attendue.
           # Déploiement : RUGGYLAB_IMAGE=ghcr.io/${{ github.repository }}:<sha|vX.Y.Z>
+          # Une branche peut contenir "/" (interdit dans un tag OCI) : les
+          # déclenchements manuels sur branche publient donc uniquement le SHA.
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}:{1}', github.repository, github.ref_name) || '' }}
           labels: |
             org.opencontainers.image.title=RuggyLab OS
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

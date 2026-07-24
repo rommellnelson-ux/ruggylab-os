@@ -18,13 +18,14 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
-from app.models import Equipment, Result, Sample
+from app.models import Equipment, Result, User
 from app.schemas.epidemiology import (
     EpidemiologyDashboard,
     EpidemiologyRequest,
     FacilityStats,
     ParameterStats,
 )
+from app.services.patient_access import apply_result_patient_scope
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +73,18 @@ def _resolve_period(req: EpidemiologyRequest) -> tuple[datetime.date, datetime.d
 # ---------------------------------------------------------------------------
 
 
-def compute_dashboard(db: Session, req: EpidemiologyRequest) -> EpidemiologyDashboard:
+def compute_dashboard(
+    db: Session,
+    req: EpidemiologyRequest,
+    *,
+    user: User,
+) -> EpidemiologyDashboard:
     """Calcule le tableau de bord épidémiologique.
 
     Args:
         db: Session SQLAlchemy.
         req: Paramètres de la requête (dates, filtres).
+        user: Utilisateur dont le périmètre patient doit être appliqué.
 
     Returns:
         Instance ``EpidemiologyDashboard`` avec toutes les agrégations.
@@ -92,9 +99,9 @@ def compute_dashboard(db: Session, req: EpidemiologyRequest) -> EpidemiologyDash
     query = (
         db.query(Result, Equipment)
         .outerjoin(Equipment, Result.equipment_id == Equipment.id)
-        .join(Sample, Result.sample_id == Sample.id)
         .filter(Result.analysis_date >= start_dt, Result.analysis_date <= end_dt)
     )
+    query = apply_result_patient_scope(query, user)
 
     # Filtre optionnel par identifiant d'équipement (proxy pour l'établissement)
     if req.facility_ids:

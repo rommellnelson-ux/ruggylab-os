@@ -6,11 +6,13 @@ from sqlalchemy import (
     CHAR,
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -47,6 +49,11 @@ class User(Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Version de sécurité incorporée aux JWT. Toute modification sensible du
+    # compte l'incrémente afin d'invalider immédiatement les sessions antérieures.
+    auth_version: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     # Unité / service de rattachement (cloisonnement RBAC des dossiers patient).
     # NULL = agent transversal (accès à tous les dossiers).
     unit: Mapped[str | None] = mapped_column(String(100))
@@ -57,6 +64,7 @@ class User(Base):
 
 class Equipment(Base):
     __tablename__ = "equipments"
+    __table_args__ = (Index("uq_equipments_asset_identifier", "asset_identifier", unique=True),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -64,6 +72,18 @@ class Equipment(Base):
     type: Mapped[str | None] = mapped_column(String(50))
     location: Mapped[str | None] = mapped_column(String(100))
     last_calibration: Mapped[dt.date | None] = mapped_column(Date)
+    manufacturer: Mapped[str | None] = mapped_column(String(150))
+    model: Mapped[str | None] = mapped_column(String(150))
+    device_family: Mapped[str | None] = mapped_column(String(100))
+    firmware_version: Mapped[str | None] = mapped_column(String(100))
+    # Réutilise la notion d'unité existante (User.unit / Patient.unit).
+    unit: Mapped[str | None] = mapped_column(String(100), index=True)
+    clinical_use: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    lifecycle_status: Mapped[str | None] = mapped_column(String(50))
+    asset_identifier: Mapped[str | None] = mapped_column(String(100))
+    updated_at: Mapped[dt.datetime | None] = mapped_column(DateTime, onupdate=utcnow_naive)
 
     results: Mapped[list["Result"]] = relationship(back_populates="equipment")
     reagent_ratios: Mapped[list["EquipmentReagentRatio"]] = relationship(
@@ -74,6 +94,210 @@ class Equipment(Base):
         back_populates="equipment",
         cascade="all, delete-orphan",
     )
+    interfaces: Mapped[list["EquipmentInterface"]] = relationship(
+        back_populates="equipment",
+        order_by="EquipmentInterface.id",
+    )
+    qualifications: Mapped[list["EquipmentQualification"]] = relationship(
+        back_populates="equipment",
+        order_by="EquipmentQualification.version",
+    )
+    documents: Mapped[list["EquipmentDocument"]] = relationship(
+        back_populates="equipment",
+        order_by="EquipmentDocument.id",
+    )
+
+
+class EquipmentInterface(Base):
+    __tablename__ = "equipment_interfaces"
+    __table_args__ = (
+        CheckConstraint(
+            "interface_type IN "
+            "('serial','usb_device','usb_storage','ethernet','file_import',"
+            "'manual','proprietary','unknown')",
+            name="ck_equipment_interfaces_type",
+        ),
+        CheckConstraint(
+            "direction IN ('inbound','outbound','bidirectional','unknown')",
+            name="ck_equipment_interfaces_direction",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    stable_identifier: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
+    interface_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    direction: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Référence expurgée vers la configuration externe, jamais une connexion.
+    endpoint_reference: Mapped[str | None] = mapped_column(String(255))
+    protocol_name: Mapped[str | None] = mapped_column(String(100))
+    protocol_version: Mapped[str | None] = mapped_column(String(100))
+    driver_name: Mapped[str | None] = mapped_column(String(100))
+    driver_version: Mapped[str | None] = mapped_column(String(100))
+    configuration_version: Mapped[str | None] = mapped_column(String(100))
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    archived: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+    updated_at: Mapped[dt.datetime | None] = mapped_column(DateTime, onupdate=utcnow_naive)
+    disabled_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    disable_reason: Mapped[str | None] = mapped_column(String(255))
+
+    equipment: Mapped["Equipment"] = relationship(back_populates="interfaces")
+    qualifications: Mapped[list["EquipmentQualification"]] = relationship(
+        back_populates="interface",
+        order_by="EquipmentQualification.version",
+    )
+
+
+class EquipmentQualification(Base):
+    __tablename__ = "equipment_qualifications"
+    __table_args__ = (
+        UniqueConstraint("equipment_id", "version", name="uq_equipment_qualifications_version"),
+        CheckConstraint(
+            "status IN "
+            "('unqualified','documentation_pending','technical_testing',"
+            "'technically_qualified','clinical_review_pending','clinically_approved',"
+            "'suspended','expired','retired')",
+            name="ck_equipment_qualifications_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    equipment_interface_id: Mapped[int] = mapped_column(
+        ForeignKey("equipment_interfaces.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(40), default="unqualified", server_default="unqualified", nullable=False
+    )
+    scope_description: Mapped[str] = mapped_column(Text, nullable=False)
+    decision_reference: Mapped[str | None] = mapped_column(String(255))
+    evidence_reference: Mapped[str | None] = mapped_column(String(255))
+    non_clinical_comment: Mapped[str | None] = mapped_column(Text)
+    document_ids_snapshot: Mapped[list[int]] = mapped_column(
+        JSON, default=list, server_default="[]", nullable=False
+    )
+    snapshot_manufacturer: Mapped[str | None] = mapped_column(String(150))
+    snapshot_model: Mapped[str | None] = mapped_column(String(150))
+    snapshot_device_family: Mapped[str | None] = mapped_column(String(100))
+    snapshot_firmware_version: Mapped[str | None] = mapped_column(String(100))
+    snapshot_interface_type: Mapped[str | None] = mapped_column(String(30))
+    snapshot_protocol_name: Mapped[str | None] = mapped_column(String(100))
+    snapshot_protocol_version: Mapped[str | None] = mapped_column(String(100))
+    snapshot_driver_name: Mapped[str | None] = mapped_column(String(100))
+    snapshot_driver_version: Mapped[str | None] = mapped_column(String(100))
+    snapshot_configuration_version: Mapped[str | None] = mapped_column(String(100))
+    effective_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    approved_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    approver_role: Mapped[str | None] = mapped_column(String(30))
+    submitted_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    approved_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    suspended_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    suspension_reason: Mapped[str | None] = mapped_column(String(100))
+    superseded_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("equipment_qualifications.id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    archived: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    equipment: Mapped["Equipment"] = relationship(back_populates="qualifications")
+    interface: Mapped["EquipmentInterface"] = relationship(back_populates="qualifications")
+    analytes: Mapped[list["EquipmentApprovedAnalyte"]] = relationship(
+        back_populates="qualification",
+        order_by="EquipmentApprovedAnalyte.id",
+    )
+    superseded_by: Mapped["EquipmentQualification | None"] = relationship(
+        remote_side=[id],
+        foreign_keys=[superseded_by_id],
+    )
+
+
+class EquipmentApprovedAnalyte(Base):
+    __tablename__ = "equipment_approved_analytes"
+    __table_args__ = (
+        UniqueConstraint(
+            "qualification_id",
+            "analyte_code",
+            "method_code",
+            "sample_type",
+            "unit",
+            name="uq_equipment_approved_analytes_scope",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    qualification_id: Mapped[int] = mapped_column(
+        ForeignKey("equipment_qualifications.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    analyte_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    method_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    sample_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    unit: Mapped[str] = mapped_column(String(100), nullable=False)
+    usage_context: Mapped[str | None] = mapped_column(String(100))
+    clinical_catalog_reference: Mapped[str | None] = mapped_column(String(255))
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+    metadata_version: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    qualification: Mapped["EquipmentQualification"] = relationship(back_populates="analytes")
+
+
+class EquipmentDocument(Base):
+    __tablename__ = "equipment_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    document_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    document_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    manufacturer: Mapped[str | None] = mapped_column(String(150))
+    model: Mapped[str | None] = mapped_column(String(150))
+    version: Mapped[str | None] = mapped_column(String(100))
+    language: Mapped[str | None] = mapped_column(String(50))
+    document_date: Mapped[dt.date | None] = mapped_column(Date)
+    page_count: Mapped[int | None] = mapped_column(Integer)
+    physical_copy_available: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    digital_copy_available: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    storage_reference: Mapped[str | None] = mapped_column(String(255))
+    contains_connectivity_section: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    contains_protocol_specification: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    review_status: Mapped[str | None] = mapped_column(String(50))
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    review_date: Mapped[dt.date | None] = mapped_column(Date)
+    checksum: Mapped[str | None] = mapped_column(String(128))
+    archived_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow_naive, nullable=False)
+
+    equipment: Mapped["Equipment"] = relationship(back_populates="documents")
 
 
 class Patient(Base):
@@ -131,6 +355,10 @@ class Result(Base):
     data_points: Mapped[dict] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict
     )
+    # Discriminateur de nature du résultat (Flux 3) : distingue les résultats
+    # chiffrés des résultats qualitatifs/textuels sans dépendre des clés JSONB.
+    # "quantitative" | "qualitative" | "poct" | "analyzer" ; None pour l'historique.
+    result_type: Mapped[str | None] = mapped_column(String(30), index=True)
     image_url: Mapped[str | None] = mapped_column(String(255))
     validator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

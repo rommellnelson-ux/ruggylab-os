@@ -13,6 +13,7 @@ import datetime as dt
 from sqlalchemy.orm import Session
 
 from app.models import Result, TatTarget, User
+from app.services.patient_access import apply_result_patient_scope
 from app.utils.datetime_utils import utcnow_naive
 
 
@@ -78,16 +79,22 @@ def _agg(values: list[float]) -> dict:
     }
 
 
-def compute_tat_dashboard(db: Session, days: int = 30) -> dict:
+def compute_tat_dashboard(
+    db: Session,
+    days: int = 30,
+    *,
+    user: User | None = None,
+) -> dict:
     """Tableau de bord TAT sur ``days`` jours (basé sur la validation biologique)."""
     cutoff = utcnow_naive() - dt.timedelta(days=days)
     targets = _targets_by_code(db)
 
-    results = (
-        db.query(Result)
-        .filter(Result.bio_validated_at.isnot(None), Result.bio_validated_at >= cutoff)
-        .all()
-    )
+    query = db.query(Result)
+    if user is not None:
+        query = apply_result_patient_scope(query, user)
+    results = query.filter(
+        Result.bio_validated_at.isnot(None), Result.bio_validated_at >= cutoff
+    ).all()
 
     # Pré-chargement des noms de techniciens (validateurs)
     validator_ids = {r.validator_id for r in results if r.validator_id}
@@ -168,13 +175,21 @@ def compute_tat_dashboard(db: Session, days: int = 30) -> dict:
     }
 
 
-def list_tat_alerts(db: Session, days: int = 7, limit: int = 100) -> list[dict]:
+def list_tat_alerts(
+    db: Session,
+    days: int = 7,
+    limit: int = 100,
+    *,
+    user: User | None = None,
+) -> list[dict]:
     """Résultats récents dépassant leur délai cible (orange/rouge)."""
     cutoff = utcnow_naive() - dt.timedelta(days=days)
     targets = _targets_by_code(db)
+    query = db.query(Result)
+    if user is not None:
+        query = apply_result_patient_scope(query, user)
     results = (
-        db.query(Result)
-        .filter(Result.bio_validated_at.isnot(None), Result.bio_validated_at >= cutoff)
+        query.filter(Result.bio_validated_at.isnot(None), Result.bio_validated_at >= cutoff)
         .order_by(Result.bio_validated_at.desc())
         .all()
     )

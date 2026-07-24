@@ -1,0 +1,334 @@
+# Revue d'intégration de la PR #80 vers `main` — 2026
+
+## 1. Résumé exécutif
+
+La PR #80 regroupe l'acquisition, les lots correctifs et les dossiers de
+qualification successifs. Son head applicatif qualifié avant le dossier
+documentaire #123 est
+`e71d57013abea71377fcce5ea68a7f2a0c5125ed`. Elle reste ouverte vers `main`,
+sans conflit technique connu, sans revue bloquante et sans autorisation de
+fusion ou de déploiement. La PR #123 ne modifie que la gouvernance et exige sa
+propre CI avant intégration.
+
+La CI cumulative courante `30089902694` est verte sur ce SHA. La CI initiale
+`30032100788` reste une référence historique du head `8562262`. La revue
+indépendante confirme les invariants transactionnels, RBAC, préanalytiques,
+d'audit, de qualité, finance, imagerie, FHIR et authentification corrigés.
+
+Quatre résiduels techniques ont été ouverts en lots séparés :
+
+- PR #102 : formatage d'un exemple Markdown détecté par Ruff courant ;
+- PR #100 : Actions et Playwright Node 24, plus CI sur la branche d'intégration ;
+- PR #103 : assertion Prometheus rendue déterministe ;
+- PR #101 : Pillow 12.3.0 après 20 avis `pip-audit` sur 12.2.0 ; CI
+  `30047965217` verte et aucun avis connu.
+
+La contradiction clinique initiale a été corrigée par la PR #107. Le registre
+`Equipment` versionné a ensuite été intégré par la PR #110. Le verdict reste
+néanmoins **NO-GO** : ni les corrections fail-closed, ni le registre logiciel ne
+valent homologation ou commissioning des appareils réels.
+
+## 2. Références exactes
+
+| Élément | Référence |
+|---|---|
+| PR | `#80`, base `main`, head `feat/acquisition-3-flux` |
+| Base initiale | `e96b63ccc902b7dad664ac44ba92ea7a86699485` |
+| Head initial audité | `856226251fa835cc433e097c6ac62e1b582e9133` |
+| CI initiale | `30032100788`, événement `pull_request`, succès |
+| Head Alembic | `20260724_0039` |
+| Head applicatif après correctifs techniques | `f938030274045d61169e422f94819723b849c04f` |
+| CI PR #80 après correctifs | `30048611087`, succès sur `f938030` |
+| Lot auto-validation | PR #104, CI `30048739217`, fusion `5f8b652` |
+| Lot fail-closed appareils/clinique | PR #107, CI `30056391313`, fusion `631396d` |
+| Dossier parc réel / commissioning | PR #108, CI `30057335660`, fusion `4c7fa35b` |
+| Qualification cumulative du contenu | Head `4c7fa35b`, CI PR #80 `30078281184`, succès |
+| Registre Equipment | PR #110, fusion `e71d57013abea71377fcce5ea68a7f2a0c5125ed` |
+| Qualification cumulative applicative avant #123 | Head `e71d570`, CI PR #80 `30089902694`, succès |
+
+La référence normative finale reste le head courant de la PR #80 ; tout commit
+de preuve ultérieur doit à son tour obtenir une CI cumulative verte.
+
+Le commit unique de `main` absent du head initial est un changement
+`.github/dependabot.yml` (`e96b63c`), antérieur de quelques minutes au commit
+d'acquisition. Aucun conflit clinique ou migration n'en résulte.
+
+Le checkout original est resté volontairement intact avec ses trois changements
+préexistants : `.env.example`, `docker-compose.yml` et
+`PLAN_AMELIORATION.md`. Le fichier d'environnement n'a pas été ouvert. Toutes
+les corrections ont été réalisées dans des worktrees dédiés.
+
+## 3. Composition
+
+### 3.1 Diff initial `main...8562262`
+
+- 89 fichiers ;
+- 9 424 ajouts, 354 suppressions ;
+- 23 commits côté feature ;
+- 1 commit unique côté `main` ;
+- 2 migrations ;
+- aucun fichier `.env` dans le diff.
+
+Répartition observée :
+
+| Catégorie | Fichiers |
+|---|---:|
+| CI | 1 |
+| Documentation | 5 |
+| Migrations | 2 |
+| Modèles | 1 |
+| Routes/endpoints | 17 |
+| Schémas | 3 |
+| Services | 23 |
+| Tests | 26 |
+| UI/statique | 3 |
+| Scripts | 3 |
+| Autres | 5 |
+
+### 3.2 Traçabilité des PR
+
+Les PR #85 à #99 sont toutes fusionnées dans
+`feat/acquisition-3-flux`. Leurs merge commits ont été vérifiés comme ancêtres
+du head initial. Aucune revue bloquante ni discussion non résolue n'a été
+trouvée.
+
+La méthode de fusion recommandée pour #80 est **merge commit**, afin de
+préserver cette traçabilité. Aucun squash/rebase n'est recommandé.
+
+## 4. Migrations et modèle
+
+La chaîne Alembic est linéaire de 0001 à `20260724_0039`.
+
+| Migration | Changement | Correspondance modèle |
+|---|---|---|
+| `20260723_0037` | `results.result_type`, nullable et indexé | `Result.result_type` présent. |
+| `20260723_0038` | `users.auth_version`, non-null, défaut 0 | `User.auth_version` présent. |
+| `20260724_0039` | Registre Equipment normalisé, sans activation ni qualification préremplie | Modèles et migration additive présents. |
+
+Contrôles :
+
+- upgrade head ;
+- downgrade base sur base jetable ;
+- nouvel upgrade head ;
+- idempotence/historique linéaire ;
+- tests PostgreSQL ;
+- smoke et UAT.
+
+Aucun head concurrent, migration dupliquée, changement de type divergent ou
+colonne modèle sans migration n'a été observé. L'absence de données réelles
+interdit toute conclusion sur les doublons historiques ou valeurs incompatibles.
+
+## 5. Revue de sécurité et intégrité
+
+| Invariant | Conclusion | Preuve principale |
+|---|---|---|
+| R1 patient/prescription/échantillon | Confirmé | Vérification même patient, verrou échantillon, idempotence. |
+| R2 autorisation avant effet | Confirmé | Comptable et hors unité refusés avant stock/audit. |
+| R4 rapport atomique | Confirmé | Signature, snapshot, audit et outbox dans une transaction. |
+| R5 numéro automatique | Confirmé | Verrou advisory PostgreSQL annuel. |
+| R6 automate/DH36 | Confirmé | Clé idempotente, verrou et transaction unique. |
+| RBAC patient/unité | Confirmé | Patients, samples, results, alertes, rapports, TAT, WebSocket. |
+| PRE Annule terminal | Confirmé | Verrou et invariant sur tous les producteurs examinés. |
+| AUD audit atomique | Confirmé | Audit avant commit et rollback testé. |
+| OPS restauration scratch | Confirmé statiquement/CI | Allowlist, checksum, échec fatal, head 0039. |
+| QMS NC/CAPA | Confirmé | `FOR UPDATE` et audit atomique. |
+| FIN facture/BNPL | Confirmé pour concurrence | Verrous et transaction unique. |
+| IMG | Confirmé | Annulation et déduplication. |
+| EPI agrégats | Confirmé | Filtre unité, rôles transversaux documentés. |
+| FHIR résultat | Confirmé | Audit avant délivrance et payload minimisé. |
+| AUTH | Confirmé | `auth_version`, révocation et ordre de verrou. |
+
+Les scans Bandit, CodeQL et secrets sont verts. Un scan vert ne prouve pas
+l'absence absolue de secret ou vulnérabilité ; le diff et les chemins ont aussi
+été contrôlés statiquement sans ouvrir de fichier d'environnement.
+
+## 6. Revue clinique
+
+### 6.1 Garanties confirmées
+
+- échantillon annulé terminal ;
+- refus hors unité avant écriture ;
+- valeur critique acquittée avant libération ;
+- rapports signés par snapshot versionné ;
+- audit FHIR résultat ;
+- bioref additif, sans modification de `flags`/`is_critical` ;
+- paludisme fail-closed et aucune mutation de résultat par l'inférence.
+
+### 6.2 PR80-CLIN-01 — corrigé techniquement, gouvernance ouverte
+
+**Ancienne criticité : P1 clinique/intégrité. État : scénario dangereux
+corrigé dans #107 ; homologation clinique non acquise.**
+
+Preuves au head fusionné `631396d` :
+
+- `submit_qualitative_result` crée un résultat non validé, sans validateur,
+  non critique et sans clôture implicite de l'échantillon ;
+- `submit_poct_batch` et le contrat Precix historique refusent tout équipement
+  avant création de résultat, calcul de seuil, stock ou audit de succès ;
+- `MobileNetV2Classifier` ne possède plus de fallback heuristique et
+  `process_malaria_job` ne modifie jamais `Result` ;
+- l'ingestion DH36 et tous les listeners sont désactivés par défaut ;
+- l'association automatique du microscope par nom approximatif est supprimée ;
+- tests ciblés locaux : 122 réussis, 3 skips ONNX ;
+- CI #107 `30056391313` : suite principale, PostgreSQL, compose, CodeQL et
+  Playwright réussis.
+
+Décisions encore nécessaires : workflow qualitatif futur, profil
+Precix/ProCheck, méthodes/unités/seuils approuvés, modèle paludisme validé et
+registre Equipment versionné. Jusqu'alors, les interfaces restent fail-closed.
+
+### 6.3 Inventaire réel et connectivité
+
+L'inventaire distingue désormais DH36, Dymind biochimie semi-auto, coagulation
+non identifiée, Anbio/BIOSCANN CHEM 100, Precix/ProCheck Expert, microscope
+Magnus, ZJZD-III et centrifugeuse 80-2. Aucun protocole LIS n'est confirmé.
+
+Les ports observés ne sont pas interprétés comme preuve d'HL7, ASTM, TCP ou
+export. Les statuts et tests sont décrits dans
+`DEVICE_INTEGRATION_MATRIX_2026.md` et
+`DEVICE_COMMISSIONING_CHECKLIST_2026.md`.
+
+## 7. CI cumulative initiale
+
+Run : `30032100788`, head `8562262`, succès.
+
+| Job | Résultat |
+|---|---|
+| Ruff lint/format, mypy, Bandit, pytest, scans | Succès |
+| PostgreSQL migrations + concurrence + smoke + UAT | Succès |
+| Docker production, TLS, ports, backup, rôles | Succès |
+| CodeQL | Succès |
+| Playwright | Succès |
+| Publication d'image | Skippée pour événement PR |
+
+La stack Docker a construit l'image et qualifié compose. Le job de publication
+GHCR était correctement skippé : aucune image n'a été publiée par cette CI.
+
+Résultat principal : **1 308 tests réussis, 15 skips, 11 warnings**.<br>
+Résultat PostgreSQL dédié : **11 tests réussis**.
+
+## 8. Inventaire des 15 skips
+
+### 8.1 Onze tests PostgreSQL, attendus et exécutés ailleurs
+
+| # | Fichier / test | Raison | Autre job | Conséquence |
+|---:|---|---|---|---|
+| 1 | `test_analyzer_idempotency_r6_postgres.py::test_r6_concurrent_analyzer_replay_creates_one_result` | SQLite principal | Oui, passé | Couvert. |
+| 2 | `test_analyzer_idempotency_r6_postgres.py::test_r6_concurrent_dh36_replay_returns_duplicate_and_consumes_once` | SQLite principal | Oui, passé | Couvert. |
+| 3 | `test_auth_session_postgres.py::test_password_change_serializes_with_concurrent_login` | PostgreSQL requis | Oui, passé | Couvert. |
+| 4 | `test_auth_session_postgres.py::test_password_change_serializes_with_concurrent_refresh` | PostgreSQL requis | Oui, passé | Couvert. |
+| 5 | `test_clinical_safety_postgres.py::test_r1_competing_sample_attachments_are_serialized` | PostgreSQL requis | Oui, passé | Couvert. |
+| 6 | `test_finance_transaction_postgres.py::test_concurrent_invoice_payments_preserve_their_sum` | PostgreSQL requis | Oui, passé | Couvert. |
+| 7 | `test_finance_transaction_postgres.py::test_concurrent_duplicate_bnpl_payment_is_recorded_once` | PostgreSQL requis | Oui, passé | Couvert. |
+| 8 | `test_imaging_transaction_postgres.py::test_concurrent_malaria_submissions_create_one_job` | PostgreSQL requis | Oui, passé | Couvert. |
+| 9 | `test_lab_numbering_r5_postgres.py::test_r5_concurrent_generation_waits_for_committed_sequence` | PostgreSQL requis | Oui, passé | Couvert. |
+| 10 | `test_preanalytic_cancelled_sample_postgres.py::test_result_and_cancellation_are_serialized` | PostgreSQL requis | Oui, passé | Couvert. |
+| 11 | `test_quality_transaction_postgres.py::test_concurrent_nc_transitions_observe_committed_status` | PostgreSQL requis | Oui, passé | Couvert. |
+
+### 8.2 Quatre skips ML non exécutés ailleurs
+
+| # | Fichier / test | Raison | Autre job | Conséquence |
+|---:|---|---|---|---|
+| 12 | `test_malaria_mobilenetv2.py::test_onnx_classifier_is_real_model` | paquet `onnx` absent | Non | Chargement réel non qualifié. |
+| 13 | `test_malaria_mobilenetv2.py::test_onnx_predict_from_image_file` | paquet `onnx` absent | Non | Inférence fichier non qualifiée. |
+| 14 | `test_malaria_mobilenetv2.py::test_onnx_confidence_sums_to_one` | paquet `onnx` absent | Non | Sortie probabiliste non qualifiée. |
+| 15 | module `tests/test_ml_pipeline.py` | PyTorch absent à la collecte | Non | Entraînement/export/validation non qualifiés. |
+
+Ces quatre skips sont attendus par la politique de dépendances optionnelles mais
+ne sont **pas acceptables pour activer la fonction clinique**. D4 impose
+fail-closed tant qu'un job ML et une validation clinique ne les couvrent pas.
+
+Les skips dynamiques CORS, quota et compression n'ont pas été pris dans cette
+exécution : leurs conditions étaient actives et les tests ont réussi.
+
+## 9. Résiduels techniques
+
+### Corrigés par lots dédiés
+
+- `CI-OPEN-01` : setup-node/upload-artifact v6 et Node 24, SHA épinglés.
+- Format Ruff de la documentation.
+- Test Prometheus non déterministe.
+- Pillow 12.2.0 : 20 avis `pip-audit`, version corrective 12.3.0.
+
+### Escaladés
+
+- `AUD-OPEN-01` : immutabilité DB des audits nécessite droits/migration.
+- `FIN-OPEN-01` : politique d'annulation facture avec BNPL.
+- `AUTH-OPEN-03` : récupération de compte.
+- `AUTH-OPEN-02` : scopes OAuth déclaratifs ; les rôles DB font actuellement
+  autorité. Aucun comportement n'est modifié.
+
+## 10. PR #81
+
+La PR #81 contient une information unique sur les garde-fous ISO 15189 §5.8 et
+une anomalie historique de traçabilité de branche. Son point ouvert sur
+`apply_bioref_to_result` est obsolète au head de #80.
+
+Traitement réalisé :
+
+1. intégrer un document adapté `docs/AUTOVALIDATION_5_8.md` ;
+2. lier `docs/INTERPRETATION.md` ;
+3. corriger les commentaires techniques contradictoires ;
+4. qualifier et fusionner la PR #104 vers la branche d'intégration ;
+5. commenter puis fermer #81 comme superseded, sans perte d'information.
+
+## 11. Changements opératoires
+
+- deux nouvelles colonnes/migrations, dont `auth_version` ;
+- rôles de processus web/scheduler/gateway et stack production qualifiés ;
+- nouveaux flux POCT/qualitatif/TCP ;
+- interfaces appareil désactivées par défaut et POCT fail-closed ;
+- outbox de rapports et worker dédié ;
+- procédures de backup/restauration renforcées ;
+- Actions CI sous Node 24 ;
+- mise à jour Pillow corrective.
+
+Le worker Windows existant n'est pas une preuve de qualification de ces rôles :
+il pointe vers un checkout mutable et sa CLI est incompatible.
+
+## 12. Rollback recommandé
+
+- fusion par merge commit ;
+- aucune activation/déploiement automatique ;
+- image par digest/SHA ;
+- rollback applicatif vers le digest précédent si schéma compatible ;
+- privilégier migration corrective vers l'avant ;
+- downgrade uniquement après répétition scratch ;
+- préserver outbox, audits et snapshots ;
+- bloquer les flux qualitatif/POCT/ML non approuvés ;
+- suivre `ROLLBACK_AND_RECOVERY_RUNBOOK_2026.md`.
+
+## 13. Limites
+
+- aucune base, donnée patient, automate, serveur cible ou service de production ;
+- aucune lecture de fichier d'environnement ;
+- aucun pentest externe ni test de charge longue durée ;
+- aucune validation scientifique des référentiels/seuils ;
+- aucun test réel du modèle paludisme ;
+- aucune preuve sur les doublons historiques ;
+- historique Windows du Planificateur désactivé ;
+- scans automatiques non assimilés à une preuve d'absence.
+
+## 14. Risques ouverts et décision recommandée
+
+| Risque | Niveau | Effet sur décision |
+|---|---|---|
+| PR80-CLIN-01 | P1 clinique, corrigé techniquement | Revue clinique humaine encore requise ; aucun flux réactivé. |
+| D4 fallback paludisme | P1 clinique, corrigé techniquement | Modèle réel et usage clinique restent non homologués. |
+| EQUIP-OPEN-01/02 | P1/P2 clinique, intégrité/gouvernance | Registre présent ; commissioning réel et décision de protection SQL restent ouverts. |
+| Protocoles appareil inconnus | P1 clinique/intégrité | Tous les appareils restent non activables en clinique. |
+| D1/D2/D3 | P1 intégrité | Bloquent les interfaces concernées avant pilote. |
+| D5/D6/D7/D8 | P1 | Bloquent le périmètre concerné avant production. |
+| Worker local | P1 exploitation | Bloque la diffusion via cette tâche. |
+| Quatre skips ML | Qualification incomplète | Acceptables seulement si ML fail-closed. |
+
+**Verdict : NO-GO temporaire.**
+
+Autorisation attendue :
+
+1. revue humaine de la correction PR80-CLIN-01 et du dossier appareils ;
+2. commissioning et approbation appareil par appareil selon EQUIP-OPEN-01,
+   sans nouvelle migration dans le présent lot ;
+3. après CI finale verte du SHA documentaire, autorisation explicite de fusionner #80 par merge
+   commit, sans déploiement ;
+4. autorisation séparée pour toute modification/redémarrage du worker.

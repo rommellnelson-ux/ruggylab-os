@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -16,5 +17,7 @@ class MalariaAnalysisRead(BaseModel):
     queued_at: dt.datetime
     started_at: dt.datetime | None = None
     completed_at: dt.datetime | None = None
+    clinical_use: Literal["non_clinical"] = "non_clinical"
+    result_mutated: Literal[False] = False
 
     model_config = ConfigDict(from_attributes=True)

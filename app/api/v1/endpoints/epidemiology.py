@@ -40,5 +40,4 @@ def epidemiology_dashboard(
     - Filtre optionnel par identifiant d'équipement (``facility_ids``)
     - Filtre optionnel par paramètre biologique (``parameters``)
     """
-    del current_user  # Authentification vérifiée par la dépendance
-    return compute_dashboard(db, payload)
+    return compute_dashboard(db, payload, user=current_user)

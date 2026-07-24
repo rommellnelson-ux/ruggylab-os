@@ -23,12 +23,16 @@ def _is_unrestricted(user: User) -> bool:
     return user.role in (UserRole.ADMIN, UserRole.OFFICER) or user.unit is None
 
 
-def can_access_patient(user: User, patient: Patient) -> bool:
-    """Indique si ``user`` est autorisé à consulter ``patient``."""
+def can_access_unit(user: User, unit: str | None) -> bool:
+    """Indique si ``user`` peut accéder à une ressource rattachée à ``unit``."""
     if _is_unrestricted(user):
         return True
-    # Agent rattaché : son unité, ou les patients non affectés
-    return patient.unit is None or patient.unit == user.unit
+    return unit is None or unit == user.unit
+
+
+def can_access_patient(user: User, patient: Patient) -> bool:
+    """Indique si ``user`` est autorisé à consulter ``patient``."""
+    return can_access_unit(user, patient.unit)
 
 
 def apply_patient_scope(query: Any, user: User) -> Any:
@@ -36,6 +40,24 @@ def apply_patient_scope(query: Any, user: User) -> Any:
     if _is_unrestricted(user):
         return query
     return query.filter(or_(Patient.unit.is_(None), Patient.unit == user.unit))
+
+
+def can_access_sample(user: User, sample: Sample) -> bool:
+    """Autorisation d'accès à un échantillon via le périmètre de son patient."""
+    if _is_unrestricted(user):
+        return True
+    if sample.patient is None:
+        return True
+    return can_access_patient(user, sample.patient)
+
+
+def apply_sample_patient_scope(query: Any, user: User) -> Any:
+    """Restreint une requête ``Sample`` au périmètre patient autorisé."""
+    if _is_unrestricted(user):
+        return query
+    return query.outerjoin(Patient, Sample.patient_id == Patient.id).filter(
+        or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit)
+    )
 
 
 def can_access_result(user: User, result: Result) -> bool:
@@ -51,17 +73,26 @@ def can_access_result(user: User, result: Result) -> bool:
     return patient.unit is None or patient.unit == user.unit
 
 
-def apply_result_patient_scope(query: Any, user: User) -> Any:
+def apply_result_patient_scope(
+    query: Any,
+    user: User,
+    *,
+    patient_joined: bool = False,
+) -> Any:
     """Restreint une requête ``Result`` au périmètre patient autorisé pour ``user``.
 
     Inclut les résultats sans patient rattaché (pas de PII à cloisonner).
+    ``patient_joined`` évite de répéter les jointures pour les rapports qui les
+    ont déjà établies afin de sélectionner des colonnes patient.
     """
     if _is_unrestricted(user):
         return query
-    return (
-        query.outerjoin(Sample, Result.sample_id == Sample.id)
-        .outerjoin(Patient, Sample.patient_id == Patient.id)
-        .filter(or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit))
+    if not patient_joined:
+        query = query.outerjoin(Sample, Result.sample_id == Sample.id).outerjoin(
+            Patient, Sample.patient_id == Patient.id
+        )
+    return query.filter(
+        or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit)
     )
 
 

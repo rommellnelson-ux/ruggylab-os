@@ -3,12 +3,19 @@ import hashlib
 from dataclasses import dataclass
 
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import DH36InboundMessage, Equipment, Patient, Result, Sample, User
 from app.services.audit import log_audit_event
+from app.services.equipment_registry import (
+    EquipmentRegistryError,
+    assert_analytes_authorized,
+    assert_equipment_interface_usable,
+)
 from app.services.interfacing.dymind_dh36 import DH36Parser
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
+from app.services.sample_workflow import CancelledSampleError, ensure_sample_processable
 from app.services.validation.med_logic import validate_nfs_parameters
 from app.utils.datetime_utils import utcnow_naive
 
@@ -64,6 +71,29 @@ def _reject(
     return DH36IngestionOutcome(message=message)
 
 
+def _duplicate_outcome(
+    db: Session,
+    message: DH36InboundMessage,
+    *,
+    user: User | None,
+) -> DH36IngestionOutcome:
+    log_audit_event(
+        db,
+        user=user,
+        event_type="dh36.message.duplicate",
+        entity_type="dh36_inbound_message",
+        entity_id=str(message.id),
+        payload={
+            "sample_barcode": message.sample_barcode,
+            "message_control_id": message.message_control_id,
+            "result_id": message.result_id,
+        },
+    )
+    db.commit()
+    db.refresh(message)
+    return DH36IngestionOutcome(message=message, duplicate=True)
+
+
 def ingest_dh36_message(
     db: Session,
     *,
@@ -74,7 +104,6 @@ def ingest_dh36_message(
     parser = DH36Parser(raw_message)
     info = parser.get_info()
     message_control_id = info.get("message_control_id")
-
     duplicate_query = db.query(DH36InboundMessage).filter(
         DH36InboundMessage.raw_hash == message_hash
     )
@@ -87,32 +116,45 @@ def ingest_dh36_message(
         )
     existing = duplicate_query.first()
     if existing:
-        log_audit_event(
-            db,
-            user=user,
-            event_type="dh36.message.duplicate",
-            entity_type="dh36_inbound_message",
-            entity_id=str(existing.id),
-            payload={
-                "sample_barcode": existing.sample_barcode,
-                "message_control_id": existing.message_control_id,
-                "result_id": existing.result_id,
-            },
+        return _duplicate_outcome(db, existing, user=user)
+
+    equipment_query = db.query(Equipment).filter(Equipment.name == DH36_EQUIPMENT_NAME)
+    equipment_serial = info.get("equipment_serial")
+    if equipment_serial:
+        equipment_query = equipment_query.filter(Equipment.serial_number == equipment_serial)
+    equipment_candidates = equipment_query.order_by(Equipment.id).all()
+    if not equipment_candidates:
+        raise EquipmentRegistryError(
+            "dh36_equipment_not_registered",
+            "Equipement Dymind DH36 non enregistre.",
+            http_status=422,
         )
-        db.commit()
-        db.refresh(existing)
-        return DH36IngestionOutcome(message=existing, duplicate=True)
+    if len(equipment_candidates) != 1:
+        raise EquipmentRegistryError(
+            "dh36_equipment_ambiguous",
+            "L'identite du DH36 ne designe pas un equipement unique.",
+            http_status=422,
+        )
+    equipment = equipment_candidates[0]
+    interface = assert_equipment_interface_usable(db, equipment=equipment)
 
     message = DH36InboundMessage(
         raw_hash=message_hash,
         message_control_id=message_control_id,
         sample_barcode=info.get("barcode"),
-        equipment_serial=info.get("equipment_serial"),
+        equipment_serial=equipment_serial,
         status="received",
         raw_message=raw_message.strip(),
     )
     db.add(message)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        existing = duplicate_query.first()
+        if existing is not None:
+            return _duplicate_outcome(db, existing, user=user)
+        raise
 
     if not message.sample_barcode:
         return _reject(
@@ -132,6 +174,10 @@ def ingest_dh36_message(
             reason=f"Code-barres inconnu: {message.sample_barcode}.",
             user=user,
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        return _reject(db, message, reason=str(exc), user=user)
 
     patient = db.query(Patient).filter(Patient.id == sample.patient_id).first()
     if not patient:
@@ -142,23 +188,6 @@ def ingest_dh36_message(
             user=user,
         )
 
-    equipment_query = db.query(Equipment).filter(Equipment.name == DH36_EQUIPMENT_NAME)
-    if message.equipment_serial:
-        equipment_query = equipment_query.filter(
-            or_(
-                Equipment.serial_number == message.equipment_serial,
-                Equipment.serial_number.is_(None),
-            )
-        )
-    equipment = equipment_query.order_by(Equipment.serial_number.desc()).first()
-    if not equipment:
-        return _reject(
-            db,
-            message,
-            reason="Equipement Dymind DH36 non enregistre.",
-            user=user,
-        )
-
     analysis_date = utcnow_naive()
     results_raw = parser.parse_results()
     if not results_raw:
@@ -166,6 +195,19 @@ def ingest_dh36_message(
             db,
             message,
             reason="Message DH36 sans resultats OBX exploitables.",
+            user=user,
+        )
+    try:
+        assert_analytes_authorized(
+            db,
+            interface=interface,
+            analyte_codes=set(results_raw),
+        )
+    except EquipmentRegistryError:
+        return _reject(
+            db,
+            message,
+            reason="Message DH36 hors du perimetre analytique approuve.",
             user=user,
         )
 
@@ -184,7 +226,6 @@ def ingest_dh36_message(
         is_validated=True,
         is_critical=is_panic,
     )
-    sample.status = "Termine"
     db.add(result)
     db.flush()
 
@@ -206,6 +247,7 @@ def ingest_dh36_message(
             user=user,
         )
 
+    sample.status = "Termine"
     message.status = "processed"
     message.result_id = result.id
     message.processed_at = utcnow_naive()

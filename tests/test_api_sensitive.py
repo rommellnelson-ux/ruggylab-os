@@ -1,5 +1,7 @@
+from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models import ReportDeliveryOutbox
+from app.models import AuditEvent, Equipment, ReportDeliveryOutbox, Result
+from tests.equipment_registry_testkit import register_synthetic_qualified_equipment
 
 
 def _login(client, username: str = "admin", password: str = "change_me_admin_password") -> str:
@@ -13,6 +15,18 @@ def _login(client, username: str = "admin", password: str = "change_me_admin_pas
 
 def _auth_headers(client) -> dict[str, str]:
     return {"Authorization": f"Bearer {_login(client)}"}
+
+
+def _qualify_synthetic_dh36(equipment_id: int) -> None:
+    with SessionLocal() as db:
+        equipment = db.get(Equipment, equipment_id)
+        assert equipment is not None
+        register_synthetic_qualified_equipment(
+            db,
+            equipment=equipment,
+            asset_identifier=f"synthetic-dh36-{equipment_id}",
+            analyte_codes={"WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT"},
+        )
 
 
 def _create_patient_sample_equipment(client) -> None:
@@ -65,9 +79,17 @@ def _dh36_message(barcode: str, message_id: str, serial: str = "DH36-ING-001") -
     )
 
 
-def test_precis_expert_endpoint_creates_result_and_audit_event(client) -> None:
+def test_precis_expert_endpoint_is_fail_closed_without_qualification(client) -> None:
     _create_patient_sample_equipment(client)
     headers = _auth_headers(client)
+
+    with SessionLocal() as db:
+        result_count = db.query(Result).count()
+        success_audit_count = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.event_type == "result.precis_expert.create")
+            .count()
+        )
 
     response = client.post(
         "/api/v1/results/precis-expert",
@@ -82,19 +104,16 @@ def test_precis_expert_endpoint_creates_result_and_audit_event(client) -> None:
             "ketones_raw": 0.2,
         },
     )
-    assert response.status_code == 201, response.text
-    assert response.json()["is_critical"] is True
-    result_id = response.json()["result_id"]
-
-    result_response = client.get(f"/api/v1/results/{result_id}", headers=headers)
-    assert result_response.status_code == 200
-    assert result_response.json()["is_validated"] is True
-
-    audit_response = client.get("/api/v1/audit-events", headers=headers)
-    assert any(
-        event["event_type"] == "result.precis_expert.create"
-        for event in audit_response.json()["items"]
-    )
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "poct_equipment_not_qualified"
+    with SessionLocal() as db:
+        assert db.query(Result).count() == result_count
+        assert (
+            db.query(AuditEvent)
+            .filter(AuditEvent.event_type == "result.precis_expert.create")
+            .count()
+            == success_audit_count
+        )
 
 
 def test_imaging_endpoint_creates_reservation_and_audit_event(client) -> None:
@@ -527,6 +546,7 @@ def test_dh36_ingestion_creates_validated_result_and_is_idempotent(client) -> No
             "type": "Automate",
         },
     ).json()
+    _qualify_synthetic_dh36(equipment["id"])
     reagent = client.post(
         "/api/v1/reagents",
         headers=headers,
@@ -583,9 +603,43 @@ def test_dh36_ingestion_creates_validated_result_and_is_idempotent(client) -> No
     assert results["meta"]["total"] == 1
 
 
+def test_dh36_ingestion_is_fail_closed_when_not_qualified(client) -> None:
+    headers = _auth_headers(client)
+    db = SessionLocal()
+    try:
+        result_count_before = db.query(Result).count()
+        audit_count_before = db.query(AuditEvent).count()
+    finally:
+        db.close()
+
+    previous_setting = settings.ENABLE_DH36_INGESTION
+    settings.ENABLE_DH36_INGESTION = False
+    try:
+        response = client.post(
+            "/api/v1/dh36/ingest",
+            headers=headers,
+            json={"raw_message": _dh36_message("BAR-DISABLED", "MSG-DISABLED")},
+        )
+    finally:
+        settings.ENABLE_DH36_INGESTION = previous_setting
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Interface DH36 désactivée : protocole, appareil et mapping non qualifiés "
+        "pour un usage clinique."
+    )
+
+    db = SessionLocal()
+    try:
+        assert db.query(Result).count() == result_count_before
+        assert db.query(AuditEvent).count() == audit_count_before
+    finally:
+        db.close()
+
+
 def test_dh36_ingestion_rejects_unknown_barcode(client) -> None:
     headers = _auth_headers(client)
-    client.post(
+    equipment_response = client.post(
         "/api/v1/equipments",
         headers=headers,
         json={
@@ -594,6 +648,7 @@ def test_dh36_ingestion_rejects_unknown_barcode(client) -> None:
             "type": "Automate",
         },
     )
+    _qualify_synthetic_dh36(equipment_response.json()["id"])
 
     response = client.post(
         "/api/v1/dh36/ingest",
@@ -871,7 +926,7 @@ def test_technician_cannot_sign_result_report(client) -> None:
     assert response.status_code == 403
 
 
-def test_malaria_analysis_is_queued_processed_and_audited(client) -> None:
+def test_malaria_analysis_fails_closed_without_qualified_model(client) -> None:
     headers = _auth_headers(client)
     patient = client.post(
         "/api/v1/patients",
@@ -915,27 +970,30 @@ def test_malaria_analysis_is_queued_processed_and_audited(client) -> None:
     )
     assert process_response.status_code == 200, process_response.text
     processed_job = process_response.json()
-    assert processed_job["status"] == "completed"
-    assert processed_job["prediction_label"] == "positive"
-    assert processed_job["confidence"] >= 0.9
+    assert processed_job["status"] == "failed"
+    assert processed_job["prediction_label"] is None
+    assert processed_job["confidence"] is None
+    assert processed_job["error_message"] == "ClinicalModelUnavailableError"
 
     result_response = client.get(f"/api/v1/results/{result['id']}", headers=headers)
     assert result_response.status_code == 200
     result_payload = result_response.json()
-    assert result_payload["data_points"]["malaria_ai"]["label"] == "positive"
-    assert result_payload["is_critical"] is True
+    assert result_payload["data_points"] == {}
+    assert result_payload["is_critical"] is False
 
-    duplicate_enqueue = client.post(
+    retry_enqueue = client.post(
         f"/api/v1/imaging/malaria/analyze/{result['id']}",
         headers=headers,
     )
-    assert duplicate_enqueue.status_code == 202
-    assert duplicate_enqueue.json()["id"] == job["id"]
+    assert retry_enqueue.status_code == 202
+    assert retry_enqueue.json()["status"] == "queued"
+    assert retry_enqueue.json()["id"] != job["id"]
 
     audit_response = client.get("/api/v1/audit-events", headers=headers)
     event_types = [event["event_type"] for event in audit_response.json()["items"]]
     assert "malaria.analysis.enqueue" in event_types
-    assert "malaria.analysis.complete" in event_types
+    assert "malaria.analysis.fail" in event_types
+    assert "malaria.analysis.complete" not in event_types
 
 
 def test_malaria_analysis_requires_microscope_image(client) -> None:

@@ -29,6 +29,7 @@ from app.schemas.bnpl import (
     BNPLSummary,
 )
 from app.services.accounting_service import apply_bnpl_installment_to_invoice
+from app.services.audit import log_audit_event
 from app.services.bnpl_tracker import BNPLTracker
 
 logger = logging.getLogger(__name__)
@@ -48,15 +49,26 @@ _tracker = BNPLTracker()
 def create_schedule(
     payload: BNPLScheduleCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(require_finance),
+    current_user: User = Depends(require_finance),
 ) -> BNPLScheduleOut:
     """Crée un plan BNPL avec ses échéances."""
-    result = _tracker.create_schedule(db, payload)
+    result = _tracker.create_schedule(db, payload, commit=False)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="bnpl.schedule.create",
+        entity_type="bnpl_schedule",
+        entity_id=str(result.id),
+        payload={
+            "total_amount_xof": result.total_amount_xof,
+            "installment_months": result.installment_months,
+        },
+    )
+    db.commit()
     logger.info(
         "bnpl.schedule.created",
         extra={
             "schedule_id": result.id,
-            "patient_ref": result.patient_ref,
             "total_amount_xof": result.total_amount_xof,
             "installment_months": result.installment_months,
         },
@@ -95,7 +107,7 @@ def record_payment(
     schedule_id: int,
     payload: BNPLPaymentCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(require_finance),
+    current_user: User = Depends(require_finance),
 ) -> BNPLPaymentOut:
     """Enregistre le paiement d'une échéance BNPL."""
     result = _tracker.record_payment(
@@ -103,9 +115,24 @@ def record_payment(
         schedule_id,
         payload.installment_number,
         payload.amount_xof,
+        commit=False,
     )
     # Cohérence comptable : répercute l'échéance sur la facture liée (le cas échéant).
-    apply_bnpl_installment_to_invoice(db, schedule_id, payload.amount_xof)
+    invoice = apply_bnpl_installment_to_invoice(db, schedule_id, payload.amount_xof)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="bnpl.payment.record",
+        entity_type="bnpl_payment",
+        entity_id=str(result.id),
+        payload={
+            "schedule_id": schedule_id,
+            "installment_number": payload.installment_number,
+            "amount_xof": payload.amount_xof,
+            "invoice_id": invoice.id if invoice is not None else None,
+        },
+    )
+    db.commit()
     logger.info(
         "bnpl.payment.recorded",
         extra={

@@ -27,6 +27,7 @@ def _issue_tokens(user: User, db: Session, scopes: list[str] | None = None) -> T
         user.username,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
         scopes=scopes,
+        auth_version=user.auth_version,
     )
     raw_refresh = create_refresh_token()
     expires_at = utcnow_naive() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
@@ -45,7 +46,7 @@ def login_access_token(
     db: Session = Depends(get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Token:
-    user = db.query(User).filter(User.username == form_data.username).first()
+    user = db.query(User).filter(User.username == form_data.username).with_for_update().first()
     authenticated = bool(user and verify_password(form_data.password, user.hashed_password))
     record_auth_attempt(authenticated)
 
@@ -71,11 +72,20 @@ def refresh_access_token(payload: RefreshRequest, db: Session = Depends(get_db))
     a stolen token.
     """
     token_hash = hash_token(payload.refresh_token)
+    db_token = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+
+    if not db_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token invalide ou expire.",
+        )
+
+    # Ordre de verrouillage partagé avec les mises à jour de compte :
+    # utilisateur, puis refresh token. Il sérialise la rotation avec une
+    # révocation globale sans créer d'interblocage.
+    user = db.query(User).filter(User.id == db_token.user_id).with_for_update().first()
     db_token = (
-        db.query(RefreshToken)
-        .filter(RefreshToken.token_hash == token_hash)
-        .with_for_update()
-        .first()
+        db.query(RefreshToken).filter(RefreshToken.id == db_token.id).with_for_update().first()
     )
 
     if not db_token or not db_token.is_valid:
@@ -84,7 +94,6 @@ def refresh_access_token(payload: RefreshRequest, db: Session = Depends(get_db))
             detail="Refresh token invalide ou expire.",
         )
 
-    user = db.query(User).filter(User.id == db_token.user_id).first()
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

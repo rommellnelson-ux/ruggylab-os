@@ -29,6 +29,7 @@ class ResultCreate(BaseModel):
 
 class ResultRead(ResultBase):
     id: int
+    result_type: str | None = None
     validator_id: int | None = None
     is_validated: bool = False
     critical_ack_at: dt.datetime | None = None
