@@ -83,14 +83,22 @@ def test_r6_analyzer_replay_reports_the_persisted_sample(client) -> None:
         data_points={"HGB": {"value": 13.2, "unit": "g/dL"}},
     )
     with SessionLocal() as db:
-        register_synthetic_qualified_equipment(
+        _equipment, _interface, qualification = register_synthetic_qualified_equipment(
             db,
             asset_identifier=payload.analyzer_id,
             analyte_codes={"HGB"},
         )
+        qualification_id = qualification.id
 
     with SessionLocal() as db:
         created = ingest_analyzer_result(db, payload)
+
+    suspended = client.post(
+        f"/api/v1/equipments/qualifications/{qualification_id}/suspend",
+        headers=headers,
+        json={"reason": "incident"},
+    )
+    assert suspended.status_code == 200, suspended.text
 
     replay = payload.model_copy(update={"sample_barcode": other_sample["barcode"]})
     with SessionLocal() as db:
@@ -120,12 +128,13 @@ def test_r6_dh36_stock_rejection_does_not_complete_sample(client) -> None:
     with SessionLocal() as db:
         stored_equipment = db.get(Equipment, equipment.json()["id"])
         assert stored_equipment is not None
-        register_synthetic_qualified_equipment(
+        _equipment, _interface, qualification = register_synthetic_qualified_equipment(
             db,
             equipment=stored_equipment,
             asset_identifier=f"synthetic-dh36-{_uid()}",
             analyte_codes={"WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT"},
         )
+        qualification_id = qualification.id
     reagent = client.post(
         "/api/v1/reagents",
         headers=headers,
@@ -151,22 +160,37 @@ def test_r6_dh36_stock_rejection_does_not_complete_sample(client) -> None:
     )
     assert ratio.status_code == 201, ratio.text
 
+    raw_message = _dh36_message(
+        sample["barcode"],
+        f"R6-DH36-MSG-{_uid()}",
+        serial,
+    )
     response = client.post(
         "/api/v1/dh36/ingest",
         headers=headers,
-        json={
-            "raw_message": _dh36_message(
-                sample["barcode"],
-                f"R6-DH36-MSG-{_uid()}",
-                serial,
-            )
-        },
+        json={"raw_message": raw_message},
     )
 
     assert response.status_code == 202, response.text
     assert response.json()["status"] == "rejected"
     assert response.json()["result_id"] is None
     assert "Stock reactif insuffisant" in response.json()["rejection_reason"]
+
+    suspended = client.post(
+        f"/api/v1/equipments/qualifications/{qualification_id}/suspend",
+        headers=headers,
+        json={"reason": "incident"},
+    )
+    assert suspended.status_code == 200, suspended.text
+    duplicate = client.post(
+        "/api/v1/dh36/ingest",
+        headers=headers,
+        json={"raw_message": raw_message},
+    )
+    assert duplicate.status_code == 202, duplicate.text
+    assert duplicate.json()["status"] == "duplicate"
+    assert duplicate.json()["message_id"] == response.json()["message_id"]
+
     with SessionLocal() as db:
         stored_sample = db.get(Sample, sample["id"])
         stored_reagent = db.get(Reagent, reagent.json()["id"])

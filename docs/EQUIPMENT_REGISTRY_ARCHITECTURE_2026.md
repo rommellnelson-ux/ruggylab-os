@@ -40,6 +40,10 @@ d'audit, de validation ou de commit provoque un rollback. Mettre `enabled=true`
 par schéma d'entrée est impossible : seul le service `enable_interface` peut
 effectuer cette transition.
 
+L'allocation d'une nouvelle version verrouille la ligne `Equipment` : deux
+versions concurrentes du même équipement reçoivent ainsi des numéros distincts
+et ordonnés sous PostgreSQL.
+
 L'activation du registre ne démarre aucun listener, n'ouvre aucun port et ne
 modifie aucune machine. Le démarrage opérationnel demeure un acte de
 déploiement/commissioning distinct et non autorisé par ce lot.
@@ -85,6 +89,10 @@ aussi la ligne d'interface jusqu'au commit de l'ingestion.
 
 `dh36_ingestion` exige une identité unique correspondant au numéro transmis,
 applique la même vérification de readiness et refuse un analyte hors périmètre.
+Pour les deux flux, un rejeu déjà persisté est d'abord reconnu par la piste
+d'idempotence et renvoie la réponse historique sans nouvelle écriture clinique,
+même si l'interface a été suspendue depuis. Tout nouveau message reste soumis
+aux contrôles courants avant stockage clinique.
 Le flag global DH36 et les listeners restent désactivés par défaut. Le POCT
 reste fail-closed ; aucun profil réel n'est créé par la migration.
 

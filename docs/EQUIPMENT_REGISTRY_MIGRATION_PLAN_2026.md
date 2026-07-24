@@ -37,6 +37,7 @@ conserver la base migrée jusqu'à décision DBA/qualité.
 - PostgreSQL 16 : upgrade, downgrade base, upgrade head dans le job CI.
 - PostgreSQL 16 : transaction de registre et rollback vérifiés depuis une
   nouvelle session.
+- PostgreSQL 16 : allocation concurrente des versions sérialisée par équipement.
 - Head unique contrôlé par Alembic et `pg_restore_verify.ps1`.
 
 ## Rollback applicatif

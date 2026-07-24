@@ -81,17 +81,6 @@ def _existing_result_id(db: Session, key: str) -> int | None:
 
 def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
     """Crée un résultat depuis un middleware automate, avec idempotence."""
-    try:
-        equipment, interface = find_usable_analyzer_equipment(
-            db, asset_identifier=payload.analyzer_id
-        )
-        assert_analytes_authorized(
-            db,
-            interface=interface,
-            analyte_codes=set(payload.data_points),
-        )
-    except EquipmentRegistryError as exc:
-        raise AnalyzerIngestionError(str(exc)) from exc
     key = analyzer_idempotency_key(payload)
     _lock_idempotency_key(db, key)
     duplicate_result_id = _existing_result_id(db, key)
@@ -110,6 +99,18 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
             "idempotency_key": key,
             "message": "Message automate deja integre.",
         }
+
+    try:
+        equipment, interface = find_usable_analyzer_equipment(
+            db, asset_identifier=payload.analyzer_id
+        )
+        assert_analytes_authorized(
+            db,
+            interface=interface,
+            analyte_codes=set(payload.data_points),
+        )
+    except EquipmentRegistryError as exc:
+        raise AnalyzerIngestionError(str(exc)) from exc
 
     sample = lock_sample_by_barcode(db, payload.sample_barcode)
     if sample is None:

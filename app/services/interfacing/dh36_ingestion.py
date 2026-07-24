@@ -104,6 +104,20 @@ def ingest_dh36_message(
     parser = DH36Parser(raw_message)
     info = parser.get_info()
     message_control_id = info.get("message_control_id")
+    duplicate_query = db.query(DH36InboundMessage).filter(
+        DH36InboundMessage.raw_hash == message_hash
+    )
+    if message_control_id:
+        duplicate_query = db.query(DH36InboundMessage).filter(
+            or_(
+                DH36InboundMessage.raw_hash == message_hash,
+                DH36InboundMessage.message_control_id == message_control_id,
+            )
+        )
+    existing = duplicate_query.first()
+    if existing:
+        return _duplicate_outcome(db, existing, user=user)
+
     equipment_query = db.query(Equipment).filter(Equipment.name == DH36_EQUIPMENT_NAME)
     equipment_serial = info.get("equipment_serial")
     if equipment_serial:
@@ -123,20 +137,6 @@ def ingest_dh36_message(
         )
     equipment = equipment_candidates[0]
     interface = assert_equipment_interface_usable(db, equipment=equipment)
-
-    duplicate_query = db.query(DH36InboundMessage).filter(
-        DH36InboundMessage.raw_hash == message_hash
-    )
-    if message_control_id:
-        duplicate_query = db.query(DH36InboundMessage).filter(
-            or_(
-                DH36InboundMessage.raw_hash == message_hash,
-                DH36InboundMessage.message_control_id == message_control_id,
-            )
-        )
-    existing = duplicate_query.first()
-    if existing:
-        return _duplicate_outcome(db, existing, user=user)
 
     message = DH36InboundMessage(
         raw_hash=message_hash,

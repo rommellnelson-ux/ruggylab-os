@@ -833,6 +833,7 @@ def create_new_qualification_version(
             "qualification_already_superseded",
             "Cette qualification a deja une version de remplacement.",
         )
+    _equipment_or_error(db, previous.equipment_id, for_update=True)
     _validate_document_ids(
         db,
         equipment_id=previous.equipment_id,
