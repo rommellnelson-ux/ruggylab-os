@@ -37,6 +37,11 @@ registre `Equipment` ne porte pas encore une qualification versionnée.
 | CI PR #80 après correctifs | `30048611087`, succès sur `f938030` |
 | Lot auto-validation | PR #104, CI `30048739217`, fusion `5f8b652` |
 | Lot fail-closed appareils/clinique | PR #107, CI `30056391313`, fusion `631396d` |
+| Dossier parc réel / commissioning | PR #108, CI `30057335660`, fusion `4c7fa35b` |
+| Qualification cumulative du contenu | Head `4c7fa35b`, CI PR #80 `30078281184`, succès |
+
+La référence normative finale reste le head courant de la PR #80 ; tout commit
+de preuve ultérieur doit à son tour obtenir une CI cumulative verte.
 
 Le commit unique de `main` absent du head initial est un changement
 `.github/dependabot.yml` (`e96b63c`), antérieur de quelques minutes au commit

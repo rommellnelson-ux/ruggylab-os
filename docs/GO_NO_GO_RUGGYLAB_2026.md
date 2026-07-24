@@ -29,13 +29,18 @@ CLINIQUE**.
 - Documentation auto-validation : PR #104, CI `30048739217`, fusion `5f8b652`.
 - Fail-closed interfaces/POCT/qualitatif/paludisme : PR #107, head `66c4ecf`,
   CI `30056391313` verte, fusion feature `631396d`.
+- Dossier parc réel et commissioning : PR #108, head `12b953a`, CI
+  `30057335660` verte, fusion feature `4c7fa35b`.
 - Correctifs techniques :
   - PR #102 — formatage Ruff documentaire ;
   - PR #100 — Actions et Playwright Node 24 ;
   - PR #103 — test métriques déterministe ;
   - PR #101 — Pillow 12.3.0, CI `30047965217` verte, aucun avis connu.
-- Head applicatif final et run final : à remplacer après fusion des lots de
-  qualification documentaire.
+- Contenu code + dossier qualifié : `4c7fa35b913037983c77e21f7510ac3a1717970f`,
+  CI cumulative PR #80 `30078281184` verte : 1 311 tests réussis, 15 skips,
+  PostgreSQL, Docker, CodeQL et Playwright réussis.
+- Référence normative finale : le head courant de la PR #80. Toute modification
+  postérieure, y compris de preuve, exige une nouvelle CI verte.
 
 ## Barrières avant pilote
 
