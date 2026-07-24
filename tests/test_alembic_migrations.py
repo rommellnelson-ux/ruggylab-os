@@ -13,7 +13,7 @@ GitHub Actions job).
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 
 @pytest.fixture
@@ -97,6 +97,56 @@ def test_migrations_idempotent_roundtrip(tmp_path):
 
     assert "users" in tables
     assert "refresh_tokens" in tables
+
+
+def test_equipment_registry_migration_preserves_existing_rows(tmp_path):
+    """0039 is additive and must not invent qualifications or interfaces."""
+    db_url = f"sqlite:///{tmp_path / 'equipment_existing.db'}"
+    _run_alembic("upgrade 20260723_0038", db_url)
+    engine = create_engine(db_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO equipments "
+                "(id, name, serial_number, type, location, last_calibration) "
+                "VALUES (901, 'Legacy synthetic equipment', NULL, 'legacy', "
+                "'test-location', NULL)"
+            )
+        )
+    engine.dispose()
+
+    _run_alembic("upgrade head", db_url)
+
+    engine = create_engine(db_url)
+    with engine.connect() as connection:
+        row = (
+            connection.execute(
+                text(
+                    "SELECT name, type, location, manufacturer, model, "
+                    "firmware_version, asset_identifier, clinical_use "
+                    "FROM equipments WHERE id = 901"
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert row["name"] == "Legacy synthetic equipment"
+        assert row["type"] == "legacy"
+        assert row["location"] == "test-location"
+        assert row["manufacturer"] is None
+        assert row["model"] is None
+        assert row["firmware_version"] is None
+        assert row["asset_identifier"] is None
+        assert row["clinical_use"] in (False, 0)
+        assert connection.execute(text("SELECT COUNT(*) FROM equipment_interfaces")).scalar() == 0
+        assert (
+            connection.execute(text("SELECT COUNT(*) FROM equipment_qualifications")).scalar() == 0
+        )
+        assert (
+            connection.execute(text("SELECT COUNT(*) FROM equipment_approved_analytes")).scalar()
+            == 0
+        )
+    engine.dispose()
 
 
 def test_alembic_history_is_linear(tmp_path):

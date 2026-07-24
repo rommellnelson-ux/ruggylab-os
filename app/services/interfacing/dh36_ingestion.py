@@ -8,6 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.models import DH36InboundMessage, Equipment, Patient, Result, Sample, User
 from app.services.audit import log_audit_event
+from app.services.equipment_registry import (
+    EquipmentRegistryError,
+    assert_analytes_authorized,
+    assert_equipment_interface_usable,
+)
 from app.services.interfacing.dymind_dh36 import DH36Parser
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.sample_workflow import CancelledSampleError, ensure_sample_processable
@@ -99,6 +104,25 @@ def ingest_dh36_message(
     parser = DH36Parser(raw_message)
     info = parser.get_info()
     message_control_id = info.get("message_control_id")
+    equipment_query = db.query(Equipment).filter(Equipment.name == DH36_EQUIPMENT_NAME)
+    equipment_serial = info.get("equipment_serial")
+    if equipment_serial:
+        equipment_query = equipment_query.filter(Equipment.serial_number == equipment_serial)
+    equipment_candidates = equipment_query.order_by(Equipment.id).all()
+    if not equipment_candidates:
+        raise EquipmentRegistryError(
+            "dh36_equipment_not_registered",
+            "Equipement Dymind DH36 non enregistre.",
+            http_status=422,
+        )
+    if len(equipment_candidates) != 1:
+        raise EquipmentRegistryError(
+            "dh36_equipment_ambiguous",
+            "L'identite du DH36 ne designe pas un equipement unique.",
+            http_status=422,
+        )
+    equipment = equipment_candidates[0]
+    interface = assert_equipment_interface_usable(db, equipment=equipment)
 
     duplicate_query = db.query(DH36InboundMessage).filter(
         DH36InboundMessage.raw_hash == message_hash
@@ -118,7 +142,7 @@ def ingest_dh36_message(
         raw_hash=message_hash,
         message_control_id=message_control_id,
         sample_barcode=info.get("barcode"),
-        equipment_serial=info.get("equipment_serial"),
+        equipment_serial=equipment_serial,
         status="received",
         raw_message=raw_message.strip(),
     )
@@ -164,23 +188,6 @@ def ingest_dh36_message(
             user=user,
         )
 
-    equipment_query = db.query(Equipment).filter(Equipment.name == DH36_EQUIPMENT_NAME)
-    if message.equipment_serial:
-        equipment_query = equipment_query.filter(
-            or_(
-                Equipment.serial_number == message.equipment_serial,
-                Equipment.serial_number.is_(None),
-            )
-        )
-    equipment = equipment_query.order_by(Equipment.serial_number.desc()).first()
-    if not equipment:
-        return _reject(
-            db,
-            message,
-            reason="Equipement Dymind DH36 non enregistre.",
-            user=user,
-        )
-
     analysis_date = utcnow_naive()
     results_raw = parser.parse_results()
     if not results_raw:
@@ -188,6 +195,19 @@ def ingest_dh36_message(
             db,
             message,
             reason="Message DH36 sans resultats OBX exploitables.",
+            user=user,
+        )
+    try:
+        assert_analytes_authorized(
+            db,
+            interface=interface,
+            analyte_codes=set(results_raw),
+        )
+    except EquipmentRegistryError:
+        return _reject(
+            db,
+            message,
+            reason="Message DH36 hors du perimetre analytique approuve.",
             user=user,
         )
 

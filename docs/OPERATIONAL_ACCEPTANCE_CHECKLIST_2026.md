@@ -9,7 +9,7 @@ la fusion dans `main`, ni le déploiement, ni le redémarrage d'un worker local.
 - Environnement : ______________________________
 - SHA Git : ___________________________________
 - Digest image : _______________________________
-- Head Alembic attendu : `20260723_0038`
+- Head Alembic attendu : `20260724_0039`
 - Date UTC : __________________________________
 - Responsable qualification : _________________
 
@@ -41,7 +41,7 @@ Preuves : ______________________________________
 
 - [ ] Version supportée et stockage persistant.
 - [ ] Compte applicatif au moindre privilège.
-- [ ] `upgrade head` réussi jusqu'à `20260723_0038`.
+- [ ] `upgrade head` réussi jusqu'à `20260724_0039`.
 - [ ] `downgrade base` puis nouvel `upgrade head` réussis sur base jetable.
 - [ ] Chaîne Alembic linéaire, sans head concurrent.
 - [ ] Sauvegarde de test produite avec SHA-256.

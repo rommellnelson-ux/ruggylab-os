@@ -16,16 +16,23 @@ from app.models import (
     AuditEvent,
     DH36InboundMessage,
     Equipment,
+    EquipmentApprovedAnalyte,
+    EquipmentDocument,
+    EquipmentInterface,
+    EquipmentQualification,
     EquipmentReagentRatio,
     Patient,
     Reagent,
     Result,
     Sample,
     StockMovement,
+    User,
+    UserRole,
 )
 from app.schemas.analyzer import AnalyzerResultIngest
 from app.services.analyzer_ingestion import analyzer_idempotency_key, ingest_analyzer_result
 from app.services.interfacing.dh36_ingestion import ingest_dh36_message
+from tests.equipment_registry_testkit import register_synthetic_qualified_equipment
 
 pytestmark = pytest.mark.skipif(
     engine.dialect.name != "postgresql",
@@ -66,11 +73,26 @@ def test_r6_concurrent_analyzer_replay_creates_one_result(monkeypatch) -> None:
             patient=patient,
             status="Recu",
         )
-        setup.add_all([patient, sample])
-        setup.commit()
+        actor = User(
+            username=f"r6-an-actor-{suffix}",
+            hashed_password="synthetic-test-hash",
+            role=UserRole.ADMIN,
+        )
+        setup.add_all([patient, sample, actor])
+        setup.flush()
+        equipment, interface, qualification = register_synthetic_qualified_equipment(
+            setup,
+            asset_identifier=f"r6-analyzer-{suffix}",
+            analyte_codes={"HGB"},
+            actor=actor,
+        )
         patient_id = patient.id
         sample_id = sample.id
         barcode = sample.barcode
+        equipment_id = equipment.id
+        interface_id = interface.id
+        qualification_id = qualification.id
+        actor_id = actor.id
 
     payload = AnalyzerResultIngest(
         analyzer_id=f"r6-analyzer-{suffix}",
@@ -139,6 +161,22 @@ def test_r6_concurrent_analyzer_replay_creates_one_result(monkeypatch) -> None:
             cleanup.query(Patient).filter(Patient.id == patient_id).delete(
                 synchronize_session=False
             )
+            cleanup.query(EquipmentApprovedAnalyte).filter(
+                EquipmentApprovedAnalyte.qualification_id == qualification_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentQualification).filter(
+                EquipmentQualification.id == qualification_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentDocument).filter(
+                EquipmentDocument.equipment_id == equipment_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentInterface).filter(EquipmentInterface.id == interface_id).delete(
+                synchronize_session=False
+            )
+            cleanup.query(Equipment).filter(Equipment.id == equipment_id).delete(
+                synchronize_session=False
+            )
+            cleanup.query(User).filter(User.id == actor_id).delete(synchronize_session=False)
             cleanup.commit()
 
 
@@ -176,13 +214,28 @@ def test_r6_concurrent_dh36_replay_returns_duplicate_and_consumes_once(monkeypat
             adjustment_factor=1.0,
             is_active=True,
         )
-        setup.add_all([patient, sample, equipment, reagent, ratio])
-        setup.commit()
+        actor = User(
+            username=f"r6-dh36-actor-{suffix}",
+            hashed_password="synthetic-test-hash",
+            role=UserRole.ADMIN,
+        )
+        setup.add_all([patient, sample, equipment, reagent, ratio, actor])
+        setup.flush()
+        _equipment, interface, qualification = register_synthetic_qualified_equipment(
+            setup,
+            equipment=equipment,
+            asset_identifier=f"synthetic-r6-dh36-{suffix}",
+            analyte_codes={"WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT"},
+            actor=actor,
+        )
         patient_id = patient.id
         sample_id = sample.id
         equipment_id = equipment.id
         reagent_id = reagent.id
         ratio_id = ratio.id
+        interface_id = interface.id
+        qualification_id = qualification.id
+        actor_id = actor.id
         barcode = sample.barcode
         serial = equipment.serial_number
 
@@ -282,10 +335,23 @@ def test_r6_concurrent_dh36_replay_returns_duplicate_and_consumes_once(monkeypat
             cleanup.query(Patient).filter(Patient.id == patient_id).delete(
                 synchronize_session=False
             )
+            cleanup.query(EquipmentApprovedAnalyte).filter(
+                EquipmentApprovedAnalyte.qualification_id == qualification_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentQualification).filter(
+                EquipmentQualification.id == qualification_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentDocument).filter(
+                EquipmentDocument.equipment_id == equipment_id
+            ).delete(synchronize_session=False)
+            cleanup.query(EquipmentInterface).filter(EquipmentInterface.id == interface_id).delete(
+                synchronize_session=False
+            )
             cleanup.query(Equipment).filter(Equipment.id == equipment_id).delete(
                 synchronize_session=False
             )
             cleanup.query(Reagent).filter(Reagent.id == reagent_id).delete(
                 synchronize_session=False
             )
+            cleanup.query(User).filter(User.id == actor_id).delete(synchronize_session=False)
             cleanup.commit()

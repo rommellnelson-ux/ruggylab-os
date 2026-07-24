@@ -11,6 +11,18 @@
 - [ ] Uniquement des identifiants, échantillons et messages synthétiques.
 - [ ] Sauvegarde, rollback, journalisation et critères d'arrêt définis.
 
+## Registre RuggyLab
+
+- [ ] Identité complétée par un ADMIN, sans valeur supposée.
+- [ ] Interface enregistrée avec `enabled=false` et référence expurgée.
+- [ ] Documents autorisés enregistrés par métadonnées uniquement.
+- [ ] Brouillon versionné avec analytes, méthodes, types et unités signés.
+- [ ] Soumission et snapshot technique exact contrôlés.
+- [ ] Approbation OFFICER/ADMIN distincte de l'activation ADMIN.
+- [ ] Suspension, expiration ou changement technique interdisent l'usage.
+- [ ] Audit minimal présent dans la même transaction.
+- [ ] Aucun listener, port ou service démarré par l'activation du registre.
+
 ## Fiche de preuve par scénario
 
 | Champ | Valeur |
@@ -107,3 +119,5 @@
       driver et version de configuration.
 - [ ] L'activation est explicitement approuvée ; sinon le statut reste
       **NON ACTIVABLE EN CLINIQUE**.
+- [ ] La migration seule ne vaut pas commissioning : tous les appareils réels
+      restent **NON QUALIFIÉS / NON ACTIVABLES EN CLINIQUE**.

@@ -7,9 +7,10 @@ import uuid
 import pytest
 
 from app.db.session import SessionLocal
-from app.models import DH36InboundMessage, Reagent, Result, Sample, StockMovement
+from app.models import DH36InboundMessage, Equipment, Reagent, Result, Sample, StockMovement
 from app.schemas.analyzer import AnalyzerResultIngest
 from app.services.analyzer_ingestion import ingest_analyzer_result
+from tests.equipment_registry_testkit import register_synthetic_qualified_equipment
 
 
 def _uid() -> str:
@@ -81,6 +82,12 @@ def test_r6_analyzer_replay_reports_the_persisted_sample(client) -> None:
         exam_code="NFS",
         data_points={"HGB": {"value": 13.2, "unit": "g/dL"}},
     )
+    with SessionLocal() as db:
+        register_synthetic_qualified_equipment(
+            db,
+            asset_identifier=payload.analyzer_id,
+            analyte_codes={"HGB"},
+        )
 
     with SessionLocal() as db:
         created = ingest_analyzer_result(db, payload)
@@ -110,6 +117,15 @@ def test_r6_dh36_stock_rejection_does_not_complete_sample(client) -> None:
         json={"name": "Dymind DH36", "serial_number": serial, "type": "Automate"},
     )
     assert equipment.status_code == 201, equipment.text
+    with SessionLocal() as db:
+        stored_equipment = db.get(Equipment, equipment.json()["id"])
+        assert stored_equipment is not None
+        register_synthetic_qualified_equipment(
+            db,
+            equipment=stored_equipment,
+            asset_identifier=f"synthetic-dh36-{_uid()}",
+            analyte_codes={"WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT"},
+        )
     reagent = client.post(
         "/api/v1/reagents",
         headers=headers,

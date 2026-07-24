@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.models import AuditEvent, ExamOrder, Result, Sample, StockMovement
+from app.models import AuditEvent, Equipment, ExamOrder, Result, Sample, StockMovement
+from tests.equipment_registry_testkit import register_synthetic_qualified_equipment
 
 
 class _SampleData(TypedDict):
@@ -264,6 +265,12 @@ def test_cancelled_sample_rejects_analyzer_result(client: TestClient) -> None:
     settings.ANALYZER_ALLOWED_IPS = []
     settings.ANALYZER_HMAC_SECRET = None
     message_id = f"CANCELLED-MSG-{uuid.uuid4().hex[:8]}"
+    with SessionLocal() as db:
+        register_synthetic_qualified_equipment(
+            db,
+            asset_identifier="synthetic-analyzer",
+            analyte_codes={"SYNTHETIC"},
+        )
     try:
         response = client.post(
             "/api/v1/analyzer/results",
@@ -292,11 +299,20 @@ def test_cancelled_sample_is_rejected_and_traced_by_dh36(client: TestClient) -> 
     headers = _admin(client)
     sample = _sample(client, headers)
     serial = f"CANCELLED-DH36-{uuid.uuid4().hex[:8]}"
-    client.post(
+    equipment_response = client.post(
         "/api/v1/equipments",
         headers=headers,
         json={"name": "Dymind DH36", "serial_number": serial, "type": "Automate"},
     )
+    with SessionLocal() as db:
+        equipment = db.get(Equipment, equipment_response.json()["id"])
+        assert equipment is not None
+        register_synthetic_qualified_equipment(
+            db,
+            equipment=equipment,
+            asset_identifier=f"synthetic-cancelled-dh36-{uuid.uuid4().hex[:8]}",
+            analyte_codes={"WBC", "RBC", "HGB", "HCT", "MCV", "MCH", "MCHC", "PLT"},
+        )
 
     response = client.post(
         "/api/v1/dh36/ingest",

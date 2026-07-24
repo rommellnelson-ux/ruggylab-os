@@ -15,6 +15,11 @@ from app.services.audit import log_audit_event
 from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
+from app.services.equipment_registry import (
+    EquipmentRegistryError,
+    assert_analytes_authorized,
+    find_usable_analyzer_equipment,
+)
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.reference_checker import compute_flags
 from app.services.sample_workflow import (
@@ -76,6 +81,17 @@ def _existing_result_id(db: Session, key: str) -> int | None:
 
 def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
     """Crée un résultat depuis un middleware automate, avec idempotence."""
+    try:
+        equipment, interface = find_usable_analyzer_equipment(
+            db, asset_identifier=payload.analyzer_id
+        )
+        assert_analytes_authorized(
+            db,
+            interface=interface,
+            analyte_codes=set(payload.data_points),
+        )
+    except EquipmentRegistryError as exc:
+        raise AnalyzerIngestionError(str(exc)) from exc
     key = analyzer_idempotency_key(payload)
     _lock_idempotency_key(db, key)
     duplicate_result_id = _existing_result_id(db, key)
@@ -116,6 +132,7 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
     flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
     result = Result(
         sample_id=sample.id,
+        equipment_id=equipment.id,
         analysis_date=analysis_date,
         data_points=payload.data_points,
         is_validated=True,

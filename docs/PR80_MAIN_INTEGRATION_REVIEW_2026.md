@@ -32,7 +32,7 @@ registre `Equipment` ne porte pas encore une qualification versionnée.
 | Base initiale | `e96b63ccc902b7dad664ac44ba92ea7a86699485` |
 | Head initial audité | `856226251fa835cc433e097c6ac62e1b582e9133` |
 | CI initiale | `30032100788`, événement `pull_request`, succès |
-| Head Alembic | `20260723_0038` |
+| Head Alembic | `20260724_0039` |
 | Head applicatif après correctifs techniques | `f938030274045d61169e422f94819723b849c04f` |
 | CI PR #80 après correctifs | `30048611087`, succès sur `f938030` |
 | Lot auto-validation | PR #104, CI `30048739217`, fusion `5f8b652` |
@@ -91,12 +91,13 @@ préserver cette traçabilité. Aucun squash/rebase n'est recommandé.
 
 ## 4. Migrations et modèle
 
-La chaîne Alembic est linéaire de 0001 à `20260723_0038`.
+La chaîne Alembic est linéaire de 0001 à `20260724_0039`.
 
 | Migration | Changement | Correspondance modèle |
 |---|---|---|
 | `20260723_0037` | `results.result_type`, nullable et indexé | `Result.result_type` présent. |
 | `20260723_0038` | `users.auth_version`, non-null, défaut 0 | `User.auth_version` présent. |
+| `20260724_0039` | Registre Equipment normalisé, sans activation ni qualification préremplie | Modèles et migration additive présents. |
 
 Contrôles :
 
