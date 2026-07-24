@@ -88,7 +88,7 @@ réelles.
 | PG-01 | Version | Relevé serveur. | Version signée. | Version supportée et identique à la qualification. |
 | PG-02 | Moindre privilège | Tester droits applicatifs/admin/backup. | Matrice de permissions. | Aucun droit superflu. |
 | PG-03 | Stockage | Vérifier volume, croissance, WAL, espace. | Rapport capacité. | Alertes avant saturation. |
-| PG-04 | Migration | Upgrade 0038, downgrade base, upgrade head sur base jetable. | Logs et checksum schéma. | Chaîne linéaire, aucune erreur. |
+| PG-04 | Migration | Upgrade 0039, downgrade base, upgrade head sur base jetable. | Logs et checksum schéma. | Chaîne linéaire, aucune erreur. |
 | PG-05 | Sauvegarde | Produire dump et SHA-256. | Dump de test + manifeste. | Succès et rétention conforme. |
 | PG-06 | Restauration | `pg_restore_verify.ps1` sur base scratch allowlistée. | Rapport `SUCCÈS`. | Huit contrôles conformes. |
 | PG-07 | Rétention | Simuler rotation. | Inventaire avant/après. | Aucun dump requis supprimé. |
@@ -113,7 +113,7 @@ réelles.
 |---|---|---|---|---|
 | APP-01 | Image immuable | Vérifier digest et provenance CI. | Digest/attestation. | Aucun `latest`. |
 | APP-02 | Secrets | Contrôle de présence sans afficher les valeurs. | Checklist. | Valeurs non-démo et permissions minimales. |
-| APP-03 | Migrations | Service run-once puis vérification readiness. | Log expurgé. | Head 0038. |
+| APP-03 | Migrations | Service run-once puis vérification readiness. | Log expurgé. | Head 0039. |
 | APP-04 | Web | Health, readiness, TLS et routes. | Rapport. | Vert. |
 | APP-05 | Scheduler | Une instance, fonctions attendues. | Processus/métriques. | Pas de singleton dupliqué. |
 | APP-06 | Gateway | Une instance par port/instrument. | Matrice. | Idempotence et authentification conformes. |
@@ -214,7 +214,7 @@ La qualification est recevable seulement si :
 - décision PR80-CLIN-01 ;
 - inventaire de connectivité, matrice d'intégration, registre des manuels et
   checklist de commissioning des appareils ;
-- décision Equipment A/B avant toute migration d'homologation ;
+- décision Equipment B/RBAC consignée ; commissioning signé appareil par appareil ;
 - checklist d'acceptation opérationnelle ;
 - runbook rollback/recovery ;
 - procès-verbal Go/No-Go.

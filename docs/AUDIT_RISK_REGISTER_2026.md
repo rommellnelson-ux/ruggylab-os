@@ -54,6 +54,26 @@
 | EQUIP-OPEN-01 | P1 clinique, intégrité, gouvernance | Le registre permet de documenter et contrôler une qualification, mais aucune preuve, méthode, unité, analyte ou décision clinique réelle n'est créée par cette migration. | Déclarer à tort un appareil « prêt » sans exécuter la procédure de qualification et d'acceptation locale. | Reprise additive sans valeur fabriquée ; toutes les interfaces restent désactivées ; readiness fail-closed ; checklist de commissioning. | Qualification documentée de chaque appareil réel, preuves approuvées et UAT avant activation. | Maintenir **NON QUALIFIÉ / NON ACTIVABLE EN CLINIQUE** et le NO-GO jusqu'à décision humaine. **Ouvert**. |
 | EQUIP-OPEN-02 | P2 intégrité, maintenabilité | L'immutabilité des qualifications soumises ou approuvées et des documents référencés est imposée par les services applicatifs, pas par un déclencheur ou une politique SQL. | Une écriture directe hors services pourrait altérer un snapshot ou une métadonnée de preuve. | Aucun endpoint de suppression ; services refusant les mutations ; relations sans cascade destructive ; audit atomique. | Revue des accès DB, test de contournement hors service et décision sur une protection SQL complémentaire. | Ne pas créer de trigger dans ce lot ; traiter séparément si des écritures directes sont autorisées. **Ouvert**. |
 
+## Registre GitHub des décisions ouvertes
+
+| Risque / décision | Issue |
+|---|---|
+| LAB-OPEN-01 / D1 | [#111](https://github.com/rommellnelson-ux/ruggylab-os/issues/111) |
+| ACQ-OPEN-01 / D2 | [#112](https://github.com/rommellnelson-ux/ruggylab-os/issues/112) |
+| ACQ-OPEN-02 / D3 | [#113](https://github.com/rommellnelson-ux/ruggylab-os/issues/113) |
+| EPI-OPEN-01 / D5 | [#114](https://github.com/rommellnelson-ux/ruggylab-os/issues/114) |
+| FHIR-OPEN-01 / D6 | [#115](https://github.com/rommellnelson-ux/ruggylab-os/issues/115) |
+| AUTH-OPEN-01 / D7 | [#116](https://github.com/rommellnelson-ux/ruggylab-os/issues/116) |
+| RESULT-OPEN-01 / D8 | [#117](https://github.com/rommellnelson-ux/ruggylab-os/issues/117) |
+| FIN-OPEN-01 | [#118](https://github.com/rommellnelson-ux/ruggylab-os/issues/118) |
+| AUTH-OPEN-03 | [#119](https://github.com/rommellnelson-ux/ruggylab-os/issues/119) |
+| AUD-OPEN-01 | [#120](https://github.com/rommellnelson-ux/ruggylab-os/issues/120) |
+| EQUIP-OPEN-01 | [#121](https://github.com/rommellnelson-ux/ruggylab-os/issues/121) |
+| EQUIP-OPEN-02 | [#122](https://github.com/rommellnelson-ux/ruggylab-os/issues/122) |
+
+Ces issues préparent une décision ; elles ne ferment aucun risque et ne
+constituent ni ordre d'implémentation, ni migration, ni autorisation clinique.
+
 ## Contrôles récurrents
 
 - Aucun P0/P1 ne doit être clos sans test synthétique et preuve PostgreSQL quand
