@@ -270,7 +270,7 @@ class TestHorizonPrediction:
         line = predictor.predict(_request([drug])).drug_predictions[0]
         # months_remaining sera très grand mais fini
         assert math.isfinite(line.months_of_stock_remaining)
-        assert line.estimated_rupture_date is not None
+        assert line.estimated_rupture_date == date.max
 
 
 # ===========================================================================
