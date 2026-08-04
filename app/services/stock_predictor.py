@@ -279,9 +279,13 @@ class StockPredictor:
         # Date de rupture estimée
         rupture_date: date | None = None
         if math.isfinite(months_remaining):
-            days_to_rupture = int(months_remaining * DAYS_PER_MONTH)
             max_supported_days = (date.max - ref_date).days
-            rupture_date = ref_date + timedelta(days=min(days_to_rupture, max_supported_days))
+            max_supported_months = max_supported_days / DAYS_PER_MONTH
+            if months_remaining >= max_supported_months:
+                rupture_date = date.max
+            else:
+                days_to_rupture = int(months_remaining * DAYS_PER_MONTH)
+                rupture_date = ref_date + timedelta(days=days_to_rupture)
 
         alert_level = self._compute_alert(months_remaining)
         reorder = months_remaining < SAFETY_STOCK_MONTHS

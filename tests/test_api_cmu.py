@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import pytest
 
+from app.schemas.stock_predictor import MAX_SAFE_QUANTITY_UNITS
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -223,6 +225,24 @@ def test_stock_predict_fhir_bundle_when_requested(client) -> None:
 def test_stock_predict_requires_auth(client) -> None:
     r = client.post("/api/v1/stock/predict", json=_STOCK_PAYLOAD)
     assert r.status_code == 401
+
+
+@pytest.mark.parametrize("field", ["current_stock", "cmm_units"])
+def test_stock_predict_rejects_quantity_above_safe_integer_limit(client, field: str) -> None:
+    drug = {
+        "dci_code": "TEST",
+        "current_stock": 1,
+        "cmm_units": 1,
+    }
+    drug[field] = MAX_SAFE_QUANTITY_UNITS + 1
+
+    r = client.post(
+        "/api/v1/stock/predict",
+        json={"drugs": [drug]},
+        headers=_headers(client),
+    )
+
+    assert r.status_code == 422
 
 
 # ============================================================================
