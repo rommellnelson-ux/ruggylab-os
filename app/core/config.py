@@ -52,7 +52,11 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: str = "admin"
     FIRST_SUPERUSER_PASSWORD: str = DEFAULT_FIRST_SUPERUSER_PASSWORD
     FIRST_SUPERUSER_FULL_NAME: str = "RuggyLab Administrator"
-    ENABLE_DH36_LISTENER: bool = True
+    # Toutes les interfaces d'équipement sont fail-closed par défaut. Leur
+    # activation requiert un profil identifié, un protocole confirmé et une
+    # qualification documentée.
+    ENABLE_DH36_LISTENER: bool = False
+    ENABLE_DH36_INGESTION: bool = False
     # ── Rôle du process (séparation web / tâches de fond) ───────────────────────
     # Détermine quelles tâches de fond ce process exécute, afin d'éviter les
     # duplications quand plusieurs workers web tournent (listener DH36 qui bind un
@@ -69,6 +73,7 @@ class Settings(BaseSettings):
     # /tmp est le seul emplacement toujours inscriptible par l'utilisateur non-root
     # du conteneur ; simple marqueur de vivacité, aucune donnée sensible.
     SCHEDULER_HEARTBEAT_FILE: str = "/tmp/ruggylab_scheduler.heartbeat"  # noqa: S108  # nosec B108
+    ANALYZER_GATEWAY_HEARTBEAT_FILE: str = "/tmp/ruggylab_analyzer_gateway.heartbeat"  # noqa: S108  # nosec B108
     # Fichier de log applicatif. None (défaut) = stdout uniquement — indispensable
     # en conteneur : l'utilisateur non-root ne peut pas créer /app/logs, et Docker
     # assure de toute façon collecte et rotation. Sur un poste nu (Windows), mettre
@@ -85,7 +90,7 @@ class Settings(BaseSettings):
     BASE_DATA_DIR: str = "data"
     MICROSCOPY_STORAGE_DIR: str = "data/microscopy"
     MALARIA_MODEL_PATH: str = "models/malaria_mobilenetv2"
-    MALARIA_ANALYSIS_AUTORUN: bool = True
+    MALARIA_ANALYSIS_AUTORUN: bool = False
 
     # Rate limiting and abuse protection
     RATE_LIMIT_ENABLED: bool = True
@@ -159,17 +164,17 @@ class Settings(BaseSettings):
     # Filet de sécurité avant parseur (Dymind DH36, manuel d'interfaçage en
     # attente) : les trames sont archivées telles quelles dans une liste Redis.
     # Cf. app/services/interfacing/raw_tcp_listener.py. Requiert REDIS_URL.
-    ANALYZER_RAW_LISTENER_ENABLED: bool = True
+    ANALYZER_RAW_LISTENER_ENABLED: bool = False
     ANALYZER_RAW_LISTENER_HOST: str = "127.0.0.1"  # jamais 0.0.0.0 par défaut (cf. DH36)
     ANALYZER_RAW_LISTENER_PORT: int = 9000
     ANALYZER_RAW_ACK_MODE: str = "ack"  # "ack" (ACK 0x06) | "silent" | "close"
     # Un listener par automate (routage par port, cf. services/analyzers/registry).
     # Hématologie = Dymind DH36, Biochimie = Dymind, Immuno = Anbio Bioscann.
-    ANALYZER_HEMATOLOGY_ENABLED: bool = True
+    ANALYZER_HEMATOLOGY_ENABLED: bool = False
     ANALYZER_HEMATOLOGY_PORT: int = 9000
-    ANALYZER_BIOCHEMISTRY_ENABLED: bool = True
+    ANALYZER_BIOCHEMISTRY_ENABLED: bool = False
     ANALYZER_BIOCHEMISTRY_PORT: int = 9001
-    ANALYZER_IMMUNO_ENABLED: bool = True
+    ANALYZER_IMMUNO_ENABLED: bool = False
     ANALYZER_IMMUNO_PORT: int = 9002
     ANALYZER_RAW_QUEUE_KEY: str = "raw_analyzer_frames"
     ANALYZER_RAW_QUEUE_MAXLEN: int = 100_000

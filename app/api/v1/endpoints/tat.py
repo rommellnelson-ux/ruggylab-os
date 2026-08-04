@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models import Result, TatTarget, User
 from app.schemas.tat import ResultTatUpdate, TatTargetCreate, TatTargetRead
 from app.services.audit import log_audit_event
+from app.services.patient_access import can_access_result
 from app.services.tat_service import (
     compute_result_tat,
     compute_tat_dashboard,
@@ -128,10 +129,14 @@ def get_result_tat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> dict:
-    del current_user
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    if not can_access_result(current_user, result):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès au résultat hors de votre périmètre.",
+        )
     target = None
     if result.exam_code:
         target = (
@@ -153,6 +158,11 @@ def update_result_tat(
     result = db.query(Result).filter(Result.id == result_id).first()
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Résultat introuvable.")
+    if not can_access_result(current_user, result):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès au résultat hors de votre périmètre.",
+        )
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
         raise HTTPException(
@@ -190,8 +200,7 @@ def tat_dashboard(
     current_user: User = Depends(get_current_active_user),
 ) -> dict:
     """Indicateurs de performance TAT : par examen, technicien, automate, jour."""
-    del current_user
-    return compute_tat_dashboard(db, days=days)
+    return compute_tat_dashboard(db, days=days, user=current_user)
 
 
 @router.get("/alerts")
@@ -201,5 +210,4 @@ def tat_alerts(
     current_user: User = Depends(get_current_active_user),
 ) -> list[dict]:
     """Résultats récents ayant dépassé leur délai cible (retard modéré ou important)."""
-    del current_user
-    return list_tat_alerts(db, days=days)
+    return list_tat_alerts(db, days=days, user=current_user)

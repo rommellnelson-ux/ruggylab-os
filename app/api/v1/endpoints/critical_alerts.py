@@ -26,11 +26,10 @@ def list_pending_criticals(
     current_user: User = Depends(get_current_active_user),
 ) -> list[dict]:
     """Liste les résultats critiques non-acquittés, avec le délai écoulé."""
-    del current_user
     # Use configured delay if available
     cfg = db.query(NotifConfig).filter(NotifConfig.is_active.is_(True)).first()
     effective_delay = cfg.delay_minutes if cfg else delay_minutes
-    return get_pending_criticals(db, effective_delay)
+    return get_pending_criticals(db, effective_delay, user=current_user)
 
 
 @router.post("/check", response_model=NotifyResult)

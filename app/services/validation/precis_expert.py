@@ -1,19 +1,22 @@
+"""Validateur historique de l'appareil POCT Precis Expert.
+
+Conserve son API publique (utilisée par ``/results/precis-expert``), mais
+délègue désormais les bornes cliniques au catalogue partagé
+``poct_reference`` — source unique également consommée par la route générique
+``/results/poct-batch``.
+"""
+
 import datetime as dt
 
 from app.schemas.dh36_interfacing import RuggylabJSONPoint
 from app.schemas.precis_expert import PrecisExpertJSONB, PrecisExpertManualInput
+from app.services.validation.poct_reference import build_poct_point, calculate_status
+
+__all__ = ["PrecisExpertValidator", "calculate_status", "utcnow_iso"]
 
 
 def utcnow_iso() -> str:
     return dt.datetime.now(dt.UTC).isoformat()
-
-
-def calculate_status(value: float, low: float, high: float) -> str:
-    if value < low:
-        return "L"
-    if value > high:
-        return "H"
-    return "N"
 
 
 class PrecisExpertValidator:
@@ -30,75 +33,20 @@ class PrecisExpertValidator:
         self.user_id = user_id
         self.is_overall_critical = False
 
-    def _point(
-        self,
-        *,
-        value: float,
-        unit: str,
-        low: float,
-        high: float,
-        critical_low: float | None = None,
-        critical_high: float | None = None,
-    ) -> RuggylabJSONPoint:
-        status = calculate_status(value, low, high)
-        is_critical = False
-        if critical_low is not None and value < critical_low:
-            is_critical = True
-        if critical_high is not None and value > critical_high:
-            is_critical = True
-        if is_critical:
+    def _point(self, code: str, value: float, unit: str) -> RuggylabJSONPoint:
+        point = build_poct_point(code, value, unit, self.patient_sex)
+        if point.is_critical:
             self.is_overall_critical = True
-        return RuggylabJSONPoint(
-            value=value,
-            unit=unit,
-            status=status,
-            ref_range=f"{low}-{high}",
-            is_critical=is_critical,
-        )
+        return point
 
     def validate_all(self) -> tuple[PrecisExpertJSONB, bool]:
-        point_glu = self._point(
-            value=self.input.glucose_raw,
-            unit=self.input.glucose_unit,
-            low=0.7,
-            high=1.10,
-            critical_low=0.50,
-            critical_high=3.0,
-        )
-        point_chol = self._point(
-            value=self.input.cholesterol_raw,
-            unit=self.input.cholesterol_unit,
-            low=1.4,
-            high=2.0,
-        )
-        ua_low, ua_high = (35.0, 72.0) if self.patient_sex == "M" else (26.0, 60.0)
-        point_ua = self._point(
-            value=self.input.uric_acid_raw,
-            unit=self.input.uric_acid_unit,
-            low=ua_low,
-            high=ua_high,
-        )
-        point_lac = self._point(
-            value=self.input.lactate_raw,
-            unit=self.input.lactate_unit,
-            low=0.5,
-            high=2.2,
-            critical_high=4.0,
-        )
-        point_ket = self._point(
-            value=self.input.ketones_raw,
-            unit=self.input.ketones_unit,
-            low=0.0,
-            high=0.6,
-        )
-
         return (
             PrecisExpertJSONB(
-                GLU=point_glu,
-                CHOL=point_chol,
-                UA=point_ua,
-                LAC=point_lac,
-                KET=point_ket,
+                GLU=self._point("GLU", self.input.glucose_raw, self.input.glucose_unit),
+                CHOL=self._point("CHOL", self.input.cholesterol_raw, self.input.cholesterol_unit),
+                UA=self._point("UA", self.input.uric_acid_raw, self.input.uric_acid_unit),
+                LAC=self._point("LAC", self.input.lactate_raw, self.input.lactate_unit),
+                KET=self._point("KET", self.input.ketones_raw, self.input.ketones_unit),
                 manual_entry_by=self.user_id,
                 entry_timestamp=utcnow_iso(),
             ),

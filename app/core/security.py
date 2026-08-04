@@ -21,12 +21,21 @@ def get_password_hash(password: str) -> str:
 
 
 def create_access_token(
-    subject: str, expires_delta: timedelta | None = None, scopes: list[str] | None = None
+    subject: str,
+    expires_delta: timedelta | None = None,
+    scopes: list[str] | None = None,
+    auth_version: int = 0,
 ) -> str:
     now = datetime.now(UTC)
     expire = now + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     # jti : identifiant unique du jeton, permet la révocation (denylist) ; iat : émission.
-    to_encode: dict = {"sub": subject, "exp": expire, "iat": now, "jti": uuid.uuid4().hex}
+    to_encode: dict = {
+        "sub": subject,
+        "exp": expire,
+        "iat": now,
+        "jti": uuid.uuid4().hex,
+        "ver": auth_version,
+    }
     if scopes:
         to_encode["scopes"] = scopes
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

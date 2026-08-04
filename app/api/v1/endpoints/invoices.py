@@ -38,6 +38,7 @@ from app.services.accounting_service import (
     finance_summary,
     recompute_status,
 )
+from app.services.audit import log_audit_event
 from app.services.bnpl_tracker import BNPLTracker
 from app.services.invoice_pdf import build_invoice_receipt_pdf
 from app.utils.csv_safety import sanitize_csv_cell
@@ -54,13 +55,20 @@ def _to_read(invoice: Invoice) -> InvoiceRead:
     return read
 
 
-def _get_invoice_or_404(db: Session, invoice_id: int) -> Invoice:
-    invoice = (
+def _get_invoice_or_404(
+    db: Session,
+    invoice_id: int,
+    *,
+    for_update: bool = False,
+) -> Invoice:
+    query = (
         db.query(Invoice)
         .options(selectinload(Invoice.lines), selectinload(Invoice.payments))
         .filter(Invoice.id == invoice_id)
-        .first()
     )
+    if for_update:
+        query = query.with_for_update()
+    invoice = query.first()
     if not invoice:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Facture introuvable.")
     return invoice
@@ -221,7 +229,7 @@ def record_payment(
         raise HTTPException(
             status_code=422, detail=f"Mode de paiement invalide : {payload.method}."
         )
-    invoice = _get_invoice_or_404(db, invoice_id)
+    invoice = _get_invoice_or_404(db, invoice_id, for_update=True)
     if invoice.status == "cancelled":
         raise HTTPException(status_code=409, detail="Facture annulée : encaissement impossible.")
 
@@ -235,6 +243,14 @@ def record_payment(
     )
     invoice.paid_xof = Decimal(invoice.paid_xof or 0) + Decimal(payload.amount_xof)
     recompute_status(invoice)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="invoice.payment.record",
+        entity_type="invoice",
+        entity_id=str(invoice.id),
+        payload={"amount_xof": str(payload.amount_xof), "method": payload.method},
+    )
     db.commit()
     db.refresh(invoice)
     return _to_read(invoice)
@@ -246,13 +262,21 @@ def cancel_invoice(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_finance),
 ) -> InvoiceRead:
-    del current_user
-    invoice = _get_invoice_or_404(db, invoice_id)
+    invoice = _get_invoice_or_404(db, invoice_id, for_update=True)
     if Decimal(invoice.paid_xof or 0) > 0:
         raise HTTPException(
             status_code=409, detail="Facture déjà encaissée : annulation impossible."
         )
+    old_status = invoice.status
     invoice.status = "cancelled"
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="invoice.cancel",
+        entity_type="invoice",
+        entity_id=str(invoice.id),
+        payload={"old_status": old_status},
+    )
     db.commit()
     db.refresh(invoice)
     return _to_read(invoice)
@@ -287,8 +311,7 @@ def create_payment_plan(
     À n'utiliser que lorsque le patient ne peut pas régler comptant : crée un
     plan de paiement fractionné sur le solde et le rattache à la facture.
     """
-    del current_user
-    invoice = _get_invoice_or_404(db, invoice_id)
+    invoice = _get_invoice_or_404(db, invoice_id, for_update=True)
     if invoice.status == "cancelled":
         raise HTTPException(status_code=409, detail="Facture annulée : plan impossible.")
     if invoice.payment_plan_id:
@@ -306,8 +329,20 @@ def create_payment_plan(
             total_amount_xof=int(balance),
             installment_months=payload.installment_months,
         ),
+        commit=False,
     )
     invoice.payment_plan_id = schedule.id
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="invoice.payment_plan.create",
+        entity_type="invoice",
+        entity_id=str(invoice.id),
+        payload={
+            "schedule_id": schedule.id,
+            "installment_months": payload.installment_months,
+        },
+    )
     db.commit()
     return schedule
 
@@ -320,7 +355,7 @@ def refund_credit(
     current_user: User = Depends(require_finance),
 ) -> InvoiceRead:
     """Rembourse un avoir (trop-perçu) : enregistre un mouvement négatif tracé."""
-    invoice = _get_invoice_or_404(db, invoice_id)
+    invoice = _get_invoice_or_404(db, invoice_id, for_update=True)
     credit = credit_of(invoice)
     if credit <= 0:
         raise HTTPException(status_code=409, detail="Aucun avoir à rembourser sur cette facture.")
@@ -339,6 +374,14 @@ def refund_credit(
     )
     invoice.paid_xof = Decimal(invoice.paid_xof or 0) - amount
     recompute_status(invoice)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="invoice.refund",
+        entity_type="invoice",
+        entity_id=str(invoice.id),
+        payload={"amount_xof": str(amount)},
+    )
     db.commit()
     db.refresh(invoice)
     return _to_read(invoice)

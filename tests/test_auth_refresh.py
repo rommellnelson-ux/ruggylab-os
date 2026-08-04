@@ -167,9 +167,9 @@ def test_deactivated_user_refresh_token_is_rejected(client):
         json={"is_active": False},
     )
 
-    # Refresh attempt must fail
+    # The security update revokes existing refresh tokens immediately.
     resp = client.post("/api/v1/login/refresh", json={"refresh_token": refresh_token})
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 def test_reactivated_user_can_login_again(client):
@@ -186,6 +186,75 @@ def test_reactivated_user_can_login_again(client):
         data={"username": "tech_deactivation_test", "password": "Password123!"},
     )
     assert login_resp.status_code == 200
+
+
+def test_password_change_invalidates_existing_session(client):
+    admin_headers = _auth_headers(client)
+    user = _create_technician(client, admin_headers)
+    user_id = user["id"]
+
+    tokens = _login(client, "tech_deactivation_test", "Password123!")
+    old_headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    assert client.get("/api/v1/users/me", headers=old_headers).status_code == 200
+
+    update_resp = client.patch(
+        f"/api/v1/users/{user_id}",
+        headers=admin_headers,
+        json={"password": "NewPassword456!"},
+    )
+    assert update_resp.status_code == 200, update_resp.text
+
+    assert client.get("/api/v1/users/me", headers=old_headers).status_code == 401
+    refresh_resp = client.post(
+        "/api/v1/login/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert refresh_resp.status_code == 401
+
+    old_login = client.post(
+        "/api/v1/login/access-token",
+        data={"username": "tech_deactivation_test", "password": "Password123!"},
+    )
+    assert old_login.status_code == 401
+    new_login = client.post(
+        "/api/v1/login/access-token",
+        data={"username": "tech_deactivation_test", "password": "NewPassword456!"},
+    )
+    assert new_login.status_code == 200
+
+
+def test_reactivation_does_not_resurrect_existing_session(client):
+    admin_headers = _auth_headers(client)
+    user = _create_technician(client, admin_headers)
+    user_id = user["id"]
+    tokens = _login(client, "tech_deactivation_test", "Password123!")
+    old_headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    deactivate_resp = client.patch(
+        f"/api/v1/users/{user_id}",
+        headers=admin_headers,
+        json={"is_active": False},
+    )
+    assert deactivate_resp.status_code == 200, deactivate_resp.text
+    reactivate_resp = client.patch(
+        f"/api/v1/users/{user_id}",
+        headers=admin_headers,
+        json={"is_active": True},
+    )
+    assert reactivate_resp.status_code == 200, reactivate_resp.text
+
+    assert client.get("/api/v1/users/me", headers=old_headers).status_code == 401
+    refresh_resp = client.post(
+        "/api/v1/login/refresh",
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert refresh_resp.status_code == 401
+
+    new_login = client.post(
+        "/api/v1/login/access-token",
+        data={"username": "tech_deactivation_test", "password": "Password123!"},
+    )
+    assert new_login.status_code == 200
 
 
 def test_patch_user_role_and_fullname(client):

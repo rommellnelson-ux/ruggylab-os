@@ -20,7 +20,13 @@ from app.utils.datetime_utils import utcnow_naive
 class BNPLTracker:
     """Gestion des plans de paiement fractionné BNPL."""
 
-    def create_schedule(self, db: Session, data: BNPLScheduleCreate) -> BNPLScheduleOut:
+    def create_schedule(
+        self,
+        db: Session,
+        data: BNPLScheduleCreate,
+        *,
+        commit: bool = True,
+    ) -> BNPLScheduleOut:
         """Crée le plan + génère les N échéances PENDING (due_date = today + n*30j)."""
         # Calcul du montant mensuel (arrondi au XOF entier)
         base_monthly = data.total_amount_xof // data.installment_months
@@ -54,8 +60,11 @@ class BNPLTracker:
             )
             db.add(payment)
 
-        db.commit()
-        db.refresh(schedule)
+        if commit:
+            db.commit()
+            db.refresh(schedule)
+        else:
+            db.flush()
         return BNPLScheduleOut.model_validate(schedule)
 
     def record_payment(
@@ -64,9 +73,13 @@ class BNPLTracker:
         schedule_id: int,
         installment_number: int,
         amount_xof: int,
+        *,
+        commit: bool = True,
     ) -> BNPLPaymentOut:
         """Marque une échéance comme PAID, met à jour le statut du plan si complet."""
-        schedule = db.get(BNPLSchedule, schedule_id)
+        schedule = (
+            db.query(BNPLSchedule).filter(BNPLSchedule.id == schedule_id).with_for_update().first()
+        )
         if not schedule:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -79,6 +92,7 @@ class BNPLTracker:
                 BNPLPayment.schedule_id == schedule_id,
                 BNPLPayment.installment_number == installment_number,
             )
+            .with_for_update()
             .first()
         )
         if not payment:
@@ -106,8 +120,11 @@ class BNPLTracker:
         if not pending_or_late:
             schedule.status = "COMPLETED"
 
-        db.commit()
-        db.refresh(payment)
+        if commit:
+            db.commit()
+            db.refresh(payment)
+        else:
+            db.flush()
         return BNPLPaymentOut.model_validate(payment)
 
     def get_summary(self, db: Session, schedule_id: int) -> BNPLSummary:

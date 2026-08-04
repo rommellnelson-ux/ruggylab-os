@@ -20,10 +20,10 @@ from app.services.critical_checker import _extract_numeric
 from app.utils.datetime_utils import utcnow_naive
 
 # Jetons de flag considérés « normaux ». Deux vocabulaires coexistent dans
-# ``result.flags`` : le court (``compute_flags`` → N/H/L/HH/LL) et le long,
-# écrit par ``apply_bioref_to_result`` (NORMAL/BAS/HAUT/CRITIQUE …/NÉGATIF).
-# L'auto-validateur doit reconnaître les deux, sinon un résultat normal issu
-# du référentiel bioref ne serait jamais auto-validé.
+# ``result.flags`` : le vocabulaire court officiel
+# (``compute_flags`` → N/H/L/HH/LL) et, par tolérance défensive, quelques formes
+# longues historiques (NORMAL/BAS/HAUT/CRITIQUE …/NÉGATIF).
+# Le chemin ``apply_bioref_to_result`` actuel ne modifie pas ``result.flags``.
 _NORMAL_FLAGS = {"N", "NORMAL", "NÉGATIF", "NEGATIF"}
 
 # Clés de ``data_points`` qui ne sont pas des analytes cliniques (métadonnées).

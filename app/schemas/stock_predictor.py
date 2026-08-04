@@ -17,9 +17,11 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from enum import IntEnum, StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 
 from pydantic import BaseModel, Field, field_validator
+
+MAX_SAFE_QUANTITY_UNITS: Final[int] = 2**53 - 1
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -61,8 +63,22 @@ class DrugStockInput(BaseModel):
     """Données brutes d'un médicament pour la prédiction."""
 
     dci_code: Annotated[str, Field(min_length=2, examples=["ARTEMETHER-LUMEFANTRINE"])]
-    current_stock: Annotated[int, Field(ge=0, description="Stock actuel (unités)")]
-    cmm_units: Annotated[int, Field(gt=0, description="CMM de base (unités/mois)")]
+    current_stock: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=MAX_SAFE_QUANTITY_UNITS,
+            description="Stock actuel (unités)",
+        ),
+    ]
+    cmm_units: Annotated[
+        int,
+        Field(
+            gt=0,
+            le=MAX_SAFE_QUANTITY_UNITS,
+            description="CMM de base (unités/mois)",
+        ),
+    ]
     disease_category: DiseaseCategory = DiseaseCategory.GENERAL
     unit_cost_xof: Annotated[
         Decimal | None,

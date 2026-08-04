@@ -6,7 +6,7 @@ the pure business logic in the service and utility modules directly.
 
 import pytest
 
-from app.services.malaria_ai import MobileNetV2Classifier
+from app.services.malaria_ai import ClinicalModelUnavailableError, MobileNetV2Classifier
 from app.services.report_signing import report_hash
 from app.services.validation.med_logic import (
     _build_overall_flags,
@@ -250,35 +250,31 @@ class TestBuildOverallFlags:
 class TestMobileNetV2Classifier:
     classifier = MobileNetV2Classifier("models/fake")
 
-    def test_positive_keyword_in_url(self):
-        pred = self.classifier.predict("data/microscopy/sample_positive.tiff")
-        assert pred.label == "positive"
-        assert 0.8 <= pred.confidence <= 1.0
+    def test_positive_keyword_fails_closed(self):
+        with pytest.raises(ClinicalModelUnavailableError):
+            self.classifier.predict("data/microscopy/sample_positive.tiff")
 
-    def test_palud_keyword(self):
-        pred = self.classifier.predict("data/microscopy/palud_001.tiff")
-        assert pred.label == "positive"
+    def test_palud_keyword_fails_closed(self):
+        with pytest.raises(ClinicalModelUnavailableError):
+            self.classifier.predict("data/microscopy/palud_001.tiff")
 
-    def test_negative_keyword(self):
-        pred = self.classifier.predict("data/microscopy/negative_ctrl.tiff")
-        assert pred.label == "negative"
+    def test_negative_keyword_fails_closed(self):
+        with pytest.raises(ClinicalModelUnavailableError):
+            self.classifier.predict("data/microscopy/negative_ctrl.tiff")
 
-    def test_deterministic_for_same_url(self):
+    def test_arbitrary_url_fails_closed(self):
         url = "data/microscopy/unknown_sample_xyz.tiff"
-        pred1 = self.classifier.predict(url)
-        pred2 = self.classifier.predict(url)
-        assert pred1.label == pred2.label
-        assert pred1.confidence == pred2.confidence
+        with pytest.raises(ClinicalModelUnavailableError):
+            self.classifier.predict(url)
 
-    def test_confidence_in_valid_range(self):
+    def test_all_missing_images_fail_closed(self):
         for url in [
             "data/abc.tiff",
             "data/def.tiff",
             "data/ghi.tiff",
         ]:
-            pred = self.classifier.predict(url)
-            assert 0.0 <= pred.confidence <= 1.0
-            assert pred.label in ("positive", "negative")
+            with pytest.raises(ClinicalModelUnavailableError):
+                self.classifier.predict(url)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

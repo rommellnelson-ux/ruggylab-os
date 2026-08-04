@@ -6,21 +6,40 @@ import contextlib
 import hashlib
 import json
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import AuditEvent, Result, Sample
+from app.models import AuditEvent, Result
 from app.schemas.analyzer import AnalyzerResultIngest
 from app.services.audit import log_audit_event
 from app.services.auto_validator import try_auto_validate
 from app.services.critical_checker import check_critical
 from app.services.delta_checker import check_delta
+from app.services.equipment_registry import (
+    EquipmentRegistryError,
+    assert_analytes_authorized,
+    find_usable_analyzer_equipment,
+)
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.reference_checker import compute_flags
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+)
 from app.utils.datetime_utils import utcnow_naive
 
 
 class AnalyzerIngestionError(ValueError):
     """Erreur métier contrôlée pour ingestion automate."""
+
+
+def _lock_idempotency_key(db: Session, key: str) -> None:
+    """Sérialise une même clé d'ingestion pendant la transaction PostgreSQL."""
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    lock_id = int.from_bytes(bytes.fromhex(key)[:8], byteorder="big", signed=True)
+    db.execute(select(func.pg_advisory_xact_lock(lock_id)))
 
 
 def analyzer_idempotency_key(payload: AnalyzerResultIngest) -> str:
@@ -63,23 +82,45 @@ def _existing_result_id(db: Session, key: str) -> int | None:
 def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
     """Crée un résultat depuis un middleware automate, avec idempotence."""
     key = analyzer_idempotency_key(payload)
+    _lock_idempotency_key(db, key)
     duplicate_result_id = _existing_result_id(db, key)
     if duplicate_result_id is not None:
-        sample = db.query(Sample).filter(Sample.barcode == payload.sample_barcode).first()
+        duplicate_result = db.query(Result).filter(Result.id == duplicate_result_id).first()
+        if duplicate_result is None:
+            raise AnalyzerIngestionError(
+                "Piste d'idempotence automate incoherente: resultat d'origine introuvable."
+            )
+        persisted_sample = duplicate_result.sample
         return {
             "status": "duplicate",
             "result_id": duplicate_result_id,
-            "sample_id": sample.id if sample else None,
-            "sample_barcode": payload.sample_barcode,
+            "sample_id": persisted_sample.id,
+            "sample_barcode": persisted_sample.barcode,
             "idempotency_key": key,
             "message": "Message automate deja integre.",
         }
 
-    sample = db.query(Sample).filter(Sample.barcode == payload.sample_barcode).first()
+    try:
+        equipment, interface = find_usable_analyzer_equipment(
+            db, asset_identifier=payload.analyzer_id
+        )
+        assert_analytes_authorized(
+            db,
+            interface=interface,
+            analyte_codes=set(payload.data_points),
+        )
+    except EquipmentRegistryError as exc:
+        raise AnalyzerIngestionError(str(exc)) from exc
+
+    sample = lock_sample_by_barcode(db, payload.sample_barcode)
     if sample is None:
         raise AnalyzerIngestionError(
             f"Echantillon introuvable pour le code-barres {payload.sample_barcode}."
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise AnalyzerIngestionError(str(exc)) from exc
 
     patient = sample.patient
     patient_id = patient.id if patient else None
@@ -92,6 +133,7 @@ def ingest_analyzer_result(db: Session, payload: AnalyzerResultIngest) -> dict:
     flags = compute_flags(payload.data_points, patient_sex, patient_birth, db)
     result = Result(
         sample_id=sample.id,
+        equipment_id=equipment.id,
         analysis_date=analysis_date,
         data_points=payload.data_points,
         is_validated=True,

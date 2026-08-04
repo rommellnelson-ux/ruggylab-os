@@ -1,38 +1,58 @@
-import datetime as dt
-from typing import Any
+"""Saisie POCT (Point-of-Care Testing) — Flux 2, désactivée par défaut.
+
+Les deux contrats historiques sont conservés pour compatibilité, mais aucune
+saisie clinique n'est autorisée tant que le registre ``Equipment`` ne permet
+pas d'identifier et de qualifier explicitement le profil Precix/ProCheck
+Expert, ses analytes, unités et méthodes.
+
+Le refus intervient avant tout calcul de plage, valeur critique, consommation
+de réactif, audit de succès ou création de ``Result``.
+"""
+
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import Equipment, Patient, Result, Sample, User
+from app.models import Equipment, Patient, Sample, User
+from app.schemas.poct import POCTBatchResponse, POCTBatchSubmission
 from app.schemas.precis_expert import PrecisExpertManualInput
-from app.services.audit import log_audit_event
-from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.patient_access import can_access_patient
-from app.services.validation.precis_expert import PrecisExpertValidator
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+)
 
-router = APIRouter(prefix="/results/precis-expert")
+router = APIRouter(prefix="/results")
 
 
-def utcnow_naive() -> dt.datetime:
-    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
+def _reject_unqualified_poct_equipment() -> NoReturn:
+    """Bloque toute saisie tant qu'aucun profil d'équipement n'est qualifiable."""
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail={
+            "code": "poct_equipment_not_qualified",
+            "message": (
+                "Interface POCT désactivée : aucun profil Precix/ProCheck Expert "
+                "n'est qualifié pour un usage clinique."
+            ),
+        },
+    )
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-def submit_precis_expert_results(
-    payload: PrecisExpertManualInput,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> dict[str, Any]:
-    sample = db.query(Sample).filter(Sample.barcode == payload.sample_barcode).first()
+def _resolve_sample_and_patient(
+    db: Session, *, barcode: str, current_user: User
+) -> tuple[Sample, Patient]:
+    """Résout l'échantillon et son patient, avec contrôle de périmètre."""
+    sample = lock_sample_by_barcode(db, barcode)
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Erreur pre-analytique: code-barres {payload.sample_barcode} inconnu.",
+            detail=f"Erreur pre-analytique: code-barres {barcode} inconnu.",
         )
-
     patient = db.query(Patient).filter(Patient.id == sample.patient_id).first()
     if not patient:
         raise HTTPException(
@@ -44,19 +64,25 @@ def submit_precis_expert_results(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès refusé : dossier hors de votre périmètre.",
         )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return sample, patient
 
-    analysis_date = utcnow_naive()
-    age_in_years = (
-        analysis_date.year
-        - patient.birth_date.year
-        - (
-            (analysis_date.month, analysis_date.day)
-            < (patient.birth_date.month, patient.birth_date.day)
-        )
+
+@router.post("/precis-expert", status_code=status.HTTP_201_CREATED)
+def submit_precis_expert_results(
+    payload: PrecisExpertManualInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict[str, Any]:
+    _sample, _patient = _resolve_sample_and_patient(
+        db, barcode=payload.sample_barcode, current_user=current_user
     )
-
-    validator = PrecisExpertValidator(payload, age_in_years, patient.sex, current_user.id)
-    validated_jsonb, is_panic = validator.validate_all()
 
     equipment = (
         db.query(Equipment)
@@ -69,54 +95,35 @@ def submit_precis_expert_results(
     if not equipment:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Appareil Precis Expert non enregistre: {payload.equipment_serial}.",
+            detail="Appareil POCT non enregistré ou non autorisé.",
         )
 
-    new_result = Result(
-        sample_id=sample.id,
-        equipment_id=equipment.id,
-        analysis_date=analysis_date,
-        data_points=validated_jsonb.model_dump(),
-        validator_id=current_user.id,
-        is_validated=True,
-        is_critical=is_panic,
+    _reject_unqualified_poct_equipment()
+
+
+@router.post("/poct-batch", status_code=status.HTTP_201_CREATED, response_model=POCTBatchResponse)
+def submit_poct_batch(
+    payload: POCTBatchSubmission,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict[str, Any]:
+    """Refuse le lot tant que le profil POCT réel n'est pas qualifié."""
+    _sample, _patient = _resolve_sample_and_patient(
+        db, barcode=payload.sample_barcode, current_user=current_user
     )
-    sample.status = "Termine"
-    db.add(new_result)
-    db.flush()
-    try:
-        consume_reagents_for_result(
-            db,
-            result=new_result,
-            user=current_user,
-            source="result.precis_expert.create",
+
+    equipment = (
+        db.query(Equipment)
+        .filter(
+            Equipment.serial_number == payload.device_serial,
+            Equipment.name == payload.device_model,
         )
-    except InsufficientStockError as exc:
+        .first()
+    )
+    if not equipment:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "message": "Stock reactif insuffisant pour valider ce resultat.",
-                "items": [item.__dict__ for item in exc.items],
-            },
-        ) from exc
-    log_audit_event(
-        db,
-        user=current_user,
-        event_type="result.precis_expert.create",
-        entity_type="result",
-        entity_id=str(new_result.id),
-        payload={
-            "sample_barcode": sample.barcode,
-            "equipment_serial": payload.equipment_serial,
-            "is_critical": is_panic,
-        },
-    )
-    db.commit()
-    db.refresh(new_result)
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Appareil POCT non enregistré ou non autorisé.",
+        )
 
-    return {
-        "status": "success",
-        "message": f"Resultats Precis Expert inseres pour {sample.barcode}.",
-        "result_id": new_result.id,
-        "is_critical": is_panic,
-    }
+    _reject_unqualified_poct_equipment()

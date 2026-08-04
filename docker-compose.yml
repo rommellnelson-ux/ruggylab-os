@@ -142,7 +142,7 @@ services:
     networks:
       - backend_net
 
-  # ── Analyzer gateway (listener DH36, exemplaire unique — bind un port) ────────
+  # ── Analyzer gateway (interfaces désactivées jusqu'à qualification) ───────────
   analyzer-gateway:
     build:
       context: .
@@ -160,21 +160,17 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY}
       PROCESS_ROLE: analyzer-gateway
-      ENABLE_DH36_LISTENER: "true"
-      # Écoute sur toutes les interfaces internes pour recevoir les trames automates.
-      DH36_LISTENER_HOST: 0.0.0.0
-    # Healthcheck adapté au rôle : le listener DH36 doit accepter une connexion
-    # TCP (remplace la sonde HTTP:8000 héritée de l'image, toujours KO ici).
+      ENABLE_DH36_LISTENER: "false"
+      ANALYZER_RAW_LISTENER_ENABLED: "false"
+    # Le process reste vivant sans ouvrir de port et écrit un battement. Une
+    # activation future doit fournir un override qualifié propre au site.
     healthcheck:
-      test: ["CMD", "python", "-c",
-             "import socket; socket.create_connection(('127.0.0.1', 5001), timeout=3).close()"]
+      test: ["CMD-SHELL",
+             "test -n \"$(find /tmp/ruggylab_analyzer_gateway.heartbeat -mmin -2 2>/dev/null)\""]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       start_period: 30s
       retries: 3
-    # Pour recevoir les automates du LAN, publier le port DH36 LIÉ à l'interface
-    # du VLAN automates uniquement, p.ex. :  ports: ["10.0.30.1:5001:5001"]
-    # (ne jamais publier sur 0.0.0.0 — cf. §8.1).
     depends_on:
       postgres:
         condition: service_healthy

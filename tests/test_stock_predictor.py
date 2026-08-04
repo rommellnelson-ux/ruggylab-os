@@ -17,12 +17,13 @@ Couverture :
 from __future__ import annotations
 
 import math
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
 
 from app.schemas.stock_predictor import (
+    MAX_SAFE_QUANTITY_UNITS,
     AlertLevel,
     DiseaseCategory,
     DrugStockInput,
@@ -263,14 +264,83 @@ class TestHorizonPrediction:
         if line.estimated_rupture_date:
             assert line.estimated_rupture_date > ref
 
-    def test_rupture_date_none_for_large_stock(self, predictor: StockPredictor) -> None:
+    def test_large_stock_saturates_rupture_date_at_date_max(
+        self, predictor: StockPredictor
+    ) -> None:
         """Un stock très élevé peut résulter en une date de rupture dans le futur lointain
         mais jamais None pour un CMM > 0."""
         drug = _drug(stock=100_000, cmm=1)
         line = predictor.predict(_request([drug])).drug_predictions[0]
         # months_remaining sera très grand mais fini
         assert math.isfinite(line.months_of_stock_remaining)
-        assert line.estimated_rupture_date is not None
+        assert line.estimated_rupture_date == date.max
+
+    def test_max_safe_stock_produces_only_finite_numbers(self, predictor: StockPredictor) -> None:
+        line = predictor.predict(
+            _request([_drug(stock=MAX_SAFE_QUANTITY_UNITS, cmm=1)])
+        ).drug_predictions[0]
+
+        assert line.estimated_rupture_date == date.max
+        assert all(
+            math.isfinite(value)
+            for value in (
+                line.predicted_stock_at_horizon,
+                line.months_of_stock_remaining,
+                line.seasonal_coefficient,
+                line.cmm_seasonal,
+            )
+        )
+
+    @pytest.mark.parametrize("stock", [MAX_SAFE_QUANTITY_UNITS + 1, 10**307, 10**400])
+    def test_stock_above_safe_integer_limit_is_rejected(self, stock: int) -> None:
+        with pytest.raises(ValueError):
+            _drug(stock=stock, cmm=1)
+
+    def test_max_safe_cmm_produces_only_finite_numbers(self, predictor: StockPredictor) -> None:
+        line = predictor.predict(
+            _request([_drug(stock=1, cmm=MAX_SAFE_QUANTITY_UNITS)])
+        ).drug_predictions[0]
+
+        assert all(
+            math.isfinite(value)
+            for value in (
+                line.predicted_stock_at_horizon,
+                line.months_of_stock_remaining,
+                line.seasonal_coefficient,
+                line.cmm_seasonal,
+            )
+        )
+
+    @pytest.mark.parametrize("cmm", [MAX_SAFE_QUANTITY_UNITS + 1, 10**307, 10**400])
+    def test_cmm_above_safe_integer_limit_is_rejected(self, cmm: int) -> None:
+        with pytest.raises(ValueError):
+            _drug(stock=1, cmm=cmm)
+
+    def test_reference_date_max_is_supported(self, predictor: StockPredictor) -> None:
+        line = predictor.predict(
+            _request([_drug(stock=1, cmm=1)], ref_date=date.max)
+        ).drug_predictions[0]
+        assert line.estimated_rupture_date == date.max
+
+    def test_zero_stock_at_date_max_is_supported(self, predictor: StockPredictor) -> None:
+        line = predictor.predict(
+            _request([_drug(stock=0, cmm=1)], ref_date=date.max)
+        ).drug_predictions[0]
+        assert line.estimated_rupture_date == date.max
+
+    def test_rupture_date_can_equal_date_max(self, predictor: StockPredictor) -> None:
+        ref = date(9999, 11, 1)
+        line = predictor.predict(
+            _request([_drug(stock=2, cmm=1, category=DiseaseCategory.GENERAL)], ref_date=ref)
+        ).drug_predictions[0]
+        assert line.estimated_rupture_date == date.max
+
+    def test_rupture_date_can_be_just_before_date_max(self, predictor: StockPredictor) -> None:
+        ref = date(9999, 10, 31)
+        line = predictor.predict(
+            _request([_drug(stock=2, cmm=1, category=DiseaseCategory.GENERAL)], ref_date=ref)
+        ).drug_predictions[0]
+        assert line.estimated_rupture_date == date.max - timedelta(days=1)
 
 
 # ===========================================================================

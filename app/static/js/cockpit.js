@@ -2312,9 +2312,25 @@
     async function submitPoct(btn) {
       setLoading(btn, true);
       try {
-        const body = { sample_barcode: $("poctBarcode").value, equipment_serial: $("poctSerial").value, glucose_raw: Number($("poctGlucose").value), cholesterol_raw: Number($("poctChol").value), uric_acid_raw: Number($("poctUa").value), lactate_raw: 1.2, ketones_raw: 0.2 };
-        await api("/api/v1/results/precis-expert", { method: "POST", headers: headers(), body: JSON.stringify(body) });
-        showToast("Résultat POCT enregistré avec succès", "success");
+        // Saisie groupée : on n'envoie QUE les analytes réellement mesurés.
+        // (L'ancien appel fabriquait lactate=1.2 et cétones=0.2 — valeurs
+        // cliniques inventées ; /results/poct-batch accepte un lot partiel.)
+        const fields = [["GLU", "poctGlucose"], ["CHOL", "poctChol"], ["UA", "poctUa"], ["LAC", "poctLac"], ["KET", "poctKet"]];
+        const items = [];
+        fields.forEach(function (f) {
+          const el = $(f[1]);
+          if (!el) return;
+          const raw = (el.value || "").trim();
+          if (raw === "" || isNaN(Number(raw))) return;
+          items.push({ code: f[0], value: Number(raw) });
+        });
+        if (!items.length) { showToast("Renseignez au moins un paramètre POCT", "error"); return; }
+        const body = { sample_barcode: $("poctBarcode").value, device_serial: $("poctSerial").value, items: items };
+        const data = await api("/api/v1/results/poct-batch", { method: "POST", headers: headers(), body: JSON.stringify(body) });
+        showToast(data.is_critical
+          ? `⛔ Résultat POCT critique enregistré (${items.length} paramètre(s))`
+          : `Résultat POCT enregistré (${items.length} paramètre(s))`,
+          data.is_critical ? "error" : "success");
       } catch (e) {
         showToast("Erreur lors de l'enregistrement POCT", "error");
       } finally {
@@ -4422,13 +4438,22 @@
       loadingStates.showSkeleton(tbody, 5);
       try {
         const data = await api('/api/v1/equipments', { headers: headers(false) });
+        const readinessLabels = {
+          unqualified: 'NON QUALIFIÉ',
+          documentation_missing: 'DOCUMENTATION MANQUANTE',
+          technical_testing: 'TEST TECHNIQUE',
+          clinical_approval_required: 'APPROBATION CLINIQUE REQUISE',
+          suspended: 'SUSPENDU',
+          qualified_disabled: 'QUALIFIÉ MAIS DÉSACTIVÉ',
+          enabled: 'ACTIVÉ',
+        };
         setRows('equipmentsTable', data.map(e => row(
           `<td>${e.id}</td>` +
           `<td><strong>${security.escapeHtml(e.name)}</strong></td>` +
-          `<td>${security.escapeHtml(e.type || '—')}</td>` +
-          `<td>${security.escapeHtml(e.serial_number || '—')}</td>` +
+          `<td>${security.escapeHtml(e.device_family || e.type || '—')}</td>` +
           `<td>${security.escapeHtml(e.location || '—')}</td>` +
-          `<td>${e.last_calibration || '—'}</td>`
+          `<td><span class="pill">${security.escapeHtml(readinessLabels[e.readiness_status] || 'NON QUALIFIÉ')}</span></td>` +
+          `<td>${security.escapeHtml((e.missing_condition_categories || []).join(', ') || '—')}</td>`
         )));
       } catch {
         if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--rose);">Erreur chargement équipements</td></tr>';

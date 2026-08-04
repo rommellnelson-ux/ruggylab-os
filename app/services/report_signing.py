@@ -78,6 +78,7 @@ def create_report_signature(
     result: Result,
     user: User,
     signature_meaning: str,
+    commit: bool = True,
 ) -> ReportSignature:
     signed_at = utcnow_naive()
     digest = report_hash(result)
@@ -110,8 +111,9 @@ def create_report_signature(
             "signature_meaning": signature.signature_meaning,
         },
     )
-    db.commit()
-    db.refresh(signature)
+    if commit:
+        db.commit()
+        db.refresh(signature)
     return signature
 
 
@@ -352,6 +354,7 @@ def release_result_report(
     audience: str = "clinician",
     signature: ReportSignature | None = None,
     delivery_channels: list[str] | None = None,
+    commit: bool = True,
 ) -> ReportSnapshot:
     previous = _latest_snapshot(db, result.id)
     if previous and previous.status in {"final", "provisional"}:
@@ -409,8 +412,9 @@ def release_result_report(
             "audience": audience,
         },
     )
-    db.commit()
-    db.refresh(snapshot)
+    if commit:
+        db.commit()
+        db.refresh(snapshot)
     return snapshot
 
 
@@ -421,6 +425,7 @@ def reissue_report_signature(
     result: Result,
     user: User,
     signature_meaning: str,
+    commit: bool = True,
 ) -> ReportSignature:
     signed_at = utcnow_naive()
     digest = report_hash(result)
@@ -451,8 +456,9 @@ def reissue_report_signature(
             "reissued": True,
         },
     )
-    db.commit()
-    db.refresh(signature)
+    if commit:
+        db.commit()
+        db.refresh(signature)
     return signature
 
 

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_active_user
 from app.db.session import get_db
-from app.models import ExamOrder, ExamOrderItem, Invoice, Patient, Result, Sample, User
+from app.models import ExamOrder, ExamOrderItem, Invoice, Patient, Result, User
 from app.schemas.exam_order import (
     ORDER_STATUSES,
     PRIORITIES,
@@ -24,12 +24,19 @@ from app.schemas.exam_order import (
 )
 from app.schemas.invoice import InvoiceFromOrder, InvoiceRead
 from app.services.accounting_service import balance_of, build_invoice_from_order, credit_of
+from app.services.audit import log_audit_event
 from app.services.exam_order_service import build_thread, sync_order_progress
 from app.services.order_report import build_order_report_pdf
 from app.services.patient_access import (
     apply_order_patient_scope,
     can_access_order,
     can_access_patient,
+)
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_barcode,
+    lock_sample_by_id,
 )
 
 _OUT_OF_SCOPE = "Accès refusé : prescription hors de votre périmètre."
@@ -54,6 +61,24 @@ def _get_order_or_404(db: Session, order_id: int) -> ExamOrder:
 def _get_accessible_order_or_404(db: Session, order_id: int, user: User) -> ExamOrder:
     """Charge la prescription en refusant (403) celles hors du périmètre unité."""
     order = _get_order_or_404(db, order_id)
+    if not can_access_order(user, order):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
+    return order
+
+
+def _get_locked_accessible_order_or_404(db: Session, order_id: int, user: User) -> ExamOrder:
+    """Verrouille la prescription avant tout contrôle de rattachement."""
+    order = (
+        db.query(ExamOrder)
+        .options(selectinload(ExamOrder.items))
+        .filter(ExamOrder.id == order_id)
+        .with_for_update()
+        .first()
+    )
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prescription introuvable."
+        )
     if not can_access_order(user, order):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_OUT_OF_SCOPE)
     return order
@@ -87,6 +112,19 @@ def create_exam_order(
         ],
     )
     db.add(order)
+    db.flush()
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="exam_order.create",
+        entity_type="exam_order",
+        entity_id=str(order.id),
+        payload={
+            "patient_id": order.patient_id,
+            "priority": order.priority,
+            "item_count": len(order.items),
+        },
+    )
     db.commit()
     db.refresh(order)
     return order
@@ -138,21 +176,71 @@ def collect_exam_order(
     current_user: User = Depends(get_current_active_user),
 ) -> ExamOrderThread:
     """Rattache l'échantillon prélevé (par id ou code-barres) et synchronise."""
-    order = _get_accessible_order_or_404(db, order_id, current_user)
+    order = _get_locked_accessible_order_or_404(db, order_id, current_user)
     if payload.sample_id is None and not payload.barcode:
         raise HTTPException(status_code=422, detail="Fournir sample_id ou barcode.")
 
     sample = None
     if payload.sample_id is not None:
-        sample = db.query(Sample).filter(Sample.id == payload.sample_id).first()
+        sample = lock_sample_by_id(db, payload.sample_id)
     elif payload.barcode:
-        sample = db.query(Sample).filter(Sample.barcode == payload.barcode).first()
+        sample = lock_sample_by_barcode(db, payload.barcode)
     if not sample:
         raise HTTPException(status_code=404, detail="Échantillon introuvable.")
+    if payload.barcode and sample.barcode != payload.barcode:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="sample_id et barcode désignent des échantillons différents.",
+        )
 
+    if sample.patient_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Un échantillon sans patient ne peut pas être rattaché à cette prescription.",
+        )
+    if sample.patient_id != order.patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="L'échantillon et la prescription doivent appartenir au même patient.",
+        )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    if order.status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette prescription ne peut plus être collectée.",
+        )
+    if order.status == "completed":
+        if order.sample_id == sample.id:
+            return build_thread(db, order, synchronize=False)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette prescription ne peut plus être collectée.",
+        )
+    if order.sample_id is not None:
+        if order.sample_id == sample.id:
+            return build_thread(db, order, synchronize=False)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette prescription est déjà rattachée à un autre échantillon.",
+        )
     order.sample_id = sample.id
-    db.commit()
-    return build_thread(db, order)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="exam_order.collect",
+        entity_type="exam_order",
+        entity_id=str(order.id),
+        payload={"sample_id": sample.id, "patient_id": order.patient_id},
+    )
+    sync_order_progress(db, order)
+    return build_thread(db, order, synchronize=False)
 
 
 @router.patch("/{order_id}", response_model=ExamOrderRead)
@@ -165,14 +253,21 @@ def update_exam_order_status(
     if payload.status not in ORDER_STATUSES:
         raise HTTPException(status_code=422, detail=f"Statut invalide : {payload.status}.")
     order = _get_accessible_order_or_404(db, order_id, current_user)
+    old_status = order.status
+    order.status = payload.status
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="exam_order.status.update",
+        entity_type="exam_order",
+        entity_id=str(order.id),
+        payload={"old_status": old_status, "requested_status": payload.status},
+    )
+    db.commit()
     if payload.status == "cancelled":
-        order.status = "cancelled"
-        db.commit()
         db.refresh(order)
         return order
     # Pour les autres statuts, on laisse la dérivation automatique faire foi.
-    order.status = payload.status
-    db.commit()
     return sync_order_progress(db, order)
 
 

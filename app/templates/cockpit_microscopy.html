@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="description" content="Cockpit de saisie des résultats qualitatifs — RuggyLab OS" />
+  <title>RuggyLab OS — Cockpit Microscopie</title>
+  <style>
+    :root {
+      --ink: #13202b; --muted: #647486; --line: rgba(36,52,66,.16);
+      --panel: #ffffff; --band: #f6fafb; --nav: #122233;
+      --blue: #2563eb; --teal: #0f766e; --rose: #be123c; --amber: #b45309; --ok: #15803d;
+      --shadow: 0 10px 30px rgba(18,34,51,.10); --radius: 12px;
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    [data-theme="dark"] {
+      --ink: #e8f0f7; --muted: #a8b7c7; --line: rgba(255,255,255,.14);
+      --panel: #1e293b; --band: #0f172a; --nav: #0f172a;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); font-family: var(--font);
+      background: var(--band); min-height: 100vh; font-size: 15px;
+    }
+    a { color: var(--blue); }
+
+    /* ── Bannière WebSocket bloquante ─────────────────────────────── */
+    .ws-banner {
+      display: none; position: fixed; inset: 0 0 auto 0; z-index: 1000;
+      background: var(--rose); color: #fff; padding: 14px 24px;
+      align-items: center; gap: 16px; box-shadow: 0 4px 18px rgba(0,0,0,.3);
+      font-weight: 600;
+    }
+    .ws-banner.show { display: flex; }
+    .ws-banner .spacer { flex: 1; }
+    .ws-banner button {
+      background: #fff; color: var(--rose); border: none; border-radius: 8px;
+      padding: 8px 16px; font-weight: 700; cursor: pointer;
+    }
+    body.ws-down { border-top: 4px solid var(--rose); }
+
+    header.top {
+      background: var(--panel); border-bottom: 1px solid var(--line);
+      padding: 14px 24px; display: flex; align-items: center; gap: 16px;
+      position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow);
+    }
+    header.top h1 {
+      margin: 0; font-size: 19px; font-weight: 800;
+      background: linear-gradient(135deg, var(--teal), var(--blue));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .badge {
+      background: linear-gradient(135deg, var(--teal), var(--blue)); color: #fff;
+      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .conn { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--muted); }
+    .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--muted); }
+    .dot.up { background: var(--ok); } .dot.down { background: var(--rose); }
+    header.top .link { font-size: 13px; }
+
+    main { max-width: 1080px; margin: 24px auto; padding: 0 24px; }
+    .grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px;
+    }
+    .card h2 { margin: 0 0 14px; font-size: 15px; font-weight: 700; }
+    .field { margin-bottom: 14px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    label .req { color: var(--rose); }
+    input[type=text], select, textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 9px; background: var(--band); color: var(--ink);
+      font-family: var(--font); font-size: 15px;
+    }
+    input:focus, select:focus, textarea:focus, button:focus-visible {
+      outline: 3px solid rgba(37,99,235,.35); outline-offset: 1px; border-color: var(--blue);
+    }
+    textarea { resize: vertical; min-height: 70px; }
+    kbd {
+      background: var(--nav); color: #fff; border-radius: 5px; padding: 1px 6px;
+      font-size: 11px; font-family: var(--font); font-weight: 600;
+    }
+
+    button {
+      cursor: pointer; border: none; border-radius: 9px; font-weight: 600;
+      font-size: 14px; padding: 10px 16px; font-family: var(--font);
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--teal), var(--blue)); color: #fff; }
+    .btn-ghost { background: var(--band); color: var(--ink); border: 1px solid var(--line); }
+    .btn-ras { background: var(--ok); color: #fff; }
+    .btn-danger-ghost { background: transparent; color: var(--rose); border: 1px solid var(--rose); padding: 6px 10px; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ── Table observations ───────────────────────────────────────── */
+    table.obs { width: 100%; border-collapse: collapse; }
+    table.obs th { text-align: left; font-size: 12px; color: var(--muted); padding: 6px 8px; }
+    table.obs td { padding: 6px 8px; vertical-align: top; }
+    table.obs td.org { width: 62%; } table.obs td.den { width: 30%; }
+    .obs-empty { color: var(--muted); font-size: 13px; padding: 10px 8px; }
+    .negative-flag {
+      display: none; margin-top: 10px; padding: 10px 14px; border-radius: 9px;
+      background: rgba(21,128,61,.12); color: var(--ok); font-weight: 600; font-size: 13px;
+    }
+    .negative-flag.show { display: block; }
+
+    .img-chip {
+      display: none; align-items: center; gap: 8px; margin-top: 10px;
+      background: rgba(15,118,110,.12); color: var(--teal); padding: 8px 12px;
+      border-radius: 9px; font-size: 13px; word-break: break-all;
+    }
+    .img-chip.show { display: flex; }
+
+    .side .card h2 { font-size: 14px; }
+    .kbd-list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+    .kbd-list li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .kbd-list li:last-child { border-bottom: none; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Toasts ───────────────────────────────────────────────────── */
+    #toasts { position: fixed; bottom: 20px; right: 20px; z-index: 1100; display: flex; flex-direction: column; gap: 10px; }
+    .toast { padding: 12px 18px; border-radius: 10px; color: #fff; font-weight: 600; box-shadow: var(--shadow); max-width: 360px; }
+    .toast.success { background: var(--ok); } .toast.error { background: var(--rose); } .toast.info { background: var(--blue); }
+  </style>
+</head>
+<body>
+  <!-- Bannière rouge bloquante : temps-réel indisponible -->
+  <div class="ws-banner" id="wsBanner" role="alert" aria-live="assertive">
+    <span>⛔ Connexion temps-réel perdue — supervision des alertes critiques interrompue. Saisie verrouillée.</span>
+    <span class="spacer"></span>
+    <button type="button" id="wsRetry">Reconnecter</button>
+  </div>
+
+  <header class="top">
+    <h1>Cockpit Microscopie</h1>
+    <span class="badge">Résultats qualitatifs</span>
+    <a class="link" href="/app">← Cockpit principal</a>
+    <div class="conn" title="État de la connexion temps-réel">
+      <span class="dot" id="wsDot"></span><span id="wsLabel">Connexion…</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid">
+      <!-- Colonne saisie -->
+      <section>
+        <form id="qualForm" autocomplete="off">
+          <div class="card">
+            <h2>1 · Échantillon &amp; nature</h2>
+            <div class="field">
+              <label for="barcode">Code-barres échantillon <span class="req">*</span></label>
+              <input type="text" id="barcode" name="barcode" placeholder="Scanner ou saisir…" autofocus required />
+              <div class="hint">Le lecteur USB HID renseigne ce champ automatiquement.</div>
+            </div>
+            <div class="field">
+              <label for="category">Type d'examen <span class="req">*</span></label>
+              <select id="category" name="category">
+                <option value="parasitology">Parasitologie</option>
+                <option value="cytology">Cytologie</option>
+                <option value="smear">Frottis sanguin</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>2 · Preuve visuelle (microscope Magnus)</h2>
+            <p class="hint" style="margin-top:0;">
+              Réutilise le composant de capture existant : réserve un emplacement image côté serveur
+              et rattache son <code>image_url</code> au résultat.
+            </p>
+            <button type="button" class="btn-ghost" id="btnCapture" accesskey="c">
+              📷 Capturer <kbd>Alt+C</kbd>
+            </button>
+            <div class="img-chip" id="imgChip">
+              <span>🖼️</span><span id="imgUrl"></span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>3 · Observations</h2>
+            <div class="btn-row" style="margin-bottom:12px;">
+              <button type="button" class="btn-ras" id="btnRas" accesskey="r">
+                Absence / RAS <kbd>Alt+R</kbd>
+              </button>
+              <button type="button" class="btn-ghost" id="btnAddObs" accesskey="a">
+                + Ajouter une observation <kbd>Alt+A</kbd>
+              </button>
+            </div>
+
+            <table class="obs" id="obsTable">
+              <thead>
+                <tr><th>Organisme / élément</th><th>Densité</th><th></th></tr>
+              </thead>
+              <tbody id="obsBody">
+                <tr id="obsEmptyRow"><td colspan="3" class="obs-empty">Aucune observation. Ajoutez-en une ou déclarez « RAS ».</td></tr>
+              </tbody>
+            </table>
+
+            <div class="negative-flag" id="negFlag">✔ Résultat négatif déclaré — absence d'élément pathologique.</div>
+
+            <!-- Dictionnaires cliniques (datalist) injectés dynamiquement -->
+            <datalist id="dictParasitology"></datalist>
+            <datalist id="dictCytology"></datalist>
+            <datalist id="dictSmear"></datalist>
+          </div>
+
+          <div class="card">
+            <h2>4 · Commentaire</h2>
+            <div class="field">
+              <textarea id="comment" name="comment" placeholder="Description cytologique, remarques techniques…"></textarea>
+            </div>
+            <div class="btn-row">
+              <button type="submit" class="btn-primary" id="btnSubmit" accesskey="s">
+                💾 Enregistrer le résultat <kbd>Alt+S</kbd>
+              </button>
+              <button type="button" class="btn-ghost" id="btnReset">Réinitialiser</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- Colonne latérale : raccourcis -->
+      <aside class="side">
+        <div class="card">
+          <h2>⌨️ Raccourcis clavier</h2>
+          <ul class="kbd-list">
+            <li><span>Absence / RAS</span> <kbd>Alt+R</kbd></li>
+            <li><span>Ajouter une observation</span> <kbd>Alt+A</kbd></li>
+            <li><span>Capturer l'image</span> <kbd>Alt+C</kbd></li>
+            <li><span>Enregistrer</span> <kbd>Alt+S</kbd></li>
+            <li><span>Champ suivant</span> <kbd>Tab</kbd></li>
+          </ul>
+          <p class="hint">Interface entièrement navigable au clavier : chaque champ est atteignable via <kbd>Tab</kbd>.</p>
+        </div>
+        <div class="card">
+          <h2>Densités admises</h2>
+          <p class="hint" style="margin-top:0;">Menu strictement fermé (anti-faute de frappe) :
+            <strong>Rares, +, ++, +++, ++++, Présence, Nombreux</strong>.</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <script>
+  (function () {
+    "use strict";
+    var API = "/api/v1";
+    var token = localStorage.getItem("ruggylab_token") || "";
+    if ((localStorage.getItem("theme") || "light") === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+    var $ = function (id) { return document.getElementById(id); };
+
+    // ── Dictionnaires cliniques (couplés aux <datalist>) ──────────────
+    var DICT = {
+      parasitology: [
+        "Plasmodium falciparum", "Plasmodium vivax", "Plasmodium ovale", "Plasmodium malariae",
+        "Plasmodium knowlesi", "Trypanosoma brucei gambiense", "Microfilaire (Loa loa)",
+        "Wuchereria bancrofti", "Schistosoma haematobium", "Schistosoma mansoni",
+        "Schistosoma intercalatum", "Entamoeba histolytica", "Giardia intestinalis",
+        "Ascaris lumbricoides", "Ankylostoma duodenale", "Trichuris trichiura",
+        "Strongyloides stercoralis", "Taenia saginata", "Enterobius vermicularis",
+        "Hymenolepis nana"
+      ],
+      cytology: [
+        "Hématies", "Leucocytes altérés", "Cellules épithéliales", "Levures (Candida albicans)",
+        "Trichomonas vaginalis", "Clue cells", "Cristaux d'oxalate de calcium",
+        "Cristaux d'acide urique", "Cylindres hyalins", "Cylindres granuleux",
+        "Flore de Döderlein"
+      ],
+      smear: [
+        "Schizontes", "Trophozoïtes", "Gamétocytes", "Corps de Howell-Jolly",
+        "Hématies falciformes", "Ponctuations basophiles", "Anisocytose", "Poïkilocytose",
+        "Cellules cibles", "Rouleaux érythrocytaires"
+      ]
+    };
+    var DENSITIES = ["Rares", "+", "++", "+++", "++++", "Présence", "Nombreux"];
+    var EXAM_CODE = { parasitology: "PARASITO", cytology: "CYTO", smear: "FROTTIS" };
+
+    function fillDatalist(id, items) {
+      var dl = $(id);
+      dl.innerHTML = items.map(function (x) {
+        return '<option value="' + x.replace(/"/g, "&quot;") + '"></option>';
+      }).join("");
+    }
+    fillDatalist("dictParasitology", DICT.parasitology);
+    fillDatalist("dictCytology", DICT.cytology);
+    fillDatalist("dictSmear", DICT.smear);
+
+    function currentDatalistId() {
+      var cat = $("category").value;
+      return cat === "cytology" ? "dictCytology" : cat === "smear" ? "dictSmear" : "dictParasitology";
+    }
+
+    // ── Toasts ────────────────────────────────────────────────────────
+    function toast(msg, kind) {
+      var t = document.createElement("div");
+      t.className = "toast " + (kind || "info");
+      t.textContent = msg;
+      $("toasts").appendChild(t);
+      setTimeout(function () { t.remove(); }, 4500);
+    }
+
+    // ── API helper ────────────────────────────────────────────────────
+    async function api(endpoint, options) {
+      options = options || {};
+      var headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = "Bearer " + token;
+      Object.assign(headers, options.headers || {});
+      var res = await fetch(window.location.origin + endpoint, Object.assign({}, options, { headers: headers }));
+      if (!res.ok) {
+        var body = await res.text();
+        var msg;
+        try { msg = JSON.parse(body).detail; } catch (e) { msg = body; }
+        if (typeof msg !== "string") msg = "HTTP " + res.status;
+        throw new Error(msg);
+      }
+      return res.status === 204 ? null : res.json();
+    }
+
+    // ── Observations ──────────────────────────────────────────────────
+    function syncEmptyState() {
+      var hasRows = $("obsBody").querySelectorAll("tr.obs-row").length > 0;
+      $("obsEmptyRow").style.display = hasRows ? "none" : "";
+    }
+    function addObservationRow(organism, density) {
+      // Ajouter une observation annule l'état « négatif ».
+      setNegative(false);
+      var tr = document.createElement("tr");
+      tr.className = "obs-row";
+      var densityOpts = DENSITIES.map(function (d) {
+        var sel = d === density ? " selected" : "";
+        return '<option value="' + d + '"' + sel + ">" + d + "</option>";
+      }).join("");
+      tr.innerHTML =
+        '<td class="org"><input type="text" class="obs-org" list="' + currentDatalistId() +
+        '" placeholder="Nom (liste clinique)…" /></td>' +
+        '<td class="den"><select class="obs-den">' + densityOpts + "</select></td>" +
+        '<td><button type="button" class="btn-danger-ghost obs-del" title="Retirer">✕</button></td>';
+      $("obsBody").appendChild(tr);
+      if (organism) tr.querySelector(".obs-org").value = organism;
+      tr.querySelector(".obs-del").addEventListener("click", function () {
+        tr.remove(); syncEmptyState();
+      });
+      syncEmptyState();
+      tr.querySelector(".obs-org").focus();
+    }
+
+    var _isNegative = false;
+    function setNegative(on) {
+      _isNegative = on;
+      $("negFlag").classList.toggle("show", on);
+      if (on) {
+        // RAS : on vide les observations existantes.
+        $("obsBody").querySelectorAll("tr.obs-row").forEach(function (r) { r.remove(); });
+        syncEmptyState();
+      }
+    }
+
+    // Quand la catégorie change, recibler les datalist des lignes existantes.
+    $("category").addEventListener("change", function () {
+      var dl = currentDatalistId();
+      $("obsBody").querySelectorAll(".obs-org").forEach(function (i) { i.setAttribute("list", dl); });
+    });
+
+    $("btnAddObs").addEventListener("click", function () { addObservationRow(); });
+    $("btnRas").addEventListener("click", function () {
+      setNegative(true);
+      toast("Résultat négatif (RAS) prêt à enregistrer.", "info");
+    });
+
+    // ── Capture image (réutilise /imaging/capture-microscope) ─────────
+    var _imageUrl = null;
+    $("btnCapture").addEventListener("click", async function () {
+      var barcode = $("barcode").value.trim();
+      if (!barcode) { toast("Renseignez d'abord le code-barres.", "error"); $("barcode").focus(); return; }
+      this.disabled = true;
+      try {
+        var data = await api(API + "/imaging/capture-microscope", {
+          method: "POST", body: JSON.stringify({ sample_barcode: barcode })
+        });
+        _imageUrl = data.image_url;
+        $("imgUrl").textContent = data.image_url;
+        $("imgChip").classList.add("show");
+        toast("Emplacement image microscope réservé.", "success");
+      } catch (e) {
+        toast("Capture impossible : " + e.message, "error");
+      } finally {
+        this.disabled = false;
+      }
+    });
+
+    // ── Construction du payload + envoi ───────────────────────────────
+    function buildPayload() {
+      var observations = [];
+      $("obsBody").querySelectorAll("tr.obs-row").forEach(function (r) {
+        var org = r.querySelector(".obs-org").value.trim();
+        var den = r.querySelector(".obs-den").value;
+        if (org) observations.push({ organism: org, density: den });
+      });
+      var category = $("category").value;
+      return {
+        sample_barcode: $("barcode").value.trim(),
+        category: category,
+        result_type: "qualitative",
+        exam_code: EXAM_CODE[category] || null,
+        image_url: _imageUrl,
+        findings: {
+          is_negative: _isNegative,
+          observations: observations,
+          comment: $("comment").value.trim() || null
+        }
+      };
+    }
+
+    $("qualForm").addEventListener("submit", async function (ev) {
+      ev.preventDefault();
+      if (document.body.classList.contains("ws-down")) {
+        toast("Temps-réel indisponible : reconnectez avant d'enregistrer.", "error");
+        return;
+      }
+      var payload = buildPayload();
+      if (!payload.sample_barcode) { toast("Code-barres requis.", "error"); $("barcode").focus(); return; }
+      if (!payload.findings.is_negative && payload.findings.observations.length === 0) {
+        toast("Ajoutez au moins une observation ou déclarez « RAS ».", "error"); return;
+      }
+      var btn = $("btnSubmit"); btn.disabled = true;
+      try {
+        var data = await api(API + "/results/qualitative", {
+          method: "POST", body: JSON.stringify(payload)
+        });
+        toast(data.is_critical ? "⛔ Résultat critique enregistré (#" + data.result_id + ")"
+                               : "✔ Résultat enregistré (#" + data.result_id + ")",
+              data.is_critical ? "error" : "success");
+        resetForm();
+      } catch (e) {
+        toast("Échec de l'enregistrement : " + e.message, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    function resetForm() {
+      $("qualForm").reset();
+      $("obsBody").querySelectorAll("tr.obs-row").forEach(function (r) { r.remove(); });
+      setNegative(false); syncEmptyState();
+      _imageUrl = null; $("imgChip").classList.remove("show"); $("imgUrl").textContent = "";
+      $("barcode").focus();
+    }
+    $("btnReset").addEventListener("click", resetForm);
+
+    // ── WebSocket temps-réel + bannière bloquante ─────────────────────
+    var _ws = null, _reconnectTimer = null, _retryDelay = 2000;
+    function setConn(up) {
+      $("wsDot").className = "dot " + (up ? "up" : "down");
+      $("wsLabel").textContent = up ? "Temps-réel connecté" : "Déconnecté";
+      $("wsBanner").classList.toggle("show", !up);
+      document.body.classList.toggle("ws-down", !up);
+      $("btnSubmit").disabled = !up;  // saisie verrouillée hors ligne (bloquant)
+    }
+    function connectWs() {
+      if (!token) { setConn(false); $("wsLabel").textContent = "Non authentifié"; return; }
+      try {
+        var proto = location.protocol === "https:" ? "wss" : "ws";
+        var ws = new WebSocket(proto + "://" + location.host + API + "/notifications/ws", ["bearer", token]);
+        _ws = ws;
+        ws.onopen = function () { setConn(true); _retryDelay = 2000; };
+        ws.onclose = function () { setConn(false); scheduleReconnect(); };
+        ws.onerror = function () { try { ws.close(); } catch (e) {} };
+      } catch (e) { setConn(false); scheduleReconnect(); }
+    }
+    function scheduleReconnect() {
+      if (_reconnectTimer) return;
+      _reconnectTimer = setTimeout(function () {
+        _reconnectTimer = null;
+        _retryDelay = Math.min(_retryDelay * 1.5, 15000);  // backoff plafonné
+        connectWs();
+      }, _retryDelay);
+    }
+    $("wsRetry").addEventListener("click", function () {
+      if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+      connectWs();
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────
+    if (!token) {
+      toast("Session absente : connectez-vous via le cockpit principal.", "error");
+    }
+    syncEmptyState();
+    connectWs();
+  })();
+  </script>
+</body>
+</html>

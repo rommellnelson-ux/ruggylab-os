@@ -5,8 +5,8 @@
 > l'architecture, les ports, les migrations ou les procédures.
 
 - **Version applicative** : 0.1.0
-- **Head Alembic** : `20260625_0036` (36 migrations, chaîne linéaire)
-- **Dernière mise à jour** : 2026-07-08 (post PR #55)
+- **Head Alembic** : `20260724_0039` (chaîne linéaire)
+- **Dernière mise à jour** : 2026-07-24 (fail-closed appareils, PR #107)
 - **Périmètre** : mono-site, LAN de laboratoire, fonctionnement sans Internet
 
 ## Statuts utilisés
@@ -44,7 +44,7 @@ Depuis le commit `64e228c`, chaque process déclare un rôle via `PROCESS_ROLE` 
 |---|---|---|---|
 | `web` | `uvicorn app.main:app` | API/UI, WebSocket, fan-out Redis (dans **chaque** worker) | VERIFIED (tests de gating) |
 | `scheduler` | `python -m app.scheduler` | Purge des jetons (1 h) — exemplaire unique | VERIFIED (tests) / CONFIGURED (runtime compose) |
-| `analyzer-gateway` | `python -m app.analyzer_gateway` | Listener DH36 (bind TCP → exemplaire unique) | VERIFIED (tests) / CONFIGURED (runtime compose) |
+| `analyzer-gateway` | `python -m app.analyzer_gateway` | Héberge les interfaces explicitement qualifiées ; aucune par défaut ; heartbeat de process | VERIFIED (tests + compose), interfaces DISABLED |
 | `all` (défaut) | `uvicorn app.main:app` | Tout-en-un (dev / mono-poste) | VERIFIED |
 
 Le rôle est loggé au démarrage. **Aucune tâche singleton ne tourne dans les
@@ -57,7 +57,7 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 | `proxy` (Caddy) | caddy:2.8-alpine | **80, 443 — seuls ports publiés** | frontend |
 | `app` | ruggylab-os | aucun | frontend, backend |
 | `scheduler` | ruggylab-os | aucun | backend |
-| `analyzer-gateway` | ruggylab-os | aucun (port DH36 à lier au VLAN automates si besoin) | analyzer, backend |
+| `analyzer-gateway` | ruggylab-os | aucun ; aucune interface activée dans le compose de référence | analyzer, backend |
 | `postgres` | postgres:16-alpine | aucun | backend |
 | `redis` | redis:7-alpine | aucun | backend |
 | `prometheus` | prom/prometheus | aucun (accès VPN/bastion) | backend, management |
@@ -81,7 +81,7 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 
 ## 4. Données et migrations
 
-- Chaîne Alembic linéaire jusqu'à `20260625_0036` — **VERIFIED** : `upgrade head`
+- Chaîne Alembic linéaire jusqu'à `20260724_0039` — **VERIFIED** : `upgrade head`
   \+ idempotence (`downgrade base` → `upgrade head`) exécutés sur PostgreSQL 16
   à chaque CI.
 - Enum `userrole` : valeurs minuscules partout (modèle `values_callable`,
@@ -140,19 +140,30 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 | Rate limiting global + login + quotas utilisateur | VERIFIED (tests) |
 | Cloisonnement par rôle/unité (RBAC) | VERIFIED (tests `*_rbac.py` + smoke 403) |
 | Démarrage refusé si secrets faibles hors test | VERIFIED (tests) |
-| Ingestion DH36 : HMAC, anti-rejeu, identités par appareil | TARGET (§15) |
+| Ingestion/listener DH36 | DISABLED par défaut ; protocole et appareil réels non qualifiés |
 | MFA (TOTP/WebAuthn) pour comptes privilégiés | TARGET (P1) |
 | Audit append-only (table `audit_events` existante, non immuable) | IMPLEMENTED / TARGET durcissement |
-| SBOM, signature d'images, pin des Actions par SHA | TARGET (P1) |
+| Scopes OAuth | DECLARATIF : aucune route scopée ; les rôles DB font autorité |
+| Pin des Actions par SHA et runtime Node 24 | VERIFIED (CI, PR #100) |
+| SBOM et signature d'images | TARGET (P1) |
 
 ## 9. Interfaçage automates
 
-- Listener **Dymind DH36** (HL7 sur TCP) : parsing + ingestion — IMPLEMENTED
-  (tests d'ingestion) ; isolement dans le process gateway — VERIFIED (tests de
-  rôle) / CONFIGURED (runtime).
-- Driver ASTM TCP (`scripts/astm_tcp_driver.py`) : IMPLEMENTED, non éprouvé sur
-  instrument réel — UNKNOWN en conditions réelles.
-- Quarantaine formalisée des messages non appariés (§15) : TARGET.
+- Le gateway reste sain grâce à un heartbeat, mais n'ouvre aucune interface
+  dans le compose de référence — **VERIFIED**, PR #107.
+- Le listener et l'endpoint historiques **Dymind DH36/HL7** sont implémentés et
+  testés sur trames synthétiques, mais désactivés par défaut. Leur correspondance
+  avec le DH36 réel n'est pas démontrée — **IMPLEMENTED / NON QUALIFIÉ**.
+- Les parseurs bruts Dymind hématologie, Dymind biochimie et Anbio immuno ont
+  `protocol="unknown"` et lèvent `NotImplementedError` — **STUB / DISABLED**.
+- Le driver ASTM TCP (`scripts/astm_tcp_driver.py`) est générique, non rattaché
+  à un appareil qualifié et non éprouvé en réel — **IMPLEMENTED / UNKNOWN**.
+- Les routes POCT/Precix sont fail-closed tant que le registre `Equipment` ne
+  peut pas porter un profil qualifié — **VERIFIED**.
+- Inventaire, statuts et tests :
+  `DEVICE_CONNECTIVITY_INVENTORY_2026.md`,
+  `DEVICE_INTEGRATION_MATRIX_2026.md` et
+  `DEVICE_COMMISSIONING_CHECKLIST_2026.md`.
 
 ## 10. Interprétation et auto-validation
 
@@ -161,7 +172,7 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - Auto-validation (§5.8 ISO 15189) : configuration versionnée + garde-fous —
   IMPLEMENTED + tests (`test_auto_validation.py`). **La présence de cette
   fonction ne vaut pas conformité ISO 15189** (preuves organisationnelles
-  requises).
+  requises). Traçabilité : `docs/AUTOVALIDATION_5_8.md`.
 - Moteur d'interprétation **unique (§21) — DÉCISION CONFIRMÉE (2026-07, responsable
   du projet) : NE PAS unifier.** `ReferenceRange`/`CriticalRange` reste le moteur
   officiel, `bioref` la couche d'aide (cf. `docs/INTERPRETATION.md`, section
@@ -183,16 +194,31 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - **Serveur physique non qualifié** : la stack tourne en CI (job `docker-stack`)
   mais n'a jamais été démarrée sur le serveur cible du laboratoire (UPS, VLAN
   automates, imprimantes) — UNKNOWN.
-- **Gateway automates non connectée à un automate réel** : IMPLEMENTED dans le
-  code, CONFIGURED dans compose (réseau bridge ≠ VLAN physique), NON VÉRIFIÉ
-  avec des trames DH36 réelles.
+- **Interfaces appareil non qualifiées** : aucune n'est connectée à un appareil
+  réel. Le compose les désactive et ne publie aucun port instrument. Activation
+  interdite sans identité, manuel, protocole, mapping et commissioning signés.
+- **PR80-CLIN-01 corrigé techniquement** : qualitatif non validé/non critique,
+  POCT refusé et aucune clôture/valeur/seuil implicite. Le workflow futur reste
+  soumis à décision clinique.
+- **Paludisme fail-closed** : aucun fallback heuristique ; modèle absent ou
+  erreur = échec explicite ; une éventuelle inférence ne modifie pas `Result`.
+  Le modèle réel et son usage clinique restent non qualifiés.
+- **Registre Equipment normalisé** : identité nullable, interfaces,
+  qualifications, analytes et documents sont portés par la révision 0039. Le
+  service central vérifie snapshot, preuve, périmètre et RBAC à l'activation et
+  à l'ingestion. Aucune donnée réelle n'est préremplie ; commissioning requis.
+- **Worker Windows local incompatible** : la tâche observée passe un argument
+  absent de la CLI courante et pointe vers un checkout mutable. Elle ne doit pas
+  être utilisée comme preuve du rôle outbox préproduction ; voir
+  `docs/INCIDENT_WORKER_PLANIFIE_2026-07-23.md`.
 - **Prometheus/Grafana « accès VPN/bastion »** : le réseau management existe,
   mais aucun VPN/bastion n'est livré par le dépôt — TARGET (accès via
   `docker exec` local en attendant).
 - **Multi-worker non testé en intégration** (le gating par rôle est testé
   unitairement ; `docker-stack` valide 1 exemplaire par rôle, pas le scaling).
-- **Heartbeat scheduler absent** : son healthcheck est neutralisé (`disable`) ;
-  un heartbeat horodaté reste à implémenter — TARGET.
+- **Heartbeats scheduler/gateway** : implémentés et contrôlés par les
+  healthchecks compose — VERIFIED en CI ; supervision réelle du serveur cible à
+  qualifier.
 - `/docs`, `/openapi.json`, `/metrics`, `/redoc` : **bloqués au proxy (404,
   VERIFIED en CI)** ; côté app ils restent servis sur le réseau backend (choix :
   Prometheus y scrape `/metrics`). Restriction applicative fine (§14) — TARGET.
@@ -206,9 +232,35 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
 - FHIR : export partiel (« sous-ensemble FHIR R4 »), pas d'API FHIR complète.
 - HL7 v2 ADT/ORM/ORU génériques, multisite, PRA : PLANNED (P1/P2).
 
-## 12. Références
+## 12. Registre Equipment
+
+La révision `20260724_0039` ajoute les tables `equipment_interfaces`,
+`equipment_qualifications`, `equipment_approved_analytes` et
+`equipment_documents`. Une migration ne crée aucune interface, qualification,
+méthode, unité, analyte ou preuve.
+
+`app.services.equipment_registry` porte la seule transition d'activation et
+ajoute l'audit avant le commit. Les mutations techniques et l'activation
+utilisent `require_admin`; l'approbation, la suspension et la désactivation
+utilisent `require_officer`. Approbation et activation sont deux actes
+distincts, sans exigence actuelle de deux personnes.
+
+L'activation du registre ne démarre aucun listener. Tous les appareils réels
+restent **NON QUALIFIÉS / NON ACTIVABLES EN CLINIQUE**.
+
+## 13. Références
 
 - Déploiement, sauvegarde, rollback : `docs/DEPLOYMENT.md`
 - Secrets : `docs/SECRETS_MANAGEMENT.md` · Observabilité : `docs/observability.md`
 - Exploitation/formation, mode dégradé, UPS : `docs/LIVRABLES_FORMATION_EXPLOITATION.md`
 - Décision moteur d'interprétation : `docs/INTERPRETATION.md`
+- Garde-fous auto-validation : `docs/AUTOVALIDATION_5_8.md`
+- Revue d'intégration PR #80 : `docs/PR80_MAIN_INTEGRATION_REVIEW_2026.md`
+- Qualification préproduction : `docs/PREPRODUCTION_QUALIFICATION_PLAN_2026.md`
+- Rollback et reprise : `docs/ROLLBACK_AND_RECOVERY_RUNBOOK_2026.md`
+- Parc équipements : `docs/DEVICE_CONNECTIVITY_INVENTORY_2026.md`
+- Matrice d'intégration : `docs/DEVICE_INTEGRATION_MATRIX_2026.md`
+- Décision de registre : `docs/DEVICE_EQUIPMENT_REGISTRY_DECISION_2026.md`
+- Architecture du registre : `docs/EQUIPMENT_REGISTRY_ARCHITECTURE_2026.md`
+- Dictionnaire : `docs/EQUIPMENT_REGISTRY_DATA_DICTIONARY_2026.md`
+- Workflow : `docs/EQUIPMENT_QUALIFICATION_WORKFLOW_2026.md`

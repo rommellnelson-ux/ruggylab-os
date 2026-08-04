@@ -1,10 +1,10 @@
 """Tests for the MobileNetV2 / ONNX malaria classifier.
 
-When no real ONNX model file exists the classifier gracefully falls back to
-the heuristic stub, so these tests can run without GPU or a trained model.
+When no real ONNX model file exists the classifier fails closed, so no
+synthetic prediction can enter a clinical workflow.
 
 Tests cover:
-- Fallback heuristic when model file is absent
+- Fail-closed behaviour when model file is absent
 - Label consistency (only "positive" or "negative")
 - Confidence is in (0, 1]
 - ONNX inference path (with a minimal 2-class ONNX model generated at test time)
@@ -87,32 +87,30 @@ def real_classifier(onnx_model_path):
 
 
 # ---------------------------------------------------------------------------
-# Heuristic fallback tests
+# Fail-closed tests
 # ---------------------------------------------------------------------------
 
 
-def test_stub_predicts_positive_for_positive_url(stub_classifier):
-    pred = stub_classifier.predict("microscopy/positive_cell.jpg")
-    assert pred.label == "positive"
-    assert 0 < pred.confidence <= 1.0
+def test_stub_rejects_positive_keyword(stub_classifier):
+    from app.services.malaria_ai import ClinicalModelUnavailableError
+
+    with pytest.raises(ClinicalModelUnavailableError):
+        stub_classifier.predict("microscopy/positive_cell.jpg")
 
 
-def test_stub_predicts_negative_for_negative_url(stub_classifier):
-    pred = stub_classifier.predict("microscopy/negative_cell.jpg")
-    assert pred.label == "negative"
-    assert 0 < pred.confidence <= 1.0
+def test_stub_rejects_negative_keyword(stub_classifier):
+    from app.services.malaria_ai import ClinicalModelUnavailableError
+
+    with pytest.raises(ClinicalModelUnavailableError):
+        stub_classifier.predict("microscopy/negative_cell.jpg")
 
 
-def test_stub_label_is_binary(stub_classifier):
-    for url in ["img_001.jpg", "sample_042.png", "field_003.bmp"]:
-        pred = stub_classifier.predict(url)
-        assert pred.label in ("positive", "negative")
+def test_stub_rejects_arbitrary_identifiers(stub_classifier):
+    from app.services.malaria_ai import ClinicalModelUnavailableError
 
-
-def test_stub_confidence_in_range(stub_classifier):
     for url in ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"]:
-        pred = stub_classifier.predict(url)
-        assert 0.0 < pred.confidence <= 1.0
+        with pytest.raises(ClinicalModelUnavailableError):
+            stub_classifier.predict(url)
 
 
 def test_stub_is_not_real_model(stub_classifier):

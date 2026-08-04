@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models import User
 from app.schemas.dh36_ingestion import DH36IngestRequest, DH36IngestResponse
@@ -20,6 +21,15 @@ def ingest_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> DH36IngestResponse:
+    if not settings.ENABLE_DH36_INGESTION:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Interface DH36 désactivée : protocole, appareil et mapping "
+                "non qualifiés pour un usage clinique."
+            ),
+        )
+
     try:
         outcome = ingest_dh36_message(
             db,

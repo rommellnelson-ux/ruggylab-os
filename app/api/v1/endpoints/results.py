@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.deps import get_current_active_user, require_officer
+from app.api.deps import forbid_accountant, get_current_active_user, require_officer
 from app.db.session import get_db
 from app.models import AuditEvent, Equipment, ReportSignature, Result, Sample, User
 from app.schemas.fhir import FHIRDiagnosticReport
@@ -33,9 +33,15 @@ from app.services.fhir_builder import build_diagnostic_report
 from app.services.inventory import InsufficientStockError, consume_reagents_for_result
 from app.services.patient_access import (
     apply_result_patient_scope,
+    can_access_patient,
     can_access_result,
 )
 from app.services.reference_checker import compute_flags
+from app.services.sample_workflow import (
+    CancelledSampleError,
+    ensure_sample_processable,
+    lock_sample_by_id,
+)
 from app.utils.datetime_utils import utcnow_naive
 
 router = APIRouter(prefix="/results")
@@ -360,8 +366,18 @@ def get_result_fhir(
     result = _get_accessible_result_or_error(db, result_id, current_user)
 
     report = build_diagnostic_report(result)
+    content = report.model_dump(exclude_none=True)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="result.fhir.export",
+        entity_type="result",
+        entity_id=str(result_id),
+        payload={"resource_type": "DiagnosticReport"},
+    )
+    db.commit()
     return JSONResponse(
-        content=report.model_dump(exclude_none=True),
+        content=content,
         media_type="application/fhir+json",
     )
 
@@ -370,14 +386,27 @@ def get_result_fhir(
 def create_result(
     payload: ResultCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(forbid_accountant),
 ) -> Result:
-    sample = db.query(Sample).filter(Sample.id == payload.sample_id).first()
+    sample = lock_sample_by_id(db, payload.sample_id)
     if not sample:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Echantillon introuvable pour l'identifiant {payload.sample_id}.",
         )
+    patient = sample.patient
+    if patient is not None and not can_access_patient(current_user, patient):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès au patient hors de votre périmètre.",
+        )
+    try:
+        ensure_sample_processable(sample)
+    except CancelledSampleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
     if payload.equipment_id is not None:
         equipment = db.query(Equipment).filter(Equipment.id == payload.equipment_id).first()
@@ -393,7 +422,6 @@ def create_result(
     # Auto-detect critical values against configured thresholds (OR with manual flag)
     result_data["is_critical"] = payload.is_critical or check_critical(payload.data_points, db)
     # Resolve patient for delta-check and reference flags
-    patient = sample.patient
     patient_id = patient.id if patient else None
     patient_sex = patient.sex if patient else None
     patient_birth = patient.birth_date if patient else None
@@ -441,6 +469,19 @@ def create_result(
         from app.services.code_mapping_service import apply_bioref_to_result
 
         apply_bioref_to_result(db, result)
+    log_audit_event(
+        db,
+        user=current_user,
+        event_type="result.create",
+        entity_type="result",
+        entity_id=str(result.id),
+        payload={
+            "sample_id": result.sample_id,
+            "exam_code": result.exam_code,
+            "is_critical": result.is_critical,
+            "is_auto_validated": result.is_auto_validated,
+        },
+    )
     db.commit()
     db.refresh(result)
     # Push temps-réel : alerte immédiate si critique ou delta dépassé

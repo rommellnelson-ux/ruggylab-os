@@ -20,19 +20,28 @@ import json
 
 from sqlalchemy.orm import Session
 
-from app.models import QcControl, QcResult, Result
+from app.models import QcControl, QcResult, Result, User
 from app.schemas.qc import QC_REJECT_RULES
 from app.services.critical_notifier import get_pending_criticals
 from app.services.expiry_notifier import get_expiring_reagents
+from app.services.patient_access import apply_result_patient_scope
 from app.utils.datetime_utils import utcnow_naive
 
 
-def _recent_delta_results(db: Session, hours: int = 48, limit: int = 20) -> list[dict]:
+def _recent_delta_results(
+    db: Session,
+    hours: int = 48,
+    limit: int = 20,
+    *,
+    user: User | None = None,
+) -> list[dict]:
     """Résultats avec delta-check dépassé sur les ``hours`` dernières heures."""
     cutoff = utcnow_naive() - dt.timedelta(hours=hours)
+    query = db.query(Result)
+    if user is not None:
+        query = apply_result_patient_scope(query, user)
     rows = (
-        db.query(Result)
-        .filter(Result.delta_exceeded.is_(True), Result.analysis_date >= cutoff)
+        query.filter(Result.delta_exceeded.is_(True), Result.analysis_date >= cutoff)
         .order_by(Result.analysis_date.desc())
         .limit(limit)
         .all()
@@ -79,14 +88,19 @@ def _qc_rejects(db: Session) -> list[dict]:
     return rejects
 
 
-def build_alert_snapshot(db: Session, *, expiry_days: int = 7) -> dict:
+def build_alert_snapshot(
+    db: Session,
+    *,
+    expiry_days: int = 7,
+    user: User | None = None,
+) -> dict:
     """Construit l'instantané complet des alertes actives.
 
     Returns un dict sérialisable JSON contenant les listes détaillées,
     les compteurs par catégorie et un total global, plus un horodatage.
     """
-    criticals = get_pending_criticals(db)
-    deltas = _recent_delta_results(db)
+    criticals = get_pending_criticals(db, user=user)
+    deltas = _recent_delta_results(db, user=user)
     expiring = get_expiring_reagents(db, days=expiry_days)
     qc_rejects = _qc_rejects(db)
 

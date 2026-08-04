@@ -70,37 +70,55 @@ def sync_order_progress(db: Session, order: ExamOrder) -> ExamOrder:
     return order
 
 
-def build_thread(db: Session, order: ExamOrder) -> ExamOrderThread:
+def build_thread(
+    db: Session,
+    order: ExamOrder,
+    *,
+    synchronize: bool = True,
+) -> ExamOrderThread:
     """Construit la vue « fil » consolidée pour la paillasse."""
-    sync_order_progress(db, order)
+    if synchronize:
+        sync_order_progress(db, order)
 
     patient = db.query(Patient).filter(Patient.id == order.patient_id).first()
     sample: Sample | None = None
     if order.sample_id is not None:
         sample = db.query(Sample).filter(Sample.id == order.sample_id).first()
 
-    # Résultats indexés pour enrichir chaque étape (critique / validé).
+    # Résultats indexés pour enrichir chaque étape (critique / validé) et,
+    # sans synchronisation, projeter un fil à jour sans modifier la session.
     results_by_id: dict[int, Result] = {}
+    results_by_code: dict[str, Result] = {}
     if order.sample_id is not None:
         for r in db.query(Result).filter(Result.sample_id == order.sample_id).all():
             results_by_id[r.id] = r
+            if r.exam_code:
+                previous = results_by_code.get(r.exam_code)
+                if previous is None or r.analysis_date >= previous.analysis_date:
+                    results_by_code[r.exam_code] = r
 
     steps: list[ExamThreadStep] = []
     resulted = 0
     active = 0
     for item in order.items:
-        if item.status != "cancelled":
+        item_status = item.status
+        item_result_id = item.result_id
+        if not synchronize and item_status != "cancelled":
+            match = results_by_code.get(item.exam_code)
+            item_status = "resulted" if match is not None else "pending"
+            item_result_id = match.id if match is not None else None
+        if item_status != "cancelled":
             active += 1
-        if item.status == "resulted":
+        if item_status == "resulted":
             resulted += 1
-        res: Result | None = results_by_id.get(item.result_id) if item.result_id else None
+        res: Result | None = results_by_id.get(item_result_id) if item_result_id else None
         catalog = exam_catalog_entry(item.exam_code)
         steps.append(
             ExamThreadStep(
                 exam_code=item.exam_code,
                 exam_label=item.exam_label,
-                status=item.status,
-                result_id=item.result_id,
+                status=item_status,
+                result_id=item_result_id,
                 is_critical=bool(res.is_critical) if res else False,
                 is_validated=bool(res.is_validated) if res else False,
                 preanalytics=catalog.get("preanalytics") if catalog else None,
@@ -109,9 +127,19 @@ def build_thread(db: Session, order: ExamOrder) -> ExamOrderThread:
         )
 
     progress = round(100 * resulted / active) if active else 0
+    projected_status = order.status
+    if not synchronize and order.status != "cancelled":
+        if active and resulted == active:
+            projected_status = "completed"
+        elif resulted > 0:
+            projected_status = "in_progress"
+        elif order.sample_id is not None:
+            projected_status = "collected"
+        else:
+            projected_status = "prescribed"
     return ExamOrderThread(
         order_id=order.id,
-        status=order.status,
+        status=projected_status,
         priority=order.priority,
         patient_id=order.patient_id,
         patient_label=_patient_label(patient),

@@ -203,6 +203,7 @@ def apply_bnpl_installment_to_invoice(
     invoice = (
         db.query(Invoice)
         .filter(Invoice.payment_plan_id == schedule_id, Invoice.status != "cancelled")
+        .with_for_update()
         .first()
     )
     if invoice is None:
@@ -213,8 +214,6 @@ def apply_bnpl_installment_to_invoice(
     )
     invoice.paid_xof = Decimal(invoice.paid_xof or 0) + amount
     recompute_status(invoice)
-    db.commit()
-    db.refresh(invoice)
     return invoice
 
 

@@ -15,6 +15,7 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
     database_path = tmp_path / "test_ruggylab.db"
     settings.TESTING = True
     settings.ENABLE_DH36_LISTENER = False
+    settings.ENABLE_DH36_INGESTION = True
     settings.SECRET_KEY = "test_secret_key_for_pytest_only_123456"
     settings.FIRST_SUPERUSER = "admin"
     settings.FIRST_SUPERUSER_PASSWORD = "change_me_admin_password"
