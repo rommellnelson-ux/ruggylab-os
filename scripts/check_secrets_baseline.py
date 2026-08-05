@@ -7,7 +7,6 @@ import copy
 import json
 import os
 import subprocess
-import tempfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
@@ -36,20 +35,21 @@ def compare_baseline_documents(before: dict[str, Any], after: dict[str, Any]) ->
 
 
 def check_update_stability(baseline_path: Path) -> list[str]:
-    """Run the official update on a temporary copy and compare safely."""
-    before = json.loads(baseline_path.read_text(encoding="utf-8"))
-    with tempfile.TemporaryDirectory() as directory:
-        candidate = Path(directory) / baseline_path.name
-        candidate.write_text(json.dumps(before, indent=2) + "\n", encoding="utf-8")
+    """Run the official update in place, compare safely, then restore it."""
+    original = baseline_path.read_text(encoding="utf-8")
+    before = json.loads(original)
+    try:
         completed = subprocess.run(
-            ["detect-secrets", "scan", "--baseline", str(candidate)],
+            ["detect-secrets", "scan", "--baseline", str(baseline_path)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
         )
         if completed.returncode != 0:
             return [".secrets.baseline: detect-secrets update failed"]
-        after = json.loads(candidate.read_text(encoding="utf-8"))
+        after = json.loads(baseline_path.read_text(encoding="utf-8"))
+    finally:
+        baseline_path.write_text(original, encoding="utf-8")
     return compare_baseline_documents(before, after)
 
 
