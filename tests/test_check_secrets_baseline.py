@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.check_secrets_baseline import validate_baseline
+from scripts.check_secrets_baseline import compare_baseline_documents, validate_baseline
 
 
 def _write_baseline(path: Path, results: dict[str, list[object]], version: str = "1.5.0") -> None:
@@ -52,3 +52,24 @@ def test_rejects_invalid_json_without_leaking_content(tmp_path: Path) -> None:
     errors = validate_baseline(baseline, tmp_path)
 
     assert errors == [".secrets.baseline: invalid baseline (JSONDecodeError)"]
+
+
+def test_stability_ignores_only_generated_at() -> None:
+    before = {
+        "version": "1.5.0",
+        "generated_at": "first",
+        "results": {"tests/example.py": [{"type": "Secret Keyword", "hashed_secret": "one"}]},
+    }
+    after = {
+        **before,
+        "generated_at": "second",
+    }
+
+    assert compare_baseline_documents(before, after) == []
+
+    after["results"] = {
+        "tests/example.py": [{"type": "Secret Keyword", "hashed_secret": "different"}]
+    }
+    assert compare_baseline_documents(before, after) == [
+        "tests/example.py: baseline results changed during update"
+    ]

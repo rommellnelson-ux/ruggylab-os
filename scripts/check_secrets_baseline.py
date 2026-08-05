@@ -3,13 +3,54 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import os
+import subprocess
+import tempfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 EXPECTED_VERSION = "1.5.0"
 JUSTIFIED_MISSING_PATHS: frozenset[str] = frozenset()
+
+
+def compare_baseline_documents(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+    """Compare baselines while ignoring only the volatile generation timestamp."""
+    expected = copy.deepcopy(before)
+    actual = copy.deepcopy(after)
+    expected.pop("generated_at", None)
+    actual.pop("generated_at", None)
+    if expected == actual:
+        return []
+
+    errors: list[str] = []
+    expected_results = expected.pop("results", {})
+    actual_results = actual.pop("results", {})
+    for path in sorted(set(expected_results) | set(actual_results)):
+        if expected_results.get(path) != actual_results.get(path):
+            errors.append(f"{path}: baseline results changed during update")
+    if expected != actual:
+        errors.append(".secrets.baseline: configuration changed during update")
+    return errors or [".secrets.baseline: content changed during update"]
+
+
+def check_update_stability(baseline_path: Path) -> list[str]:
+    """Run the official update on a temporary copy and compare safely."""
+    before = json.loads(baseline_path.read_text(encoding="utf-8"))
+    with tempfile.TemporaryDirectory() as directory:
+        candidate = Path(directory) / baseline_path.name
+        candidate.write_text(json.dumps(before, indent=2) + "\n", encoding="utf-8")
+        completed = subprocess.run(
+            ["detect-secrets", "scan", "--baseline", str(candidate)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return [".secrets.baseline: detect-secrets update failed"]
+        after = json.loads(candidate.read_text(encoding="utf-8"))
+    return compare_baseline_documents(before, after)
 
 
 def validate_baseline(baseline_path: Path, repository_root: Path) -> list[str]:
@@ -63,14 +104,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("baseline", nargs="?", type=Path, default=Path(".secrets.baseline"))
     parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument("--check-update-stability", action="store_true")
     args = parser.parse_args()
 
     errors = validate_baseline(args.baseline, args.root.resolve())
+    if not errors and args.check_update_stability:
+        errors.extend(check_update_stability(args.baseline))
     for error in errors:
         print(error)
     if errors:
         return 1
-    print("Secret baseline structure is valid.")
+    if args.check_update_stability:
+        print("Secret baseline structure and update stability are valid.")
+    else:
+        print("Secret baseline structure is valid.")
     return 0
 
 

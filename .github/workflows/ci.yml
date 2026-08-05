@@ -59,9 +59,7 @@ jobs:
         run: python scripts/check_secrets_baseline.py
 
       - name: Secret baseline update stability — Linux
-        run: |
-          detect-secrets scan --baseline .secrets.baseline
-          git diff --exit-code -- .secrets.baseline
+        run: python scripts/check_secrets_baseline.py --check-update-stability
 
       - name: Secret scan — blocking
         run: |
