@@ -97,6 +97,18 @@ def validate_baseline(baseline_path: Path, repository_root: Path) -> list[str]:
         if canonical not in JUSTIFIED_MISSING_PATHS and not (repository_root / canonical).is_file():
             errors.append(f"{raw_path}: tracked file does not exist")
 
+        findings = results[raw_path]
+        if not isinstance(findings, list):
+            errors.append(f"{raw_path}: findings must be a list")
+            continue
+        for finding in findings:
+            if not isinstance(finding, dict):
+                errors.append(f"{raw_path}: finding must be an object")
+                continue
+            nested_path = finding.get("filename")
+            if nested_path is not None and nested_path != canonical:
+                errors.append(f"{raw_path}: nested filename must match its POSIX result path")
+
     return sorted(set(errors))
 
 

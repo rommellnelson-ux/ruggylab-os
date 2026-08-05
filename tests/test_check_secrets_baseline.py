@@ -45,6 +45,21 @@ def test_rejects_windows_absolute_missing_and_wrong_version(tmp_path: Path) -> N
     assert any("missing.txt: tracked file does not exist" in error for error in errors)
 
 
+def test_rejects_non_posix_nested_filename(tmp_path: Path) -> None:
+    tracked = tmp_path / "docs" / "example.md"
+    tracked.parent.mkdir()
+    tracked.write_text("placeholder", encoding="utf-8")
+    baseline = tmp_path / ".secrets.baseline"
+    _write_baseline(
+        baseline,
+        {"docs/example.md": [{"filename": "docs\\example.md"}]},
+    )
+
+    assert validate_baseline(baseline, tmp_path) == [
+        "docs/example.md: nested filename must match its POSIX result path"
+    ]
+
+
 def test_rejects_invalid_json_without_leaking_content(tmp_path: Path) -> None:
     baseline = tmp_path / ".secrets.baseline"
     baseline.write_text("not-json", encoding="utf-8")
