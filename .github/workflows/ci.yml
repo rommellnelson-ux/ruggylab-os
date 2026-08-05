@@ -302,6 +302,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          import os
           import secrets
 
           values = {name: secrets.token_urlsafe(48) for name in (
@@ -318,6 +319,8 @@ jobs:
               )
               environment.write(f"GRAFANA_PASSWORD={values['CI_GRAFANA_PASSWORD']}\n")
               environment.write("RUGGYLAB_DOMAIN=localhost\n")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as github_environment:
+              github_environment.write(f"CI_ADMIN_PASSWORD={values['CI_ADMIN_PASSWORD']}\n")
           PY
 
       - name: Start dependencies and run migrations
@@ -383,7 +386,7 @@ jobs:
         env:
           UAT_BASE_URL: https://localhost
           UAT_INSECURE_TLS: "1"
-          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+          FIRST_SUPERUSER_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
         run: |
           pip install httpx
           python -m scripts.uat_smoke
