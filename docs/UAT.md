@@ -10,8 +10,8 @@ cloisonnée, comptes nominatifs, audit activé.
 
 ```powershell
 # Variables d'environnement (PowerShell : $env:, surtout pas "export")
-$env:SECRET_KEY = "ruggylab-uat-secret-key-min-32-characters"
-$env:FIRST_SUPERUSER_PASSWORD = "SuperAdmin2026!SecurePass"   # >= 16 caractères
+$env:SECRET_KEY = python -c "import secrets; print(secrets.token_urlsafe(48))"
+$env:FIRST_SUPERUSER_PASSWORD = python -c "import secrets; print(secrets.token_urlsafe(24))"
 $env:DATABASE_URL = "sqlite:///./uat.db"
 
 alembic upgrade head            # crée le schéma
@@ -23,11 +23,14 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 > serveur refuse de démarrer (réglages de sécurité par défaut trop faibles) et
 > la base reste vide.
 
+> Ces identifiants sont réservés à une instance UAT jetable : jamais en production,
+> jamais réutilisés. Ne commitez ni le fichier `.env` ni les valeurs générées.
+
 ### Linux / macOS (bash)
 
 ```bash
-export SECRET_KEY="ruggylab-uat-secret-key-min-32-characters"
-export FIRST_SUPERUSER_PASSWORD="SuperAdmin2026!SecurePass"
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export FIRST_SUPERUSER_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
 export DATABASE_URL="sqlite:///./uat.db"
 alembic upgrade head && python -m scripts.seed_demo
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -36,15 +39,15 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ### Variante PostgreSQL (optionnelle, « comme en production »)
 
 Uniquement si un serveur PostgreSQL est installé et démarré, avec une base et un
-utilisateur créés au préalable. Remplacez `motdepasse` par le vrai mot de passe :
+utilisateur créés au préalable. Générez un mot de passe unique pour cette instance, ne le réutilisez jamais et remplacez le placeholder explicite ci-dessous :
 
 ```powershell
 # PowerShell
-$env:DATABASE_URL = "postgresql+psycopg://ruggylab:motdepasse@localhost:5432/ruggylab_uat"
+$env:DATABASE_URL = "postgresql+psycopg://ruggylab:<UAT_DB_PASSWORD>@localhost:5432/ruggylab_uat"
 ```
 ```bash
 # bash
-export DATABASE_URL="postgresql+psycopg://ruggylab:motdepasse@localhost:5432/ruggylab_uat"
+export DATABASE_URL="postgresql+psycopg://ruggylab:<UAT_DB_PASSWORD>@localhost:5432/ruggylab_uat"
 ```
 
 Pour valider les fonctionnalités, **SQLite suffit** — PostgreSQL n'est pas nécessaire.
@@ -149,7 +152,8 @@ contre une instance de test.
   d'une autre unité (accès refusé + tracé).
 
 ## 5. Points connus (non bloquants)
-- Les étapes CI `pip-audit` / `detect-secrets` sont **informatives** (état externe).
+- `detect-secrets` est bloquant en CI ; `pip-audit` reste informatif car il dépend
+  d'un état externe.
 - Tests Playwright (e2e) ignorés si Playwright n'est pas installé.
 - Toute donnée patient saisie en UAT reste sur l'instance de test.
 

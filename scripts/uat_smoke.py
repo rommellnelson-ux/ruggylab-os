@@ -18,6 +18,7 @@ uniquement contre une instance de test dédiée.
 from __future__ import annotations
 
 import os
+import secrets
 import sys
 import uuid
 
@@ -154,14 +155,15 @@ def main() -> int:
 
     # 9. Comptable + facturation
     compta_user = f"smoke_compta_{_suffix}"
+    compta_password = secrets.token_urlsafe(24)
     client.post(
         f"{API}/users",
         headers=admin,
-        json={"username": compta_user, "password": "SmokeCompta123!", "role": "accountant"},
+        json={"username": compta_user, "password": compta_password, "role": "accountant"},
     )
     r = client.post(
         f"{API}/login/access-token",
-        data={"username": compta_user, "password": "SmokeCompta123!"},
+        data={"username": compta_user, "password": compta_password},
     )
     if not _check("connexion comptable", r.status_code == 200, r.text[:160]):
         return _summary()
