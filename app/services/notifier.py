@@ -5,7 +5,7 @@ StockNotifier — Notifications d'alerte de rupture de stock CMU Côte d'Ivoire
 Envoie des alertes de stock par webhook (HTTP POST) et/ou email (SMTP).
 
 Dépendances stdlib uniquement :
-  - urllib.request pour les appels HTTP
+  - transport HTTP sûr centralisé (app.utils.safe_http) pour les webhooks
   - smtplib pour l'envoi d'emails
 """
 
@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import logging
 import smtplib
-import urllib.error
-import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.mime.text import MIMEText
@@ -34,6 +32,7 @@ from app.schemas.stock_predictor import (
     StockPredictionLine,
 )
 from app.services.stock_predictor import get_stock_predictor
+from app.utils.safe_http import safe_post_json
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +115,9 @@ class StockNotifier:
                     channels_used.append("WEBHOOK")
                     notifications_sent += 1
                 else:
-                    errors.append(f"Échec envoi webhook vers {request.webhook_url}")
+                    # L'URL n'est jamais renvoyée à l'appelant : elle lui servirait
+                    # d'oracle pour cartographier le réseau interne (cf. F-01).
+                    errors.append("Échec envoi webhook.")
             else:
                 errors.append("webhook_url requis pour channel WEBHOOK/BOTH")
 
@@ -143,36 +144,28 @@ class StockNotifier:
         )
 
     def _send_webhook(self, url: str, payload: StockAlertNotification) -> bool:
-        """POST JSON au webhook. Timeout 10s. Retourne True si 2xx."""
+        """POST JSON au webhook. Retourne True si 2xx.
+
+        L'URL provient du corps de la requête d'un utilisateur authentifié :
+        elle est validée puis épinglée par ``safe_post_json`` juste avant la
+        connexion, et aucune redirection n'est suivie (cf. F-01).
+        """
         timeout = settings.NOTIFICATION_WEBHOOK_TIMEOUT_SECONDS
         body = payload.model_dump_json().encode("utf-8")
-        req = urllib.request.Request(  # noqa: S310
-            url,
-            data=body,
-            method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "RuggyLab-StockNotifier/1.0",
-            },
-        )
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310  # nosec B310
-                status_code: int = resp.status
-                if 200 <= status_code < 300:
-                    logger.info("stock_notifier.webhook.ok url=%s status=%d", url, status_code)
-                    return True
-                logger.warning("stock_notifier.webhook.non2xx url=%s status=%d", url, status_code)
-                return False
-        except urllib.error.HTTPError as exc:
-            logger.error(
-                "stock_notifier.webhook.http_error url=%s status=%d err=%s",
+            status_code = safe_post_json(
                 url,
-                exc.code,
-                exc,
+                body,
+                timeout=timeout,
+                headers={"User-Agent": "RuggyLab-StockNotifier/1.0"},
             )
+            if 200 <= status_code < 300:
+                logger.info("stock_notifier.webhook.ok status=%d", status_code)
+                return True
+            logger.warning("stock_notifier.webhook.non2xx status=%d", status_code)
             return False
         except Exception as exc:
-            logger.error("stock_notifier.webhook.error url=%s err=%s", url, exc)
+            logger.error("stock_notifier.webhook.error err=%s", exc)
             return False
 
     def _send_email(self, to: list[str], payload: StockAlertNotification) -> bool:
