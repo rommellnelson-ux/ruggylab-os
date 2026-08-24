@@ -39,13 +39,24 @@ async def _run() -> None:
     configure_logging(level="INFO", json_logs=not settings.TESTING, log_file=None)
     logger.info("Scheduler process starting (role=%s)", settings.PROCESS_ROLE)
     heartbeat = asyncio.create_task(_heartbeat_loop(settings.SCHEDULER_HEARTBEAT_FILE))
+    tasks = [asyncio.create_task(periodic_token_cleanup(interval_seconds=3600, keep_days=7))]
+    if settings.CSA_SYNC_ENABLED:
+        from app.services.csa_sync.inbound import periodic_csa_sync
+
+        logger.info("Intégration CSA activée : démarrage du worker de synchro")
+        tasks.append(
+            asyncio.create_task(periodic_csa_sync(settings.CSA_SYNC_INTERVAL_SECONDS))
+        )
     try:
-        # Boucle infinie ; ajouter ici les autres tâches planifiées à l'avenir.
-        await periodic_token_cleanup(interval_seconds=3600, keep_days=7)
+        # Boucles infinies concurrentes (nettoyage jetons + éventuellement synchro CSA).
+        await asyncio.gather(*tasks)
     finally:
         heartbeat.cancel()
+        for task in tasks:
+            task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await heartbeat
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def main() -> None:
