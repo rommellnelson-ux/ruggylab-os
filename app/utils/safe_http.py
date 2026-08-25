@@ -143,6 +143,19 @@ class _PinnedHTTPConnection(http.client.HTTPConnection):
         self.sock = self._connect_validated_socket()
 
 
+def _default_tls_context() -> ssl.SSLContext:
+    """Contexte TLS vérifiant le certificat et refusant TLS < 1.2.
+
+    ``create_default_context`` valide déjà certificat et nom d'hôte, mais laisse
+    le plancher de version à la configuration OpenSSL de l'hôte : TLSv1 et
+    TLSv1.1 y restent négociables. On fixe le plancher explicitement pour que la
+    garantie tienne quelle que soit la machine.
+    """
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
 class _PinnedHTTPSConnection(_PinnedHTTPConnection):
     def __init__(
         self,
@@ -151,7 +164,7 @@ class _PinnedHTTPSConnection(_PinnedHTTPConnection):
         context: ssl.SSLContext | None = None,
     ) -> None:
         super().__init__(target, timeout)
-        self._context = context or ssl.create_default_context()
+        self._context = context or _default_tls_context()
 
     def connect(self) -> None:
         raw_socket = self._connect_validated_socket()

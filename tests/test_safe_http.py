@@ -420,3 +420,19 @@ def test_public_destination_is_still_reachable() -> None:
         status = safe_http.safe_post_json("http://hooks.example/notify", b"{}", timeout=1)
 
     assert status == 202
+
+
+@pytest.mark.parametrize(
+    "refused_version",
+    [ssl.TLSVersion.SSLv3, ssl.TLSVersion.TLSv1, ssl.TLSVersion.TLSv1_1],
+)
+def test_default_tls_context_refuses_obsolete_protocol_versions(
+    refused_version: ssl.TLSVersion,
+) -> None:
+    """Le plancher TLS est fixé dans le code, pas laissé à la config OpenSSL locale."""
+    context = safe_http._default_tls_context()
+
+    assert context.minimum_version == ssl.TLSVersion.TLSv1_2
+    assert context.minimum_version > refused_version
+    assert context.check_hostname is True
+    assert context.verify_mode == ssl.CERT_REQUIRED
