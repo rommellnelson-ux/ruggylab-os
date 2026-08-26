@@ -1148,13 +1148,14 @@
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
               <div>
                 <h3 style="margin:0;">Ma file de travail</h3>
-                <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Actions terrain prioritaires : critiques, TAT, échantillons, QC et NC/CAPA.</p>
+                <p style="margin:4px 0 0;color:var(--muted);font-size:13px;">Actions terrain prioritaires : critiques, TAT, prescriptions (dont CSA), échantillons, QC et NC/CAPA.</p>
               </div>
               <div class="toolbar">
                 <select id="worklistCategory" onchange="loadWorklist()">
                   <option value="">Toutes priorités</option>
                   <option value="critical">Critiques</option>
                   <option value="tat">TAT</option>
+                  <option value="order">Prescriptions (à prélever / résulter)</option>
                   <option value="sample">Échantillons</option>
                   <option value="qc">QC</option>
                   <option value="quality">NC/CAPA</option>
