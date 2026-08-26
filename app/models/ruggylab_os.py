@@ -821,6 +821,10 @@ class CsaSyncState(Base):
     last_run_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
     last_error: Mapped[str | None] = mapped_column(Text)
     processed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Flux SORTANT (I4) : observabilité du worker de remontée des résultats.
+    last_outbound_run_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    last_outbound_error: Mapped[str | None] = mapped_column(Text)
+    pushed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
