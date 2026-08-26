@@ -37,8 +37,8 @@ Composants RuggyLab : `app/services/csa_sync/` (`client.py`, `inbound.py`,
 | `CSA_RUGGYLAB_PASSWORD` | **Secret** — via secret manager, jamais commité | *(fourni au déploiement)* |
 | `CSA_SYNC_INTERVAL_SECONDS` | Cadence du poll | `60` |
 
-Prérequis base : `alembic upgrade head` (migrations `20260709_0038` →
-`20260711_0040`).
+Prérequis base : `alembic upgrade head` (migrations `20260826_0041` →
+`20260826_0043`).
 
 ---
 

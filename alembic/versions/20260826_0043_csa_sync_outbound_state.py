@@ -1,7 +1,7 @@
 """Intégration CSA (durcissement I4) : état du flux sortant dans csa_sync_state
 
-Revision ID: 20260711_0040
-Revises: 20260710_0039
+Revision ID: 20260826_0043
+Revises: 20260826_0042
 Create Date: 2026-07-11 00:00:40
 
 Observabilité du worker sortant (phase I4). Additif et idempotent :
@@ -15,8 +15,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260711_0040"
-down_revision = "20260710_0039"
+revision = "20260826_0043"
+down_revision = "20260826_0042"
 branch_labels = None
 depends_on = None
 

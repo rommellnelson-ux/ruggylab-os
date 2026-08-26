@@ -1,7 +1,7 @@
 """Intégration CSA (flux entrant) : csa_prescription_id, birth_date_estimee, csa_sync_state
 
-Revision ID: 20260709_0038
-Revises: 20260708_0037
+Revision ID: 20260826_0041
+Revises: 20260724_0039
 Create Date: 2026-07-09 00:00:38
 
 Support du flux entrant CSA→RuggyLab (phase I1). Additif et idempotent :
@@ -15,8 +15,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260709_0038"
-down_revision = "20260708_0037"
+revision = "20260826_0041"
+down_revision = "20260724_0039"
 branch_labels = None
 depends_on = None
 

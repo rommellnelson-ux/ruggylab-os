@@ -1,7 +1,7 @@
 """Intégration CSA (flux sortant) : exam_order_items.csa_pushed_at
 
-Revision ID: 20260710_0039
-Revises: 20260709_0038
+Revision ID: 20260826_0042
+Revises: 20260826_0041
 Create Date: 2026-07-10 00:00:39
 
 Support du flux sortant RuggyLab→CSA (phase I2). Additif et idempotent :
@@ -14,8 +14,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "20260710_0039"
-down_revision = "20260709_0038"
+revision = "20260826_0042"
+down_revision = "20260826_0041"
 branch_labels = None
 depends_on = None
 
