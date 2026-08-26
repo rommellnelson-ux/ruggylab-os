@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import urllib.request
-from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
@@ -17,27 +15,20 @@ from app.models import Result, User
 from app.models.ruggylab_os import NotifConfig
 from app.services.patient_access import apply_result_patient_scope
 from app.utils.datetime_utils import utcnow_naive
-from app.utils.url_safety import is_safe_external_url
+from app.utils.safe_http import safe_post_json
 
 
 def _send_webhook(url: str, payload: dict) -> bool:
-    """Envoie un POST JSON à `url`. Retourne True si HTTP 2xx."""
-    # Garde anti-SSRF : refuse loopback, IP privées, métadonnées cloud, etc.
-    if not is_safe_external_url(url):
-        return False
-    if urlparse(url).scheme not in {"http", "https"}:
-        return False
+    """Envoie un POST JSON à `url`. Retourne True si HTTP 2xx.
 
+    Le transport valide la destination puis épingle l'adresse résolue juste
+    avant la connexion : ni rebinding DNS ni redirection ne peuvent rediriger
+    l'appel vers le réseau interne (cf. F-01).
+    """
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(  # noqa: S310 - scheme restricted above
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310  # nosec B310
-            return bool(resp.status < 400)
+        status_code = safe_post_json(url, data, timeout=5)
+        return 200 <= status_code < 300
     except Exception:  # noqa: BLE001
         return False
 

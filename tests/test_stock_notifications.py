@@ -17,12 +17,9 @@ Couverture :
 
 from __future__ import annotations
 
-import urllib.error
-import urllib.request
 from collections.abc import Generator
 from datetime import UTC, date
 from decimal import Decimal
-from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -242,41 +239,38 @@ def _make_payload() -> object:
 
 
 class TestSendWebhook:
-    def test_returns_true_on_200(self, notifier: StockNotifier) -> None:
-        mock_response = MagicMock()
-        mock_response.status = 200
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
+    def test_blocks_private_network_url(self) -> None:
+        notifier = StockNotifier()
 
-        with patch("urllib.request.urlopen", return_value=mock_response):
+        with patch(
+            "app.services.notifier.safe_post_json",
+            side_effect=ValueError("unsafe destination"),
+        ) as mock_post:
+            result = notifier._send_webhook(
+                "http://169.254.169.254/latest/meta-data/",
+                _make_payload(),
+            )
+
+        assert result is False
+        mock_post.assert_called_once()
+
+    def test_returns_true_on_200(self, notifier: StockNotifier) -> None:
+        with patch("app.services.notifier.safe_post_json", return_value=200):
             result = notifier._send_webhook("http://example.com/hook", _make_payload())  # type: ignore[arg-type]
         assert result is True
 
     def test_returns_true_on_201(self, notifier: StockNotifier) -> None:
-        mock_response = MagicMock()
-        mock_response.status = 201
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
-
-        with patch("urllib.request.urlopen", return_value=mock_response):
+        with patch("app.services.notifier.safe_post_json", return_value=201):
             result = notifier._send_webhook("http://example.com/hook", _make_payload())  # type: ignore[arg-type]
         assert result is True
 
     def test_returns_false_on_500(self, notifier: StockNotifier) -> None:
-        http_error = urllib.error.HTTPError(
-            url="http://example.com/hook",
-            code=500,
-            msg="Internal Server Error",
-            hdrs=MagicMock(),  # type: ignore[arg-type]
-            fp=BytesIO(b"error"),
-        )
-        with patch("urllib.request.urlopen", side_effect=http_error):
+        with patch("app.services.notifier.safe_post_json", return_value=500):
             result = notifier._send_webhook("http://example.com/hook", _make_payload())  # type: ignore[arg-type]
         assert result is False
 
     def test_returns_false_on_timeout(self, notifier: StockNotifier) -> None:
-
-        with patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")):
+        with patch("app.services.notifier.safe_post_json", side_effect=TimeoutError("timed out")):
             result = notifier._send_webhook("http://example.com/hook", _make_payload())  # type: ignore[arg-type]
         assert result is False
 
@@ -284,7 +278,7 @@ class TestSendWebhook:
         self, notifier: StockNotifier, caplog: pytest.LogCaptureFixture
     ) -> None:
 
-        with patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")):
+        with patch("app.services.notifier.safe_post_json", side_effect=TimeoutError("timed out")):
             with caplog.at_level("ERROR", logger="app.services.notifier"):
                 notifier._send_webhook("http://example.com/hook", _make_payload())  # type: ignore[arg-type]
         assert any("error" in r.message.lower() for r in caplog.records)
@@ -375,14 +369,16 @@ class TestNotifyChannelRouting:
 
     def test_failed_webhook_adds_error(self) -> None:
         notifier, _, _ = self._make_notifier_with_mocks(webhook_ok=False)
+        submitted_url = "http://hook.example.com/private-path"
         req = _notification_request(
             channel=NotificationChannel.WEBHOOK,
-            webhook_url="http://hook.example.com",
+            webhook_url=submitted_url,
             stock=5,
         )
         result = notifier.notify(req)
         assert result.notifications_sent == 0
-        assert len(result.errors) > 0
+        assert result.errors == ["Échec envoi webhook."]
+        assert submitted_url not in str(result.errors)
 
     def test_drugs_notified_contains_dci_codes(self) -> None:
         notifier, _, _ = self._make_notifier_with_mocks()
@@ -525,3 +521,68 @@ class TestStockNotificationEndpoint:
         data = resp.json()
         assert data["notifications_sent"] == 0
         assert data["drugs_notified"] == []
+
+
+class TestNotifyEndpointSsrfClosure:
+    """F-01 — bout en bout : l'endpoint ne peut plus atteindre le réseau interne.
+
+    Le PoC de la baseline (SHA 65e1a02) atteignait 127.0.0.1 via ce chemin.
+    Ces tests verrouillent la fermeture au niveau de l'API, pas seulement du
+    transport : ils vérifient qu'aucune connexion n'est ouverte, que la réponse
+    reste un 200 documenté, et qu'aucune URL interne ne fuit dans le corps.
+    """
+
+    _INTERNAL_TARGETS = [
+        "http://127.0.0.1/interne/admin",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://10.0.0.1/hook",
+        "http://192.168.1.1/hook",
+        "http://[::1]/hook",
+        "file:///etc/passwd",
+    ]
+
+    @staticmethod
+    def _payload(webhook_url: str) -> dict:
+        return {
+            "drugs": [
+                {
+                    "dci_code": "ARTEMETHER-LUMEFANTRINE",
+                    "current_stock": 5,
+                    "cmm_units": 100,
+                    "disease_category": "ANTIMALARIAL",
+                }
+            ],
+            "horizon_days": 90,
+            "channel": "WEBHOOK",
+            "severity_filter": "TOUTES",
+            "webhook_url": webhook_url,
+        }
+
+    @pytest.mark.parametrize("webhook_url", _INTERNAL_TARGETS)
+    def test_internal_target_opens_no_socket(self, client: TestClient, webhook_url: str) -> None:
+        headers = _auth_headers(client)
+        with patch("app.utils.safe_http.socket.socket") as socket_factory:
+            resp = client.post(
+                "/api/v1/stock/notify",
+                json=self._payload(webhook_url),
+                headers=headers,
+            )
+
+        assert resp.status_code == 200, resp.text
+        socket_factory.assert_not_called()
+        body = resp.json()
+        assert body["notifications_sent"] == 0
+        assert "WEBHOOK" not in body["channels_used"]
+
+    def test_refusal_does_not_leak_the_internal_url(self, client: TestClient) -> None:
+        """Le message d'erreur ne doit pas renvoyer la cible interne à l'appelant."""
+        headers = _auth_headers(client)
+        with patch("app.utils.safe_http.socket.socket"):
+            resp = client.post(
+                "/api/v1/stock/notify",
+                json=self._payload("http://169.254.169.254/latest/meta-data/"),
+                headers=headers,
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert "169.254.169.254" not in resp.text
