@@ -190,9 +190,7 @@ def _exam_order_items(db: Session, user: User, limit: int) -> list[WorklistItem]
     en distinguant l'origine CSA, avec un lien direct vers la prescription.
     """
     now = utcnow_naive()
-    query = db.query(ExamOrder).options(
-        joinedload(ExamOrder.patient), joinedload(ExamOrder.items)
-    )
+    query = db.query(ExamOrder).options(joinedload(ExamOrder.patient), joinedload(ExamOrder.items))
     query = _order_scope(query, user)
     rows = (
         query.filter(ExamOrder.status.in_(["prescribed", "collected"]))

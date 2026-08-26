@@ -63,11 +63,15 @@ def main() -> int:
         print(f"Patients créés/mis à jour : {len(patients)}")
         for p in patients:
             ddn = f"{p.birth_date} (estimée)" if p.birth_date_estimee else str(p.birth_date)
-            print(f"  - {p.ipp_unique_id} : {p.last_name} {p.first_name} | sexe={p.sex} | né(e) {ddn}")
+            print(
+                f"  - {p.ipp_unique_id} : {p.last_name} {p.first_name} | sexe={p.sex} | né(e) {ddn}"
+            )
         print(f"\nOrdres d'examen créés : {len(orders)}")
         for o in orders:
-            print(f"  Ordre #{o.id} (CSA presc {o.csa_prescription_id}) "
-                  f"prio={o.priority} statut={o.status} service={o.requesting_service}")
+            print(
+                f"  Ordre #{o.id} (CSA presc {o.csa_prescription_id}) "
+                f"prio={o.priority} statut={o.status} service={o.requesting_service}"
+            )
             for it in o.items:
                 flag = "  <-- NON MAPPÉ" if it.status == "unmapped" else ""
                 print(f"      · {it.exam_code:12s} {it.exam_label}  [{it.status}]{flag}")

@@ -22,8 +22,10 @@ from app.services.exam_catalog import exam_catalog_entry
 
 # Valeurs de démonstration plausibles par examen (data_points structuré).
 _DEMO_VALUES = {
-    "NFS": {"WBC": {"value": 6.8, "unit": "10^9/L", "status": "N"},
-            "HGB": {"value": 13.2, "unit": "g/dL", "status": "N"}},
+    "NFS": {
+        "WBC": {"value": 6.8, "unit": "10^9/L", "status": "N"},
+        "HGB": {"value": 13.2, "unit": "g/dL", "status": "N"},
+    },
     "GLYC": {"GLYC": {"value": 0.98, "unit": "g/L", "status": "N"}},
     "CHOL": {"CHOL": {"value": 1.85, "unit": "g/L", "status": "N"}},
     "TG": {"TG": {"value": 1.10, "unit": "g/L", "status": "N"}},
@@ -55,7 +57,9 @@ def main() -> int:
 
         # 1) Simulation labo : échantillon + résultats validés pour les items mappés.
         if order.sample_id is None:
-            sample = Sample(barcode=f"DEMO-{order.id}", patient_id=order.patient_id, status="received")
+            sample = Sample(
+                barcode=f"DEMO-{order.id}", patient_id=order.patient_id, status="received"
+            )
             db.add(sample)
             db.flush()
             order.sample_id = sample.id
@@ -70,16 +74,22 @@ def main() -> int:
             )
             if already:
                 continue
-            db.add(Result(
-                sample_id=order.sample_id,
-                exam_code=item.exam_code,
-                data_points=_DEMO_VALUES.get(item.exam_code, {item.exam_code: {"value": 1.0, "status": "N"}}),
-                result_type="quantitative",
-                is_validated=True,
-            ))
+            db.add(
+                Result(
+                    sample_id=order.sample_id,
+                    exam_code=item.exam_code,
+                    data_points=_DEMO_VALUES.get(
+                        item.exam_code, {item.exam_code: {"value": 1.0, "status": "N"}}
+                    ),
+                    result_type="quantitative",
+                    is_validated=True,
+                )
+            )
             created += 1
         db.commit()
-        print(f"Labo simulé : échantillon {order.sample_id}, {created} résultat(s) validé(s) créé(s).\n")
+        print(
+            f"Labo simulé : échantillon {order.sample_id}, {created} résultat(s) validé(s) créé(s).\n"
+        )
     finally:
         db.close()
 

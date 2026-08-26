@@ -74,8 +74,8 @@ def sync_health(db: Session) -> dict:
             "last_run_at": _iso(getattr(state, "last_outbound_run_at", None)),
             "pushed_count": getattr(state, "pushed_count", 0) or 0,
             "last_error": getattr(state, "last_outbound_error", None),
-            "pending_total": len(pend),      # items en attente (échantillon prélevé)
-            "pending_ready": ready,          # dont résultat validé prêt à remonter
+            "pending_total": len(pend),  # items en attente (échantillon prélevé)
+            "pending_ready": ready,  # dont résultat validé prêt à remonter
         },
         "orders": {
             "csa_orders_total": int(csa_orders),

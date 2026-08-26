@@ -58,10 +58,14 @@ def _order_with_sample_result(db):
     db.add(sample)
     db.flush()
     order.sample_id = sample.id
-    db.add(Result(
-        sample_id=sample.id, exam_code="GLYC",
-        data_points={"GLYC": {"value": 0.9}}, is_validated=True,
-    ))
+    db.add(
+        Result(
+            sample_id=sample.id,
+            exam_code="GLYC",
+            data_points={"GLYC": {"value": 0.9}},
+            is_validated=True,
+        )
+    )
     db.commit()
     return order
 
@@ -76,11 +80,16 @@ def test_health_empty(db):
 
 
 def test_unmapped_report(db):
-    apply_prescription(db, _presc(examens=[
-        {"code": "BGDC022", "nom": "VDRL"},
-        {"code": "BGDC022", "nom": "VDRL"},  # même code -> agrégé
-        {"code": "BZZZ999", "nom": "Exotique"},
-    ]))
+    apply_prescription(
+        db,
+        _presc(
+            examens=[
+                {"code": "BGDC022", "nom": "VDRL"},
+                {"code": "BGDC022", "nom": "VDRL"},  # même code -> agrégé
+                {"code": "BZZZ999", "nom": "Exotique"},
+            ]
+        ),
+    )
     db.commit()
     rep = unmapped_report(db)
     codes = {r["code"]: r["count"] for r in rep}

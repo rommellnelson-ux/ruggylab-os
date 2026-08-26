@@ -18,33 +18,33 @@ from __future__ import annotations
 # CSA LABO_ACTES  ->  liste de codes EXAM_CATALOG RuggyLab.
 CSA_TO_RUGGYLAB: dict[str, list[str]] = {
     # ── Hématologie ──
-    "BEDA005": ["NFS"],            # NFS / Hémogramme complet
-    "BEDC001": ["GRH"],            # Groupage ABO-Rh(D)
-    "BEDD001": ["VS"],             # Vitesse de sédimentation
+    "BEDA005": ["NFS"],  # NFS / Hémogramme complet
+    "BEDC001": ["GRH"],  # Groupage ABO-Rh(D)
+    "BEDD001": ["VS"],  # Vitesse de sédimentation
     # ── Biochimie ──
-    "BNDA008": ["GLYC"],           # Glycémie
-    "BNDA009": ["HBA1C"],          # HbA1c
-    "BNDA012": ["UREE"],           # Urée
-    "BNDA013": ["CREAT"],          # Créatinine
+    "BNDA008": ["GLYC"],  # Glycémie
+    "BNDA009": ["HBA1C"],  # HbA1c
+    "BNDA012": ["UREE"],  # Urée
+    "BNDA013": ["CREAT"],  # Créatinine
     "BNDA014": ["UREE", "CREAT"],  # Bilan rénal (urée + créatinine)
-    "BLDA007": ["ALAT", "ASAT"],   # Transaminases
+    "BLDA007": ["ALAT", "ASAT"],  # Transaminases
     "BLDA005": ["ALAT"],
     "BLDA006": ["ASAT"],
-    "BMDA003": ["CRP"],            # CRP
-    "BNDC001": ["CALC"],           # Calcium
-    "BNDB002": ["URIC"],           # Acide urique
-    "BNDB001": ["CHOL"],           # Cholestérol total
-    "BNDB003": ["TG"],             # Triglycérides
+    "BMDA003": ["CRP"],  # CRP
+    "BNDC001": ["CALC"],  # Calcium
+    "BNDB002": ["URIC"],  # Acide urique
+    "BNDB001": ["CHOL"],  # Cholestérol total
+    "BNDB003": ["TG"],  # Triglycérides
     "BNDB005": ["CHOL", "TG", "HDL", "LDL"],  # Bilan lipidique complet
     # ── Immuno / sérologie / parasito ──
-    "BYDZ004": ["AGHBS"],          # TDR AgHBs
-    "BGDE071": ["HIV"],            # TDR VIH 1&2
-    "BGDC019": ["WIDAL"],          # Widal
-    "BYDZ001": ["GE"],             # TDR Paludisme -> goutte épaisse (paludisme)
-    "BFDB006": ["GE"],             # Goutte épaisse / frottis
-    "BFDB007": ["GE"],             # GE + frottis + TDR
+    "BYDZ004": ["AGHBS"],  # TDR AgHBs
+    "BGDE071": ["HIV"],  # TDR VIH 1&2
+    "BGDC019": ["WIDAL"],  # Widal
+    "BYDZ001": ["GE"],  # TDR Paludisme -> goutte épaisse (paludisme)
+    "BFDB006": ["GE"],  # Goutte épaisse / frottis
+    "BFDB007": ["GE"],  # GE + frottis + TDR
     # ── Bactériologie ──
-    "BFDA001": ["ECBU"],           # ECBU
+    "BFDA001": ["ECBU"],  # ECBU
 }
 
 

@@ -23,7 +23,9 @@ depends_on = None
 _COLS = {
     "last_outbound_run_at": lambda: sa.Column("last_outbound_run_at", sa.DateTime(), nullable=True),
     "last_outbound_error": lambda: sa.Column("last_outbound_error", sa.Text(), nullable=True),
-    "pushed_count": lambda: sa.Column("pushed_count", sa.Integer(), nullable=False, server_default="0"),
+    "pushed_count": lambda: sa.Column(
+        "pushed_count", sa.Integer(), nullable=False, server_default="0"
+    ),
 }
 
 

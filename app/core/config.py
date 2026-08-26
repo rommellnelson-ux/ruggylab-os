@@ -110,9 +110,9 @@ class Settings(BaseSettings):
     # non explicitement activé et configuré. Identifiants du compte technique
     # RUGGYLAB à fournir via le secret manager, jamais en clair dans le dépôt.
     CSA_SYNC_ENABLED: bool = False
-    CSA_SUPABASE_URL: str = ""            # ex. https://<ref>.supabase.co
-    CSA_SUPABASE_ANON_KEY: str = ""       # clé publishable (sb_publishable_*)
-    CSA_RUGGYLAB_EMAIL: str = ""          # compte technique RUGGYLAB
+    CSA_SUPABASE_URL: str = ""  # ex. https://<ref>.supabase.co
+    CSA_SUPABASE_ANON_KEY: str = ""  # clé publishable (sb_publishable_*)
+    CSA_RUGGYLAB_EMAIL: str = ""  # compte technique RUGGYLAB
     CSA_RUGGYLAB_PASSWORD: str = ""
     CSA_SYNC_INTERVAL_SECONDS: int = 60
 

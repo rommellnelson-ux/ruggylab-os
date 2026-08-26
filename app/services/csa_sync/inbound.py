@@ -114,11 +114,7 @@ def apply_prescription(db: Session, payload: dict) -> ExamOrder:
     if not presc_id:
         raise ValueError("prescription sans prescription_id")
 
-    existing = (
-        db.query(ExamOrder)
-        .filter(ExamOrder.csa_prescription_id == presc_id)
-        .one_or_none()
-    )
+    existing = db.query(ExamOrder).filter(ExamOrder.csa_prescription_id == presc_id).one_or_none()
     if existing is not None:
         return existing
 
@@ -141,7 +137,9 @@ def apply_prescription(db: Session, payload: dict) -> ExamOrder:
     db.flush()
     logger.info(
         "CSA prescription %s -> ExamOrder %s (%d examens)",
-        presc_id, order.id, len(order.items),
+        presc_id,
+        order.id,
+        len(order.items),
     )
     return order
 
@@ -212,7 +210,9 @@ async def periodic_csa_sync(interval_seconds: int) -> None:
         try:
             summary = await asyncio.to_thread(run_sync_cycle)
             if summary.get("processed"):
-                logger.info("Synchro CSA entrante : %d prescription(s) intégrée(s)", summary["processed"])
+                logger.info(
+                    "Synchro CSA entrante : %d prescription(s) intégrée(s)", summary["processed"]
+                )
         except Exception:  # noqa: BLE001 — resilience : on réessaie au tour suivant
             logger.exception("Cycle entrant CSA échoué (nouvelle tentative au prochain tour)")
         try:

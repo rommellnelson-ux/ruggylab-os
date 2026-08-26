@@ -59,7 +59,7 @@ def test_map_bundle_1_to_n():
 
 
 def test_map_unmapped():
-    assert exam_map.map_exam("TEZZ001") == []   # acte de soin, pas un examen labo
+    assert exam_map.map_exam("TEZZ001") == []  # acte de soin, pas un examen labo
     assert exam_map.map_exam("") == []
     assert exam_map.is_mapped("BEDA005") is True
 
@@ -90,9 +90,7 @@ def test_sentinel_dob_when_missing(db):
 
 
 def test_unmapped_exam_is_preserved(db):
-    order = apply_prescription(
-        db, _presc(examens=[{"code": "BGDC022", "nom": "VDRL (syphilis)"}])
-    )
+    order = apply_prescription(db, _presc(examens=[{"code": "BGDC022", "nom": "VDRL (syphilis)"}]))
     db.commit()
     assert len(order.items) == 1
     item = order.items[0]

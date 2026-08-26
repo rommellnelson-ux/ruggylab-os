@@ -36,9 +36,13 @@ def main() -> int:
     print("Sortant (résultats validés -> CSA) :")
     print(f"  dernier cycle   : {out['last_run_at'] or '—'}")
     print(f"  remontés        : {out['pushed_count']}")
-    print(f"  en attente      : {out['pending_ready']} prêt(s) / {out['pending_total']} item(s) prélevé(s)")
+    print(
+        f"  en attente      : {out['pending_ready']} prêt(s) / {out['pending_total']} item(s) prélevé(s)"
+    )
     print(f"  dernière erreur : {out['last_error'] or 'aucune'}\n")
-    print(f"Ordres CSA : {h['orders']['csa_orders_total']} — items remontés : {h['orders']['items_pushed_total']}\n")
+    print(
+        f"Ordres CSA : {h['orders']['csa_orders_total']} — items remontés : {h['orders']['items_pushed_total']}\n"
+    )
 
     unmapped = h["unmapped_exams"]
     if unmapped:

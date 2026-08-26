@@ -49,11 +49,7 @@ def pending_items(db: Session) -> list[ExamOrderItem]:
 
 def _releasable(result: Result) -> bool:
     """Le résultat est-il en état d'être montré au prescripteur CSA ?"""
-    return bool(
-        result.is_validated
-        or result.is_auto_validated
-        or result.released_at is not None
-    )
+    return bool(result.is_validated or result.is_auto_validated or result.released_at is not None)
 
 
 def _iso(value: dt.datetime | None) -> str | None:
@@ -134,7 +130,9 @@ def push_results(db: Session, client) -> dict:
             client.push_event("labo_resultats", source_item_id, _build_payload(order, item, result))
         except Exception as exc:  # noqa: BLE001 — resilience : on réessaiera au prochain tour
             last_error = f"{source_item_id}: {exc}"
-            logger.exception("Échec de remontée résultat CSA (%s), réessai au prochain cycle", source_item_id)
+            logger.exception(
+                "Échec de remontée résultat CSA (%s), réessai au prochain cycle", source_item_id
+            )
             continue
         # Succès : on complète le fil et on marque l'idempotence.
         item.result_id = result.id
