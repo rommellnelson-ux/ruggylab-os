@@ -100,7 +100,8 @@ Aucune interruption fonctionnelle : le poll échoué est simplement rejoué.
 
 > ⚠️ **Décision de release.** Ne pas exécuter sans validation explicite du
 > responsable. Effectuer d'abord une revue : I0→I3 validés en staging (fait),
-> personnel prêt à consulter les résultats dans CSA, procédure de repli comprise.
+> **complétude du workflow opérateur RuggyLab comprise (cf. §8)**, personnel prêt
+> à consulter les résultats dans CSA, procédure de repli comprise.
 
 Projet prod CSA : `wsnehnempnexzxzuklbv`. Étapes :
 
@@ -137,7 +138,40 @@ Projet prod CSA : `wsnehnempnexzxzuklbv`. Étapes :
 ## 7. Tests
 
 - RuggyLab : `pytest tests/test_csa_sync*.py` (mapping, idempotence entrant/sortant,
-  santé — 21 tests).
+  santé — 21 tests) + `tests/test_worklist.py` (ordres CSA dans la file).
 - CSA : `tests.html` (formatage + lien accusés/résultats — TESTS_PASS).
 - End-to-end staging : cf. `scripts/csa_sync_smoke.py` (entrant) et
   `scripts/csa_sync_outbound_smoke.py` (sortant), base SQLite jetable.
+
+---
+
+## 8. Complétude du workflow opérateur RuggyLab (audit 2026-08-26)
+
+L'intégration remonte les résultats **validés** ; encore faut-il qu'un opérateur
+puisse, dans RuggyLab, faire cheminer un ordre reçu de CSA jusqu'à un résultat
+validé. Audit du parcours (ordre → prélèvement → résultat → validation) :
+
+| Étape | État | Détail |
+|---|---|---|
+| Voir l'ordre CSA | ✅ **corrigé** | Les ordres `prescribed`/`collected` (origine CSA distinguée) apparaissent dans « Ma file » (`_exam_order_items`, `app/services/worklist.py`). |
+| Prélever (rattacher échantillon) | ✅ existe | `POST /exam-orders/{id}/collect` → `ExamOrder.sample_id` ; transition auto `prescribed→collected`. |
+| Saisir un résultat | ⚠️ partiel | Fonctionne (`sample_id`+`exam_code`), mais `ExamOrderItem.result_id` n'est réconcilié que paresseusement (`sync_order_progress`, à l'ouverture du fil). |
+| Valider / libérer | ⚠️ partiel | Le résultat naît `is_validated=True` (pas de double contrôle bio) ; `released_at` jamais posé. |
+
+**Verdict** : le parcours est fonctionnel et désormais **surfacé** dans la file de
+travail. Deux limites subsistent, qui sont des **choix**, pas des bugs :
+
+- **Lien ordre↔résultat paresseux** (trou n°2). Sans impact sur l'intégration : le
+  flux sortant fait sa **propre réconciliation** par échantillon
+  (`Result.sample_id == ExamOrder.sample_id`), indépendamment de
+  `ExamOrderItem.result_id`.
+- **Validation implicite** (trou n°3). Décision de gouvernance assumée
+  (`REQUIRE_VALIDATION_FOR_RELEASE=false`, faute de biologiste validateur). **À
+  traiter le jour où ce personnel arrive** : basculer le flag à `true` (validation
+  stricte avant libération) et ajouter une étape de bio-validation explicite reliée
+  à l'`ExamOrder`, en renseignant `released_at`. Voir la section RESULT REPORT
+  RELEASE POLICY de `.env.example` et `docs/ARCHITECTURE_AS_BUILT.md §11`.
+
+Prérequis de mise en service : ces deux points sont acceptables pour un démarrage
+en **mode dégradé** (un seul manipulateur, pas de biologiste). Ils ne bloquent ni
+l'intégration ni le parcours opérateur.
