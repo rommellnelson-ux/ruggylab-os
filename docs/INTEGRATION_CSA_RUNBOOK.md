@@ -24,6 +24,40 @@ Composants RuggyLab : `app/services/csa_sync/` (`client.py`, `inbound.py`,
 `outbound.py`, `exam_map.py`, `health.py`). Worker dans le process
 `PROCESS_ROLE=scheduler` (`app/scheduler.py`), gated `CSA_SYNC_ENABLED`.
 
+### 1.1 Garde-fous de sécurité clinique du flux sortant
+
+Le flux sortant publie un résultat **sous une identité patient, chez un tiers**.
+Deux garde-fous non contournables encadrent cette publication.
+
+**a) Cohérence patient (fail-closed).** Avant toute publication, `_same_patient()`
+revérifie que l'échantillon d'où provient le résultat appartient bien au patient
+de l'ordre. L'API de rattachement le vérifie déjà, mais le flux sortant ne
+dépend d'aucune garantie posée en amont : échantillon absent, orphelin ou
+appartenant à un autre patient ⇒ **publication bloquée**, incident journalisé
+(`csa_sync.outbound.patient_mismatch`, identifiants techniques uniquement).
+
+**b) Niveau de validation annoncé sans ambiguïté.** Tant que
+`REQUIRE_VALIDATION_FOR_RELEASE=False` est admis (mode dégradé), un résultat peut
+être *libéré* sans validation biologique. Le payload `labo_resultats` distingue
+donc explicitement les trois états — il ne présente jamais une libération en mode
+dégradé comme une validation biologique :
+
+| `statut` | `validation.niveau` | `mode_degrade` | Signification |
+| --- | --- | --- | --- |
+| `valide` | `biologique` | `false` | Validation biologique humaine |
+| `valide_auto` | `auto` | `false` | Auto-validation par règles |
+| `libere_sans_validation` | `aucune` | `true` | **Libéré sans validation** — mode dégradé |
+
+Le bloc `validation` porte aussi `bio_validated_at`, `tech_validated_at`,
+`auto_validated_at`, `released_at` et `valide_par_id`, afin que le prescripteur
+CSA dispose de la traçabilité complète.
+
+> **Contrat d'interface.** Les valeurs `valide_auto` et `libere_sans_validation`
+> sont nouvelles : le consommateur CSA doit les prendre en charge avant la
+> bascule. Un consommateur qui ne teste que `statut === 'valide'` cessera
+> simplement d'afficher les résultats non validés — dégradation sûre, mais à
+> valider explicitement avec l'équipe CSA.
+
 ---
 
 ## 2. Configuration (variables d'environnement RuggyLab)

@@ -21,7 +21,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from app.models import CsaSyncState, ExamOrder, ExamOrderItem, Result
+from app.models import CsaSyncState, ExamOrder, ExamOrderItem, Result, Sample
 from app.services.exam_catalog import exam_catalog_entry
 from app.utils.datetime_utils import utcnow_naive
 
@@ -68,6 +68,32 @@ def _validated_at(result: Result) -> dt.datetime | None:
     )
 
 
+def _validation_level(result: Result) -> str:
+    """Niveau de validation RÉELLEMENT atteint par ce résultat.
+
+    ``_releasable`` accepte trois états distincts, qu'il serait faux de présenter
+    au prescripteur sous une étiquette unique :
+      - ``biologique`` : validation biologique humaine (``is_validated``) ;
+      - ``auto``       : auto-validation par règles (``is_auto_validated``) ;
+      - ``aucune``     : résultat seulement *libéré*. Possible tant que
+        ``REQUIRE_VALIDATION_FOR_RELEASE=False`` (mode dégradé). Ce n'est PAS une
+        validation biologique et ne doit jamais être publié comme telle.
+    """
+    if result.is_validated:
+        return "biologique"
+    if result.is_auto_validated:
+        return "auto"
+    return "aucune"
+
+
+# Statut porté au prescripteur, aligné sur le niveau réellement atteint.
+_STATUT_PAR_NIVEAU = {
+    "biologique": "valide",
+    "auto": "valide_auto",
+    "aucune": "libere_sans_validation",
+}
+
+
 def _build_payload(order: ExamOrder, item: ExamOrderItem, result: Result) -> dict:
     """Projette un résultat validé en payload ``labo_resultats`` (sans perte).
 
@@ -75,6 +101,7 @@ def _build_payload(order: ExamOrder, item: ExamOrderItem, result: Result) -> dic
     qu'un aplatissement valeur/unité qui trahirait les examens multi-analytes.
     """
     entry = exam_catalog_entry(item.exam_code) or {}
+    niveau = _validation_level(result)
     return {
         "prescription_id": order.csa_prescription_id,
         "exam_code": item.exam_code,
@@ -93,13 +120,54 @@ def _build_payload(order: ExamOrder, item: ExamOrderItem, result: Result) -> dic
         "ruggylab_result_id": result.id,
         "ruggylab_validator_id": result.validator_id,
         "valide_le": _iso(_validated_at(result)),
-        "statut": "valide",
+        "statut": _STATUT_PAR_NIVEAU[niveau],
+        # Niveau de validation explicite : le prescripteur doit pouvoir
+        # distinguer une validation biologique d'une libération en mode dégradé.
+        "validation": {
+            "niveau": niveau,
+            "mode_degrade": niveau == "aucune",
+            "valide_par_id": result.validator_id,
+            "bio_validated_at": _iso(result.bio_validated_at),
+            "tech_validated_at": _iso(result.tech_validated_at),
+            "auto_validated_at": _iso(result.auto_validated_at),
+            "released_at": _iso(result.released_at),
+        },
     }
 
 
+def _same_patient(db: Session, order: ExamOrder) -> bool:
+    """L'échantillon rattaché appartient-il bien au patient de l'ordre ?
+
+    Garde-fou de cohérence patient au *dernier* point avant publication externe.
+    L'API de rattachement (``POST /exam-orders/{id}/collect``) vérifie déjà
+    ``sample.patient_id == order.patient_id``, mais le flux sortant publie un
+    résultat sous une identité chez un tiers (CSA) : il ne doit dépendre d'aucune
+    garantie posée en amont. Toute incohérence — échantillon absent ou
+    appartenant à un autre patient — bloque la publication (fail-closed).
+    """
+    patient_id = db.query(Sample.patient_id).filter(Sample.id == order.sample_id).scalar()
+    if patient_id is None or patient_id != order.patient_id:
+        # Identifiants techniques uniquement : aucune donnée nominative en journal.
+        logger.error(
+            "csa_sync.outbound.patient_mismatch order_id=%s sample_id=%s "
+            "order_patient_id=%s sample_patient_id=%s — publication bloquée",
+            order.id,
+            order.sample_id,
+            order.patient_id,
+            patient_id,
+        )
+        return False
+    return True
+
+
 def _find_result(db: Session, order: ExamOrder, item: ExamOrderItem) -> Result | None:
-    """Résultat libérable de cet examen, rattaché à l'échantillon de l'ordre."""
+    """Résultat libérable de cet examen, rattaché à l'échantillon de l'ordre.
+
+    Ne renvoie jamais un résultat si la cohérence patient n'est pas démontrée.
+    """
     if order.sample_id is None:
+        return None
+    if not _same_patient(db, order):
         return None
     candidates = (
         db.query(Result)

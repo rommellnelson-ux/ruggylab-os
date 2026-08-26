@@ -149,3 +149,91 @@ def test_poll_advances_watermark_and_acks(db):
     res2 = poll_once(db, client)
     assert res2["processed"] == 0
     assert db.query(ExamOrder).count() == 2
+
+
+# ── idempotence du flux entrant sous rejeu (§10.2) ──────────────────────────
+
+
+def test_replay_of_same_batch_creates_no_duplicate(db):
+    """Rejeu du MÊME lot en ignorant le watermark : aucun ordre dupliqué.
+
+    Cas réel : redémarrage du worker avec un watermark perdu ou remis à zéro.
+    L'idempotence ne doit pas reposer sur le seul watermark, mais sur la
+    contrainte d'unicité de ``csa_prescription_id``.
+    """
+
+    class _ReplayClient(_FakeClient):
+        def pull_prescriptions(self, changed_since, max_rows):
+            return list(self.rows)  # ignore délibérément le watermark
+
+    rows = [
+        {"updated_at": "2026-08-01T10:00:00+00:00", "payload": _presc(prescription_id="LAB-1")},
+        {"updated_at": "2026-08-01T11:00:00+00:00", "payload": _presc(prescription_id="LAB-2")},
+    ]
+    client = _ReplayClient(rows)
+
+    poll_once(db, client)
+    poll_once(db, client)
+    poll_once(db, client)
+
+    assert db.query(ExamOrder).count() == 2
+    ids = {o.csa_prescription_id for o in db.query(ExamOrder).all()}
+    assert ids == {"LAB-1", "LAB-2"}
+    # Un patient unique par dossier, malgré les trois passages.
+    assert db.query(Patient).count() == 1
+
+
+def test_concurrent_apply_does_not_duplicate_order(db):
+    """Deux sessions traitent la même prescription : un seul ordre en base."""
+    apply_prescription(db, _presc(prescription_id="LAB-CONC"))
+    db.commit()
+
+    second = db_session.SessionLocal()
+    try:
+        again = apply_prescription(second, _presc(prescription_id="LAB-CONC", motif="rejeu"))
+        second.commit()
+        assert again.csa_prescription_id == "LAB-CONC"
+    finally:
+        second.close()
+
+    assert db.query(ExamOrder).filter_by(csa_prescription_id="LAB-CONC").count() == 1
+
+
+def test_unique_constraint_blocks_duplicate_prescription_id(db):
+    """Garde-fou de dernier recours : la contrainte d'unicité en base."""
+    import sqlalchemy.exc
+
+    from app.models import ExamOrderItem  # noqa: F401  (chargement du mapper)
+
+    apply_prescription(db, _presc(prescription_id="LAB-UNIQ"))
+    db.commit()
+    patient = db.query(Patient).first()
+
+    db.add(ExamOrder(patient_id=patient.id, csa_prescription_id="LAB-UNIQ", status="prescribed"))
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        db.commit()
+    db.rollback()
+
+
+# ── cohérence patient à l'entrée (§10.1) ────────────────────────────────────
+
+
+def test_distinct_dossiers_never_share_a_patient(db):
+    """Deux dossiers CSA distincts -> deux patients distincts, jamais fusionnés."""
+    o1 = apply_prescription(db, _presc(prescription_id="LAB-A", dossier_no="CSA-0001"))
+    o2 = apply_prescription(
+        db,
+        _presc(prescription_id="LAB-B", dossier_no="CSA-0002", patient_nom="KONE Awa"),
+    )
+    db.commit()
+
+    assert o1.patient_id != o2.patient_id
+    assert db.query(Patient).count() == 2
+
+
+def test_order_patient_matches_its_dossier(db):
+    """L'ordre créé porte bien le patient du dossier source, pas un autre."""
+    order = apply_prescription(db, _presc(prescription_id="LAB-C", dossier_no="CSA-0042"))
+    db.commit()
+    patient = db.query(Patient).filter_by(ipp_unique_id="CSA-CSA-0042").one()
+    assert order.patient_id == patient.id

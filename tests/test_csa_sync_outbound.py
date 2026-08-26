@@ -135,6 +135,65 @@ def test_released_without_validation_is_pushed(db):
     assert push_results(db, client)["pushed"] == 1
 
 
+# ── validation vs libération en mode dégradé (§10.4) ────────────────────────
+# `REQUIRE_VALIDATION_FOR_RELEASE=False` autorise la libération d'un résultat
+# sans validation biologique. Ce mode ne doit JAMAIS être présenté au
+# prescripteur comme une validation biologique.
+
+
+def test_biological_validation_is_reported_as_such(db):
+    order = _order_with_sample(db)
+    _validated_result(db, order.sample_id, "GLYC", is_validated=True)
+
+    client = _FakeClient()
+    push_results(db, client)
+    _, _, payload = client.pushed[0]
+
+    assert payload["statut"] == "valide"
+    assert payload["validation"]["niveau"] == "biologique"
+    assert payload["validation"]["mode_degrade"] is False
+
+
+def test_auto_validation_is_not_reported_as_biological(db):
+    order = _order_with_sample(db)
+    _validated_result(db, order.sample_id, "GLYC", is_validated=False, is_auto_validated=True)
+
+    client = _FakeClient()
+    push_results(db, client)
+    _, _, payload = client.pushed[0]
+
+    assert payload["statut"] == "valide_auto"
+    assert payload["validation"]["niveau"] == "auto"
+    assert payload["validation"]["mode_degrade"] is False
+
+
+def test_degraded_release_is_never_labelled_validated(db):
+    """Résultat libéré SANS validation -> jamais annoncé « valide » au prescripteur."""
+    import datetime as dt
+
+    order = _order_with_sample(db)
+    _validated_result(
+        db,
+        order.sample_id,
+        "GLYC",
+        is_validated=False,
+        is_auto_validated=False,
+        released_at=dt.datetime(2026, 8, 1, 9),
+    )
+
+    client = _FakeClient()
+    assert push_results(db, client)["pushed"] == 1
+    _, _, payload = client.pushed[0]
+
+    assert payload["statut"] == "libere_sans_validation"
+    assert payload["statut"] != "valide"
+    assert payload["validation"]["niveau"] == "aucune"
+    assert payload["validation"]["mode_degrade"] is True
+    # L'absence de validation est explicite et traçable côté prescripteur.
+    assert payload["validation"]["bio_validated_at"] is None
+    assert payload["validation"]["released_at"] is not None
+
+
 def test_no_sample_no_push(db):
     # Ordre CSA sans échantillon prélevé : rien à remonter (pas de résultat possible).
     apply_prescription(db, _presc())
@@ -173,3 +232,127 @@ def test_push_failure_leaves_item_unmarked(db):
     # CSA revient : le cycle suivant pousse.
     ok = _FakeClient()
     assert push_results(db, ok)["pushed"] == 1
+
+
+# ── cohérence patient (§10.1) ───────────────────────────────────────────────
+# Le flux sortant publie un résultat sous une identité chez un tiers. Il ne doit
+# jamais le faire si l'échantillon d'où provient le résultat n'appartient pas au
+# patient de l'ordre — quelle que soit la façon dont l'incohérence est apparue.
+
+
+def test_result_of_another_patient_is_never_published(db):
+    """Échantillon rattaché appartenant à un AUTRE patient -> publication bloquée."""
+    order = _order_with_sample(db)
+    # Second patient, avec son propre échantillon et son propre résultat.
+    other = apply_prescription(
+        db,
+        _presc(prescription_id="LAB-2", dossier_no="CSA-0002", patient_nom="KONE Awa"),
+    )
+    db.flush()
+    other_sample = Sample(barcode="B-OTHER", patient_id=other.patient_id, status="received")
+    db.add(other_sample)
+    db.flush()
+    assert other.patient_id != order.patient_id
+    _validated_result(db, other_sample.id, "GLYC")
+
+    # Contournement de l'API : l'ordre du patient A pointe l'échantillon du patient B.
+    order.sample_id = other_sample.id
+    db.commit()
+
+    client = _FakeClient()
+    res = push_results(db, client)
+
+    assert res["pushed"] == 0, "un résultat d'un autre patient ne doit jamais être publié"
+    assert client.pushed == []
+    assert order.items[0].csa_pushed_at is None
+    assert order.items[0].result_id is None
+
+
+def test_orphan_sample_reference_blocks_publication(db):
+    """Échantillon référencé mais introuvable -> fail-closed, aucune publication."""
+    order = _order_with_sample(db)
+    _validated_result(db, order.sample_id, "GLYC")
+    order.sample_id = 999999  # référence orpheline
+    db.commit()
+
+    client = _FakeClient()
+    assert push_results(db, client)["pushed"] == 0
+    assert client.pushed == []
+
+
+def test_patient_swap_after_order_creation_blocks_publication(db):
+    """Le patient de l'ordre change après coup -> l'échantillon ne correspond plus."""
+    order = _order_with_sample(db)
+    _validated_result(db, order.sample_id, "GLYC")
+    other = apply_prescription(
+        db,
+        _presc(prescription_id="LAB-3", dossier_no="CSA-0003", patient_nom="TRAORE Ali"),
+    )
+    db.flush()
+    order.patient_id = other.patient_id  # bascule silencieuse d'identité
+    db.commit()
+
+    client = _FakeClient()
+    assert push_results(db, client)["pushed"] == 0
+    assert client.pushed == []
+
+
+def test_health_report_also_ignores_cross_patient_item(db):
+    """Le monitoring partage le même garde-fou : pas de faux « prêt à pousser »."""
+    from app.services.csa_sync.health import sync_health
+
+    order = _order_with_sample(db)
+    other = apply_prescription(
+        db,
+        _presc(prescription_id="LAB-4", dossier_no="CSA-0004", patient_nom="BAMBA Sita"),
+    )
+    db.flush()
+    other_sample = Sample(barcode="B-OTHER-2", patient_id=other.patient_id, status="received")
+    db.add(other_sample)
+    db.flush()
+    _validated_result(db, other_sample.id, "GLYC")
+    order.sample_id = other_sample.id
+    db.commit()
+
+    health = sync_health(db)
+    assert health["outbound"]["pending_total"] == 1  # l'item est bien éligible…
+    assert health["outbound"]["pending_ready"] == 0  # …mais jamais « prêt à pousser »
+
+
+# ── idempotence sous rejeu / concurrence (§10.2) ────────────────────────────
+
+
+def test_replay_never_duplicates_even_across_cycles(db):
+    """Trois cycles consécutifs : un seul événement émis pour le même item."""
+    order = _order_with_sample(db)
+    _validated_result(db, order.sample_id, "GLYC")
+
+    client = _FakeClient()
+    totals = [push_results(db, client)["pushed"] for _ in range(3)]
+
+    assert totals == [1, 0, 0]
+    assert len(client.pushed) == 1
+    assert len({sid for _, sid, _ in client.pushed}) == 1
+
+
+def test_concurrent_cycles_do_not_release_twice(db):
+    """Deux sessions concurrentes sur la même base : un seul push effectif.
+
+    Simule deux workers sortants menés en parallèle sur le même item. Le second
+    ne doit ni republier, ni écraser l'horodatage d'idempotence du premier.
+    """
+    order = _order_with_sample(db)
+    _validated_result(db, order.sample_id, "GLYC")
+
+    second = db_session.SessionLocal()
+    try:
+        first_client, second_client = _FakeClient(), _FakeClient()
+        first = push_results(db, first_client)["pushed"]
+        # La seconde session lit l'état déjà commité par la première.
+        concurrent = push_results(second, second_client)["pushed"]
+    finally:
+        second.close()
+
+    assert first == 1
+    assert concurrent == 0
+    assert len(first_client.pushed) + len(second_client.pushed) == 1
