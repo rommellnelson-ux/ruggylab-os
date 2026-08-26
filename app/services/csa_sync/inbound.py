@@ -162,10 +162,13 @@ def poll_once(db: Session, client) -> dict:
     for row in rows:
         payload = row.get("payload") or {}
         order = apply_prescription(db, payload)
+        presc_id = str(payload.get("prescription_id"))
         client.push_event(
             "labo_receipts",
-            str(payload.get("prescription_id")),
-            {"statut": "recu", "lab_order_id": order.id},
+            presc_id,
+            # prescription_id DANS le payload : côté CSA, la synchro ne conserve que
+            # le payload (l'item_id est perdu), donc le lien doit y figurer.
+            {"statut": "recu", "prescription_id": presc_id, "lab_order_id": order.id},
         )
         processed += 1
         watermark = row.get("updated_at") or watermark
