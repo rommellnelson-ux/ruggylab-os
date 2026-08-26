@@ -798,6 +798,10 @@ class ExamOrderItem(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     # Résultat produit pour cet examen (le bout du fil).
     result_id: Mapped[int | None] = mapped_column(ForeignKey("results.id"))
+    # Flux SORTANT CSA (I2) : horodatage de remontée du résultat vers CSA. NULL
+    # tant que non poussé ; renseigné une fois l'événement labo_resultats accepté.
+    # Marqueur d'idempotence : on ne repousse jamais un item déjà remonté.
+    csa_pushed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
 
     order: Mapped["ExamOrder"] = relationship(back_populates="items")
 
