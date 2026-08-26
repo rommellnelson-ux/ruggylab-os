@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import os
 
@@ -176,6 +177,11 @@ class Settings(BaseSettings):
     ANALYZER_BIOCHEMISTRY_PORT: int = 9001
     ANALYZER_IMMUNO_ENABLED: bool = False
     ANALYZER_IMMUNO_PORT: int = 9002
+    # Adresse de l'hôte sur laquelle docker-compose PUBLIE les ports automates
+    # (override qualifié `docker-compose.analyzers.yml` uniquement — la stack de
+    # base ne publie rien). Défaut volontairement en loopback : sûr par
+    # construction. `0.0.0.0` est refusé, cf. `analyzer_bind_ip_problem`.
+    ANALYZER_BIND_IP: str = "127.0.0.1"
     ANALYZER_RAW_QUEUE_KEY: str = "raw_analyzer_frames"
     ANALYZER_RAW_QUEUE_MAXLEN: int = 100_000
     ANALYZER_RAW_MAX_FRAME_BYTES: int = 1_048_576
@@ -230,6 +236,84 @@ class Settings(BaseSettings):
             or "change_me" in self.FIRST_SUPERUSER_PASSWORD.lower()
         )
         return weak_secret or weak_admin_password
+
+    @property
+    def analyzer_listeners_enabled(self) -> bool:
+        """Au moins un listener automate ouvre-t-il un port TCP ?"""
+        return bool(
+            self.ENABLE_DH36_LISTENER
+            or self.ANALYZER_RAW_LISTENER_ENABLED
+            or self.ANALYZER_HEMATOLOGY_ENABLED
+            or self.ANALYZER_BIOCHEMISTRY_ENABLED
+            or self.ANALYZER_IMMUNO_ENABLED
+        )
+
+    def analyzer_bind_ip_problem(self) -> str | None:
+        """Motif de refus de `ANALYZER_BIND_IP`, ou ``None`` si la valeur est sûre.
+
+        Les ports automates transportent des identités patient et des résultats
+        en clair sur un protocole sans authentification. Leur publication doit
+        donc viser une interface *nommée*, sur le VLAN automates — jamais toutes
+        les interfaces, et jamais une adresse routable depuis Internet.
+
+        Règles, appliquées dans TOUS les environnements — il n'existe aucun cas
+        légitime d'exposition publique d'un port automate, pas même en
+        développement, donc aucun indicateur d'environnement ne les relâche :
+          - valeur vide ou blanche              -> refus (ambigu) ;
+          - `0.0.0.0`, `::`, `*`                -> refus (bind universel) ;
+          - adresse non littérale (nom d'hôte)  -> refus (résolution mouvante) ;
+          - adresse globale/publique            -> refus.
+        Le loopback et les adresses privées (VLAN automates) sont acceptés.
+
+        Limite connue : les plages de documentation/réservées (RFC 5737, p. ex.
+        `203.0.113.0/24`) ne sont pas « globales » au sens de `ipaddress` et
+        passent donc ce contrôle. Elles ne correspondent à aucune interface
+        réelle : le bind échouerait au démarrage de Docker, sans exposition.
+        """
+        raw = (self.ANALYZER_BIND_IP or "").strip()
+        if not raw:
+            return "ANALYZER_BIND_IP est vide : l'adresse de publication doit être explicite."
+        if raw in {"0.0.0.0", "::", "*", "[::]"}:  # noqa: S104  # nosec B104 - justement refusés
+            return (
+                f"ANALYZER_BIND_IP={raw} publierait les ports automates sur toutes "
+                "les interfaces. Indiquer l'IP de l'hôte sur le VLAN automates."
+            )
+        try:
+            address = ipaddress.ip_address(raw)
+        except ValueError:
+            return (
+                f"ANALYZER_BIND_IP={raw} n'est pas une adresse IP littérale. "
+                "Un nom d'hôte peut changer de résolution : exiger une IP."
+            )
+        if address.is_unspecified:
+            return f"ANALYZER_BIND_IP={raw} est une adresse non spécifiée (bind universel)."
+        if address.is_global:
+            return (
+                f"ANALYZER_BIND_IP={raw} est une adresse publique : les automates "
+                "ne doivent jamais être exposés hors du réseau interne."
+            )
+        return None
+
+    def validate_analyzer_network(self) -> None:
+        """Refuse au démarrage une exposition automate dangereuse (fail-closed).
+
+        N'est contraignant que si un listener est effectivement activé : la stack
+        par défaut n'en active aucun et n'est donc pas impactée.
+        """
+        if not self.analyzer_listeners_enabled:
+            return
+        problem = self.analyzer_bind_ip_problem()
+        if problem is not None:
+            raise ValueError(problem)
+        for label, host in (
+            ("DH36_LISTENER_HOST", self.DH36_LISTENER_HOST),
+            ("ANALYZER_RAW_LISTENER_HOST", self.ANALYZER_RAW_LISTENER_HOST),
+        ):
+            # 0.0.0.0 reste admis *dans le conteneur* (interface interne), mais
+            # jamais combiné à une publication non bornée : ANALYZER_BIND_IP
+            # ci-dessus est la borne réelle. On refuse en revanche une valeur vide.
+            if not (host or "").strip():
+                raise ValueError(f"{label} est vide alors qu'un listener automate est activé.")
 
 
 settings = Settings()
