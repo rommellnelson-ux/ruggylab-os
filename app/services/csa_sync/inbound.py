@@ -194,15 +194,28 @@ def run_sync_cycle() -> dict:
 
 
 async def periodic_csa_sync(interval_seconds: int) -> None:
-    """Boucle du worker (process scheduler). Un échec de cycle ne tue pas la boucle."""
+    """Boucle du worker (process scheduler). Un échec de cycle ne tue pas la boucle.
+
+    Chaque tick fait les DEUX sens : entrant (prescriptions→ordres) puis sortant
+    (résultats validés→CSA). Les deux ont une gestion d'erreur indépendante :
+    l'échec de l'un n'empêche pas l'autre ni les tours suivants.
+    """
     import asyncio
+
+    from .outbound import run_outbound_cycle
 
     logger.info("Worker de synchro CSA démarré (intervalle %ss)", interval_seconds)
     while True:
         try:
             summary = await asyncio.to_thread(run_sync_cycle)
             if summary.get("processed"):
-                logger.info("Synchro CSA : %d prescription(s) intégrée(s)", summary["processed"])
+                logger.info("Synchro CSA entrante : %d prescription(s) intégrée(s)", summary["processed"])
         except Exception:  # noqa: BLE001 — resilience : on réessaie au tour suivant
-            logger.exception("Cycle de synchro CSA échoué (nouvelle tentative au prochain tour)")
+            logger.exception("Cycle entrant CSA échoué (nouvelle tentative au prochain tour)")
+        try:
+            out = await asyncio.to_thread(run_outbound_cycle)
+            if out.get("pushed"):
+                logger.info("Synchro CSA sortante : %d résultat(s) remonté(s)", out["pushed"])
+        except Exception:  # noqa: BLE001 — resilience : on réessaie au tour suivant
+            logger.exception("Cycle sortant CSA échoué (nouvelle tentative au prochain tour)")
         await asyncio.sleep(interval_seconds)
