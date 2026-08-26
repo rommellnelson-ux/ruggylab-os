@@ -8,6 +8,8 @@ endpoint d'administration / export de métriques.
 
 from __future__ import annotations
 
+import datetime as dt
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -16,7 +18,7 @@ from app.models import CsaSyncState, ExamOrder, ExamOrderItem
 from .outbound import _find_result, pending_items
 
 
-def _iso(value) -> str | None:
+def _iso(value: dt.datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
 
 

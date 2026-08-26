@@ -25,6 +25,8 @@ from app.models import CsaSyncState, ExamOrder, ExamOrderItem, Result
 from app.services.exam_catalog import exam_catalog_entry
 from app.utils.datetime_utils import utcnow_naive
 
+from .client import CsaEventSink
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,7 +113,7 @@ def _find_result(db: Session, order: ExamOrder, item: ExamOrderItem) -> Result |
     return None
 
 
-def push_results(db: Session, client) -> dict:
+def push_results(db: Session, client: CsaEventSink) -> dict:
     """Un cycle sortant : pour chaque item CSA non poussé dont le résultat est
     libérable, pousse ``labo_resultats`` et marque l'item. Idempotent.
 

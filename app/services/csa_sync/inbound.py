@@ -18,6 +18,7 @@ from app.services.exam_catalog import exam_catalog_entry
 from app.utils.datetime_utils import utcnow_naive
 
 from . import exam_map
+from .client import CsaInboundSource
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ def apply_prescription(db: Session, payload: dict) -> ExamOrder:
     return order
 
 
-def poll_once(db: Session, client) -> dict:
+def poll_once(db: Session, client: CsaInboundSource) -> dict:
     """Un cycle de synchro entrant : pull → apply → accusé → avance le watermark.
 
     ``client`` expose ``pull_prescriptions(changed_since, max_rows)`` et

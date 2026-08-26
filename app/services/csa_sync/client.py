@@ -8,13 +8,25 @@ appelle les deux RPC exposées par CSA. Les jetons sont rafraîchis sur 401.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class CsaEventSink(Protocol):
+    """Contrat minimal attendu par le flux sortant : pousser un evenement CSA."""
+
+    def push_event(self, kind: str, source_item_id: str, payload: dict) -> Any: ...
+
+
+class CsaInboundSource(CsaEventSink, Protocol):
+    """Contrat attendu par le flux entrant : tirer les prescriptions + accuser."""
+
+    def pull_prescriptions(self, changed_since: str, max_rows: int = 100) -> list[dict]: ...
 
 
 class CsaClient:
