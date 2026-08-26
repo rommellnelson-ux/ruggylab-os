@@ -864,10 +864,12 @@
       const sampleId = Number(params.get("sample"));
       const controlId = Number(params.get("control"));
       const ncId = Number(params.get("nc"));
+      const orderId = Number(params.get("order"));
       if (name === "results" && resultId) await openResultDetail(resultId);
       if (name === "samples" && sampleId) await openSampleFromWorklist(sampleId);
       if (name === "qc" && controlId) await openQcControlFromWorklist(controlId);
       if (name === "quality" && ncId) await openNcDetail(ncId);
+      if (name === "prescription" && orderId) await openOrderThread(orderId);
     }
     async function openSampleFromWorklist(sampleId) {
       await loadSamples();
