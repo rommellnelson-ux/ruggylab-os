@@ -21,11 +21,30 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from app.models import ExamOrder, ExamOrderItem, Result
+from app.models import CsaSyncState, ExamOrder, ExamOrderItem, Result
 from app.services.exam_catalog import exam_catalog_entry
 from app.utils.datetime_utils import utcnow_naive
 
 logger = logging.getLogger(__name__)
+
+
+def pending_items(db: Session) -> list[ExamOrderItem]:
+    """Items d'ordres CSA, non encore remontés, non annulés, mappés, prélevés.
+
+    Factorisé ici pour être réutilisé par le monitoring (``health``) et le push.
+    """
+    return (
+        db.query(ExamOrderItem)
+        .join(ExamOrder, ExamOrderItem.order_id == ExamOrder.id)
+        .filter(
+            ExamOrder.csa_prescription_id.isnot(None),
+            ExamOrder.sample_id.isnot(None),
+            ExamOrderItem.csa_pushed_at.is_(None),
+            ExamOrderItem.status != "cancelled",
+            ~ExamOrderItem.exam_code.like("CSA:%"),  # les non-mappés n'ont pas de résultat
+        )
+        .all()
+    )
 
 
 def _releasable(result: Result) -> bool:
@@ -102,21 +121,9 @@ def push_results(db: Session, client) -> dict:
 
     ``client`` expose ``push_event(kind, source_item_id, payload)``.
     """
-    # Items d'ordres d'origine CSA, non encore remontés, non annulés, mappés.
-    items = (
-        db.query(ExamOrderItem)
-        .join(ExamOrder, ExamOrderItem.order_id == ExamOrder.id)
-        .filter(
-            ExamOrder.csa_prescription_id.isnot(None),
-            ExamOrder.sample_id.isnot(None),
-            ExamOrderItem.csa_pushed_at.is_(None),
-            ExamOrderItem.status != "cancelled",
-            ~ExamOrderItem.exam_code.like("CSA:%"),  # les non-mappés n'ont pas de résultat
-        )
-        .all()
-    )
-
+    items = pending_items(db)
     pushed = 0
+    last_error: str | None = None
     for item in items:
         order = item.order
         result = _find_result(db, order, item)
@@ -125,7 +132,8 @@ def push_results(db: Session, client) -> dict:
         source_item_id = f"{order.csa_prescription_id}:{item.exam_code}"
         try:
             client.push_event("labo_resultats", source_item_id, _build_payload(order, item, result))
-        except Exception:  # noqa: BLE001 — resilience : on réessaiera au prochain tour
+        except Exception as exc:  # noqa: BLE001 — resilience : on réessaiera au prochain tour
+            last_error = f"{source_item_id}: {exc}"
             logger.exception("Échec de remontée résultat CSA (%s), réessai au prochain cycle", source_item_id)
             continue
         # Succès : on complète le fil et on marque l'idempotence.
@@ -134,8 +142,17 @@ def push_results(db: Session, client) -> dict:
         item.csa_pushed_at = utcnow_naive()
         pushed += 1
 
+    # Observabilité (I4) : trace du cycle sortant sur la ligne d'état unique.
+    state = db.get(CsaSyncState, 1)
+    if state is None:
+        state = CsaSyncState(id=1)
+        db.add(state)
+    state.last_outbound_run_at = utcnow_naive()
+    state.last_outbound_error = last_error
+    state.pushed_count = (state.pushed_count or 0) + pushed
+
     db.commit()
-    return {"pushed": pushed}
+    return {"pushed": pushed, "error": last_error}
 
 
 def run_outbound_cycle() -> dict:
