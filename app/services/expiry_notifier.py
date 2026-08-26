@@ -2,20 +2,21 @@
 
 Scanne les réactifs dont la date d'expiration est dans les N prochains jours
 et envoie des notifications webhook via les NotifConfig actifs.
-Aucune dépendance externe — utilise uniquement urllib.request.
+Aucune dépendance externe — utilise le transport HTTP sûr centralisé.
 """
 
 from __future__ import annotations
 
-import contextlib
 import datetime as dt
 import json
-import urllib.request
+import logging
 
 from sqlalchemy.orm import Session
 
 from app.models.ruggylab_os import NotifConfig, Reagent
-from app.utils.url_safety import is_safe_external_url
+from app.utils.safe_http import safe_post_json
+
+logger = logging.getLogger(__name__)
 
 
 def get_expiring_reagents(db: Session, days: int = 30) -> list[dict]:
@@ -78,16 +79,13 @@ def check_and_notify_expiry(db: Session, days: int = 30) -> dict:
     for cfg in configs:
         url = cfg.webhook_url
         # Garde anti-SSRF : refuse loopback, IP privées, métadonnées cloud, etc.
-        if not url or not is_safe_external_url(url):
+        if not url:
             continue
-        req = urllib.request.Request(  # noqa: S310
-            url,
-            data=payload_bytes,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with contextlib.suppress(Exception):
-            with urllib.request.urlopen(req, timeout=5):  # noqa: S310  # nosec B310
-                pass
-            notified += 1
+        try:
+            status_code = safe_post_json(url, payload_bytes, timeout=5)
+            if 200 <= status_code < 300:
+                notified += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("expiry_notifier.webhook.error err=%s", exc)
+            continue
     return {"notified": notified, "expiring": len(expiring)}

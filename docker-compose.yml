@@ -160,23 +160,44 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY}
       PROCESS_ROLE: analyzer-gateway
+      # Requis : les listeners bruts archivent chaque trame dans Redis
+      # (LPUSH raw_analyzer_frames). Sans REDIS_URL ils refusent de démarrer.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       ENABLE_DH36_LISTENER: "true"
       # Écoute sur toutes les interfaces internes pour recevoir les trames automates.
       DH36_LISTENER_HOST: 0.0.0.0
-    # Healthcheck adapté au rôle : le listener DH36 doit accepter une connexion
+      # Listeners bruts : un par automate (routage par port -> analyzer_kind).
+      # Bind sur toutes les interfaces INTERNES du conteneur ; l'exposition
+      # réelle reste bornée par `ports:` ci-dessous.
+      ANALYZER_RAW_LISTENER_ENABLED: "true"
+      ANALYZER_RAW_LISTENER_HOST: 0.0.0.0
+      ANALYZER_HEMATOLOGY_PORT: ${ANALYZER_HEMATOLOGY_PORT:-9000}
+      ANALYZER_BIOCHEMISTRY_PORT: ${ANALYZER_BIOCHEMISTRY_PORT:-9001}
+      ANALYZER_IMMUNO_PORT: ${ANALYZER_IMMUNO_PORT:-9002}
+    # Healthcheck adapté au rôle : les listeners doivent accepter une connexion
     # TCP (remplace la sonde HTTP:8000 héritée de l'image, toujours KO ici).
+    # On sonde le port DH36 historique ET un listener brut : le process meurt
+    # si l'un des listeners tombe, la sonde le détecte donc dans les deux cas.
     healthcheck:
       test: ["CMD", "python", "-c",
-             "import socket; socket.create_connection(('127.0.0.1', 5001), timeout=3).close()"]
+             "import socket; [socket.create_connection(('127.0.0.1', p), timeout=3).close() for p in (5001, 9000)]"]
       interval: 30s
       timeout: 10s
       start_period: 30s
       retries: 3
-    # Pour recevoir les automates du LAN, publier le port DH36 LIÉ à l'interface
-    # du VLAN automates uniquement, p.ex. :  ports: ["10.0.30.1:5001:5001"]
-    # (ne jamais publier sur 0.0.0.0 — cf. §8.1).
+    # Ports automates publiés UNIQUEMENT sur l'interface du VLAN automates
+    # (ANALYZER_BIND_IP, p.ex. 10.0.30.1) — jamais sur 0.0.0.0, cf. §8.1.
+    # Défaut volontairement en loopback : sûr par construction si la variable
+    # n'est pas renseignée ; l'exposition au VLAN est un acte explicite.
+    ports:
+      - "${ANALYZER_BIND_IP:-127.0.0.1}:5001:5001"   # DH36 MLLP (héritage)
+      - "${ANALYZER_BIND_IP:-127.0.0.1}:9000:9000"   # Dymind hématologie
+      - "${ANALYZER_BIND_IP:-127.0.0.1}:9001:9001"   # Dymind biochimie
+      - "${ANALYZER_BIND_IP:-127.0.0.1}:9002:9002"   # Anbio Bioscann (immuno)
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - analyzer_net
