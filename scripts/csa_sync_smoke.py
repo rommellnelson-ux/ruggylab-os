@@ -60,16 +60,18 @@ def main() -> int:
     try:
         patients = db.query(Patient).all()
         orders = db.query(ExamOrder).all()
+        # Sortie volontairement NON NOMINATIVE : ce script est pointé sur une base
+        # via DATABASE_URL et rien ne garantit qu'elle soit jetable. On vérifie la
+        # *mécanique* (création, sentinelle DDN, mapping des examens), jamais
+        # l'identité des patients ni les identifiants de prescription CSA.
         print(f"Patients créés/mis à jour : {len(patients)}")
         for p in patients:
-            ddn = f"{p.birth_date} (estimée)" if p.birth_date_estimee else str(p.birth_date)
-            print(
-                f"  - {p.ipp_unique_id} : {p.last_name} {p.first_name} | sexe={p.sex} | né(e) {ddn}"
-            )
+            ddn = "estimée (sentinelle)" if p.birth_date_estimee else "fournie"
+            print(f"  - patient #{p.id} | sexe renseigné={p.sex is not None} | DDN {ddn}")
         print(f"\nOrdres d'examen créés : {len(orders)}")
         for o in orders:
             print(
-                f"  Ordre #{o.id} (CSA presc {o.csa_prescription_id}) "
+                f"  Ordre #{o.id} (origine CSA={o.csa_prescription_id is not None}) "
                 f"prio={o.priority} statut={o.status} service={o.requesting_service}"
             )
             for it in o.items:

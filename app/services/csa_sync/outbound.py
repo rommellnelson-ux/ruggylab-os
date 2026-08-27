@@ -147,14 +147,16 @@ def _same_patient(db: Session, order: ExamOrder) -> bool:
     """
     patient_id = db.query(Sample.patient_id).filter(Sample.id == order.sample_id).scalar()
     if patient_id is None or patient_id != order.patient_id:
-        # Identifiants techniques uniquement : aucune donnée nominative en journal.
+        # Journal volontairement réduit aux clés internes RuggyLab : ni identité,
+        # ni identifiant patient, ni identifiant de prescription CSA. `order_id`
+        # et `sample_id` suffisent à instruire l'incident en base ; y ajouter les
+        # `patient_id` ferait du flux de logs un vecteur de corrélation patient.
         logger.error(
             "csa_sync.outbound.patient_mismatch order_id=%s sample_id=%s "
-            "order_patient_id=%s sample_patient_id=%s — publication bloquée",
+            "reason=%s — publication bloquée",
             order.id,
             order.sample_id,
-            order.patient_id,
-            patient_id,
+            "sample_absent" if patient_id is None else "patient_differe",
         )
         return False
     return True
@@ -199,9 +201,12 @@ def push_results(db: Session, client: CsaEventSink) -> dict:
         try:
             client.push_event("labo_resultats", source_item_id, _build_payload(order, item, result))
         except Exception as exc:  # noqa: BLE001 — resilience : on réessaiera au prochain tour
-            last_error = f"{source_item_id}: {exc}"
+            # `source_item_id` porte le prescription_id CSA, qui identifie un
+            # patient chez le tiers : on ne le journalise pas. La clé interne de
+            # l'item suffit à retrouver l'ordre, l'examen et la prescription en base.
+            last_error = f"item {item.id}: {type(exc).__name__}"
             logger.exception(
-                "Échec de remontée résultat CSA (%s), réessai au prochain cycle", source_item_id
+                "Échec de remontée résultat CSA (item %s), réessai au prochain cycle", item.id
             )
             continue
         # Succès : on complète le fil et on marque l'idempotence.

@@ -109,7 +109,9 @@ def main() -> int:
             .order_by(ExamOrder.id.desc())
             .first()
         )
-        print(f"Ordre #{order.id} (CSA presc {order.csa_prescription_id}) — items :")
+        # Pas de prescription_id CSA en sortie : il identifie un patient chez le
+        # tiers. La clé interne de l'ordre suffit au diagnostic.
+        print(f"Ordre #{order.id} (origine CSA) — items :")
         for it in order.items:
             marque = it.csa_pushed_at.isoformat() if it.csa_pushed_at else "—"
             label = (exam_catalog_entry(it.exam_code) or {}).get("label", it.exam_label)

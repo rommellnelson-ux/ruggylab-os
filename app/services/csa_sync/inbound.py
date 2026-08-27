@@ -136,11 +136,10 @@ def apply_prescription(db: Session, payload: dict) -> ExamOrder:
     )
     db.add(order)
     db.flush()
+    # Le prescription_id CSA identifie un patient chez le tiers : hors journal.
+    # La clé interne de l'ordre suffit à le retrouver en base si besoin.
     logger.info(
-        "CSA prescription %s -> ExamOrder %s (%d examens)",
-        presc_id,
-        order.id,
-        len(order.items),
+        "CSA prescription intégrée -> ExamOrder %s (%d examens)", order.id, len(order.items)
     )
     return order
 
