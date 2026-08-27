@@ -32,7 +32,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ruff bandit pip-audit detect-secrets mypy
+          pip install ruff bandit pip-audit detect-secrets==1.5.0 mypy
 
       # ── Hard gates (must pass) ──────────────────────────────────────────────
       - name: Ruff lint
@@ -55,9 +55,20 @@ jobs:
         continue-on-error: true
         run: pip-audit -r requirements.txt
 
-      - name: Secret scan (advisory)
-        continue-on-error: true
-        run: python -m detect_secrets.pre_commit_hook --baseline .secrets.baseline $(git ls-files)
+      - name: Validate secret baseline structure
+        run: python scripts/check_secrets_baseline.py
+
+      - name: Secret baseline update stability — Linux
+        run: python scripts/check_secrets_baseline.py --check-update-stability
+
+      - name: Secret scan — blocking
+        run: |
+          git ls-files -z |
+            xargs -0 detect-secrets-hook \
+              --baseline .secrets.baseline
+
+      - name: Secret scan negative probe
+        run: python scripts/check_secret_scan_probe.py
 
   test-postgres:
     name: Migrations + flux clinique E2E (PostgreSQL)
@@ -232,11 +243,23 @@ jobs:
           npm install -D playwright
           npx playwright install --with-deps chromium
 
+      - name: Generate ephemeral E2E credentials
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import secrets
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as environment:
+              for name in ("CI_SECRET_KEY", "CI_ADMIN_PASSWORD"):
+                  environment.write(f"{name}={secrets.token_urlsafe(48)}\n")
+          PY
+
       - name: Start application (SQLite)
         env:
           DATABASE_URL: sqlite:///./e2e.db
-          SECRET_KEY: e2e-secret-key-minimum-32-characters-long
-          FIRST_SUPERUSER_PASSWORD: E2ePassword123!Secure
+          SECRET_KEY: ${{ env.CI_SECRET_KEY }}
+          FIRST_SUPERUSER_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
           CACHE_BACKEND: memory
         run: |
           alembic upgrade head
@@ -248,7 +271,7 @@ jobs:
       - name: Run billing E2E
         env:
           UI_CHECK_BASE_URL: http://127.0.0.1:8000
-          FIRST_SUPERUSER_PASSWORD: E2ePassword123!Secure
+          FIRST_SUPERUSER_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
         run: node scripts/billing_flow_playwright.js
 
       - name: Upload E2E screenshots
@@ -273,17 +296,30 @@ jobs:
       - name: Build production image
         run: docker build -t ruggylab-os:ci .
 
-      - name: Create production .env
+      - name: Create production .env with ephemeral credentials
+        shell: bash
         run: |
-          cat > .env <<'EOF'
-          RUGGYLAB_IMAGE=ruggylab-os:ci
-          SECRET_KEY=ci-secret-key-minimum-32-characters-long
-          FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
-          POSTGRES_PASSWORD=ci_pg_password_123
-          DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
-          GRAFANA_PASSWORD=ci_grafana_password_123
-          RUGGYLAB_DOMAIN=localhost
-          EOF
+          python - <<'PY'
+          import os
+          import secrets
+
+          values = {name: secrets.token_urlsafe(48) for name in (
+              "CI_SECRET_KEY", "CI_ADMIN_PASSWORD", "CI_DATABASE_PASSWORD", "CI_GRAFANA_PASSWORD"
+          )}
+          with open(".env", "w", encoding="utf-8") as environment:
+              environment.write("RUGGYLAB_IMAGE=ruggylab-os:ci\n")
+              environment.write(f"SECRET_KEY={values['CI_SECRET_KEY']}\n")
+              environment.write(f"FIRST_SUPERUSER_PASSWORD={values['CI_ADMIN_PASSWORD']}\n")
+              environment.write(f"POSTGRES_PASSWORD={values['CI_DATABASE_PASSWORD']}\n")
+              environment.write(
+                  "DATABASE_URL=postgresql+psycopg://ruggylab:"
+                  f"{values['CI_DATABASE_PASSWORD']}@postgres:5432/ruggylab\n"
+              )
+              environment.write(f"GRAFANA_PASSWORD={values['CI_GRAFANA_PASSWORD']}\n")
+              environment.write("RUGGYLAB_DOMAIN=localhost\n")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as github_environment:
+              github_environment.write(f"CI_ADMIN_PASSWORD={values['CI_ADMIN_PASSWORD']}\n")
+          PY
 
       - name: Start dependencies and run migrations
         run: |
@@ -348,7 +384,7 @@ jobs:
         env:
           UAT_BASE_URL: https://localhost
           UAT_INSECURE_TLS: "1"
-          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+          FIRST_SUPERUSER_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
         run: |
           pip install httpx
           python -m scripts.uat_smoke

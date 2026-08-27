@@ -157,7 +157,7 @@ reçus). Tous les imports sont **authentifiés, idempotents et audités**.
 - WebSocket authentifié par sous-protocole (jeton hors URL).
 - Ingestion automates : clé API + HMAC + allowlist IP.
 - Audit applicatif des actions sensibles ; CSV protégé contre l'injection.
-- CI : bandit + CodeQL + `pip-audit`/`detect-secrets` (advisory).
+- CI : bandit + CodeQL + `detect-secrets` bloquant ; `pip-audit` reste advisory.
 - Gestion des secrets : variables d'env / gestionnaire (`docs/SECRETS_MANAGEMENT.md`),
   contrôle `scripts/check_deploy_readiness.py`.
 

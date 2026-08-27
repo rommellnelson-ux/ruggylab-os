@@ -1,0 +1,137 @@
+"""Validate the portable, non-sensitive structure of .secrets.baseline."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import json
+import os
+import subprocess
+from pathlib import Path, PurePosixPath, PureWindowsPath
+from typing import Any
+
+EXPECTED_VERSION = "1.5.0"
+JUSTIFIED_MISSING_PATHS: frozenset[str] = frozenset()
+
+
+def compare_baseline_documents(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+    """Compare baselines while ignoring only the volatile generation timestamp."""
+    expected = copy.deepcopy(before)
+    actual = copy.deepcopy(after)
+    expected.pop("generated_at", None)
+    actual.pop("generated_at", None)
+    if expected == actual:
+        return []
+
+    errors: list[str] = []
+    expected_results = expected.pop("results", {})
+    actual_results = actual.pop("results", {})
+    for path in sorted(set(expected_results) | set(actual_results)):
+        if expected_results.get(path) != actual_results.get(path):
+            errors.append(f"{path}: baseline results changed during update")
+    if expected != actual:
+        errors.append(".secrets.baseline: configuration changed during update")
+    return errors or [".secrets.baseline: content changed during update"]
+
+
+def check_update_stability(baseline_path: Path) -> list[str]:
+    """Run the official update in place, compare safely, then restore it."""
+    original = baseline_path.read_text(encoding="utf-8")
+    before = json.loads(original)
+    try:
+        completed = subprocess.run(
+            ["detect-secrets", "scan", "--baseline", str(baseline_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if completed.returncode != 0:
+            return [".secrets.baseline: detect-secrets update failed"]
+        after = json.loads(baseline_path.read_text(encoding="utf-8"))
+    finally:
+        baseline_path.write_text(original, encoding="utf-8")
+    return compare_baseline_documents(before, after)
+
+
+def validate_baseline(baseline_path: Path, repository_root: Path) -> list[str]:
+    """Return redacted structural errors without reading or printing candidates."""
+    try:
+        document: dict[str, Any] = json.loads(baseline_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"{baseline_path.name}: invalid baseline ({type(exc).__name__})"]
+
+    errors: list[str] = []
+    if document.get("version") != EXPECTED_VERSION:
+        errors.append(f"{baseline_path.name}: expected version {EXPECTED_VERSION}")
+
+    results = document.get("results")
+    if not isinstance(results, dict):
+        return [*errors, f"{baseline_path.name}: results must be an object"]
+
+    canonical_sources: dict[str, str] = {}
+    for raw_path in results:
+        if not isinstance(raw_path, str):
+            errors.append(f"{baseline_path.name}: non-string result path")
+            continue
+
+        if "\\" in raw_path:
+            errors.append(f"{raw_path}: Windows path separator is forbidden")
+
+        canonical = raw_path.replace("\\", "/")
+        if (
+            PurePosixPath(canonical).is_absolute()
+            or PureWindowsPath(raw_path).is_absolute()
+            or os.path.isabs(raw_path)
+        ):
+            errors.append(f"{raw_path}: absolute path is forbidden")
+
+        previous = canonical_sources.setdefault(canonical, raw_path)
+        if previous != raw_path:
+            errors.append(f"{raw_path}: duplicates {previous} after canonicalization")
+
+        parts = PurePosixPath(canonical).parts
+        if not canonical or any(part in {"", ".", ".."} for part in parts):
+            errors.append(f"{raw_path}: path is not a canonical repository-relative path")
+            continue
+
+        if canonical not in JUSTIFIED_MISSING_PATHS and not (repository_root / canonical).is_file():
+            errors.append(f"{raw_path}: tracked file does not exist")
+
+        findings = results[raw_path]
+        if not isinstance(findings, list):
+            errors.append(f"{raw_path}: findings must be a list")
+            continue
+        for finding in findings:
+            if not isinstance(finding, dict):
+                errors.append(f"{raw_path}: finding must be an object")
+                continue
+            nested_path = finding.get("filename")
+            if nested_path is not None and nested_path != canonical:
+                errors.append(f"{raw_path}: nested filename must match its POSIX result path")
+
+    return sorted(set(errors))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("baseline", nargs="?", type=Path, default=Path(".secrets.baseline"))
+    parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument("--check-update-stability", action="store_true")
+    args = parser.parse_args()
+
+    errors = validate_baseline(args.baseline, args.root.resolve())
+    if not errors and args.check_update_stability:
+        errors.extend(check_update_stability(args.baseline))
+    for error in errors:
+        print(error)
+    if errors:
+        return 1
+    if args.check_update_stability:
+        print("Secret baseline structure and update stability are valid.")
+    else:
+        print("Secret baseline structure is valid.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
