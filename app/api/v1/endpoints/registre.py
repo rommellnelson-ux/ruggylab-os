@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models import User
 from app.schemas.registre import RegistreImportRequest, RegistreRowsRequest
 from app.services.registre_analytics import compute_registre_analytics
+from app.services.registre_import import MAX_ROWS as REGISTRE_MAX_ROWS
 from app.services.registre_import import RegistreImportTooLargeError, import_registre_rows
 from app.services.registre_parser import build_import_preview
 
@@ -60,4 +61,8 @@ def registre_import(
     try:
         return import_registre_rows(db, payload.rows, user=current_user, dry_run=payload.dry_run)
     except RegistreImportTooLargeError as exc:
-        raise HTTPException(status_code=413, detail=str(exc)) from exc
+        # Voir bulk_import : message reconstruit, jamais propage depuis l'exception.
+        raise HTTPException(
+            status_code=413,
+            detail=f"Import trop volumineux : maximum {REGISTRE_MAX_ROWS} lignes.",
+        ) from exc
