@@ -98,10 +98,27 @@ transport HTTP sortant est centralisé, valide toutes les réponses DNS, épingl
 la connexion à l'adresse validée, refuse les redirections et impose un plancher
 TLS 1.2.
 
-**Restent ouvertes sur `main`** : 0 critique, 7 hautes
-(`py/clear-text-logging-sensitive-data`) et 5 moyennes
-(`py/stack-trace-exposure`). Ces alertes hautes **ne sont pas encore
-qualifiées** : elles doivent être analysées et tranchées avant tout GO (§5).
+**Restent ouvertes sur `main`** (relevé du 2026-08-26) : **0 critique, 8 hautes
+et 4 moyennes**, soit 12 alertes.
+
+| Sévérité | Règle | Nombre | Emplacements |
+| --- | --- | --- | --- |
+| Haute | `py/clear-text-logging-sensitive-data` | 8 | `core/secrets_manager.py` ×4, `core/config.py`, `api/v1/endpoints/pdf_prescription.py`, `services/prescription_scanner.py`, `services/billing_engine.py` |
+| Moyenne | `py/stack-trace-exposure` | 4 | `api/v1/endpoints/bulk_import.py` ×2, `api/v1/endpoints/registre.py`, `main.py` |
+
+**Analyse préliminaire, à confirmer par une revue formelle.** Les cinq
+occurrences de `core/` journalisent le **nom** d'un secret et l'exception
+associée, jamais la valeur ; l'une d'elles ne journalise que le *type* de
+gestionnaire (`aws`/`azure`/`gcp`/`local`). Elles paraissent donc être des
+**faux positifs quant à la divulgation de la valeur**, avec un risque résiduel
+faible mais réel : l'interpolation de l'exception complète pourrait, selon le
+SDK, contenir un détail de requête. Les trois autres (`pdf_prescription`,
+`prescription_scanner`, `billing_engine`) touchent des chemins **cliniques ou
+financiers** et n'ont pas été analysées ici.
+
+**Aucune de ces 8 alertes hautes n'est à ce jour formellement qualifiée.**
+Cette analyse préliminaire ne vaut pas qualification : chacune doit être
+tranchée par écrit — corrigée, ou justifiée et suivie — avant tout GO (§5, C2).
 
 ### 3.2 Cohérence patient au point de publication externe
 
@@ -158,7 +175,7 @@ Toutes doivent être satisfaites et **prouvées**. Aucune n'est présumée acqui
 | # | Condition | Preuve attendue | Statut au 2026-08-26 |
 | --- | --- | --- | --- |
 | C1 | Aucune alerte de sécurité **critique** ouverte | Tableau CodeQL sur `main` | ✅ **satisfait** (0 critique) |
-| C2 | Alertes **hautes** qualifiées (corrigées ou justifiées et suivies) | Analyse écrite par alerte | ❌ 7 hautes non qualifiées |
+| C2 | Alertes **hautes** qualifiées (corrigées ou justifiées et suivies) | Analyse écrite par alerte | ❌ **8 hautes** non qualifiées (§3.1) |
 | C3 | CI **entièrement verte** sur le SHA autorisé | Run GitHub Actions | ✅ run `32987425070` vert sur `main` |
 | C4 | **Tête Alembic unique** | `alembic heads` | ⏳ à revérifier sur le SHA autorisé |
 | C5 | Test de **sauvegarde et de restauration** réussi | Procès-verbal de restauration | ❌ à produire |
