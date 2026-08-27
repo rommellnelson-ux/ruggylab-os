@@ -37,6 +37,26 @@ from app.services.onmci_client import ONMCIClient, get_onmci_client
 logger = logging.getLogger(__name__)
 
 
+def _age_band(age_years: float | None) -> str:
+    """Tranche d'âge pour la journalisation — jamais l'âge exact.
+
+    Les règles d'interaction et de posologie dépendent du groupe d'âge : la
+    tranche suffit donc au diagnostic d'un scan, sans porter d'attribut patient
+    brut dans le flux de logs.
+    """
+    if age_years is None:
+        return "inconnu"
+    if age_years < 2:
+        return "0-1"
+    if age_years < 12:
+        return "2-11"
+    if age_years < 18:
+        return "12-17"
+    if age_years < 65:
+        return "18-64"
+    return "65+"
+
+
 # ---------------------------------------------------------------------------
 # Base de données d'interactions médicamenteuses
 # Calibrée pour le contexte CI (OMS Essential Medicines + ANSM + PNLP)
@@ -481,12 +501,16 @@ class PrescriptionScanner:
         dci_codes = [line.dci.code for line in request.drugs]
         cim10_codes = [d.code for d in request.diagnoses]
 
+        # `patient_age` était journalisé en clair. Un âge exact, horodaté, dans
+        # une population de centre de santé restreinte, est quasi-identifiant.
+        # La tranche conserve la valeur diagnostique (les règles d'interaction
+        # dépendent du groupe d'âge) sans porter d'attribut patient brut.
         logger.info(
             "prescription_scanner.scan",
             extra={
                 "drug_count": len(dci_codes),
                 "diagnosis_count": len(cim10_codes),
-                "patient_age": request.patient.age_years,
+                "patient_age_band": _age_band(request.patient.age_years),
             },
         )
 

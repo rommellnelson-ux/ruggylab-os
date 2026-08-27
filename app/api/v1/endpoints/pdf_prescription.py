@@ -67,12 +67,16 @@ def generate_prescription_report(
     date_str = str(payload.prescription_date) if payload.prescription_date else str(date.today())
     filename = f"ordonnance-{date_str}.pdf"
 
+    # `pdf_filename` portait la date de l'ordonnance, donc une donnée issue du
+    # dossier du patient. Elle n'apportait rien au diagnostic : seuls comptent
+    # le verdict du scan et sa confiance. La taille du PDF aide à repérer une
+    # génération anormale sans rien révéler du contenu.
     logger.info(
         "pdf_prescription.report.ok",
         extra={
             "status": result.status,
             "confidence": result.confidence_score,
-            "pdf_filename": filename,
+            "pdf_bytes": len(pdf_bytes),
         },
     )
 
