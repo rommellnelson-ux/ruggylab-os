@@ -178,6 +178,153 @@ jobs:
           path: uvicorn-pg.log
           if-no-files-found: ignore
 
+  # ── Sauvegarde → restauration → application (bloquant) ─────────────────────
+  # Une sauvegarde qu'on n'a jamais restaurée n'est pas une sauvegarde. Ce job
+  # démontre le cycle complet sur PostgreSQL 16 jetable, avec des données
+  # exclusivement SYNTHÉTIQUES : jamais de base réelle, jamais de donnée
+  # patient, jamais d'export existant.
+  backup-restore:
+    name: Sauvegarde et restauration PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ruggylab
+          POSTGRES_PASSWORD: ruggylab_test
+          POSTGRES_DB: ruggylab_restore_src
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      PGHOST: localhost
+      PGUSER: ruggylab
+      PGPASSWORD: ruggylab_test
+      SRC_DB: ruggylab_restore_src
+      DST_DB: ruggylab_restore_verify
+      SECRET_KEY: ci-secret-key-minimum-32-characters-long
+      FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Le client doit correspondre au serveur : pg_dump refuse une version
+      # serveur plus récente que la sienne, et l'image ubuntu-latest peut être
+      # en retard sur PostgreSQL 16.
+      - name: Install PostgreSQL 16 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -sSf -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-16
+          pg_dump --version
+
+      - name: "1. Migrations jusqu'à la tête sur la base source"
+        env:
+          DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_restore_src
+        run: |
+          alembic upgrade head
+          head=$(alembic heads | head -1 | awk '{print $1}')
+          echo "Tête appliquée : $head"
+          test "$head" = "20260826_0043" || { echo "::error::tête inattendue $head"; exit 1; }
+
+      - name: "2. Semis de données strictement synthétiques"
+        run: |
+          python -m scripts.backup_restore_verify seed \
+            --url "postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/${SRC_DB}" \
+            --manifest restore-manifest.json
+
+      - name: "3. Sauvegarde (pg_dump format custom)"
+        run: |
+          pg_dump --format=custom --no-owner --no-privileges \
+            --dbname "$SRC_DB" --file ruggylab-backup.dump
+          ls -lh ruggylab-backup.dump
+          test -s ruggylab-backup.dump || { echo "::error::dump vide"; exit 1; }
+
+      # La base cible est créée VIDE : on prouve une restauration réelle, pas une
+      # base source qu'on se contenterait de relire.
+      - name: "4. Restauration dans une base vierge"
+        run: |
+          psql -d postgres -c "DROP DATABASE IF EXISTS ${DST_DB};"
+          psql -d postgres -c "CREATE DATABASE ${DST_DB};"
+          tables=$(psql -tAd "$DST_DB" -c \
+            "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
+          test "$tables" = "0" || { echo "::error::base cible non vierge ($tables tables)"; exit 1; }
+          pg_restore --no-owner --no-privileges --dbname "$DST_DB" ruggylab-backup.dump
+          echo "Restauration terminée."
+
+      - name: "5. Vérification : comptages, relations, contraintes, index"
+        run: |
+          python -m scripts.backup_restore_verify verify \
+            --url "postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/${DST_DB}" \
+            --manifest restore-manifest.json
+
+      # Preuve que la base restaurée est réellement exploitable, pas seulement
+      # structurellement correcte.
+      - name: "6. Démarrage de l'application sur la base RESTAURÉE"
+        env:
+          DATABASE_URL: postgresql+psycopg://ruggylab:ruggylab_test@localhost:5432/ruggylab_restore_verify
+          CACHE_BACKEND: memory
+          ENABLE_DH36_LISTENER: "false"
+          ANALYZER_RAW_LISTENER_ENABLED: "false"
+          CSA_SYNC_ENABLED: "false"
+        run: |
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8010 --log-level warning \
+            > uvicorn-restore.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8010/api/v1/health && break || sleep 1
+          done
+          curl -sf http://127.0.0.1:8010/api/v1/health \
+            || { echo "::error::l'application ne démarre pas sur la base restaurée"; exit 1; }
+
+      - name: "7. Smoke test API sur la base restaurée"
+        env:
+          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
+        run: |
+          token=$(curl -sf -X POST http://127.0.0.1:8010/api/v1/auth/login \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            -d "username=admin&password=${FIRST_SUPERUSER_PASSWORD}" \
+            | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+          test -n "$token" || { echo "::error::authentification impossible"; exit 1; }
+          count=$(curl -sf http://127.0.0.1:8010/api/v1/patients \
+            -H "Authorization: Bearer $token" \
+            | python -c 'import json,sys; d=json.load(sys.stdin); print(len(d.get("items", d)))')
+          echo "Patients lus via l'API après restauration : $count"
+          test "$count" -ge 3 \
+            || { echo "::error::les patients restaurés ne sont pas lisibles via l'API"; exit 1; }
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: backup-restore-logs
+          path: |
+            uvicorn-restore.log
+            restore-manifest.json
+          if-no-files-found: ignore
+
   codeql:
     name: CodeQL security analysis
     needs: test
