@@ -24,6 +24,46 @@ Composants RuggyLab : `app/services/csa_sync/` (`client.py`, `inbound.py`,
 `outbound.py`, `exam_map.py`, `health.py`). Worker dans le process
 `PROCESS_ROLE=scheduler` (`app/scheduler.py`), gated `CSA_SYNC_ENABLED`.
 
+### 1.2 ⚠️ Compte technique sur-privilégié côté CSA — à corriger AVANT bascule
+
+Revue des politiques RLS de `csa-plateau`
+(`supabase/migrations/202606120001_secure_csa.sql` et `202607010001_ruggylab_interoperability.sql`).
+
+**Ce qui est correct.** RLS est bien activée sur `csa_events` et `csa_profiles`.
+**Aucune** politique ne cible le rôle `anon` : la clé publishable **seule** ne
+donne accès à rien. Aucune politique `DELETE` n'existe → suppression refusée
+partout. La politique `UPDATE` liste explicitement ses tables, et les trois
+tables labo n'y figurent pas → **une prescription déjà émise ne peut pas être
+modifiée**, par personne.
+
+**Le problème.** Le compte technique `RUGGYLAB` est créé avec `module='labo'`.
+Or les politiques RLS se cumulent en **OR**, et la politique générale
+`events_read_by_role` s'applique à tout `authenticated` via `csa_can_read()`,
+qui pour `module='labo'` autorise `patients`, `consultations`, `labo_actes`.
+
+Conséquence : le compte dont RuggyLab OS détient le mot de passe peut
+
+- **lister l'ensemble des patients de CSA Plateau** ;
+- lire les consultations et les actes de laboratoire ;
+- **insérer une prescription** (`lab_prescription_insert_staff` accepte
+  `permissions && {soins,labo}`, satisfait par ce compte).
+
+RuggyLab OS n'exerce aucune de ces capacités — il n'appelle que les deux RPC
+`SECURITY DEFINER`. Mais le privilège existe, et un identifiant compromis
+l'exposerait. **Le principe de moindre privilège n'est pas respecté.**
+
+**Correction attendue (dépôt `csa-plateau`, pas ici) :** sortir le compte
+technique du champ de `csa_can_read`/`csa_can_write` — par exemple un
+`module='interop'` absent de ces deux fonctions, en ne lui laissant que
+`lab_interop_read_staff` et `lab_interop_insert_ruggylab` ; et retirer le
+compte technique du champ de `lab_prescription_insert_staff`.
+
+**Tant que ce point n'est pas corrigé, `CSA_SYNC_ENABLED` doit rester `false`.**
+Côté RuggyLab, cette inertie est verrouillée par `tests/test_csa_fail_closed.py` :
+intégration éteinte par défaut, aucun identifiant livré dans le code, et refus
+de construire le client — avant tout appel réseau — si l'un des quatre réglages
+requis manque.
+
 ### 1.1 Garde-fous de sécurité clinique du flux sortant
 
 Le flux sortant publie un résultat **sous une identité patient, chez un tiers**.
