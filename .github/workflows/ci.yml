@@ -299,21 +299,45 @@ jobs:
           curl -sf http://127.0.0.1:8010/api/v1/health \
             || { echo "::error::l'application ne démarre pas sur la base restaurée"; exit 1; }
 
+      # La preuve décisive : les lignes restaurées se relisent à travers toute
+      # la pile applicative (auth, ORM, sérialisation), pas seulement en SQL.
       - name: "7. Smoke test API sur la base restaurée"
-        env:
-          FIRST_SUPERUSER_PASSWORD: CiPassword123!Secure
         run: |
-          token=$(curl -sf -X POST http://127.0.0.1:8010/api/v1/auth/login \
+          login=$(curl -s -o login.json -w '%{http_code}' \
+            -X POST http://127.0.0.1:8010/api/v1/login/access-token \
             -H 'Content-Type: application/x-www-form-urlencoded' \
-            -d "username=admin&password=${FIRST_SUPERUSER_PASSWORD}" \
-            | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
-          test -n "$token" || { echo "::error::authentification impossible"; exit 1; }
-          count=$(curl -sf http://127.0.0.1:8010/api/v1/patients \
-            -H "Authorization: Bearer $token" \
-            | python -c 'import json,sys; d=json.load(sys.stdin); print(len(d.get("items", d)))')
-          echo "Patients lus via l'API après restauration : $count"
-          test "$count" -ge 3 \
+            --data-urlencode "username=admin" \
+            --data-urlencode "password=${FIRST_SUPERUSER_PASSWORD}")
+          if [ "$login" != "200" ]; then
+            echo "::error::authentification impossible (HTTP $login)"; head -c 400 login.json; exit 1
+          fi
+          token=$(python -c 'import json;print(json.load(open("login.json"))["access_token"])')
+          test -n "$token" || { echo "::error::jeton absent"; exit 1; }
+
+          code=$(curl -s -o patients.json -w '%{http_code}' \
+            "http://127.0.0.1:8010/api/v1/patients?limit=100" \
+            -H "Authorization: Bearer $token")
+          if [ "$code" != "200" ]; then
+            echo "::error::lecture des patients impossible (HTTP $code)"; head -c 400 patients.json; exit 1
+          fi
+          # Réponse paginée : {items: [...], meta: {total: N}}.
+          total=$(python -c 'import json;d=json.load(open("patients.json"));print(d["meta"]["total"])')
+          echo "Patients relus via l'API après restauration : $total"
+          test "$total" -ge 3 \
             || { echo "::error::les patients restaurés ne sont pas lisibles via l'API"; exit 1; }
+
+          # Les identités restaurées sont bien celles qui avaient été semées.
+          python - <<'PY'
+          import json, sys
+          items = json.load(open("patients.json"))["items"]
+          ipps = {p["ipp_unique_id"] for p in items}
+          attendus = {"TEST-IPP-0001", "TEST-IPP-0002", "TEST-IPP-0003"}
+          manquants = attendus - ipps
+          if manquants:
+              print(f"::error::IPP absents après restauration : {sorted(manquants)}")
+              sys.exit(1)
+          print(f"Les {len(attendus)} IPP synthétiques sont relus via l'API.")
+          PY
 
       - name: Upload logs on failure
         if: failure()
