@@ -95,9 +95,35 @@ class CsaClient:
         self._http.close()
 
 
+#: Réglages sans lesquels l'intégration CSA ne peut pas fonctionner. Tous
+#: viennent de l'extérieur du dépôt (secret manager / variables d'env) : aucune
+#: valeur par défaut du code ne permet d'activer le flux.
+_REGLAGES_REQUIS = (
+    "CSA_SUPABASE_URL",
+    "CSA_SUPABASE_ANON_KEY",
+    "CSA_RUGGYLAB_EMAIL",
+    "CSA_RUGGYLAB_PASSWORD",
+)
+
+
+def missing_csa_settings() -> list[str]:
+    """Réglages requis encore absents. Vide = configuration externe complète."""
+    return [name for name in _REGLAGES_REQUIS if not str(getattr(settings, name, "") or "").strip()]
+
+
 def build_client_from_settings() -> CsaClient:
-    if not settings.CSA_SUPABASE_URL:
-        raise RuntimeError("CSA_SUPABASE_URL non configuré")
+    """Construit le client, ou refuse si la configuration externe est incomplète.
+
+    Fail-closed : le refus intervient AVANT toute tentative réseau. Un
+    déploiement qui active ``CSA_SYNC_ENABLED`` sans fournir le mot de passe du
+    compte technique échoue ici, au lieu d'ouvrir une session GoTrue vouée à
+    l'échec et de laisser croire que l'intégration est configurée.
+    """
+    manquants = missing_csa_settings()
+    if manquants:
+        raise RuntimeError(
+            "Intégration CSA non configurée — réglages absents : " + ", ".join(manquants)
+        )
     return CsaClient(
         settings.CSA_SUPABASE_URL,
         settings.CSA_SUPABASE_ANON_KEY,
