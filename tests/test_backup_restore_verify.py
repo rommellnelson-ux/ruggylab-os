@@ -147,3 +147,42 @@ def test_no_fstring_interpolation_of_manifest_table_names():
     """Le module ne construit aucune requête à partir d'une valeur du manifeste."""
     source = (REPO_ROOT / "scripts" / "backup_restore_verify.py").read_text(encoding="utf-8")
     assert 'text(f"SELECT count(*) FROM {table}")' not in source
+
+
+# ── le semis couvre toutes les colonnes obligatoires ────────────────────────
+
+
+def test_seed_can_satisfy_every_not_null_column():
+    """Aucune colonne NOT NULL ne reste sans valeur au moment de l'insertion.
+
+    Régression réelle : la première version insérait en SQL brut et omettait
+    `exam_orders.ordered_at`, dont le défaut est côté Python — invisible pour un
+    INSERT direct. Le semis passe désormais par l'ORM ; ce test vérifie que
+    chaque colonne obligatoire est bien couverte, soit par un défaut (serveur ou
+    Python), soit par une valeur que le semis fournit explicitement.
+    """
+    import app.models  # noqa: F401 — charge les mappers
+    from app.db.base import Base
+
+    fournis = {
+        "patients": {"ipp_unique_id", "first_name", "last_name", "birth_date", "sex"},
+        "samples": {"barcode", "patient_id", "status"},
+        "exam_orders": {"patient_id", "sample_id", "status", "requesting_service", "priority"},
+        "exam_order_items": {"order_id", "exam_code", "exam_label", "status", "result_id"},
+        "results": {"sample_id", "exam_code", "data_points", "result_type", "is_validated"},
+    }
+
+    for table_name, explicites in fournis.items():
+        table = Base.metadata.tables[table_name]
+        for column in table.columns:
+            if column.primary_key or column.nullable:
+                continue
+            couverte = (
+                column.server_default is not None
+                or column.default is not None
+                or column.name in explicites
+            )
+            assert couverte, (
+                f"{table_name}.{column.name} est NOT NULL, sans défaut, "
+                "et le semis ne le fournit pas"
+            )

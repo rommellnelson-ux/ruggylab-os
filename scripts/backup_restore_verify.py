@@ -69,86 +69,96 @@ def _engine(url: str) -> Engine:
 
 
 def seed(url: str, manifest_path: Path) -> dict:
-    """Peuple la base jetable et renvoie (et écrit) le manifeste attendu."""
+    """Peuple la base jetable et renvoie (et écrit) le manifeste attendu.
+
+    Le semis passe par l'**ORM**, à dessein : les colonnes NOT NULL dont le
+    défaut est côté Python (``ordered_at``, ``analysis_date``, ``status``…) sont
+    alors renseignées automatiquement, et le semis reste correct quand le modèle
+    évolue. La vérification, elle, relit la base en **SQL brut** : elle contrôle
+    ainsi ce que la base contient réellement, sans repasser par les mêmes
+    hypothèses que le semis.
+    """
+    from sqlalchemy.orm import Session
+
+    from app.models import ExamOrder, ExamOrderItem, Patient, Result, Sample
+
     engine = _engine(url)
-    now = dt.datetime(2026, 8, 27, 9, 0, 0)
 
-    with engine.begin() as conn:
-        patient_ids = []
-        for ipp, last, first, dob, sex in _PATIENTS:
-            pid = conn.execute(
-                text(
-                    "INSERT INTO patients (ipp_unique_id, last_name, first_name, "
-                    "birth_date, birth_date_estimee, sex) "
-                    "VALUES (:ipp, :last, :first, :dob, false, :sex) RETURNING id"
-                ),
-                {"ipp": ipp, "last": last, "first": first, "dob": dob, "sex": sex},
-            ).scalar_one()
-            patient_ids.append(pid)
+    with Session(engine) as session:
+        patients = [
+            Patient(
+                ipp_unique_id=ipp,
+                last_name=last,
+                first_name=first,
+                birth_date=dob,
+                birth_date_estimee=False,
+                sex=sex,
+            )
+            for ipp, last, first, dob, sex in _PATIENTS
+        ]
+        session.add_all(patients)
+        session.flush()
 
-        sample_ids = []
-        for index, pid in enumerate(patient_ids, start=1):
-            sid = conn.execute(
-                text(
-                    "INSERT INTO samples (barcode, patient_id, collection_date, status) "
-                    "VALUES (:barcode, :pid, :collected, 'received') RETURNING id"
-                ),
-                {"barcode": f"TEST-BC-{index:04d}", "pid": pid, "collected": now},
-            ).scalar_one()
-            sample_ids.append(sid)
+        samples = [
+            Sample(barcode=f"TEST-BC-{i:04d}", patient_id=p.id, status="received")
+            for i, p in enumerate(patients, start=1)
+        ]
+        session.add_all(samples)
+        session.flush()
 
-        order_ids, item_ids, result_ids = [], [], []
-        for index, (pid, sid) in enumerate(zip(patient_ids, sample_ids, strict=True), start=1):
-            oid = conn.execute(
-                text(
-                    "INSERT INTO exam_orders (patient_id, sample_id, status, "
-                    "requesting_service, priority) "
-                    "VALUES (:pid, :sid, 'collected', 'TEST', 'routine') RETURNING id"
-                ),
-                {"pid": pid, "sid": sid},
-            ).scalar_one()
-            order_ids.append(oid)
+        orders, items, results = [], [], []
+        for index, (patient, sample) in enumerate(zip(patients, samples, strict=True), start=1):
+            order = ExamOrder(
+                patient_id=patient.id,
+                sample_id=sample.id,
+                status="collected",
+                requesting_service="TEST",
+                priority="routine",
+            )
+            session.add(order)
+            session.flush()
+            orders.append(order)
 
             # Le premier ordre porte deux examens : la restauration doit préserver
             # la cardinalité 1-n, pas seulement des comptages globaux.
-            exams = _EXAMS if index == 1 else _EXAMS[:1]
-            for code, label in exams:
-                rid = conn.execute(
-                    text(
-                        "INSERT INTO results (sample_id, exam_code, data_points, "
-                        "result_type, is_validated) "
-                        "VALUES (:sid, :code, CAST(:points AS json), 'quantitative', true) "
-                        "RETURNING id"
-                    ),
-                    {
-                        "sid": sid,
-                        "code": code,
-                        "points": json.dumps({code: {"value": 1.0, "unit": "g/L"}}),
-                    },
-                ).scalar_one()
-                result_ids.append(rid)
+            for code, label in _EXAMS if index == 1 else _EXAMS[:1]:
+                result = Result(
+                    sample_id=sample.id,
+                    exam_code=code,
+                    data_points={code: {"value": 1.0, "unit": "g/L"}},
+                    result_type="quantitative",
+                    is_validated=True,
+                )
+                session.add(result)
+                session.flush()
+                results.append(result)
 
-                iid = conn.execute(
-                    text(
-                        "INSERT INTO exam_order_items (order_id, exam_code, exam_label, "
-                        "status, result_id) "
-                        "VALUES (:oid, :code, :label, 'resulted', :rid) RETURNING id"
-                    ),
-                    {"oid": oid, "code": code, "label": label, "rid": rid},
-                ).scalar_one()
-                item_ids.append(iid)
+                item = ExamOrderItem(
+                    order_id=order.id,
+                    exam_code=code,
+                    exam_label=label,
+                    status="resulted",
+                    result_id=result.id,
+                )
+                session.add(item)
+                session.flush()
+                items.append(item)
+
+        session.commit()
+        counts = {
+            "patients": len(patients),
+            "samples": len(samples),
+            "exam_orders": len(orders),
+            "exam_order_items": len(items),
+            "results": len(results),
+        }
+        chain_rows = len(items)
 
     manifest = {
         "alembic_head": EXPECTED_ALEMBIC_HEAD,
-        "counts": {
-            "patients": len(patient_ids),
-            "samples": len(sample_ids),
-            "exam_orders": len(order_ids),
-            "exam_order_items": len(item_ids),
-            "results": len(result_ids),
-        },
+        "counts": counts,
         # Chaîne complète attendue : chaque item remonte à son patient d'origine.
-        "chain_rows": len(item_ids),
+        "chain_rows": chain_rows,
         "orders_with_two_items": 1,
         "ipps": [p[0] for p in _PATIENTS],
         "barcodes": [f"TEST-BC-{i:04d}" for i in range(1, len(_PATIENTS) + 1)],
