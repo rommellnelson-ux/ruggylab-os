@@ -40,6 +40,12 @@ async def _heartbeat_loop(path: str, interval_seconds: int = 30) -> None:
 
 async def _run() -> None:
     configure_logging(level="INFO", json_logs=not settings.TESTING, log_file=None)
+
+    # Fail-closed : dès qu'un listener automate est activé, l'exposition réseau
+    # doit être explicitement bornée. Un bind universel ou une adresse publique
+    # arrête le process ici, plutôt que d'ouvrir un port non maîtrisé.
+    settings.validate_analyzer_network()
+
     tasks: list[asyncio.Task[None]] = []
 
     if settings.ENABLE_DH36_LISTENER:

@@ -1,0 +1,79 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# OVERRIDE QUALIFIÉ — activation des interfaces automates
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# La stack de base (`docker-compose.yml`) laisse la passerelle automates VIVANTE
+# mais SANS AUCUN PORT OUVERT ni publié : c'est l'état conforme au NO-GO
+# clinique en vigueur (« parc automates non activable en clinique »).
+#
+# Ce fichier est l'« override qualifié propre au site » annoncé par le
+# commentaire de `docker-compose.yml`. Il n'est JAMAIS chargé implicitement :
+# `docker compose up` seul ne le lit pas. Son emploi est un acte explicite,
+# réservé à un site dont les automates ont été qualifiés.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.analyzers.yml up -d
+#
+# ── Prérequis avant emploi ───────────────────────────────────────────────────
+#   1. Qualification documentée de chaque automate raccordé (dossier §8).
+#   2. `ANALYZER_BIND_IP` = IP de l'hôte SUR LE VLAN AUTOMATES (jamais 0.0.0.0,
+#      jamais une adresse routable depuis Internet). Le process refuse de
+#      démarrer sinon (`Settings.validate_analyzer_network`).
+#   3. Règles pare-feu : seul le VLAN automates atteint ces ports ; aucun
+#      routage vers Internet, ni depuis le réseau bureautique.
+#   4. Décision de levée du NO-GO formellement signée.
+#
+# ── Modèle de menace (résumé) ────────────────────────────────────────────────
+# Ces ports parlent des protocoles d'automates (MLLP / trames brutes) SANS
+# authentification ni chiffrement, et transportent identités patient et
+# résultats. Un accès réseau = lecture et injection de résultats. La seule
+# barrière est donc le confinement réseau : d'où le bind sur une interface
+# nommée et le refus programmatique de toute publication universelle.
+# ═════════════════════════════════════════════════════════════════════════════
+
+services:
+  analyzer-gateway:
+    environment:
+      # Activation explicite des listeners (désactivés dans la stack de base).
+      ENABLE_DH36_LISTENER: "true"
+      ANALYZER_RAW_LISTENER_ENABLED: "true"
+      # Dans le conteneur, les listeners bindent l'interface interne ; la borne
+      # réelle d'exposition est `ports:` ci-dessous, jamais cette valeur.
+      DH36_LISTENER_HOST: 0.0.0.0
+      ANALYZER_RAW_LISTENER_HOST: 0.0.0.0
+      # Contrôlé par `validate_analyzer_network()` : refus si vide, 0.0.0.0,
+      # nom d'hôte, ou adresse publique.
+      ANALYZER_BIND_IP: ${ANALYZER_BIND_IP:?ANALYZER_BIND_IP must be set to the analyzer-VLAN host IP}
+      ANALYZER_HEMATOLOGY_ENABLED: "true"
+      ANALYZER_BIOCHEMISTRY_ENABLED: "true"
+      ANALYZER_IMMUNO_ENABLED: "true"
+      ANALYZER_HEMATOLOGY_PORT: ${ANALYZER_HEMATOLOGY_PORT:-9000}
+      ANALYZER_BIOCHEMISTRY_PORT: ${ANALYZER_BIOCHEMISTRY_PORT:-9001}
+      ANALYZER_IMMUNO_PORT: ${ANALYZER_IMMUNO_PORT:-9002}
+      # Les listeners bruts archivent chaque trame dans Redis (LPUSH) : sans
+      # REDIS_URL ils refusent de démarrer.
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+
+    # Publication bornée à UNE interface nommée. Pas de valeur par défaut
+    # permissive : `ANALYZER_BIND_IP` est obligatoire (`:?` ci-dessus), donc
+    # aucun repli silencieux sur 0.0.0.0 n'est possible.
+    ports:
+      - "${ANALYZER_BIND_IP}:${DH36_LISTENER_PORT:-5001}:5001"          # DH36 MLLP
+      - "${ANALYZER_BIND_IP}:${ANALYZER_HEMATOLOGY_PORT:-9000}:9000"    # Dymind hématologie
+      - "${ANALYZER_BIND_IP}:${ANALYZER_BIOCHEMISTRY_PORT:-9001}:9001"  # Dymind biochimie
+      - "${ANALYZER_BIND_IP}:${ANALYZER_IMMUNO_PORT:-9002}:9002"        # Anbio Bioscann (immuno)
+
+    # Sonde adaptée : le process meurt si l'un des listeners tombe ; on vérifie
+    # donc qu'ils acceptent bien une connexion TCP à l'intérieur du conteneur.
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import socket; [socket.create_connection(('127.0.0.1', p), timeout=3).close() for p in (5001, 9000)]"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

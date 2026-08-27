@@ -163,7 +163,11 @@ services:
       ENABLE_DH36_LISTENER: "false"
       ANALYZER_RAW_LISTENER_ENABLED: "false"
     # Le process reste vivant sans ouvrir de port et écrit un battement. Une
-    # activation future doit fournir un override qualifié propre au site.
+    # activation future doit fournir un override qualifié propre au site :
+    # `docker-compose.analyzers.yml`, chargé explicitement et jamais par défaut
+    #   docker compose -f docker-compose.yml -f docker-compose.analyzers.yml up -d
+    # Il publie les ports sur `ANALYZER_BIND_IP` (IP du VLAN automates) et le
+    # process refuse de démarrer sur un bind universel ou une adresse publique.
     healthcheck:
       test: ["CMD-SHELL",
              "test -n \"$(find /tmp/ruggylab_analyzer_gateway.heartbeat -mmin -2 2>/dev/null)\""]
