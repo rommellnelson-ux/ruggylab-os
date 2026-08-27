@@ -93,6 +93,11 @@ _STATUT_PAR_NIVEAU = {
     "aucune": "libere_sans_validation",
 }
 
+# Version du contrat `labo_resultats`. v1 portait un `statut` unique valant
+# toujours "valide" ; v2 sépare l'axe DIFFUSION de l'axe VALIDATION. Un
+# consommateur peut ainsi savoir quoi lire sans deviner.
+CONTRAT_LABO_RESULTATS_VERSION = 2
+
 
 def _build_payload(order: ExamOrder, item: ExamOrderItem, result: Result) -> dict:
     """Projette un résultat validé en payload ``labo_resultats`` (sans perte).
@@ -120,9 +125,24 @@ def _build_payload(order: ExamOrder, item: ExamOrderItem, result: Result) -> dic
         "ruggylab_result_id": result.id,
         "ruggylab_validator_id": result.validator_id,
         "valide_le": _iso(_validated_at(result)),
+        "contrat_version": CONTRAT_LABO_RESULTATS_VERSION,
         "statut": _STATUT_PAR_NIVEAU[niveau],
-        # Niveau de validation explicite : le prescripteur doit pouvoir
-        # distinguer une validation biologique d'une libération en mode dégradé.
+        # DEUX AXES INDÉPENDANTS, jamais confondus.
+        #
+        # `etat_diffusion` répond à « ce résultat est-il montrable ? ».
+        # `validation.niveau` répond à « qui/quoi l'a validé ? ».
+        #
+        # Les confondre est précisément le défaut corrigé : un résultat libéré
+        # en mode dégradé est diffusable SANS être biologiquement validé. Un
+        # consommateur qui n'implémente qu'un seul axe doit lire
+        # `validation.niveau` — jamais `etat_diffusion` — pour décider s'il peut
+        # présenter le résultat comme validé.
+        #
+        # Par construction, seuls des résultats libérables sont poussés :
+        # `etat_diffusion` vaut donc toujours "libere" ici. Le champ est présent
+        # pour que le contrat soit auto-descriptif et reste vrai si un état
+        # "bloque" venait à être diffusé un jour.
+        "etat_diffusion": "libere",
         "validation": {
             "niveau": niveau,
             "mode_degrade": niveau == "aucune",
