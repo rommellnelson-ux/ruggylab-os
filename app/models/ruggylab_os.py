@@ -308,6 +308,9 @@ class Patient(Base):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     birth_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    # Date de naissance estimée (sentinelle 1900-01-01) faute de DDN à la source —
+    # ex. prescription CSA d'un patient sans date. À compléter ; ne bloque rien.
+    birth_date_estimee: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sex: Mapped[str | None] = mapped_column(CHAR(1))
     rank: Mapped[str | None] = mapped_column(String(50))
     phone: Mapped[str | None] = mapped_column(String(30))
@@ -997,6 +1000,9 @@ class ExamOrder(Base):
     # Échantillon rattaché une fois prélevé : c'est le maillon central du fil.
     sample_id: Mapped[int | None] = mapped_column(ForeignKey("samples.id"))
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # Idempotence de l'intégration CSA : prescription_id source (labo_prescriptions).
+    # NULL pour un ordre créé en interne RuggyLab. Unique -> pas de doublon au re-poll.
+    csa_prescription_id: Mapped[str | None] = mapped_column(String(80), unique=True, index=True)
 
     patient: Mapped["Patient"] = relationship()
     sample: Mapped["Sample | None"] = relationship()
@@ -1016,8 +1022,33 @@ class ExamOrderItem(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     # Résultat produit pour cet examen (le bout du fil).
     result_id: Mapped[int | None] = mapped_column(ForeignKey("results.id"))
+    # Flux SORTANT CSA (I2) : horodatage de remontée du résultat vers CSA. NULL
+    # tant que non poussé ; renseigné une fois l'événement labo_resultats accepté.
+    # Marqueur d'idempotence : on ne repousse jamais un item déjà remonté.
+    csa_pushed_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
 
     order: Mapped["ExamOrder"] = relationship(back_populates="items")
+
+
+class CsaSyncState(Base):
+    """État du worker de synchro CSA Plateau (flux entrant).
+
+    Une seule ligne (id=1). ``last_pulled_at`` est le ``updated_at`` (ISO UTC) du
+    dernier événement ``labo_prescriptions`` traité : c'est le watermark rejoué en
+    ``changed_since`` au poll suivant, garantissant qu'on ne reprend qu'au-delà.
+    """
+
+    __tablename__ = "csa_sync_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    last_pulled_at: Mapped[str | None] = mapped_column(String(40))
+    last_run_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    processed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Flux SORTANT (I4) : observabilité du worker de remontée des résultats.
+    last_outbound_run_at: Mapped[dt.datetime | None] = mapped_column(DateTime)
+    last_outbound_error: Mapped[str | None] = mapped_column(Text)
+    pushed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

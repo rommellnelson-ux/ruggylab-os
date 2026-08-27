@@ -6,7 +6,15 @@ import datetime as dt
 import uuid
 
 import app.db.session as db_session
-from app.models import NonConformity, QcControl, QcResult, Result, Sample
+from app.models import (
+    ExamOrder,
+    ExamOrderItem,
+    NonConformity,
+    QcControl,
+    QcResult,
+    Result,
+    Sample,
+)
 from app.utils.datetime_utils import utcnow_naive
 
 
@@ -42,6 +50,41 @@ def _patient_sample(client, headers: dict[str, str], *, status: str = "Recu") ->
     )
     assert sample.status_code == 201, sample.text
     return sample.json()["id"]
+
+
+def _patient(client, headers: dict[str, str]) -> int:
+    resp = client.post(
+        "/api/v1/patients",
+        headers=headers,
+        json={
+            "ipp_unique_id": f"WLO-{_uid()}",
+            "first_name": "Ordo",
+            "last_name": "Patient",
+            "birth_date": "1980-01-01",
+            "sex": "M",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
+def _order(client, headers, **fields) -> int:
+    pid = _patient(client, headers)
+    db = db_session.SessionLocal()
+    try:
+        order = ExamOrder(
+            patient_id=pid,
+            priority=fields.get("priority", "routine"),
+            status=fields.get("status", "prescribed"),
+            requesting_service=fields.get("requesting_service", "Consultation"),
+            csa_prescription_id=fields.get("csa_prescription_id"),
+            items=[ExamOrderItem(exam_code="GLYC", exam_label="Glycémie", status="pending")],
+        )
+        db.add(order)
+        db.commit()
+        return order.id
+    finally:
+        db.close()
 
 
 def test_worklist_requires_auth(client) -> None:
@@ -170,6 +213,39 @@ def test_worklist_category_filter(client) -> None:
     assert response.status_code == 200, response.text
     assert response.json()["items"]
     assert {item["category"] for item in response.json()["items"]} == {"critical"}
+
+
+def test_worklist_surfaces_prescribed_order(client) -> None:
+    headers = _auth(client)
+    oid = _order(client, headers, status="prescribed")
+    resp = client.get("/api/v1/worklist/my?category=order", headers=headers)
+    assert resp.status_code == 200, resp.text
+    items = resp.json()["items"]
+    assert {item["category"] for item in items} == {"order"}
+    item = next(i for i in items if i["id"] == f"order:{oid}")
+    assert item["status"] == "à prélever"
+    assert item["actions"][0]["path"] == f"#/prescription?order={oid}"
+    assert "1 examen" in item["subtitle"]
+
+
+def test_worklist_flags_csa_origin_and_collected(client) -> None:
+    headers = _auth(client)
+    oid = _order(
+        client, headers, status="collected", priority="urgent", csa_prescription_id="LAB-XYZ"
+    )
+    resp = client.get("/api/v1/worklist/my?category=order", headers=headers)
+    item = next(i for i in resp.json()["items"] if i["id"] == f"order:{oid}")
+    assert "CSA Plateau" in item["title"]
+    assert item["priority"] == "urgent"
+    assert "résultats" in item["status"].lower()
+
+
+def test_worklist_order_completed_absent(client) -> None:
+    # Un ordre terminé ne doit plus encombrer la file.
+    headers = _auth(client)
+    oid = _order(client, headers, status="completed")
+    resp = client.get("/api/v1/worklist/my?category=order", headers=headers)
+    assert all(i["id"] != f"order:{oid}" for i in resp.json()["items"])
 
 
 def test_worklist_uat_field_scenarios_and_source_deep_links(client) -> None:

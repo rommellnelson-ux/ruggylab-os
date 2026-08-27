@@ -9,7 +9,17 @@ from typing import Any
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import NonConformity, Patient, QcControl, QcResult, Result, Sample, TatTarget, User
+from app.models import (
+    ExamOrder,
+    NonConformity,
+    Patient,
+    QcControl,
+    QcResult,
+    Result,
+    Sample,
+    TatTarget,
+    User,
+)
 from app.models.ruggylab_os import UserRole
 from app.schemas.qc import QC_REJECT_RULES
 from app.schemas.worklist import WorklistAction, WorklistItem, WorklistResponse, WorklistSummary
@@ -164,6 +174,70 @@ def _sample_items(db: Session, user: User, limit: int) -> list[WorklistItem]:
     return items
 
 
+def _order_scope(query: Any, user: User) -> Any:
+    if _is_unrestricted(user):
+        return query
+    return query.outerjoin(Patient, ExamOrder.patient_id == Patient.id).filter(
+        or_(Patient.id.is_(None), Patient.unit.is_(None), Patient.unit == user.unit)
+    )
+
+
+def _exam_order_items(db: Session, user: User, limit: int) -> list[WorklistItem]:
+    """Ordres d'examen en attente d'action — surtout ceux reçus de CSA Plateau.
+
+    Comble le trou de découvrabilité : un ordre ``prescribed`` (à prélever) ou
+    ``collected`` (à résulter) n'apparaissait dans aucune file. On les surface ici
+    en distinguant l'origine CSA, avec un lien direct vers la prescription.
+    """
+    now = utcnow_naive()
+    query = db.query(ExamOrder).options(joinedload(ExamOrder.patient), joinedload(ExamOrder.items))
+    query = _order_scope(query, user)
+    rows = (
+        query.filter(ExamOrder.status.in_(["prescribed", "collected"]))
+        .order_by(ExamOrder.ordered_at.asc(), ExamOrder.id.asc())
+        .limit(limit)
+        .all()
+    )
+    items: list[WorklistItem] = []
+    for order in rows:
+        is_csa = order.csa_prescription_id is not None
+        origin = "CSA Plateau" if is_csa else (order.requesting_service or "interne")
+        patient = order.patient
+        plabel = (
+            f"{patient.last_name} {patient.first_name} · {patient.ipp_unique_id}"
+            if patient
+            else "patient non rattaché"
+        )
+        elapsed = int((now - order.ordered_at).total_seconds() / 60) if order.ordered_at else 0
+        urgent = order.priority in ("urgent", "stat")
+        n_exams = sum(1 for it in order.items if it.status != "cancelled")
+        if order.status == "prescribed":
+            title = f"Prélèvement à faire · {origin}"
+            status_label = "à prélever"
+        else:  # collected
+            title = f"Résultats à saisir · {origin}"
+            status_label = "prélevé — en attente de résultats"
+        items.append(
+            WorklistItem(
+                id=f"order:{order.id}",
+                category="order",
+                priority="urgent" if urgent else "normal",
+                title=title,
+                subtitle=f"{plabel} · {n_exams} examen(s)",
+                status=status_label,
+                elapsed_minutes=elapsed,
+                unit=patient.unit if patient else None,
+                actions=[
+                    WorklistAction(
+                        label="Ouvrir la prescription",
+                        path=f"#/prescription?order={order.id}",
+                    )
+                ],
+            )
+        )
+    return items
+
+
 def _qc_items(db: Session, limit: int) -> list[WorklistItem]:
     controls = db.query(QcControl).filter(QcControl.is_active.is_(True)).all()
     latest_results: dict[int, QcResult] = {}
@@ -244,6 +318,7 @@ def build_my_worklist(
     builders = {
         "critical": lambda: _critical_items(db, user, limit),
         "tat": lambda: _tat_items(db, user, limit),
+        "order": lambda: _exam_order_items(db, user, limit),
         "sample": lambda: _sample_items(db, user, limit),
         "qc": lambda: _qc_items(db, limit),
         "quality": lambda: _nc_items(db, limit),
