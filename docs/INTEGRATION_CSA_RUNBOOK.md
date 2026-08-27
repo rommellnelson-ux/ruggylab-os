@@ -36,6 +36,21 @@ dépend d'aucune garantie posée en amont : échantillon absent, orphelin ou
 appartenant à un autre patient ⇒ **publication bloquée**, incident journalisé
 (`csa_sync.outbound.patient_mismatch`, identifiants techniques uniquement).
 
+**c) Politique de journalisation.** Les journaux de l'intégration ne portent
+**que des clés internes RuggyLab** (`order_id`, `sample_id`, `item_id`) :
+
+- jamais de donnée nominative ;
+- jamais de `patient_id` — deux identifiants patient dans une même ligne
+  suffiraient à corréler des dossiers ;
+- jamais de `csa_prescription_id` — il identifie un patient *chez le tiers*.
+
+`csa_sync_state.last_outbound_error`, affiché par le monitoring, suit la même
+règle (`item <id>: <TypeErreur>`). Toutes ces clés permettent de retrouver
+l'ordre, l'examen et la prescription **en base** lors de l'instruction d'un
+incident : la capacité de diagnostic est intacte, la corrélation depuis les
+seuls journaux ne l'est pas. Les scripts de smoke suivent la même règle : ils
+peuvent être pointés sur n'importe quelle base via `DATABASE_URL`.
+
 **b) Niveau de validation annoncé sans ambiguïté.** Tant que
 `REQUIRE_VALIDATION_FOR_RELEASE=False` est admis (mode dégradé), un résultat peut
 être *libéré* sans validation biologique. Le payload `labo_resultats` distingue
