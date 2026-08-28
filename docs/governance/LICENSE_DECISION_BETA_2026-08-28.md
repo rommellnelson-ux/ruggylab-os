@@ -54,6 +54,36 @@ ou d'apport.
 Tant que cet acte n'est pas intervenu, la titularité reste celle énoncée au §2.
 Aucun transfert n'est réputé acquis du seul fait de la présente décision.
 
+## 4 bis. Décisions de distribution — 2026-08-28
+
+Prises par le titulaire, elles ne sont plus des options ouvertes.
+
+| Décision | Valeur | Où elle s'applique |
+| --- | --- | --- |
+| `EVALUATION_DURATION` | **6 mois** | [`../../LICENSE.md`](../../LICENSE.md) §4.1 |
+| `RENEWAL` | **autorisation écrite uniquement** | `LICENSE.md` §4.1 |
+| `TARGET_REPOSITORY_VISIBILITY` | **privé avant tag** | [`PRIVATE_REPOSITORY_PRE_TAG_CHECKLIST.md`](PRIVATE_REPOSITORY_PRE_TAG_CHECKLIST.md) |
+| `REDIS_7_4_DISTRIBUTION` | **écarté** | `THIRD_PARTY_NOTICES.md` §6.1 |
+| `REDIS_REPLACEMENT` | **Valkey** | PR technique distincte |
+| `GRAFANA_CORE_DEPENDENCY` | **non** | `THIRD_PARTY_NOTICES.md` §6.2 |
+| `GRAFANA_DISTRIBUTED_BY_RUGGYLAB` | **non** | idem |
+| `GRAFANA_OPTIONAL_EXTERNAL_SERVICE` | **oui** | PR technique distincte |
+| `PROMETHEUS_RETAINED` | **oui** | stack principale |
+
+**Une décision n'est pas une mise en œuvre.** Les statuts
+`REDIS_REPLACED_BY_VALKEY` et `GRAFANA_EXTERNALIZED` ne seront prononcés
+qu'après fusion des PR techniques correspondantes et requalification des
+notices. D'ici là, les marqueurs de revue obligatoire restent en place : ils
+décrivent l'état du dépôt, pas l'intention du titulaire.
+
+**Durée et cessation.** L'autorisation d'évaluation vaut six mois au maximum à
+compter de l'autorisation écrite, sans reconduction tacite. Elle cesse par
+anticipation en cas de remplacement de version, de retrait pour raison de
+sécurité, de violation des conditions d'évaluation, de décision du titulaire ou
+de modification du statut de gouvernance. Le modèle d'autorisation, **non
+signé**, est disponible :
+[`EVALUATION_AUTHORIZATION_CSA_GR_PLATEAU_TEMPLATE.md`](EVALUATION_AUTHORIZATION_CSA_GR_PLATEAU_TEMPLATE.md).
+
 ## 5. Ce que cette décision ne tranche pas
 
 - **La licence des versions futures.** La présente décision porte sur

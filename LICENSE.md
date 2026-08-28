@@ -50,6 +50,33 @@ ou `-rc`, l'autorisation est limitée à l'**évaluation technique interne** :
 installation, essais fonctionnels, tests de performance, revue de sécurité et
 formation des utilisateurs sur des jeux d'essai.
 
+### 4.1 Durée
+
+L'autorisation d'évaluation de RUGGYLAB OS `v0.8.0-beta.1` est accordée pour une
+durée **maximale de six (6) mois**, à compter de la date portée sur
+l'autorisation écrite.
+
+Elle **n'est pas renouvelée automatiquement**. Toute prolongation requiert une
+**autorisation écrite distincte** délivrée par le Titulaire. À l'échéance, et à
+défaut de prolongation écrite, l'autorisation cesse de plein droit : le
+Bénéficiaire arrête d'utiliser le Logiciel et en supprime les instances.
+
+### 4.2 Cessation anticipée
+
+L'autorisation prend fin avant son terme, sans préavis, dans l'un des cas
+suivants :
+
+| Cas | Effet |
+| --- | --- |
+| Remplacement par une nouvelle version | l'autorisation porte sur la version qu'elle désigne ; elle ne s'étend pas à celle qui lui succède |
+| Retrait pour raison de sécurité | cessation immédiate d'utilisation à la notification du Titulaire |
+| Violation des conditions d'évaluation | notamment usage sur données réelles, usage clinique, ou redistribution |
+| Décision du Titulaire | discrétionnaire, notifiée par écrit |
+| Modification du statut de gouvernance | notamment changement du statut clinique ou du régime de licence |
+
+La cessation, à terme ou anticipée, n'ouvre droit à aucune indemnité et
+n'emporte aucun transfert de droit.
+
 ## 5. Données autorisées
 
 **Seules des données fictives ou synthétiques peuvent être utilisées.**
@@ -118,7 +145,8 @@ Les points suivants **ne sont pas arrêtés** par le présent document et
 extérieur à l'organisation du Titulaire :
 
 - le **droit applicable** et la **juridiction compétente** ;
-- la **durée** de la licence et ses conditions de résiliation ;
+- la **forme contractuelle** de la résiliation et ses effets civils — la
+  *durée* d'évaluation, elle, est arrêtée au §4.1 et n'est plus en discussion ;
 - toute **limitation ou plafonnement financier de responsabilité**, dont la
   validité dépend du droit applicable et de la qualité des parties ;
 - la **procédure de règlement des litiges** ;

@@ -70,6 +70,7 @@ _FICHIERS_TITULARITE = (
     "LICENSE.md",
     "docs/governance/LICENSE_DECISION_BETA_2026-08-28.md",
     "docs/governance/LICENSE_RECOMMENDATION_BETA_2026-08-28.md",
+    "docs/governance/EVALUATION_AUTHORIZATION_CSA_GR_PLATEAU_TEMPLATE.md",
 )
 
 #: Lignes qui attribuent des droits à quelqu'un.
@@ -289,3 +290,106 @@ def test_dockerignore_does_not_exclude_the_licence_files():
         assert exception in contenu, (
             f"{exception} absent : le contexte de build n'inclura pas les licences"
         )
+
+
+# ── décisions de distribution : durée, site, dépôt privé ────────────────────
+
+_MODELE_AUTORISATION = "docs/governance/EVALUATION_AUTHORIZATION_CSA_GR_PLATEAU_TEMPLATE.md"
+_CHECKLIST_PRIVE = "docs/governance/PRIVATE_REPOSITORY_PRE_TAG_CHECKLIST.md"
+
+
+def test_evaluation_duration_is_recorded_and_not_renewable():
+    """Six mois, sans reconduction tacite : ce n'est plus une question ouverte."""
+    licence = _lire("LICENSE.md")
+    assert "maximale de six (6) mois" in licence
+    assert "n'est pas renouvelée automatiquement" in licence
+    assert "autorisation écrite distincte" in licence
+
+
+def test_duration_is_no_longer_listed_as_an_open_clause():
+    """Le §12 listait la durée comme non arrêtée ; elle l'est désormais."""
+    clauses = _lire("LICENSE.md").split("## 12.")[1].split("## 13.")[0]
+    assert "n'est plus en discussion" in clauses
+
+
+@pytest.mark.parametrize(
+    "cas",
+    [
+        "Remplacement par une nouvelle version",
+        "Retrait pour raison de sécurité",
+        "Violation des conditions d'évaluation",
+        "Décision du Titulaire",
+        "Modification du statut de gouvernance",
+    ],
+)
+def test_early_termination_cases_are_enumerated(cas):
+    assert cas in _lire("LICENSE.md"), f"cas de cessation absent : {cas}"
+
+
+def test_the_authorisation_template_is_not_signed():
+    """Un modèle pré-rempli serait une signature simulée."""
+    contenu = _lire(_MODELE_AUTORISATION)
+    assert "MODÈLE — NON SIGNÉ, NON DÉLIVRÉ" in contenu
+    for ligne in contenu.splitlines():
+        depouille = ligne.strip()
+        if depouille.startswith(("Nom :", "Qualité :", "Date :", "Signature :")):
+            assert depouille.endswith(":"), f"champ pré-rempli : {depouille!r}"
+
+
+def test_the_authorisation_template_states_the_site_holds_no_rights():
+    contenu = _lire(_MODELE_AUTORISATION)
+    assert "Centre de Santé des Armées de la Garde Républicaine du Plateau" in contenu
+    assert "ne détient aucun droit de propriété" in contenu
+    assert TITULAIRE in contenu
+    for exigence in (
+        "six (6) mois",
+        "fictives ou synthétiques",
+        "REAL_DATA_NO_GO",
+        "Interdiction de redistribution",
+        "Résiliation anticipée",
+    ):
+        assert exigence in contenu, f"exigence absente du modèle : {exigence}"
+
+
+def test_the_private_repository_checklist_blocks_tagging():
+    contenu = _lire(_CHECKLIST_PRIVE)
+    assert "INTERDICTION DE TAGUER" in contenu
+    for verification in (
+        "Bundle Git complet",
+        "forks publics",
+        "collaborateurs",
+        "Aucun secret dans l'historique",
+        "Quota GitHub Actions",
+        "CodeQL",
+        "GHCR",
+        "Relancer l'intégralité de la CI",
+        "Rollback",
+    ):
+        assert verification in contenu, f"vérification absente : {verification}"
+
+
+def test_repository_visibility_is_not_claimed_to_have_changed():
+    contenu = _lire(_CHECKLIST_PRIVE)
+    assert "Visibilité actuelle | **publique — inchangée**" in contenu
+
+
+# ── décisions Redis et Grafana : prises, mais pas encore mises en œuvre ─────
+
+
+def test_redis_and_grafana_decisions_are_recorded():
+    notices = _lire("THIRD_PARTY_NOTICES.md")
+    assert "REDIS_7_4_DISTRIBUTION = REJECTED" in notices
+    assert "REDIS_REPLACEMENT      = VALKEY" in notices
+    assert "GRAFANA_CORE_DEPENDENCY          = FALSE" in notices
+    assert "GRAFANA_OPTIONAL_EXTERNAL_SERVICE = TRUE" in notices
+
+
+def test_implementation_statuses_are_not_claimed_before_the_work_lands():
+    """`REDIS_REPLACED_BY_VALKEY` et `GRAFANA_EXTERNALIZED` ne se déclarent pas d'avance."""
+    notices = _lire("THIRD_PARTY_NOTICES.md")
+    for statut in ("REDIS_REPLACED_BY_VALKEY", "GRAFANA_EXTERNALIZED"):
+        assert f"`{statut}`\n> **n'est pas prononcé**" in notices or (
+            statut in notices and "n'est pas prononcé" in notices
+        ), f"{statut} doit être explicitement non prononcé"
+    assert "MANUAL_LICENSE_REVIEW_REQUIRED" in notices
+    assert "AGPL_DISTRIBUTION_REVIEW_REQUIRED" in notices

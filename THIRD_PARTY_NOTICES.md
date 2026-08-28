@@ -152,10 +152,35 @@ confusion entre LGPL et GPL est courante et conduirait à une conclusion fausse.
 
 ## 6. Éléments non résolus — bloquants pour la distribution
 
-### 6.1 Redis 7.4 — `MANUAL_LICENSE_REVIEW_REQUIRED`
+### 6.1 Redis 7.4 — décision prise : **écarté de la distribution**
 
-**Aucune décision n'est prise ici, et aucune licence n'est choisie à la place du
-titulaire.**
+> ## ✅ Décision du titulaire — 2026-08-28
+>
+> ```
+> REDIS_7_4_DISTRIBUTION = REJECTED
+> REDIS_REPLACEMENT      = VALKEY
+> ```
+>
+> **Redis 7.4 ne sera pas retenu dans la distribution de la bêta.** Le
+> remplacement technique prévu est **Valkey**, fork BSD-3-Clause maintenu par la
+> Linux Foundation. C'est l'**option D combinée à l'option C** du tableau
+> ci-dessous : le composant sous licence source-available sort de la
+> distribution, remplacé par un composant sous licence permissive.
+>
+> **Ce que cette décision ne dit pas encore.** Le statut
+> `REDIS_REPLACED_BY_VALKEY` **n'est pas prononcé** : il suppose la migration
+> technique réalisée, testée et fusionnée. Tant que la PR de migration n'est pas
+> fusionnée et le présent document requalifié, la pile décrite ici embarque
+> encore Redis 7.4 et **la distribution externe reste bloquée par ce point**.
+>
+> **Marqueur maintenu : `MANUAL_LICENSE_REVIEW_REQUIRED`.** Une décision n'est
+> pas une mise en œuvre. Le marqueur ne tombera qu'avec la fusion de la
+> migration et la requalification de ce document — le lever plus tôt
+> laisserait croire que la pile livrée est déjà propre.
+>
+> L'analyse qui a conduit à la décision est conservée ci-dessous : elle
+> documente le raisonnement, et les options écartées redeviendraient utiles si
+> la question était rouverte.
 
 Redis a changé de licence à partir de la version 7.4 : il n'est plus distribué
 sous BSD-3-Clause mais sous un **double régime source-available**, au choix du
@@ -184,12 +209,45 @@ faut retenir pour une distribution :
 | C. Alternative compatible | un cache sous licence permissive, au prix d'une migration et de tests |
 | D. Exclure Redis de la distribution | ne pas livrer l'image ; l'exploitant fournit son propre Redis |
 
-**Aucune de ces options n'est appliquée dans cette PR.** Remplacer ou rétrograder
-Redis exigerait une décision distincte et une campagne de tests complète : le
-cache porte les compteurs de rate-limiting, la file de trames automates et le
-verrou de numérotation.
+**Option retenue : D + C.** Redis 7.4 sort de la distribution, remplacé par
+Valkey. La migration est portée par une **PR technique distincte**, comme il se
+doit : le cache porte les compteurs de rate-limiting, la file de trames
+automates et le verrou de numérotation — cela ne se remplace pas dans une PR de
+licence, et pas sans une campagne de tests complète.
 
-### 6.2 Grafana 11 — `AGPL_DISTRIBUTION_REVIEW_REQUIRED`
+### 6.2 Grafana 11 — décision prise : **hors du cœur distribué**
+
+> ## ✅ Décision du titulaire — 2026-08-28
+>
+> ```
+> GRAFANA_CORE_DEPENDENCY          = FALSE
+> GRAFANA_DISTRIBUTED_BY_RUGGYLAB  = FALSE
+> GRAFANA_OPTIONAL_EXTERNAL_SERVICE = TRUE
+> PROMETHEUS_RETAINED              = TRUE
+> ```
+>
+> **Grafana ne fera pas partie du cœur distribué de RUGGYLAB OS.** Il devient une
+> **intégration optionnelle et externe** : l'exploitant qui la souhaite récupère
+> l'image directement auprès de son éditeur et l'exécute pour son propre compte.
+> RUGGYLAB ne la copie pas, ne la reconditionne pas et ne la publie pas.
+>
+> Cela répond à la question laissée ouverte plus bas — *la pile est-elle
+> distribuée, ou seulement déployée ?* — en supprimant le cas : la pile
+> distribuée ne contient plus Grafana.
+>
+> Prometheus, lui, **reste dans la stack principale** (Apache-2.0, sans
+> difficulté de licence). L'absence de Grafana n'est **pas un mode dégradé** :
+> le fonctionnement nominal de RUGGYLAB est défini sans lui.
+>
+> **Ce que cette décision ne dit pas encore.** Le statut `GRAFANA_EXTERNALIZED`
+> **n'est pas prononcé** : il suppose l'externalisation réalisée, testée et
+> fusionnée. Tant que la PR technique n'est pas fusionnée et ce document
+> requalifié, `docker-compose.yml` embarque encore Grafana.
+>
+> **Marqueur maintenu : `AGPL_DISTRIBUTION_REVIEW_REQUIRED`.** Tant que
+> `docker-compose.yml` embarque le service Grafana, la pile telle qu'elle est
+> versionnée aujourd'hui contient bien un composant AGPL-3.0. Le marqueur
+> décrit l'état du dépôt, pas l'intention.
 
 Grafana 11 est sous **AGPL-3.0**. Les obligations diffèrent radicalement selon
 l'usage, et **aucune conclusion n'est tirée ici sans preuve écrite** :
@@ -205,9 +263,11 @@ l'usage, et **aucune conclusion n'est tirée ici sans preuve écrite** :
 avec des tableaux de bord provisionnés. Les tableaux de bord sont des **données
 de configuration** propres au projet, pas des œuvres dérivées de Grafana.
 
-Ce qui reste à trancher : la pile est-elle **distribuée** à des tiers, ou
-seulement déployée par le titulaire ? La réponse détermine l'obligation, et elle
-n'est pas technique.
+Ce qui restait à trancher — la pile est-elle **distribuée** à des tiers, ou
+seulement déployée par le titulaire ? — est tranché par la décision ci-dessus :
+la pile distribuée ne contiendra pas Grafana. La ligne du tableau qui
+s'appliquera est la première, et elle s'appliquera **chez l'exploitant**, pas
+chez le titulaire.
 
 ### 6.3 Google Fonts — provenance à préciser
 
@@ -294,6 +354,8 @@ Vérifié dans cette PR :
 | Licences indéterminées | **0** |
 | Composants du SBOM d'image sans licence, non qualifiés | **0** |
 | Exceptions qualifiées au registre | **4** — `SBOM_LICENSE_EXCEPTIONS.json` |
+| Décisions du titulaire prises | **§6.1 Redis → écarté ; §6.2 Grafana → hors du cœur** |
+| Mises en œuvre correspondantes | **non fusionnées** — les marqueurs restent |
 | `THIRD_PARTY_LICENSES_QUALIFIED` | ❌ — §6.1, §6.2, §6.3, §6.4 ouverts |
 | Effet | **la distribution externe reste bloquée** |
 

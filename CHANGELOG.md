@@ -112,6 +112,30 @@ Deux réserves, explicites :
 obligations ; les textes intégraux sont dans `licenses/third-party/`. Les
 distributions Python et l'image Docker les embarquent.
 
+### Gouvernance de la distribution
+
+Décisions du titulaire, arrêtées le 2026-08-28 :
+
+- **durée d'évaluation : six mois maximum**, sans reconduction tacite ; toute
+  prolongation exige une autorisation écrite distincte. Cinq cas de cessation
+  anticipée sont énumérés (`LICENSE.md` §4.1 et §4.2). La durée n'est donc plus
+  au nombre des clauses en attente de validation juridique ;
+- **Redis 7.4 écarté de la distribution**, remplacement prévu par **Valkey**
+  (BSD-3-Clause) ;
+- **Grafana hors du cœur distribué** : intégration optionnelle et externe,
+  récupérée par l'exploitant auprès de son éditeur. **Prometheus est conservé**
+  dans la stack principale, et l'absence de Grafana n'est pas un mode dégradé ;
+- **dépôt privé avant tag** — préparation seulement, la visibilité est
+  inchangée.
+
+Une décision n'est pas une mise en œuvre : `REDIS_REPLACED_BY_VALKEY` et
+`GRAFANA_EXTERNALIZED` ne sont **pas** prononcés, et les marqueurs de revue
+obligatoire restent en place tant que les PR techniques ne sont pas fusionnées.
+
+Modèle d'autorisation d'évaluation pour le site du CSA GR Plateau : préparé,
+**non signé**. Le site est un site d'évaluation et ne détient aucun droit de
+propriété.
+
 ### Rollback
 
 Revenir au tag `v0.7.4`, ou déployer l'image du digest précédent. Aucune
