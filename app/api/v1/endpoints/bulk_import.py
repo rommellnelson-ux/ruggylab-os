@@ -1,5 +1,7 @@
 """Import en lot CSV — patients et réactifs. Réservé aux officiers/admins."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -15,6 +17,7 @@ from app.services.bulk_import import (
 )
 
 router = APIRouter(prefix="/bulk-import")
+logger = logging.getLogger(__name__)
 
 
 @router.post("/patients", response_model=BulkImportResult)
@@ -30,14 +33,16 @@ def bulk_import_patients(
     del current_user
     try:
         return import_patients(db, payload.csv, dry_run=payload.dry_run)
-    except BulkImportTooLargeError as exc:
-        # Message reconstruit a partir de la contrainte connue plutot que
-        # propage depuis l'exception : la reponse ne peut structurellement pas
-        # porter de detail interne, quelle que soit l'evolution du service.
+    except BulkImportTooLargeError:
+        # Le chaine d'exception est volontairement COUPEE (`from None`) : garder
+        # `from exc` faisait remonter l'exception jusqu'a la reponse dans le
+        # modele de CodeQL (py/stack-trace-exposure). La trace reste cote
+        # serveur, ou elle est utile ; le client ne recoit que la contrainte.
+        logger.warning("bulk_import.rejected reason=too_large max_rows=%s", MAX_ROWS)
         raise HTTPException(
             status_code=413,
             detail=f"Fichier trop volumineux : maximum {MAX_ROWS} lignes.",
-        ) from exc
+        ) from None
 
 
 @router.post("/reagents", response_model=BulkImportResult)
@@ -54,11 +59,13 @@ def bulk_import_reagents(
     del current_user
     try:
         return import_reagents(db, payload.csv, dry_run=payload.dry_run)
-    except BulkImportTooLargeError as exc:
-        # Message reconstruit a partir de la contrainte connue plutot que
-        # propage depuis l'exception : la reponse ne peut structurellement pas
-        # porter de detail interne, quelle que soit l'evolution du service.
+    except BulkImportTooLargeError:
+        # Le chaine d'exception est volontairement COUPEE (`from None`) : garder
+        # `from exc` faisait remonter l'exception jusqu'a la reponse dans le
+        # modele de CodeQL (py/stack-trace-exposure). La trace reste cote
+        # serveur, ou elle est utile ; le client ne recoit que la contrainte.
+        logger.warning("bulk_import.rejected reason=too_large max_rows=%s", MAX_ROWS)
         raise HTTPException(
             status_code=413,
             detail=f"Fichier trop volumineux : maximum {MAX_ROWS} lignes.",
-        ) from exc
+        ) from None

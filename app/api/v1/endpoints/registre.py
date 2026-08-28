@@ -4,6 +4,8 @@ Les lignes du registre sont postées en JSON (le client extrait le tableur).
 Aucune donnée patient n'est conservée hors d'un import explicitement confirmé.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,7 @@ from app.services.registre_import import RegistreImportTooLargeError, import_reg
 from app.services.registre_parser import build_import_preview
 
 router = APIRouter(prefix="/registre")
+logger = logging.getLogger(__name__)
 
 
 @router.post("/preview")
@@ -60,9 +63,10 @@ def registre_import(
         )
     try:
         return import_registre_rows(db, payload.rows, user=current_user, dry_run=payload.dry_run)
-    except RegistreImportTooLargeError as exc:
-        # Voir bulk_import : message reconstruit, jamais propage depuis l'exception.
+    except RegistreImportTooLargeError:
+        # Voir bulk_import : message reconstruit et chaine d'exception coupee.
+        logger.warning("registre_import.rejected reason=too_large max_rows=%s", REGISTRE_MAX_ROWS)
         raise HTTPException(
             status_code=413,
             detail=f"Import trop volumineux : maximum {REGISTRE_MAX_ROWS} lignes.",
-        ) from exc
+        ) from None
