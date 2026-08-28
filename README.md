@@ -92,7 +92,7 @@ In practice, this keeps request handling thin while making domain workflows easi
 At runtime, background work is separated from the web workers via `PROCESS_ROLE`
 (`web` / `scheduler` / `analyzer-gateway`, default `all` for single-process dev).
 In production (Docker Compose), only the Caddy reverse proxy publishes ports
-(80/443); the app, PostgreSQL, Redis, Prometheus and Grafana stay on internal
+(80/443); the app, PostgreSQL, Redis and Prometheus stay on internal
 networks.
 
 The authoritative description of the **system as actually built** (services,

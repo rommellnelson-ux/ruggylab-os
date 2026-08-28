@@ -26,7 +26,7 @@ POSTGRES_PASSWORD=<mot de passe PostgreSQL>
 DATABASE_URL=postgresql+psycopg://ruggylab:<POSTGRES_PASSWORD>@postgres:5432/ruggylab
 REDIS_URL=redis://redis:6379/0
 CACHE_BACKEND=redis
-GRAFANA_PASSWORD=<mot de passe Grafana>
+# GRAFANA_PASSWORD — UNIQUEMENT si l'overlay de supervision optionnel est utilisé
 RUGGYLAB_DOMAIN=<domaine ou nom d'hôte servi par le proxy, ex. labo.exemple.ci>
 # Artefact immuable : TOUJOURS un tag précis publié par la CI, jamais `latest`.
 RUGGYLAB_IMAGE=ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha ou vX.Y.Z>
@@ -45,8 +45,33 @@ Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48)
 ```bash
 docker compose up -d postgres redis           # dépendances
 docker compose --profile migrate run --rm migrate  # alembic upgrade head (run-once)
-docker compose up -d                          # proxy + app + workers + supervision
+docker compose up -d                          # proxy + app + workers + Prometheus
 ```
+
+Ce scénario est le **mode nominal supporté**. Il ne télécharge aucune image
+Grafana et n'exige aucune variable Grafana.
+
+### 3.1 Overlay de supervision — optionnel
+
+Grafana **ne fait pas partie du cœur distribué** de RUGGYLAB OS. Son absence
+n'est pas un mode dégradé : Prometheus collecte `/metrics` directement, et les
+tableaux de bord métier sont intégrés à l'application.
+
+L'exploitant qui veut Grafana l'ajoute lui-même, en récupérant l'image auprès de
+son éditeur :
+
+```bash
+docker compose   -f docker-compose.yml   -f docker-compose.monitoring.yml   up -d
+```
+
+Cet overlay exige `GRAFANA_PASSWORD` (et accepte `GRAFANA_USER`, défaut
+`admin`). En développement, ajouter `-f docker-compose.monitoring.dev.yml` pour
+publier Grafana sur `127.0.0.1:3000`.
+
+> **Composant tiers sous AGPL-3.0.** Grafana est distinct de RUGGYLAB OS et
+> n'est pas couvert par sa licence. RUGGYLAB ne le copie pas, ne le
+> reconditionne pas et ne le republie pas : l'image vient du registre de son
+> éditeur, non modifiée.
 
 > **Verrou de migration** : l'application refuse de démarrer si le schéma de la
 > base n'est pas au head Alembic embarqué dans l'image (message explicite ;
@@ -69,8 +94,8 @@ docker compose up -d                          # proxy + app + workers + supervis
 
 L'accès utilisateur se fait **uniquement** via `https://$RUGGYLAB_DOMAIN` (le proxy
 Caddy termine le TLS et redirige 80→443). Aucun autre port n'est publié : app,
-PostgreSQL, Redis, Prometheus et Grafana ne sont joignables que sur les réseaux
-internes. Prometheus/Grafana s'atteignent via VPN/bastion (voir §8/9 des
+PostgreSQL, Redis et Prometheus ne sont joignables que sur les réseaux
+internes. Prometheus s'atteint via VPN/bastion (voir §8/9 des
 Instructions maîtres et `deploy/Caddyfile`).
 
 > TLS : par défaut le proxy utilise une **CA interne** (site LAN sans Internet —
@@ -104,9 +129,9 @@ UAT_BASE_URL=https://votre-domaine python -m scripts.uat_smoke
 - [ ] **Mot de passe admin changé** dès la 1re connexion (le défaut de test est refusé par le contrôle).
 - [ ] Référentiels initialisés : `bioref/seed-defaults`, `tariffs/seed-defaults` (prix ajustés), cibles TAT.
 - [ ] Comptes nominatifs créés par rôle (technician/officer/accountant) ; pas de comptes partagés.
-- [ ] Proxy Caddy actif (TLS) ; **seuls 80/443 publiés**. app (8000), PostgreSQL (5432), Redis (6379), Prometheus (9090), Grafana (3000) non exposés — `docker compose ps` / `ss -lntp` pour vérifier.
+- [ ] Proxy Caddy actif (TLS) ; **seuls 80/443 publiés**. app (8000), PostgreSQL (5432), Redis (6379), Prometheus (9090) non exposés — `docker compose ps` / `ss -lntp` pour vérifier.
 - [ ] **Sauvegarde testée** : `scripts/pg_backup.ps1` puis **restauration vérifiée** `scripts/pg_restore_verify.ps1` → verdict `SUCCÈS` sur base scratch (§6).
-- [ ] Supervision : Prometheus/Grafana accessibles, alertes configurées (voir [observability.md](observability.md)).
+- [ ] Supervision : Prometheus accessible et collectant `/metrics`, alertes configurées (voir [observability.md](observability.md)). Grafana, s'il est souhaité, relève de l'overlay optionnel.
 - [ ] Audit activé et consultable (rôle admin).
 - [ ] `uat_smoke` → **15/15** contre l'instance de prod (sur données de test, à nettoyer ensuite via `scripts/cleanup_uat_data.py`).
 - [ ] Plan de rollback connu (§7).
