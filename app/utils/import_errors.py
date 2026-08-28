@@ -1,79 +1,76 @@
-"""Messages d'erreur d'import : construits, jamais recopiés depuis l'exception.
+"""Messages d'erreur d'import : catalogue constant, jamais dérivé d'une exception.
 
-Les services d'import en masse plaçaient `str(exc)` dans la liste `errors`
-renvoyée au client, avec le commentaire « message de validation métier : sûr à
-exposer ». Ce n'est pas exact :
+Les services d'import plaçaient `str(exc)` dans la liste `errors` renvoyée au
+client, avec le commentaire « message de validation métier : sûr à exposer ».
+C'était inexact : une ``ValidationError`` Pydantic contient le nom du modèle
+interne, le chemin du champ, le type d'erreur **et la valeur d'entrée** — donc,
+pour un import de patients, la donnée patient elle-même.
 
-- une ``ValidationError`` Pydantic contient le nom du modèle interne, le chemin
-  du champ, le type d'erreur **et la valeur d'entrée** — donc, pour un import de
-  patients, la donnée patient elle-même, renvoyée telle quelle dans la réponse ;
-- une ``ValueError`` peut venir de n'importe quelle bibliothèque appelée en
-  chemin, et son texte n'est alors contrôlé par personne.
+Une première correction reconstruisait le message depuis ``exc.errors()``. Elle
+restait dérivée de l'objet exception, donc sur le chemin de flux que CodeQL
+suit (`py/stack-trace-exposure`). L'approche retenue est plus stricte :
 
-Ce module transforme l'exception en message **construit à partir de champs
-connus**. Le lien entre l'erreur et sa cause est conservé — c'est ce dont
-l'opérateur a besoin pour corriger son fichier — sans recopier de texte
-d'exception dans la réponse HTTP.
+1. **valider en amont** ce qu'on sait vérifier soi-même (champ manquant,
+   doublon, date illisible) et produire un **code** métier ;
+2. n'utiliser ce code que pour choisir un message dans le catalogue constant
+   ci-dessous ;
+3. dans les blocs ``except``, **ne pas lier l'exception du tout** et émettre un
+   message constant.
+
+Ainsi aucune partie de la réponse client n'est dérivée d'un objet exception —
+ni son texte, ni ses attributs, ni sa classe.
 """
 
 from __future__ import annotations
 
-from pydantic import ValidationError
+import datetime as dt
 
-#: Traductions des types d'erreur Pydantic les plus courants sur un import CSV.
-#: Vocabulaire fermé : rien de ce qui sort d'ici ne vient de l'exception.
-_RAISONS = {
-    "missing": "valeur manquante",
-    "string_too_long": "valeur trop longue",
-    "string_too_short": "valeur trop courte",
-    "string_pattern_mismatch": "format invalide",
-    "date_parsing": "date invalide",
-    "date_from_datetime_parsing": "date invalide",
-    "date_type": "date invalide",
-    "int_parsing": "nombre entier attendu",
-    "int_type": "nombre entier attendu",
-    "float_parsing": "nombre attendu",
-    "decimal_parsing": "nombre attendu",
-    "greater_than": "valeur trop petite",
-    "greater_than_equal": "valeur trop petite",
-    "less_than": "valeur trop grande",
-    "less_than_equal": "valeur trop grande",
-    "enum": "valeur hors des choix autorisés",
-    "literal_error": "valeur hors des choix autorisés",
-    "value_error": "valeur invalide",
-    "bool_parsing": "oui/non attendu",
+#: Catalogue FERMÉ. La réponse client ne peut contenir que ces chaînes.
+MESSAGES: dict[str, str] = {
+    "champ_manquant": "Ligne rejetée — champ obligatoire manquant.",
+    "identifiant_manquant": "Ligne rejetée — identifiant manquant.",
+    "identifiant_duplique": "Ligne rejetée — identifiant déjà présent dans le fichier.",
+    "deja_existant": "Ligne rejetée — enregistrement déjà existant.",
+    "date_invalide": "Ligne rejetée — date invalide (format attendu AAAA-MM-JJ).",
+    "nombre_invalide": "Ligne rejetée — valeur numérique invalide.",
+    "donnees_invalides": "Ligne rejetée — données invalides.",
+    "erreur_base": "Ligne rejetée (erreur base de données).",
 }
 
-_RAISON_PAR_DEFAUT = "valeur invalide"
-_MESSAGE_GENERIQUE = "Ligne rejetée (données invalides)."
+#: Message servi si un code inconnu était demandé — jamais de KeyError en prod,
+#: et jamais de texte imprévu dans la réponse.
+_REPLI = MESSAGES["donnees_invalides"]
 
 
-def _champ(localisation: tuple[object, ...]) -> str:
-    """Nom du champ fautif, ou chaîne vide si Pydantic n'en désigne aucun."""
-    parties = [str(p) for p in localisation if isinstance(p, str)]
-    return ".".join(parties)
+def message(code: str) -> str:
+    """Message client pour un code métier. Toujours issu du catalogue."""
+    return MESSAGES.get(code, _REPLI)
 
 
-def describe_validation_error(exc: Exception) -> str:
-    """Message sûr décrivant une erreur de validation de ligne.
+def parse_date(valeur: str | None) -> tuple[dt.date | None, str | None]:
+    """(date, code d'erreur). Ne lève pas : le code remplace l'exception.
 
-    Ne renvoie que des libellés issus d'un vocabulaire fermé et des noms de
-    champs du schéma. La valeur saisie et le texte de l'exception n'y figurent
-    jamais.
+    Valider en amont évite d'avoir à rattraper une exception dont on ne pourra
+    de toute façon rien exposer.
     """
-    if isinstance(exc, ValidationError):
-        details = exc.errors()
-        if not details:
-            return _MESSAGE_GENERIQUE
-        problemes: list[str] = []
-        for detail in details[:5]:  # au-delà, la ligne est à refaire de toute façon
-            raison = _RAISONS.get(str(detail.get("type", "")), _RAISON_PAR_DEFAUT)
-            nom = _champ(tuple(detail.get("loc", ())))
-            problemes.append(f"{nom} : {raison}" if nom else raison)
-        reste = len(details) - len(problemes)
-        suffixe = f" (+{reste} autre(s))" if reste > 0 else ""
-        return f"Ligne rejetée — {'; '.join(problemes)}{suffixe}."
+    texte = (valeur or "").strip()
+    if not texte:
+        return None, "champ_manquant"
+    try:
+        return dt.date.fromisoformat(texte), None
+    except ValueError:
+        return None, "date_invalide"
 
-    # `ValueError` non-Pydantic : le texte vient d'une bibliothèque quelconque
-    # en chemin, personne ne le contrôle. On ne le propage donc pas.
-    return _MESSAGE_GENERIQUE
+
+def parse_decimal(
+    valeur: str | None, *, obligatoire: bool = False
+) -> tuple[str | None, str | None]:
+    """(texte numérique validé, code d'erreur). Ne lève pas."""
+    texte = (valeur or "").strip()
+    if not texte:
+        return (None, "champ_manquant") if obligatoire else (None, None)
+    try:
+        float(texte.replace(",", "."))
+    except ValueError:
+        return None, "nombre_invalide"
+    return texte, None

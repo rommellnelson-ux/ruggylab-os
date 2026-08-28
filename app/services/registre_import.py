@@ -19,7 +19,7 @@ from app.services.audit import log_audit_event
 from app.services.registre_analytics import _parse_date
 from app.services.registre_parser import parse_exam_cell
 from app.utils.datetime_utils import utcnow_naive
-from app.utils.import_errors import describe_validation_error
+from app.utils.import_errors import message as import_message
 
 MAX_ROWS = 10_000
 
@@ -151,12 +151,14 @@ def import_registre_rows(
 
             created_patients += 1
             created_samples += 1
-        except ValueError as exc:
-            # Message de validation métier : sûr à exposer.
-            errors.append({"row": idx, "error": describe_validation_error(exc)})
+        # Exception volontairement NON liee (`as exc`) : rien de ce qu elle
+        # porte ne doit pouvoir atteindre la reponse client. Les causes que
+        # l on sait nommer sont validees en amont, cf. app/utils/import_errors.
+        except ValueError:
+            errors.append({"row": idx, "error": import_message("donnees_invalides")})
         except (IntegrityError, SQLAlchemyError):
             # Ne pas exposer le détail SQL/interne au client (fuite d'information).
-            errors.append({"row": idx, "error": "Ligne rejetée (erreur base de données)."})
+            errors.append({"row": idx, "error": import_message("erreur_base")})
 
     if not dry_run and created_patients:
         log_audit_event(

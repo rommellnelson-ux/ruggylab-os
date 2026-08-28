@@ -1,129 +1,174 @@
-"""Tests — les erreurs d'import ne recopient jamais le texte d'une exception.
+"""Tests — la réponse d'import ne dérive d'aucun objet exception.
 
-Les services d'import plaçaient `str(exc)` dans la liste `errors` renvoyée au
-client, avec le commentaire « message de validation métier : sûr à exposer ».
-Ce n'était pas exact : une `ValidationError` Pydantic contient **la valeur
-d'entrée** — donc, pour un import de patients, la donnée patient — ainsi que le
-nom du modèle interne.
+Les services plaçaient `str(exc)` dans la liste `errors` renvoyée au client,
+avec le commentaire « message de validation métier : sûr à exposer ». C'était
+inexact : une `ValidationError` Pydantic contient le nom du modèle interne, le
+chemin du champ, le type d'erreur **et la valeur d'entrée** — donc, pour un
+import de patients, la donnée patient elle-même.
 
 C'est la source réelle des alertes `py/stack-trace-exposure` #16/#27/#28 : le
 flux part de `except … as exc` dans le service et atteint la réponse par la
-valeur de retour de l'endpoint. Mes deux corrections précédentes visaient
-l'`HTTPException`, qui n'était pas sur ce chemin.
+valeur de retour de l'endpoint. Deux corrections précédentes visaient
+l'`HTTPException`, qui n'est pas sur ce chemin.
+
+Une troisième reconstruisait le message depuis `exc.errors()` : toujours dérivé
+de l'objet exception. L'invariant retenu est donc plus strict — **les blocs
+`except` de ces services ne lient plus l'exception du tout**, et la réponse ne
+peut contenir que des messages d'un catalogue constant.
 """
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
-from pydantic import BaseModel, Field, ValidationError
 
-from app.utils.import_errors import describe_validation_error
+from app.utils.import_errors import MESSAGES, message, parse_date, parse_decimal
 
-# Marqueurs qui trahiraient une recopie du texte d'exception.
-_INTERDITS = (
-    "validation error",
-    "pydantic",
-    "https://errors.pydantic.dev",
-    "Input should be",
-    "type=",
-    "input_value",
-    "For further information",
-    "Traceback",
-)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SERVICES = REPO_ROOT / "app" / "services"
+_FICHIERS = ("bulk_import.py", "registre_import.py")
 
 
-class _Patient(BaseModel):
-    ipp_unique_id: str = Field(min_length=3)
-    last_name: str = Field(min_length=1)
-    birth_date: int = Field(ge=1900)
+def _code_sans_commentaires(nom: str) -> str:
+    source = (SERVICES / nom).read_text(encoding="utf-8")
+    return "\n".join(x for x in source.splitlines() if not x.lstrip().startswith("#"))
 
 
-def _erreur_reelle(**champs) -> ValidationError:
-    try:
-        _Patient(**champs)
-    except ValidationError as exc:
-        return exc
-    raise AssertionError("le modèle aurait dû échouer")
+# ── l'invariant central ─────────────────────────────────────────────────────
 
 
-# ── non-vacuité : l'exception brute FUIT réellement ─────────────────────────
+@pytest.mark.parametrize("nom", _FICHIERS)
+def test_no_except_clause_binds_the_exception(nom):
+    """`except … as exc` est proscrit : rien ne peut plus en être dérivé.
 
-
-def test_raw_exception_text_would_leak_the_input_value():
-    """Preuve que le problème est réel : `str(exc)` contient la valeur saisie.
-
-    Sans ce contrôle, les tests ci-dessous pourraient passer sans rien prouver.
+    Interdire seulement `str(exc)` était insuffisant — `exc.errors()` passait au
+    travers. Interdire la liaison elle-même ferme toute la classe de défauts.
     """
-    exc = _erreur_reelle(ipp_unique_id="XY", last_name="DIOMANDE", birth_date=1850)
-    brut = str(exc)
-    assert "XY" in brut or "1850" in brut, (
-        "si l'exception ne portait pas la valeur d'entrée, il n'y aurait rien à corriger"
-    )
-    assert any(m.lower() in brut.lower() for m in _INTERDITS)
+    code = _code_sans_commentaires(nom)
+    lie = re.findall(r"except\s+[^\n:]+\s+as\s+(\w+)\s*:", code)
+    assert not lie, f"{nom} lie encore l'exception : {lie}"
 
 
-# ── le message construit ne porte rien de tout cela ─────────────────────────
+@pytest.mark.parametrize("nom", _FICHIERS)
+def test_no_exception_text_reaches_the_response(nom):
+    code = _code_sans_commentaires(nom)
+    for interdit in ("str(exc)", ".errors()", "exc.args", "repr(exc)", "format_exc"):
+        assert interdit not in code, f"{nom} dérive encore de l'exception ({interdit})"
 
 
-def test_built_message_hides_the_input_value():
-    exc = _erreur_reelle(ipp_unique_id="XY", last_name="DIOMANDE", birth_date=1850)
-    message = describe_validation_error(exc)
-    assert "XY" not in message
-    assert "1850" not in message
-    assert "DIOMANDE" not in message
+@pytest.mark.parametrize("nom", _FICHIERS)
+def test_error_entries_only_use_the_catalogue(nom):
+    """Toute valeur de `errors[].error` vient de `import_message(...)`."""
+    code = _code_sans_commentaires(nom)
+    appels = re.findall(r'"error":\s*([^}]+)\}', code)
+    assert appels, f"{nom} : aucune entrée d'erreur trouvée"
+    for appel in appels:
+        assert appel.strip().startswith("import_message("), (
+            f"{nom} : message d'erreur hors catalogue -> {appel.strip()!r}"
+        )
 
 
-def test_built_message_hides_pydantic_internals():
-    exc = _erreur_reelle(ipp_unique_id="XY", last_name="", birth_date=1850)
-    message = describe_validation_error(exc)
-    for marqueur in _INTERDITS:
-        assert marqueur.lower() not in message.lower(), f"{marqueur!r} exposé : {message!r}"
-    assert "_Patient" not in message, "le nom du modèle interne ne doit pas fuiter"
+def test_catalogue_is_closed_and_free_of_placeholders():
+    """Aucun message ne peut être interpolé : pas de format, pas de f-string."""
+    for code, texte in MESSAGES.items():
+        assert "{" not in texte and "%" not in texte, f"{code} interpolable : {texte!r}"
+        assert texte.startswith("Ligne rejetée")
 
 
-def test_built_message_still_names_the_faulty_field():
-    """Utile à l'opérateur : il doit savoir quelle colonne corriger."""
-    exc = _erreur_reelle(ipp_unique_id="XY", last_name="Kone", birth_date=1850)
-    message = describe_validation_error(exc)
-    assert "birth_date" in message or "ipp_unique_id" in message
+def test_unknown_code_falls_back_instead_of_raising():
+    """Un code inattendu ne doit ni lever, ni faire fuiter un texte imprévu."""
+    assert message("code_qui_n_existe_pas") in MESSAGES.values()
 
 
-def test_built_message_lists_several_problems():
-    exc = _erreur_reelle(ipp_unique_id="X", last_name="", birth_date=10)
-    message = describe_validation_error(exc)
-    assert message.count(":") >= 2, f"les champs fautifs devraient être listés : {message!r}"
-
-
-def test_plain_value_error_text_is_never_propagated():
-    """Le texte d'une `ValueError` vient d'une lib quelconque : jamais propagé."""
-    message = describe_validation_error(ValueError("chemin /srv/app/secret.csv illisible"))
-    assert "/srv/app/secret.csv" not in message
-    assert message == "Ligne rejetée (données invalides)."
+# ── validation en amont : elle remplace l'exception ─────────────────────────
 
 
 @pytest.mark.parametrize(
-    "champs",
+    "valeur,attendu",
     [
-        {"ipp_unique_id": "AB", "last_name": "K", "birth_date": 1990},
-        {"ipp_unique_id": "ABC", "last_name": "", "birth_date": 1990},
-        {"ipp_unique_id": "ABC", "last_name": "K", "birth_date": 1000},
+        ("2026-08-28", None),
+        ("", "champ_manquant"),
+        (None, "champ_manquant"),
+        ("32/13/1990", "date_invalide"),
+        ("pas une date", "date_invalide"),
+        ("1990-13-01", "date_invalide"),
     ],
 )
-def test_message_vocabulary_is_closed(champs):
-    """Quelle que soit l'erreur, la sortie reste dans un vocabulaire connu."""
-    message = describe_validation_error(_erreur_reelle(**champs))
-    assert message.startswith("Ligne rejetée")
-    assert message.endswith(".")
+def test_parse_date_returns_a_code_instead_of_raising(valeur, attendu):
+    date, code = parse_date(valeur)
+    assert code == attendu
+    assert (date is None) == (attendu is not None)
 
 
-# ── plus aucun `str(exc)` dans les services d'import ────────────────────────
+@pytest.mark.parametrize(
+    "valeur,obligatoire,attendu",
+    [
+        ("12.5", False, None),
+        ("12,5", False, None),
+        ("", False, None),
+        ("", True, "champ_manquant"),
+        ("abc", False, "nombre_invalide"),
+    ],
+)
+def test_parse_decimal_returns_a_code_instead_of_raising(valeur, obligatoire, attendu):
+    _, code = parse_decimal(valeur, obligatoire=obligatoire)
+    assert code == attendu
 
 
-def test_services_no_longer_stringify_exceptions():
-    from pathlib import Path
+def test_prevalidation_never_raises_on_hostile_input():
+    """Aucune entrée ne doit provoquer d'exception : c'est tout l'intérêt."""
+    for valeur in ("", " ", "\x00", "9" * 500, "2026-02-30", "--", "1e400"):
+        parse_date(valeur)
+        parse_decimal(valeur)
 
-    racine = Path(__file__).resolve().parents[1] / "app" / "services"
-    for nom in ("bulk_import.py", "registre_import.py"):
-        source = (racine / nom).read_text(encoding="utf-8")
-        code = "\n".join(x for x in source.splitlines() if not x.lstrip().startswith("#"))
-        assert "str(exc)" not in code, f"{nom} recopie encore le texte de l'exception"
+
+# ── bout en bout : la réponse HTTP ne porte rien de l'entrée ────────────────
+
+
+def _auth(client) -> dict[str, str]:
+    token = client.post(
+        "/api/v1/login/access-token",
+        data={"username": "admin", "password": "change_me_admin_password"},
+    ).json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_invalid_rows_never_echo_the_submitted_data(client):
+    """Une date impossible et un IPP manquant : la réponse ne renvoie ni l'un ni l'autre."""
+    csv = (
+        "ipp_unique_id,first_name,last_name,birth_date,sex,rank\n"
+        "SECRET-IPP-001,Awa,Kone,32/13/1990,F,Sergent\n"
+        ",Yao,Brou,1985-11-03,M,Caporal\n"
+    )
+    reponse = client.post(
+        "/api/v1/bulk-import/patients", headers=_auth(client), json={"csv": csv, "dry_run": True}
+    )
+    assert reponse.status_code == 200, reponse.text
+    corps = reponse.text
+
+    # Ni la valeur fautive, ni les internes de Pydantic.
+    assert "32/13/1990" not in corps
+    assert "SECRET-IPP-001" not in corps
+    for marqueur in ("validation error", "Input should be", "pydantic", "type=", "PatientCreate"):
+        assert marqueur.lower() not in corps.lower(), f"{marqueur!r} exposé"
+
+    erreurs = reponse.json()["errors"]
+    assert len(erreurs) == 2
+    for entree in erreurs:
+        assert entree["error"] in MESSAGES.values(), entree
+
+
+def test_operator_still_learns_why_the_row_failed(client):
+    """Le durcissement ne doit pas rendre le rapport inutilisable."""
+    csv = (
+        "ipp_unique_id,first_name,last_name,birth_date,sex,rank\n"
+        "IMP-OK-1,Awa,Kone,32/13/1990,F,Sergent\n"
+    )
+    reponse = client.post(
+        "/api/v1/bulk-import/patients", headers=_auth(client), json={"csv": csv, "dry_run": True}
+    )
+    erreur = reponse.json()["errors"][0]["error"]
+    assert erreur == MESSAGES["date_invalide"]
+    assert "date" in erreur.lower(), "l'opérateur doit savoir quelle nature d'erreur corriger"
