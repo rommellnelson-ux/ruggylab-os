@@ -30,6 +30,7 @@ LABEL org.opencontainers.image.title="RuggyLab OS" \
       org.opencontainers.image.description="Laboratory Information System for hospitals in Côte d'Ivoire" \
       org.opencontainers.image.source="https://github.com/rommellnelson-ux/ruggylab-os" \
       org.opencontainers.image.licenses="GPL-2.0" \
+      org.opencontainers.image.version="0.8.0-beta.1" \
       org.opencontainers.image.vendor="RuggyLab"
 
 WORKDIR /app

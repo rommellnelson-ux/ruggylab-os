@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ruggylab-os"
-version = "0.1.0"
+version = "0.8.0b1"
 description = "RuggyLab OS - Laboratory Management System"
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Healthcare Industry",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
     "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
