@@ -24,7 +24,7 @@ SECRET_KEY=<chaîne aléatoire >= 32 caractères, unique>
 FIRST_SUPERUSER_PASSWORD=<mot de passe fort >= 16 caractères>
 POSTGRES_PASSWORD=<mot de passe PostgreSQL>
 DATABASE_URL=postgresql+psycopg://ruggylab:<POSTGRES_PASSWORD>@postgres:5432/ruggylab
-REDIS_URL=redis://redis:6379/0
+REDIS_URL=redis://valkey:6379/0
 CACHE_BACKEND=redis
 GRAFANA_PASSWORD=<mot de passe Grafana>
 RUGGYLAB_DOMAIN=<domaine ou nom d'hôte servi par le proxy, ex. labo.exemple.ci>
@@ -43,7 +43,7 @@ Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48)
 ## 3. Démarrage (Docker Compose)
 
 ```bash
-docker compose up -d postgres redis           # dépendances
+docker compose up -d postgres valkey          # dépendances
 docker compose --profile migrate run --rm migrate  # alembic upgrade head (run-once)
 docker compose up -d                          # proxy + app + workers + supervision
 ```

@@ -28,7 +28,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     # En dev, l'app fait tout (mono-process) : pas besoin des services scheduler /
-    # analyzer-gateway. Stack minimale : `docker compose up app postgres redis`.
+    # analyzer-gateway. Stack minimale : `docker compose up app postgres valkey`.
     volumes:
       # Live source mount – changes take effect without rebuilding the image
       - ./app:/app/app:ro
@@ -48,7 +48,7 @@ services:
       # débraye le verrou de migration, réservé à la production.
       SKIP_MIGRATION_CHECK: "1"
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-NOT-for-production-use-32c}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_URL: ${REDIS_URL:-redis://valkey:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-DevPassword123!}
       CACHE_BACKEND: ${CACHE_BACKEND:-memory}
 
@@ -74,8 +74,8 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
 
-  redis:
-    # Expose Redis on localhost for local debugging
+  valkey:
+    # Expose Valkey on localhost for local debugging (protocole Redis)
     ports:
       - "127.0.0.1:6379:6379"
 

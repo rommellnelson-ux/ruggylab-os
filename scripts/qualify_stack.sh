@@ -19,7 +19,7 @@ step() { printf '\n== %s ==\n' "$1"; }
 echo "Qualification RuggyLab OS — domaine: $DOMAIN — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 step "1. Services démarrés et sains"
-for svc in proxy app scheduler analyzer-gateway postgres redis prometheus grafana db-backup; do
+for svc in proxy app scheduler analyzer-gateway postgres valkey prometheus grafana db-backup; do
   cid=$(docker compose ps -q "$svc" 2>/dev/null)
   if [ -z "$cid" ]; then fail "$svc absent"; continue; fi
   status=$(docker inspect -f '{{.State.Status}}' "$cid")

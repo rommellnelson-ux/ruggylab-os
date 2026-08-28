@@ -6,7 +6,7 @@
 # Réseau (§8/§9) : SEUL le reverse proxy `proxy` publie des ports (80/443). L'app,
 # PostgreSQL, Redis, Prometheus et Grafana n'exposent aucun port. Segmentation :
 #   frontend_net   : proxy, app
-#   backend_net    : app, scheduler, analyzer-gateway, postgres, redis, prometheus, migrate
+#   backend_net    : app, scheduler, analyzer-gateway, postgres, valkey, prometheus, migrate
 #   management_net : prometheus, grafana (accès VPN/bastion — jamais le VLAN clinique)
 #   analyzer_net   : analyzer-gateway (automates)
 #
@@ -69,7 +69,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_URL: ${REDIS_URL:-redis://valkey:6379/0}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
       CACHE_BACKEND: redis
       # Gouvernance clinique — DÉCISION 2026-07-08 (responsable labo) : false, les
@@ -89,7 +89,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
     # Pas de `ports:` — l'app n'est jointe que par le proxy (frontend_net).
     healthcheck:
@@ -124,7 +124,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://ruggylab:CHANGE_ME@postgres:5432/ruggylab}  # pragma: allowlist secret
       SECRET_KEY: ${SECRET_KEY}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_URL: ${REDIS_URL:-redis://valkey:6379/0}
       PROCESS_ROLE: scheduler
     # Healthcheck adapté au rôle : le process écrit un battement toutes les ~30 s
     # (app/scheduler.py) ; on vérifie que le fichier a moins de 2 min. Remplace
@@ -259,9 +259,19 @@ services:
     networks:
       - backend_net
 
-  # ── Redis 7 ─────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7.4-alpine   # version mineure épinglée (§10)
+  # ── Valkey 8.1 (remplace Redis 7.4) ─────────────────────────────────────────
+  # Redis a quitté BSD-3-Clause à partir de la 7.4 pour un double régime
+  # source-available (RSALv2 / SSPLv1), qui restreint la redistribution.
+  # Valkey est le fork BSD-3-Clause du même serveur, hébergé par la Linux
+  # Foundation. Le PROTOCOLE ne change pas : `redis-py` reste le client, sous
+  # licence MIT, et les URL `redis://` restent valides — c'est le nom du
+  # protocole, pas celui du produit serveur.
+  #
+  # Épinglée par version ET par digest : un tag est mutable, un digest non.
+  # valkey/valkey:8.1.9-alpine — BSD-3-Clause — vérifié le 2026-08-28.
+  # Voir docs/governance/VALKEY_IMAGE_PROVENANCE.md
+  valkey:
+    image: valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84
     restart: unless-stopped
     logging: *default-logging
     deploy:
@@ -269,11 +279,11 @@ services:
         limits:
           cpus: "1.0"
           memory: 512M
-    command: redis-server --appendonly yes
+    command: valkey-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 10s
       timeout: 5s
       start_period: 10s
@@ -361,7 +371,7 @@ services:
 # ── Named volumes ────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
-  redis_data:
+  valkey_data:
   prometheus_data:
   app_data:
   app_models:

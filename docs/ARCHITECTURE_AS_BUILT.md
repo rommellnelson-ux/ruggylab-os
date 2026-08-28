@@ -59,7 +59,7 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 | `scheduler` | ruggylab-os | aucun | backend |
 | `analyzer-gateway` | ruggylab-os | aucun ; aucune interface activée dans le compose de référence | analyzer, backend |
 | `postgres` | postgres:16-alpine | aucun | backend |
-| `redis` | redis:7-alpine | aucun | backend |
+| `valkey` | valkey/valkey:8.1.9-alpine (digest épinglé) | aucun | backend |
 | `prometheus` | prom/prometheus | aucun (accès VPN/bastion) | backend, management |
 | `grafana` | grafana:11.0.0 | aucun (accès VPN/bastion) | management |
 | `migrate` | ruggylab-os | run-once manuel (`--profile migrate`) | backend |
