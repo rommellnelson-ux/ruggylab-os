@@ -1,5 +1,20 @@
 # Note de décision — licence de la bêta technique `v0.8.0-beta.1`
 
+> ## ✅ Suite donnée — 2026-08-28
+>
+> La recommandation ci-dessous **a été suivie**. Le titulaire des droits,
+> **WOGNIN Nelson Rommell Boni Ruggairrhye**, a retenu une licence propriétaire
+> d'évaluation : **RuggyLab Evaluation License 1.0**.
+>
+> Voir [`LICENSE_DECISION_BETA_2026-08-28.md`](LICENSE_DECISION_BETA_2026-08-28.md)
+> et [`../../LICENSE.md`](../../LICENSE.md).
+>
+> La note est **conservée telle quelle** : elle documente le raisonnement qui a
+> conduit à la décision, et les options écartées restent utiles si la question
+> est rouverte pour une version ultérieure.
+
+---
+
 > **PROJET DE DÉCISION — À VALIDER ET SIGNER PAR LE PROPRIÉTAIRE.**
 > Cette note **recommande** ; elle ne décide rien. Aucun fichier `LICENSE` n'a
 > été ajouté au dépôt. Tant que la décision n'est pas prise et mise en œuvre,

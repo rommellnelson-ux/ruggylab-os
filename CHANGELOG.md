@@ -73,8 +73,39 @@ défaut** : `CSA_SYNC_ENABLED=false`, `ANALYZER_BIND_IP=127.0.0.1`,
 - Le compte technique CSA est **sur-privilégié côté `csa-plateau`** ; la
   correction est préparée mais non déployée. `CSA_SYNC_ENABLED` doit rester
   `false`.
-- **Licence non résolue** : GPL-2.0 est déclarée dans `pyproject.toml`, le
-  `Dockerfile` et le README, mais le dépôt ne contient aucun fichier `LICENSE`.
+- **Composants tiers non entièrement qualifiés** — **bloquant pour toute
+  distribution externe.** Deux composants sont en revue de licence obligatoire :
+  **Redis 7.4** (source-available RSALv2/SSPLv1 depuis cette version, et non
+  plus BSD-3-Clause) et **Grafana 11** (AGPL-3.0, dont les obligations diffèrent
+  selon que la pile est seulement déployée ou réellement distribuée). La police
+  chargée depuis Google Fonts reste à préciser. Options et détail dans
+  `THIRD_PARTY_NOTICES.md` §6.
+
+### Licence
+
+La déclaration GPL-2.0 antérieure était **inexacte** : elle figurait dans
+`pyproject.toml`, le `Dockerfile` et le README alors que le dépôt ne contenait
+**aucun fichier `LICENSE`**.
+
+**Décision de principe adoptée.** RUGGYLAB OS `0.8.0-beta.1` est publié sous
+**RuggyLab Evaluation License 1.0** (`LicenseRef-RuggyLab-Evaluation-1.0`),
+licence propriétaire d'évaluation. Copyright © 2026 WOGNIN Nelson Rommell Boni
+Ruggairrhye. Les quatre déclarations du dépôt sont alignées et verrouillées par
+un test.
+
+Deux réserves, explicites :
+
+- **le texte n'a pas été validé par un juriste.** Les clauses de droit
+  applicable, juridiction, durée, limitation de responsabilité et règlement des
+  litiges sont regroupées au §12 de `LICENSE.md` et **exigent cette validation
+  avant toute distribution externe** ;
+- **les obligations des composants tiers ne sont pas toutes satisfaites** à ce
+  jour (voir ci-dessus). La qualification des composants tiers appartient au
+  gate de **distribution**, pas au gate de build.
+
+`THIRD_PARTY_NOTICES.md` recense les composants, leurs licences et leurs
+obligations ; les textes intégraux sont dans `licenses/third-party/`. Les
+distributions Python et l'image Docker les embarquent.
 
 ### Rollback
 

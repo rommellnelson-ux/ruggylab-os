@@ -1,7 +1,30 @@
 # `LICENSE_DECISION_REQUIRED` — décision de licence à prendre avant le tag
 
+> ## ✅ Mise à jour du 2026-08-28 — décision de principe PRISE
+>
+> Le titulaire a retenu une **licence propriétaire d'évaluation** :
+> **RuggyLab Evaluation License 1.0** (`LicenseRef-RuggyLab-Evaluation-1.0`).
+> Voir [`LICENSE_DECISION_BETA_2026-08-28.md`](LICENSE_DECISION_BETA_2026-08-28.md)
+> et [`../../LICENSE.md`](../../LICENSE.md). Les quatre déclarations du dépôt
+> sont alignées et verrouillées par un test.
+>
+> **Ce document reste néanmoins ouvert.** Deux points demeurent :
+>
+> 1. **Texte contractuel externe non validé.** Les clauses du §12 de la licence
+>    — droit applicable, juridiction, durée, limitation de responsabilité,
+>    règlement des litiges — exigent une **validation juridique** avant toute
+>    distribution à un tiers extérieur.
+> 2. **Composants tiers non entièrement qualifiés.** Voir
+>    [`../../THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) : certains
+>    composants restent en revue obligatoire et bloquent la distribution.
+>
+> Le constat initial ci-dessous est **conservé tel quel**, à titre historique :
+> il décrit fidèlement l'état antérieur à la décision.
+
+---
+
 - **Date du constat** : 2026-08-28
-- **Statut** : **bloquant pour `v0.8.0-beta.1`**
+- **Statut initial** : **bloquant pour `v0.8.0-beta.1`**
 - **Décideur** : le propriétaire du dépôt. Ce point n'est pas technique.
 
 ## Le constat
