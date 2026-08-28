@@ -77,7 +77,12 @@ défaut** : `CSA_SYNC_ENABLED=false`, `ANALYZER_BIND_IP=127.0.0.1`,
   distribution externe.** Deux composants sont en revue de licence obligatoire :
   **Redis 7.4** (source-available RSALv2/SSPLv1 depuis cette version, et non
   plus BSD-3-Clause) et **Grafana 11** (AGPL-3.0, dont les obligations diffèrent
-  selon que la pile est seulement déployée ou réellement distribuée). La police
+  selon que la pile est seulement déployée ou réellement distribuée). Le SBOM de
+  l'image a fait apparaître un troisième point : la base `python:3.13-slim`
+  embarque **87 paquets Debian, majoritairement sous GPL/LGPL**. Les notices et
+  les textes de licence sont bien présents dans l'image — vérifié —, mais
+  l'obligation d'**offre du code source** attachée à la distribution de binaires
+  GPL n'a pas été instruite. Cela ne rend pas RUGGYLAB OS open source. La police
   chargée depuis Google Fonts reste à préciser. Options et détail dans
   `THIRD_PARTY_NOTICES.md` §6.
 

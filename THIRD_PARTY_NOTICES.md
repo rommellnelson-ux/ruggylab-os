@@ -69,6 +69,16 @@ Répartition observée sur l'environnement complet, à titre indicatif : MIT (58
 Apache-2.0 (16), BSD-3-Clause (16), autres variantes BSD/MIT, LGPL-3.0 (2 —
 psycopg et psycopg-binary). **0 licence indéterminée.**
 
+**Mesure en environnement propre, exécutée en CI** (`run` 33184265952) :
+**53 distributions**, dont **20 directes**, **0 licence indéterminée**. C'est
+ce périmètre-là — et non celui du poste de développement — qui est distribué.
+
+> **Le périmètre Python ne suffit pas.** L'image embarque en plus toute la base
+> système. `scripts/audit_sbom_licenses.py` audite donc le SBOM de l'image
+> elle-même : tout composant sans licence doit être qualifié par écrit dans
+> `docs/governance/SBOM_LICENSE_EXCEPTIONS.json`, sinon la conformité échoue.
+> Ce contrôle a fait apparaître l'élément traité au **§6.4**.
+
 ## 3. Images Docker
 
 Les digests sont résolus par la CI au moment du build et publiés dans l'artefact
@@ -77,7 +87,7 @@ réellement l'image livrée**.
 
 | Image | Tag | Rôle | Licence | Décision |
 | --- | --- | --- | --- | --- |
-| `python` | `3.13-slim` | base applicative | PSF-2.0 (Python) + Debian (base) | compatible — distribution binaire, notices conservées |
+| **`python`** | **`3.13-slim`** | base applicative | PSF-2.0 (Python) + **87 paquets Debian 13, majoritairement GPL/LGPL** | **REVUE OBLIGATOIRE — §6.4** |
 | `caddy` | `2.8-alpine` | proxy TLS | Apache-2.0 | compatible — notice + NOTICE requis |
 | `postgres` | `16.6-alpine` | base de données | PostgreSQL License (type BSD) | compatible — conteneur séparé, non modifié |
 | **`redis`** | **`7.4-alpine`** | cache / files | **voir §6.1** | **REVUE OBLIGATOIRE** |
@@ -205,6 +215,61 @@ La ou les familles chargées depuis `fonts.googleapis.com` ne sont pas
 identifiées dans cet inventaire. La plupart sont sous **OFL 1.1**, mais cela doit
 être **vérifié police par police**, pas supposé.
 
+### 6.4 Base Debian de l'image applicative — `BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED`
+
+**Découvert par le SBOM, pas supposé.** Le SBOM CycloneDX de l'image
+(`artifacts/sbom.cyclonedx.json`, artefact `third-party-evidence`) recense
+**155 composants** hors entrées de fichier, dont **87 paquets Debian 13
+« trixie »** hérités de `python:3.13-slim`. Le recensement des licences
+copyleft, produit par `scripts/audit_sbom_licenses.py` :
+
+| Famille | Occurrences relevées |
+| --- | --- |
+| GPL-2.0 (`-only` / `-or-later`) | 111 |
+| GPL-3.0 (`-only` / `-or-later`) | 64 |
+| LGPL-2.0 / 2.1 (`-only` / `-or-later`) | 92 |
+| LGPL-3.0 (`-only` / `-or-later`) | 34 |
+| GPL-1.0, GPL générique, exceptions de liaison | 29 |
+| MPL-1.1 / MPL-2.0 | 3 |
+
+Une même licence peut être comptée pour plusieurs paquets ; ces nombres
+mesurent la présence, pas un nombre de composants distincts.
+
+**Ce qui est démontré.** Deux constats, vérifiés dans l'image construite :
+
+- les **87 fichiers `copyright` Debian sont présents** dans l'image
+  (`/usr/share/doc/*/copyright`) ;
+- les **textes de licence référencés sont présents** eux aussi
+  (`/usr/share/common-licenses/` contient GPL-1, GPL-2, GPL-3, LGPL-2,
+  LGPL-2.1, LGPL-3, MPL-1.1, MPL-2.0, Apache-2.0, BSD…), et 77 des
+  87 fichiers `copyright` y renvoient.
+
+L'obligation de **notice** est donc satisfaite par l'image elle-même.
+
+**Ce qui n'est PAS résolu.** La GPL-2.0 (§3) et la GPL-3.0 (§6) attachent, à
+qui **distribue** des binaires, une obligation d'**offre du code source
+correspondant**. Publier l'image sur un registre accessible à des tiers est une
+distribution. Trois voies existent — offre écrite valable trois ans, mise à
+disposition depuis la même source, ou transmission de l'offre reçue de l'amont —
+et **aucune n'est tranchée ici**. Il n'est conclu ni que l'obligation est
+satisfaite, ni qu'elle est violée : elle n'a pas été instruite.
+
+**Ce que cela ne veut pas dire.** La présence de paquets GPL dans l'image de
+base **ne rend pas RUGGYLAB OS open source**. Ces paquets sont des programmes
+séparés, non modifiés, exécutés comme tels ; RUGGYLAB OS ne les incorpore pas
+dans son propre code.
+
+**Conduite à tenir.** Marqueur `BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED`.
+Bloquant pour toute **distribution externe** de l'image, sans effet sur l'usage
+d'évaluation interne. Options à instruire, sans préférence exprimée ici :
+
+| Option | Ce qu'elle implique |
+| --- | --- |
+| A. Offre écrite de source | rédiger et honorer une offre valable trois ans pour les composants GPL de la base |
+| B. Renvoi à l'amont Debian | s'appuyer sur les sources publiées par Debian ; à confirmer par écrit, ce n'est pas automatique |
+| C. Base à empreinte réduite | réduire la surface copyleft ; décision d'ingénierie distincte, avec tests complets |
+| D. Pas de distribution externe de l'image | statu quo actuel : l'image reste interne |
+
 ## 7. Éléments explicitement absents de la distribution
 
 Vérifié dans cette PR :
@@ -227,5 +292,11 @@ Vérifié dans cette PR :
 | --- | --- |
 | `THIRD_PARTY_NOTICES_GENERATED` | ✅ |
 | Licences indéterminées | **0** |
-| `THIRD_PARTY_LICENSES_QUALIFIED` | ❌ — §6.1, §6.2, §6.3 ouverts |
+| Composants du SBOM d'image sans licence, non qualifiés | **0** |
+| Exceptions qualifiées au registre | **4** — `SBOM_LICENSE_EXCEPTIONS.json` |
+| `THIRD_PARTY_LICENSES_QUALIFIED` | ❌ — §6.1, §6.2, §6.3, §6.4 ouverts |
 | Effet | **la distribution externe reste bloquée** |
+
+Les quatre éléments ouverts bloquent la **distribution externe**. Aucun ne
+bloque l'usage d'évaluation interne sur données fictives, qui est le seul usage
+autorisé par la licence à ce stade.

@@ -434,3 +434,19 @@ def test_release_provenance_records_the_immutable_digest(jobs):
     assert etape["env"]["DIGEST"] == "${{ needs.deploy.outputs.digest }}"
     assert "RELEASE_PROVENANCE.md" in etape["run"]
     assert "CLINICAL_STATUS" in etape["run"], "la provenance doit porter le statut clinique"
+
+
+def test_image_sbom_is_audited_for_unknown_licenses(jobs):
+    """Le gate Python ne couvre pas la base système, que l'image distribue."""
+    etape = next(
+        s for s in _steps(jobs["license-compliance"]) if "Auditer le SBOM" in str(s.get("name", ""))
+    )
+    assert "audit_sbom_licenses.py" in etape["run"]
+    assert "SBOM_LICENSE_EXCEPTIONS.json" in etape["run"]
+
+
+def test_the_audit_runs_after_the_sboms_are_generated(jobs):
+    noms = [str(s.get("name", "")) for s in _steps(jobs["license-compliance"])]
+    generation = next(i for i, n in enumerate(noms) if "Générer les SBOM" in n)
+    audit = next(i for i, n in enumerate(noms) if "Auditer le SBOM" in n)
+    assert generation < audit, "auditer un SBOM avant de le produire ne prouve rien"

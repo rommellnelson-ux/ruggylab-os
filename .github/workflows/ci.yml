@@ -505,10 +505,16 @@ jobs:
           test -s artifacts/sbom.cyclonedx.json || { echo "::error::SBOM CycloneDX vide"; exit 1; }
           test -s artifacts/sbom.spdx.json      || { echo "::error::SBOM SPDX vide"; exit 1; }
 
-      # ── 6. Les composants à revue obligatoire restent au registre ─────────
-      - name: "9. Registre des décisions de licence"
+      # L'inventaire Python ne couvre que les distributions Python. L'image, elle,
+      # embarque toute la base système : c'est ce que l'on distribue réellement.
+      - name: "9. Auditer le SBOM de l'image (aucune licence indéterminée)"
         run: |
-          for marqueur in MANUAL_LICENSE_REVIEW_REQUIRED AGPL_DISTRIBUTION_REVIEW_REQUIRED "Redis 7.4" "Grafana 11"; do
+          python scripts/audit_sbom_licenses.py artifacts/sbom.cyclonedx.json             --exceptions docs/governance/SBOM_LICENSE_EXCEPTIONS.json
+
+      # ── 6. Les composants à revue obligatoire restent au registre ─────────
+      - name: "10. Registre des décisions de licence"
+        run: |
+          for marqueur in MANUAL_LICENSE_REVIEW_REQUIRED AGPL_DISTRIBUTION_REVIEW_REQUIRED \n                          BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED "Redis 7.4" "Grafana 11"; do
             grep -q "$marqueur" THIRD_PARTY_NOTICES.md \
               || { echo "::error::'$marqueur' absent du registre des décisions"; exit 1; }
           done
@@ -522,6 +528,7 @@ jobs:
           name: third-party-evidence
           path: |
             THIRD_PARTY_NOTICES.md
+            docs/governance/SBOM_LICENSE_EXCEPTIONS.json
             artifacts/python-licenses.json
             artifacts/sbom.cyclonedx.json
             artifacts/sbom.spdx.json
