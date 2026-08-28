@@ -29,7 +29,8 @@ FROM python:3.13-slim AS runtime
 LABEL org.opencontainers.image.title="RuggyLab OS" \
       org.opencontainers.image.description="Laboratory Information System for hospitals in Côte d'Ivoire" \
       org.opencontainers.image.source="https://github.com/rommellnelson-ux/ruggylab-os" \
-      org.opencontainers.image.licenses="GPL-2.0" \
+      org.opencontainers.image.licenses="LicenseRef-RuggyLab-Evaluation-1.0" \
+      org.opencontainers.image.authors="WOGNIN Nelson Rommell Boni Ruggairrhye" \
       org.opencontainers.image.version="0.8.0-beta.1" \
       org.opencontainers.image.vendor="RuggyLab"
 
@@ -46,6 +47,15 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY --chown=ruggylab:ruggylab app/       ./app/
 COPY --chown=ruggylab:ruggylab alembic/   ./alembic/
 COPY --chown=ruggylab:ruggylab alembic.ini .
+
+# Licence et notices tierces embarquées dans l'image : une image distribuée sans
+# ses conditions d'usage ni les notices de ses composants est incomplète, et
+# plusieurs licences tierces l'exigent explicitement. Mode 0444 — lecture seule,
+# y compris pour le propriétaire : ces fichiers ne doivent jamais être réécrits
+# depuis le conteneur.
+COPY --chown=ruggylab:ruggylab --chmod=0444 LICENSE.md              ./LICENSE.md
+COPY --chown=ruggylab:ruggylab --chmod=0444 THIRD_PARTY_NOTICES.md  ./THIRD_PARTY_NOTICES.md
+COPY --chown=ruggylab:ruggylab --chmod=0444 licenses/third-party/   ./licenses/third-party/
 
 # Runtime directories (must exist before USER switch).
 # `logs` inclus par précaution : le défaut journalise sur stdout (LOG_FILE=None),
