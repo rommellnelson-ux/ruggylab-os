@@ -172,6 +172,24 @@ def test_dockerfile_copies_licence_files_into_the_image():
     assert "--chmod=0444" in contenu, "les licences doivent être en lecture seule"
 
 
+def test_licence_directories_stay_traversable():
+    """`--chmod=0444` sur une arborescence rend les répertoires intraversables.
+
+    Les textes seraient présents dans l'image mais illisibles pour l'utilisateur
+    du conteneur — une notice qu'on ne peut pas lire ne vaut pas notice. Le mode
+    est donc posé par type, après la copie.
+    """
+    contenu = _lire("Dockerfile")
+    copie = next(
+        ligne
+        for ligne in contenu.splitlines()
+        if ligne.startswith("COPY") and "licenses/third-party/" in ligne
+    )
+    assert "--chmod" not in copie, "un mode unique casserait la traversée des répertoires"
+    assert "-type d -exec chmod 0555" in contenu
+    assert "-type f -exec chmod 0444" in contenu
+
+
 # ── notices tierces ─────────────────────────────────────────────────────────
 
 
@@ -262,3 +280,12 @@ def test_licence_defers_clauses_needing_legal_review():
     contenu = _lire("LICENSE.md")
     assert "Clauses à valider avant distribution externe" in contenu
     assert "n'est pas un avis juridique" in contenu
+
+
+def test_dockerignore_does_not_exclude_the_licence_files():
+    """`*.md` les excluait en silence : le build echouait, mais seulement en CI."""
+    contenu = _lire(".dockerignore")
+    for exception in ("!LICENSE.md", "!THIRD_PARTY_NOTICES.md", "!licenses/"):
+        assert exception in contenu, (
+            f"{exception} absent : le contexte de build n'inclura pas les licences"
+        )

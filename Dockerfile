@@ -55,7 +55,15 @@ COPY --chown=ruggylab:ruggylab alembic.ini .
 # depuis le conteneur.
 COPY --chown=ruggylab:ruggylab --chmod=0444 LICENSE.md              ./LICENSE.md
 COPY --chown=ruggylab:ruggylab --chmod=0444 THIRD_PARTY_NOTICES.md  ./THIRD_PARTY_NOTICES.md
-COPY --chown=ruggylab:ruggylab --chmod=0444 licenses/third-party/   ./licenses/third-party/
+COPY --chown=ruggylab:ruggylab              licenses/third-party/   ./licenses/third-party/
+
+# `--chmod` applique un mode UNIQUE à tout ce qu'il copie : sur une arborescence,
+# 0444 retire le bit d'exécution des RÉPERTOIRES, qui deviennent intraversables.
+# Les textes de licence seraient présents mais illisibles pour l'utilisateur du
+# conteneur — une notice qu'on ne peut pas lire ne vaut pas notice. Le mode est
+# donc posé par type : 0555 sur les répertoires, 0444 sur les fichiers.
+RUN find ./licenses -type d -exec chmod 0555 {} + \
+    && find ./licenses -type f -exec chmod 0444 {} +
 
 # Runtime directories (must exist before USER switch).
 # `logs` inclus par précaution : le défaut journalise sur stdout (LOG_FILE=None),
