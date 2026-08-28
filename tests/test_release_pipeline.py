@@ -87,12 +87,13 @@ _JOBS_BLOQUANTS = {
     "docker-stack",
     "backup-restore",
     "tag-guard",
+    "license-compliance",
 }
 
 
 def test_release_depends_on_docker_publication(jobs):
     """Une release ne peut pas précéder la publication de l'image."""
-    assert set(_needs(jobs["release"])) == {"deploy", "tag-guard"}
+    assert set(_needs(jobs["release"])) == {"deploy", "tag-guard", "license-compliance"}
 
 
 def test_docker_publication_depends_on_every_blocking_job(jobs):
@@ -348,3 +349,88 @@ def test_elevated_permission_is_scoped_to_one_job(jobs, job, permission):
         if nom != job and (j.get("permissions") or {}).get(permission) == "write"
     ]
     assert not autres, f"{permission}: write accordé aussi à {autres}"
+
+
+# ── conformité de licence : gate de distribution ────────────────────────────
+#
+# La qualification des composants tiers appartient au gate de DISTRIBUTION.
+# Publier une image ou une Release sans son SBOM ni son texte de licence, ce
+# serait distribuer sans pouvoir dire ce que l'on distribue.
+
+
+def test_license_compliance_job_exists(jobs):
+    assert "license-compliance" in jobs
+
+
+@pytest.mark.parametrize("job", ["deploy", "release"])
+def test_distribution_depends_on_license_compliance(jobs, job):
+    assert "license-compliance" in jobs[job]["needs"], (
+        f"{job} peut publier sans preuve de conformité de licence"
+    )
+
+
+def test_syft_is_pinned_by_version_and_checksum(jobs):
+    """`latest` rendrait le SBOM non reproductible ; sans empreinte, non fiable."""
+    env = jobs["license-compliance"]["env"]
+    assert re.fullmatch(r"\d+\.\d+\.\d+", env["SYFT_VERSION"]), env["SYFT_VERSION"]
+    assert re.fullmatch(r"[0-9a-f]{64}", env["SYFT_SHA256"])
+    etape = next(s for s in _steps(jobs["license-compliance"]) if "Syft" in str(s.get("name", "")))
+    assert "sha256sum --check --strict" in etape["run"]
+    assert "checksums.txt" not in etape["run"], (
+        "récupérer le checksum depuis la release qu'il vérifie ne prouve rien"
+    )
+
+
+def test_no_action_or_tool_uses_a_floating_tag(ci):
+    """Aucune référence mouvante : ni `@latest`, ni `@main`, ni tag non épinglé."""
+    contenu = CI_PATH.read_text(encoding="utf-8")
+    for reference in re.findall(r"uses:\s*(\S+)", contenu):
+        if reference.startswith("${{"):
+            continue
+        assert re.search(r"@[0-9a-f]{40}$", reference), f"action non épinglée : {reference}"
+
+
+def test_unknown_third_party_licenses_fail_the_build(jobs):
+    etape = next(
+        s for s in _steps(jobs["license-compliance"]) if "Inventaire" in str(s.get("name", ""))
+    )
+    assert "--fail-on-unknown" in etape["run"], (
+        "une licence indéterminée ne peut pas être acceptée en silence"
+    )
+
+
+def test_release_attaches_the_compliance_evidence(jobs):
+    etape = next(
+        s
+        for s in _steps(jobs["release"])
+        if str(s.get("uses", "")).startswith("softprops/action-gh-release")
+    )
+    joints = etape["with"]["files"]
+    for piece in (
+        "CHANGELOG.md",
+        "LICENSE.md",
+        "THIRD_PARTY_NOTICES.md",
+        "sbom.cyclonedx.json",
+        "sbom.spdx.json",
+        "RELEASE_PROVENANCE.md",
+    ):
+        assert piece in joints, f"{piece} n'est pas joint à la Release"
+    assert etape["with"]["fail_on_unmatched_files"] is True, (
+        "une pièce manquante doit faire échouer la publication, pas être ignorée"
+    )
+
+
+def test_release_reuses_the_verified_sboms(jobs):
+    """Régénérer les SBOM ici publierait un inventaire que rien n'a vérifié."""
+    etapes = _steps(jobs["release"])
+    assert any(str(s.get("uses", "")).startswith("actions/download-artifact") for s in etapes), (
+        "les SBOM doivent venir du job de conformité"
+    )
+    assert not any("syft" in str(s.get("run", "")).lower() for s in etapes)
+
+
+def test_release_provenance_records_the_immutable_digest(jobs):
+    etape = next(s for s in _steps(jobs["release"]) if "provenance" in str(s.get("name", "")))
+    assert etape["env"]["DIGEST"] == "${{ needs.deploy.outputs.digest }}"
+    assert "RELEASE_PROVENANCE.md" in etape["run"]
+    assert "CLINICAL_STATUS" in etape["run"], "la provenance doit porter le statut clinique"
