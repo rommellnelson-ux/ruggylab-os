@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.models import Patient, Reagent
 from app.schemas.patient import PatientCreate
 from app.schemas.reagent import ReagentCreate
+from app.utils.import_errors import describe_validation_error
 
 # Borne dure pour éviter un traitement synchrone trop lourd / un déni de service.
 MAX_ROWS = 5000
@@ -96,7 +97,7 @@ def import_patients(db: Session, csv_text: str, *, dry_run: bool = False) -> dic
             created += 1
         except (ValidationError, ValueError) as exc:
             # Message de validation métier : sûr à exposer.
-            errors.append({"row": idx, "error": str(exc).replace("\n", " ")[:300]})
+            errors.append({"row": idx, "error": describe_validation_error(exc)})
         except (IntegrityError, SQLAlchemyError):
             # Ne pas exposer le détail SQL/interne au client (fuite d'information).
             errors.append({"row": idx, "error": "Ligne rejetée (erreur base de données)."})
@@ -149,7 +150,7 @@ def import_reagents(db: Session, csv_text: str, *, dry_run: bool = False) -> dic
             created += 1
         except (ValidationError, ValueError) as exc:
             # Message de validation métier : sûr à exposer.
-            errors.append({"row": idx, "error": str(exc).replace("\n", " ")[:300]})
+            errors.append({"row": idx, "error": describe_validation_error(exc)})
         except (IntegrityError, SQLAlchemyError):
             # Ne pas exposer le détail SQL/interne au client (fuite d'information).
             errors.append({"row": idx, "error": "Ligne rejetée (erreur base de données)."})

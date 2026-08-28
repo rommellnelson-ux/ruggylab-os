@@ -19,6 +19,7 @@ from app.services.audit import log_audit_event
 from app.services.registre_analytics import _parse_date
 from app.services.registre_parser import parse_exam_cell
 from app.utils.datetime_utils import utcnow_naive
+from app.utils.import_errors import describe_validation_error
 
 MAX_ROWS = 10_000
 
@@ -152,7 +153,7 @@ def import_registre_rows(
             created_samples += 1
         except ValueError as exc:
             # Message de validation métier : sûr à exposer.
-            errors.append({"row": idx, "error": str(exc).replace("\n", " ")[:300]})
+            errors.append({"row": idx, "error": describe_validation_error(exc)})
         except (IntegrityError, SQLAlchemyError):
             # Ne pas exposer le détail SQL/interne au client (fuite d'information).
             errors.append({"row": idx, "error": "Ligne rejetée (erreur base de données)."})
