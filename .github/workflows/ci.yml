@@ -563,6 +563,82 @@ jobs:
         if: failure()
         run: docker compose logs --tail 200
 
+  # ── Preuves de source correspondante (base Debian) ─────────────────────────
+  # Distribuer une image, c'est distribuer les binaires qu'elle contient. Une
+  # partie de la base Debian est sous GPL/LGPL. Ce job produit les PREUVES —
+  # quels paquets, quelles versions, quelles sources, disponibles où — sans rien
+  # conclure juridiquement. Il échoue si la NOTICE est incomplète dans l'image,
+  # ce qui se constate sans avis juridique.
+  debian-source-evidence:
+    name: Preuves de source correspondante (base Debian)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      - name: Build the image whose packages will be inventoried
+        run: docker build -t ruggylab-os:source-evidence .
+
+      # La base est référencée par digest dans le Dockerfile. Si le digest
+      # bougeait, ce serait un changement délibéré, pas une dérive silencieuse.
+      - name: Assert the base image is pinned by digest
+        run: |
+          if ! grep -qE '^FROM python:[0-9]+\.[0-9]+\.[0-9]+-slim[a-z-]*@sha256:[0-9a-f]{64}' Dockerfile; then
+            echo "::error::la base Python n'est pas épinglée par version exacte ET digest"
+            grep -n '^FROM' Dockerfile
+            exit 1
+          fi
+          grep -c '^FROM python:.*@sha256:' Dockerfile
+
+      - name: Generate the Debian source and licence manifests
+        run: |
+          python scripts/debian_source_manifest.py ruggylab-os:source-evidence             --out artifacts             --exceptions docs/governance/DEBIAN_NOTICE_EXCEPTIONS.json             --check-availability
+
+      # Une URL écrite dans un manifeste ne prouve rien tant que personne ne
+      # l'a ouverte. `--check-availability` l'ouvre ; on vérifie ici qu'aucune
+      # source n'est restée introuvable.
+      - name: Assert every corresponding source is reachable
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          sources = json.loads(
+              pathlib.Path("artifacts/debian-source-packages.json").read_text(encoding="utf-8")
+          )
+          introuvables = [
+              s for s in sources if s["source_availability"].startswith("indisponible:")
+          ]
+          non_verifies = [
+              s for s in sources if s["source_availability"].startswith("non verifie:")
+          ]
+          print(f"{len(sources)} paquets sources, {len(introuvables)} introuvables, "
+                f"{len(non_verifies)} non vérifiés")
+          for s in introuvables:
+              print(f"::error::source introuvable : {s['source_package']} {s['source_version']}")
+          if introuvables:
+              sys.exit(1)
+          if non_verifies:
+              print("::warning::certaines vérifications n'ont pas abouti (réseau)")
+          PY
+
+      - name: Publier les preuves de source correspondante
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: debian-source-evidence
+          path: |
+            artifacts/debian-binary-packages.json
+            artifacts/debian-source-packages.json
+            artifacts/debian-license-manifest.json
+            docs/compliance/SOURCE_COMPLIANCE.md
+            docs/governance/DEBIAN_NOTICE_EXCEPTIONS.json
+          if-no-files-found: error
+
   # ── Garde de tag (avant toute publication) ─────────────────────────────────
   # Placée AVANT `deploy` : un tag malformé ne doit pas même déclencher une
   # construction d'image. Deux contrôles.
