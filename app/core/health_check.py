@@ -4,6 +4,8 @@ Health checks and status endpoints for RuggyLab OS.
 Provides liveness, readiness, and detailed health check endpoints.
 """
 
+import logging
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -11,6 +13,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.metrics import MetricsRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class HealthStatus(BaseModel):
@@ -40,10 +44,19 @@ class HealthCheckService:
                 "status": "healthy",
                 "message": "Database connection successful",
             }
-        except Exception as exc:
+        except Exception:
+            # `/health` et `/health/ready` sont interrogeables sans authentification
+            # (sondes d'orchestrateur, et le proxy les laisse passer). Or un échec
+            # psycopg/SQLAlchemy porte couramment l'hôte, le port, la base et
+            # l'utilisateur — parfois un chemin local. On ne renvoie donc RIEN de
+            # l'exception au client : seul un identifiant d'incident, corrélable
+            # avec la trace complète conservée côté serveur.
+            incident_id = uuid.uuid4().hex[:12]
+            logger.exception("health.database.check_failed incident_id=%s", incident_id)
             return False, {
                 "status": "unhealthy",
-                "message": f"Database check failed: {str(exc)}",
+                "message": "Database check failed.",
+                "incident_id": incident_id,
             }
 
     def check_cache(self) -> tuple[bool, dict[str, Any]]:

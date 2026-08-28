@@ -17,7 +17,7 @@ rejetée pour obtenir un tableau vert.
 | N° | Fichier:ligne | Donnée source | Destination | Verdict | Action |
 | --- | --- | --- | --- | --- | --- |
 | #1 | `app/core/secrets_manager.py:146` | `secret_name` (nom), `exc` (échec Azure) | `logger.error` | **Faux positif démontré** | Aucune — justifié ci-dessous |
-| #2 | `app/core/config.py:32` | `secret_name` (nom), `exc` (échec manager) | `logger.warning` | **Faux positif démontré** | Aucune |
+| #2 | `app/core/config.py:33` | `secret_name` (nom), `exc` (échec manager) | `logger.warning` | **Faux positif démontré** | Aucune |
 | #3 | `app/core/secrets_manager.py:80` | `secret_name` (nom), `exc` (échec AWS) | `logger.error` | **Faux positif démontré** | Aucune |
 | #4 | `app/core/secrets_manager.py:188` | `secret_name` (nom), `exc` (échec GCP) | `logger.error` | **Faux positif démontré** | Aucune |
 | #5 | `app/core/secrets_manager.py:224` | `manager_type` (`aws`/`azure`/`gcp`) | `logger.info` | **Faux positif démontré** | Aucune |
@@ -115,7 +115,64 @@ porter un montant, un identifiant de patient ou un libellé de diagnostic.
 | Objectif | État |
 | --- | --- |
 | `0_CRITICAL_OPEN` | ✅ atteint — SSRF #11 `fixed` |
-| `0_HIGH_UNQUALIFIED` | ✅ atteint après fusion de cette PR — 2 corrigées, 6 qualifiées ici |
+| `0_HIGH_UNQUALIFIED` | ✅ atteint — 2 corrigées (#8, #10), 6 qualifiées ici |
 
 Les alertes qualifiées **restent ouvertes** dans GitHub : aucune n'a été
 rejetée. Ce document est leur suivi.
+
+État constaté sur `main` après fusion de la PR #137 :
+
+| Sévérité | Corrigées | Ouvertes | Rejetées |
+| --- | ---: | ---: | ---: |
+| Critique | 1 (#11) | 0 | 0 |
+| Haute | 4 (#8, #10, #12, #13) | 6 (qualifiées ici) | 0 |
+| Moyenne | 0 | 4 (voir §6) | 0 |
+
+---
+
+## 6. Alertes moyennes `py/stack-trace-exposure`
+
+Traitées dans la PR « security(errors): stop exposing internal detail in error
+responses ». Une bêta technique publiera une image Docker : ces quatre alertes
+devaient être tranchées avant, et non reportées.
+
+| N° | Fichier:ligne | Exception source | Réponse au client | Verdict | Action |
+| --- | --- | --- | --- | --- | --- |
+| #6 | `app/core/health_check.py` (via `main.py:226`) | **toute** `Exception` de `db.execute` | `str(exc)` dans `message` | **Vrai positif** | **Corrigé** |
+| #14 | `app/api/v1/endpoints/bulk_import.py:27` | `BulkImportTooLargeError` | `str(exc)` | Faux positif, **neutralisé** | **Corrigé** |
+| #15 | `app/api/v1/endpoints/bulk_import.py:45` | `BulkImportTooLargeError` | `str(exc)` | Faux positif, **neutralisé** | **Corrigé** |
+| #16 | `app/api/v1/endpoints/registre.py:61` | `RegistreImportTooLargeError` | `str(exc)` | Faux positif, **neutralisé** | **Corrigé** |
+
+### #6 — sonde de santé : vrai positif
+
+`HealthCheckService.check_database` capturait **toute** exception et plaçait
+`str(exc)` dans la réponse. Or `/health` et `/health/ready` sont interrogeables
+**sans authentification** — le proxy les laisse passer, contrairement à
+`/metrics`, `/docs` et `/openapi.json`. Un échec psycopg y aurait exposé l'hôte,
+le port, la base et l'utilisateur de la base de données.
+
+Corrigé : le client ne reçoit plus que `"Database check failed."` et un
+`incident_id` de 12 caractères. La trace complète part dans le journal serveur
+via `logger.exception`, corrélée par ce même identifiant.
+
+### #14, #15, #16 — imports en masse : faux positifs neutralisés
+
+Ces trois handlers ne capturaient qu'une exception **applicative dédiée**, dont
+le message est un littéral entièrement contrôlé
+(`f"Trop de lignes ({len(rows)}). Maximum autorisé : {MAX_ROWS}."`) — ni trace,
+ni chemin, ni détail interne. Techniquement des faux positifs.
+
+Plutôt que de les qualifier, le message est désormais **reconstruit depuis la
+contrainte connue** au lieu d'être propagé depuis l'exception. La réponse ne
+peut donc structurellement plus porter de détail interne, quelle que soit
+l'évolution future du service — et l'appelant conserve l'information utile (la
+limite applicable).
+
+### Verrouillage
+
+`tests/test_no_stack_trace_exposure.py` : une session de test échoue avec un
+message volontairement bavard (hôte, IP, base, utilisateur) et le test vérifie
+qu'aucun de ces éléments — ni `Traceback`, `File "`, `site-packages`,
+`psycopg`, `sqlalchemy`, chemin local — n'atteint le client ; que l'identifiant
+d'incident est présent, unique par incident, et retrouvé dans le journal
+serveur ; et qu'aucun endpoint ne réintroduit `detail=str(exc)`.
