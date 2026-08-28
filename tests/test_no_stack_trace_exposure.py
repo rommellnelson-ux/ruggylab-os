@@ -103,15 +103,54 @@ def test_readiness_payload_is_free_of_internal_detail():
 # ── imports en masse : messages reconstruits, jamais propagés ───────────────
 
 
-def test_bulk_import_handlers_never_propagate_the_exception():
-    """Le détail HTTP est construit depuis la contrainte, pas depuis `str(exc)`."""
+def _endpoint_source(nom: str) -> str:
     from pathlib import Path
 
+    return (
+        Path(__file__).resolve().parents[1] / "app" / "api" / "v1" / "endpoints" / nom
+    ).read_text(encoding="utf-8")
+
+
+def test_bulk_import_handlers_never_propagate_the_exception():
+    """Le détail HTTP est construit depuis la contrainte, pas depuis `str(exc)`."""
     for nom in ("bulk_import.py", "registre.py"):
-        source = (
-            Path(__file__).resolve().parents[1] / "app" / "api" / "v1" / "endpoints" / nom
-        ).read_text(encoding="utf-8")
+        source = _endpoint_source(nom)
         assert "detail=str(exc)" not in source, f"{nom} propage encore l'exception au client"
+
+
+def test_http_errors_sever_the_exception_chain():
+    """`raise HTTPException(...) from exc` est proscrit dans ces handlers.
+
+    Première correction insuffisante : retirer `str(exc)` du `detail` ne
+    suffisait pas — CodeQL a refermé les alertes puis les a rouvertes aux
+    nouvelles lignes, car c'est le **chaînage** `from exc` qui fait remonter
+    l'exception jusqu'à la réponse dans son modèle. La chaîne est donc coupée
+    (`from None`), et la trace journalisée côté serveur.
+    """
+    import re
+
+    for nom in ("bulk_import.py", "registre.py"):
+        # On écarte les commentaires : ils citent `from exc` pour l'expliquer.
+        code = "\n".join(
+            ligne
+            for ligne in _endpoint_source(nom).splitlines()
+            if not ligne.lstrip().startswith("#")
+        )
+        assert not re.search(r"raise HTTPException\([^)]*\)\s*from\s+exc", code, re.S), (
+            f"{nom} chaîne encore l'exception vers la réponse HTTP"
+        )
+        assert "from None" in code, f"{nom} doit couper explicitement la chaîne"
+
+
+def test_rejected_imports_are_logged_server_side():
+    """Couper la chaîne ne doit pas faire perdre l'information : on journalise."""
+    for nom, evenement in (
+        ("bulk_import.py", "bulk_import.rejected"),
+        ("registre.py", "registre_import.rejected"),
+    ):
+        source = _endpoint_source(nom)
+        assert evenement in source, f"{nom} doit journaliser le rejet côté serveur"
+        assert "logger" in source
 
 
 def _auth(client) -> dict[str, str]:
