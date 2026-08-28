@@ -393,3 +393,41 @@ def test_implementation_statuses_are_not_claimed_before_the_work_lands():
         ), f"{statut} doit être explicitement non prononcé"
     assert "MANUAL_LICENSE_REVIEW_REQUIRED" in notices
     assert "AGPL_DISTRIBUTION_REVIEW_REQUIRED" in notices
+
+
+_PREFLIGHT_PRIVE = "docs/governance/PRIVATE_REPOSITORY_PREFLIGHT_2026-08-28.md"
+
+
+def test_the_private_repository_preflight_measures_rather_than_asserts():
+    contenu = _lire(_PREFLIGHT_PRIVE)
+    for mesure in (
+        "Forks | **0**",
+        "Runs déclenchés en août 2026",
+        "2 000 minutes",
+        "Alertes ouvertes",
+    ):
+        assert mesure in contenu, f"mesure absente du préflight : {mesure}"
+
+
+def test_the_preflight_flags_the_three_decisions_needed_before_switching():
+    """Quota Actions, CodeQL en privé, checks requis incomplets."""
+    contenu = _lire(_PREFLIGHT_PRIVE)
+    assert "Quota Actions" in contenu
+    assert "CodeQL sur dépôt privé" in contenu
+    assert "Checks requis incomplets" in contenu
+    assert "PRIVATE_REPOSITORY_PREFLIGHT_READY" in contenu
+
+
+def test_the_preflight_does_not_claim_the_visibility_changed():
+    contenu = _lire(_PREFLIGHT_PRIVE)
+    assert "La visibilité n'a pas été modifiée" in contenu
+    assert "Visibilité | **publique**" in contenu
+
+
+def test_the_preflight_says_going_private_does_not_undo_the_past():
+    """Un dépôt rendu privé ne récupère pas ce qui a déjà été copié."""
+    # Les phrases sont enveloppées, citées et emphasées : on compare le propos.
+    brut = _lire(_PREFLIGHT_PRIVE).replace("*", "").replace(">", " ")
+    contenu = " ".join(brut.split())
+    assert "Le passage en privé protège l'avenir, pas le passé" in contenu
+    assert "doit être révoqué" in contenu
