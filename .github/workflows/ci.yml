@@ -8,10 +8,15 @@ on:
     branches: [ main, feat/acquisition-3-flux ]
   workflow_dispatch:
 
+# Moindre privilège par défaut : chaque job qui a besoin de plus le déclare
+# lui-même. Accorder `security-events: write` et `packages: write` globalement
+# les donnait à TOUS les jobs, y compris ceux qui exécutent du code de test —
+# une élévation inutile sur la surface la plus exposée du pipeline.
+#   security-events: write -> job `codeql` seul
+#   packages: write        -> job `deploy` seul
+#   contents: write        -> job `release` seul
 permissions:
   contents: read
-  security-events: write
-  packages: write
 
 jobs:
   test:
@@ -46,6 +51,36 @@ jobs:
 
       - name: Bandit security scan
         run: bandit -q -r app -c pyproject.toml
+
+      # Les workflows portent désormais le verrouillage du pipeline de release :
+      # une erreur de syntaxe ou d'expression y serait un trou de sécurité, pas
+      # une simple gêne. On les valide donc comme du code.
+      # Binaire téléchargé depuis une release épinglée plutôt qu'une action
+      # tierce : une dépendance de moins à auditer (§11 supply-chain).
+      - name: Actionlint (validation des workflows)
+        env:
+          ACTIONLINT_VERSION: "1.7.7"
+          # SHA-256 de actionlint_1.7.7_linux_amd64.tar.gz, INSCRIT EN DUR ICI.
+          # Un tag de release GitHub est mutable : télécharger le checksum depuis
+          # la même release ne prouverait rien, puisqu'un attaquant capable de
+          # remplacer l'archive remplacerait aussi le fichier de checksums.
+          # Cette valeur a été vérifiée deux fois : calcul local sur l'archive
+          # téléchargée, et comparaison au `actionlint_1.7.7_checksums.txt`
+          # publié. Toute mise à jour de version doit la recalculer.
+          ACTIONLINT_SHA256: "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757"
+        run: |
+          curl -sSfL -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum --check --strict
+          tar -xzf actionlint.tar.gz actionlint
+          # `-shellcheck=` désactive l'intégration shellcheck. Ce qu'on veut ici,
+          # c'est valider la SYNTAXE et les EXPRESSIONS des workflows — le
+          # verrouillage du pipeline de release en dépend. Shellcheck remonte par
+          # ailleurs une dizaine d'avertissements de style (SC2015, SC2034…) dans
+          # des scripts `run:` préexistants et sans rapport : les corriger ici
+          # serait un nettoyage collatéral, à traiter séparément.
+          ./actionlint -color -shellcheck=
+          rm -f actionlint actionlint.tar.gz
 
       - name: Test suite
         run: pytest
@@ -528,19 +563,82 @@ jobs:
         if: failure()
         run: docker compose logs --tail 200
 
+  # ── Garde de tag (avant toute publication) ─────────────────────────────────
+  # Placée AVANT `deploy` : un tag malformé ne doit pas même déclencher une
+  # construction d'image. Deux contrôles.
+  #
+  # 1. FORME. Seuls `vX.Y.Z`, `vX.Y.Z-alpha.N`, `-beta.N`, `-rc.N` sont admis.
+  #    Sans cela, `v0.8` ou `v0.8.0-beta` (sans numéro) auraient produit une
+  #    image et une release aux identifiants ambigus.
+  #
+  # 2. GOUVERNANCE. Tant que `docs/governance/CLINICAL_STATUS` vaut
+  #    REAL_DATA_NO_GO, un tag STABLE (sans suffixe) est refusé : publier une
+  #    version présentée comme stable contredirait la décision clinique en
+  #    vigueur. Le statut vit dans un fichier versionné, et non en dur ici :
+  #    lever le NO-GO devient une modification tracée et relue, pas un
+  #    contournement de CI.
+  tag-guard:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      make_latest: ${{ steps.check.outputs.make_latest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Contrôler la forme du tag et le statut de gouvernance
+        id: check
+        run: |
+          # Le job tourne sur TOUS les déclencheurs, pour rester une dépendance
+          # satisfaite de `deploy` (un `needs` sauté sauterait aussi `deploy`).
+          # Hors tag, il n'y a simplement rien à valider.
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            echo "Déclenchement hors tag : aucune version à valider."
+            exit 0
+          fi
+          tag="${GITHUB_REF_NAME}"
+          stable='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          pre='^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$'
+
+          if [[ "$tag" =~ $pre ]]; then
+            echo "prerelease=true"   >> "$GITHUB_OUTPUT"
+            echo "make_latest=false" >> "$GITHUB_OUTPUT"
+            echo "$tag : pré-version valide -> prerelease=true, make_latest=false"
+          elif [[ "$tag" =~ $stable ]]; then
+            statut="$(tr -d '[:space:]' < docs/governance/CLINICAL_STATUS)"
+            echo "statut de gouvernance : $statut"
+            if [[ "$statut" == "REAL_DATA_NO_GO" ]]; then
+              echo "::error::Tag stable '$tag' refusé : le statut clinique est REAL_DATA_NO_GO."
+              echo "::error::Utiliser une pré-version (-alpha.N / -beta.N / -rc.N), ou faire lever"
+              echo "::error::le NO-GO par une décision signée modifiant docs/governance/CLINICAL_STATUS."
+              exit 1
+            fi
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true" >> "$GITHUB_OUTPUT"
+            echo "$tag : version stable -> prerelease=false, make_latest=true"
+          else
+            echo "::error::Tag '$tag' malformé. Formes admises : vX.Y.Z, vX.Y.Z-alpha.N, vX.Y.Z-beta.N, vX.Y.Z-rc.N."
+            exit 1
+          fi
+
   deploy:
     name: Build and publish Docker image
     # Déploiement uniquement sur tag de version (vX.Y.Z) ou déclenchement manuel —
     # pas sur chaque commit poussé sur main.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    # E2E bloquant : aucune image n'est publiée si le parcours navigateur (e2e),
-    # le flux clinique PostgreSQL (test-postgres) ou la stack Docker de
-    # production (docker-stack) échoue.
-    needs: [test, test-postgres, codeql, e2e, docker-stack]
+    # Tous bloquants : aucune image n'est publiée si l'un de ces contrôles
+    # échoue — parcours navigateur (e2e), flux clinique PostgreSQL
+    # (test-postgres), stack Docker de production (docker-stack), analyse CodeQL,
+    # et **restauration de sauvegarde** (backup-restore). Publier une image dont
+    # on n'a pas démontré que la base se restaure reviendrait à livrer sans filet.
+    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore, tag-guard]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -556,6 +654,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and publish Docker image
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
@@ -572,3 +671,67 @@ jobs:
           labels: |
             org.opencontainers.image.title=RuggyLab OS
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Récapitulatif de l'image publiée
+        run: |
+          echo "digest immuable : ${{ steps.build.outputs.digest }}"
+          {
+            echo "### Image publiée"
+            echo ""
+            echo "- Référence : \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`"
+            echo "- Digest : \`${{ steps.build.outputs.digest }}\`"
+            echo "- Tag \`latest\` : **non appliqué**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Publication de la GitHub Release (dernier maillon) ─────────────────────
+  # La Release était auparavant créée par un workflow `release.yml` distinct,
+  # déclenché par le même tag mais SANS aucune dépendance : elle pouvait donc
+  # naître avant — ou malgré — l'échec des tests, et annoncer une version qui
+  # n'avait rien prouvé. Elle est désormais le dernier maillon de la CI :
+  # `needs: [deploy]`, qui dépend lui-même de tous les jobs bloquants.
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    # `tag-guard` est la SOURCE UNIQUE de la nature de la version : dupliquer la
+    # règle ici la ferait diverger un jour, et c'est précisément la classification
+    # prerelease/stable qu'il ne faut pas se tromper.
+    needs: [deploy, tag-guard]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      # L'avertissement est préfixé aux notes générées : l'API GitHub place le
+      # `body` fourni AVANT les notes qu'elle génère.
+      - name: Composer l'avertissement de pré-version
+        id: body
+        if: needs.tag-guard.outputs.prerelease == 'true'
+        run: |
+          {
+            echo 'text<<RELEASE_BODY_EOF'
+            echo '> ⚠️ BÊTA TECHNIQUE — REAL_DATA_NO_GO'
+            echo '>'
+            echo '> Cette version est destinée exclusivement au développement, à la qualification'
+            echo '> technique et aux essais sur données fictives ou synthétiques.'
+            echo '> Elle ne constitue pas une autorisation d'"'"'utilisation clinique réelle.'
+            echo '> La synchronisation CSA et les interfaces automates restent désactivées par défaut.'
+            echo ''
+            echo "Image : \`ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME}\`"
+            echo "Digest : \`${{ needs.deploy.outputs.digest }}\`"
+            echo 'RELEASE_BODY_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body: ${{ steps.body.outputs.text }}
+          generate_release_notes: true
+          prerelease: ${{ needs.tag-guard.outputs.prerelease }}
+          make_latest: ${{ needs.tag-guard.outputs.make_latest }}
+          files: |
+            CHANGELOG.md
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
