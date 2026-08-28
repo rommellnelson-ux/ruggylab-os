@@ -47,6 +47,21 @@ jobs:
       - name: Bandit security scan
         run: bandit -q -r app -c pyproject.toml
 
+      # Les workflows portent désormais le verrouillage du pipeline de release :
+      # une erreur de syntaxe ou d'expression y serait un trou de sécurité, pas
+      # une simple gêne. On les valide donc comme du code.
+      # Binaire téléchargé depuis une release épinglée plutôt qu'une action
+      # tierce : une dépendance de moins à auditer (§11 supply-chain).
+      - name: Actionlint (validation des workflows)
+        env:
+          ACTIONLINT_VERSION: "1.7.7"
+        run: |
+          curl -sSfL -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf actionlint.tar.gz actionlint
+          ./actionlint -color
+          rm -f actionlint actionlint.tar.gz
+
       - name: Test suite
         run: pytest
 
@@ -533,14 +548,18 @@ jobs:
     # Déploiement uniquement sur tag de version (vX.Y.Z) ou déclenchement manuel —
     # pas sur chaque commit poussé sur main.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    # E2E bloquant : aucune image n'est publiée si le parcours navigateur (e2e),
-    # le flux clinique PostgreSQL (test-postgres) ou la stack Docker de
-    # production (docker-stack) échoue.
-    needs: [test, test-postgres, codeql, e2e, docker-stack]
+    # Tous bloquants : aucune image n'est publiée si l'un de ces contrôles
+    # échoue — parcours navigateur (e2e), flux clinique PostgreSQL
+    # (test-postgres), stack Docker de production (docker-stack), analyse CodeQL,
+    # et **restauration de sauvegarde** (backup-restore). Publier une image dont
+    # on n'a pas démontré que la base se restaure reviendrait à livrer sans filet.
+    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -556,6 +575,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and publish Docker image
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
@@ -572,3 +592,80 @@ jobs:
           labels: |
             org.opencontainers.image.title=RuggyLab OS
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Récapitulatif de l'image publiée
+        run: |
+          echo "digest immuable : ${{ steps.build.outputs.digest }}"
+          {
+            echo "### Image publiée"
+            echo ""
+            echo "- Référence : \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`"
+            echo "- Digest : \`${{ steps.build.outputs.digest }}\`"
+            echo "- Tag \`latest\` : **non appliqué**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Publication de la GitHub Release (dernier maillon) ─────────────────────
+  # La Release était auparavant créée par un workflow `release.yml` distinct,
+  # déclenché par le même tag mais SANS aucune dépendance : elle pouvait donc
+  # naître avant — ou malgré — l'échec des tests, et annoncer une version qui
+  # n'avait rien prouvé. Elle est désormais le dernier maillon de la CI :
+  # `needs: [deploy]`, qui dépend lui-même de tous les jobs bloquants.
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      # Un suffixe SemVer (`-beta.1`, `-alpha.1`, `-rc.1`) désigne une
+      # pré-version : elle ne doit ni être marquée stable, ni devenir « latest ».
+      - name: Déterminer la nature de la version
+        id: kind
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ "$tag" == *-* ]]; then
+            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
+            echo "make_latest=false" >> "$GITHUB_OUTPUT"
+            echo "$tag : pré-version -> prerelease=true, make_latest=false"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true"  >> "$GITHUB_OUTPUT"
+            echo "$tag : version stable -> prerelease=false, make_latest=true"
+          fi
+
+      # L'avertissement est préfixé aux notes générées : l'API GitHub place le
+      # `body` fourni AVANT les notes qu'elle génère.
+      - name: Composer l'avertissement de pré-version
+        id: body
+        if: steps.kind.outputs.prerelease == 'true'
+        run: |
+          {
+            echo 'text<<RELEASE_BODY_EOF'
+            echo '> ⚠️ BÊTA TECHNIQUE — REAL_DATA_NO_GO'
+            echo '>'
+            echo '> Cette version est destinée exclusivement au développement, à la qualification'
+            echo '> technique et aux essais sur données fictives ou synthétiques.'
+            echo '> Elle ne constitue pas une autorisation d'"'"'utilisation clinique réelle.'
+            echo '> La synchronisation CSA et les interfaces automates restent désactivées par défaut.'
+            echo ''
+            echo "Image : \`ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME}\`"
+            echo "Digest : \`${{ needs.deploy.outputs.digest }}\`"
+            echo 'RELEASE_BODY_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body: ${{ steps.body.outputs.text }}
+          generate_release_notes: true
+          prerelease: ${{ steps.kind.outputs.prerelease }}
+          make_latest: ${{ steps.kind.outputs.make_latest }}
+          files: |
+            CHANGELOG.md
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
