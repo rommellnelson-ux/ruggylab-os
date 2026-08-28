@@ -12,6 +12,7 @@ Ces tests lisent le workflow réel. Ils échouent si le garde-fou disparaît.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -78,12 +79,20 @@ def test_exactly_one_release_step(jobs):
 
 # ── la release est le dernier maillon ───────────────────────────────────────
 
-_JOBS_BLOQUANTS = {"test", "test-postgres", "codeql", "e2e", "docker-stack", "backup-restore"}
+_JOBS_BLOQUANTS = {
+    "test",
+    "test-postgres",
+    "codeql",
+    "e2e",
+    "docker-stack",
+    "backup-restore",
+    "tag-guard",
+}
 
 
 def test_release_depends_on_docker_publication(jobs):
     """Une release ne peut pas précéder la publication de l'image."""
-    assert _needs(jobs["release"]) == ["deploy"]
+    assert set(_needs(jobs["release"])) == {"deploy", "tag-guard"}
 
 
 def test_docker_publication_depends_on_every_blocking_job(jobs):
@@ -127,15 +136,13 @@ def test_prerelease_and_make_latest_are_explicit(jobs):
     with_ = _release_step(jobs)["with"]
     assert "prerelease" in with_, "prerelease doit être explicite"
     assert "make_latest" in with_, "make_latest doit être explicite"
-    assert "steps.kind.outputs.prerelease" in str(with_["prerelease"])
-    assert "steps.kind.outputs.make_latest" in str(with_["make_latest"])
+    assert "needs.tag-guard.outputs.prerelease" in str(with_["prerelease"])
+    assert "needs.tag-guard.outputs.make_latest" in str(with_["make_latest"])
 
 
 def test_suffixed_tag_is_classified_as_prerelease(jobs):
-    """La règle de classement repose sur le suffixe SemVer."""
-    etape = next(s for s in _steps(jobs["release"]) if s.get("id") == "kind")
-    script = etape["run"]
-    assert "*-*" in script, "le suffixe SemVer doit décider de la nature de la version"
+    """La classification vit dans `tag-guard`, source unique."""
+    script = _tag_guard_script(jobs)
     assert "prerelease=true" in script
     assert "make_latest=false" in script
     assert "prerelease=false" in script
@@ -166,7 +173,7 @@ def test_beta_body_carries_the_clinical_warning(jobs):
 
 def test_warning_is_only_composed_for_prereleases(jobs):
     etape = next(s for s in _steps(jobs["release"]) if s.get("id") == "body")
-    assert etape["if"] == "steps.kind.outputs.prerelease == 'true'"
+    assert etape["if"] == "needs.tag-guard.outputs.prerelease == 'true'"
 
 
 def test_body_precedes_generated_notes(jobs):
@@ -216,3 +223,128 @@ def test_no_workflow_pushes_to_the_repository():
     for path in WORKFLOWS.glob("*.y*ml"):
         contenu = path.read_text(encoding="utf-8")
         assert "git push" not in contenu, f"{path.name} pousse vers le dépôt"
+
+
+# ── garde de tag : forme et gouvernance ─────────────────────────────────────
+
+_TAGS_VALIDES = ["v0.8.0", "v0.8.0-alpha.1", "v0.8.0-beta.1", "v0.8.0-rc.2", "v10.20.30"]
+_TAGS_INVALIDES = [
+    "v0.8",  # composant manquant
+    "v0.8.0-beta",  # suffixe sans numéro
+    "v0.8.0-beta.",  # numéro vide
+    "0.8.0",  # préfixe v manquant
+    "v0.8.0-dev.1",  # suffixe hors contrat
+    "v0.8.0-BETA.1",  # casse
+    "release-0.8.0",
+    "v0.8.0.1",
+]
+
+
+def _tag_guard_script(jobs) -> str:
+    etape = next(s for s in _steps(jobs["tag-guard"]) if s.get("id") == "check")
+    return etape["run"]
+
+
+def test_tag_guard_exists_and_gates_the_image(jobs):
+    """Un tag malformé ne doit pas même déclencher une construction d'image."""
+    assert "tag-guard" in jobs
+    assert "tag-guard" in _needs(jobs["deploy"])
+
+
+def test_tag_guard_runs_on_every_trigger(jobs):
+    """Sans `if` de job : un `needs` sauté sauterait `deploy` hors tag."""
+    assert "if" not in jobs["tag-guard"]
+    assert "GITHUB_REF_TYPE" in _tag_guard_script(jobs), (
+        "le no-op hors tag doit être fait dans le script, pas par un `if` de job"
+    )
+
+
+def _regexes(jobs) -> tuple[str, str]:
+    script = _tag_guard_script(jobs)
+    stable = re.search(r"stable='([^']+)'", script).group(1)
+    pre = re.search(r"pre='([^']+)'", script).group(1)
+    return stable, pre
+
+
+@pytest.mark.parametrize("tag", _TAGS_VALIDES)
+def test_valid_tags_are_accepted(jobs, tag):
+    stable, pre = _regexes(jobs)
+    assert re.match(stable, tag) or re.match(pre, tag), f"{tag} devrait être accepté"
+
+
+@pytest.mark.parametrize("tag", _TAGS_INVALIDES)
+def test_malformed_tags_are_refused(jobs, tag):
+    stable, pre = _regexes(jobs)
+    assert not (re.match(stable, tag) or re.match(pre, tag)), f"{tag} devrait être refusé"
+
+
+def test_governance_status_file_exists_and_says_no_go():
+    statut = (
+        (REPO_ROOT / "docs" / "governance" / "CLINICAL_STATUS").read_text(encoding="utf-8").strip()
+    )
+    assert statut == "REAL_DATA_NO_GO"
+
+
+def test_stable_tag_is_refused_while_no_go(jobs):
+    """Tant que le NO-GO tient, aucune version ne peut se présenter comme stable."""
+    script = _tag_guard_script(jobs)
+    assert "docs/governance/CLINICAL_STATUS" in script, (
+        "le statut doit être lu depuis un fichier versionné, pas codé en dur"
+    )
+    assert "REAL_DATA_NO_GO" in script
+    assert "exit 1" in script
+
+
+def test_tag_guard_is_the_single_source_of_classification(jobs):
+    """La règle prerelease ne doit exister qu'à un seul endroit."""
+    porteurs = [
+        nom
+        for nom, job in jobs.items()
+        if any("prerelease=" in str(s.get("run", "")) for s in _steps(job))
+    ]
+    assert porteurs == ["tag-guard"], f"règle dupliquée dans {porteurs}"
+
+
+# ── approvisionnement d'actionlint ──────────────────────────────────────────
+
+
+def test_actionlint_archive_is_pinned_by_checksum(jobs):
+    """Un tag de release est mutable : l'archive doit être vérifiée par SHA-256."""
+    etape = next(s for s in _steps(jobs["test"]) if "Actionlint" in str(s.get("name", "")))
+    sha = etape["env"]["ACTIONLINT_SHA256"]
+    assert re.fullmatch(r"[0-9a-f]{64}", sha), f"SHA-256 malformé : {sha!r}"
+    assert "sha256sum --check --strict" in etape["run"]
+
+
+def test_checksum_is_not_fetched_from_the_same_release(jobs):
+    """Télécharger le checksum depuis la release qu'il vérifie ne prouve rien."""
+    etape = next(s for s in _steps(jobs["test"]) if "Actionlint" in str(s.get("name", "")))
+    script = etape["run"]
+    assert "checksums.txt" not in script
+    assert script.count("curl") == 1, "une seule récupération : l'archive elle-même"
+
+
+# ── permissions minimales ───────────────────────────────────────────────────
+
+
+def test_workflow_default_permissions_are_read_only(ci):
+    assert ci["permissions"] == {"contents": "read"}
+
+
+@pytest.mark.parametrize(
+    "job,permission",
+    [
+        ("codeql", "security-events"),
+        ("deploy", "packages"),
+        ("release", "contents"),
+    ],
+)
+def test_elevated_permission_is_scoped_to_one_job(jobs, job, permission):
+    """Chaque droit d'écriture n'existe que là où il est indispensable."""
+    assert jobs[job]["permissions"].get(permission) == "write"
+    autres = [
+        nom
+        for nom, j in jobs.items()
+        if nom != job and (j.get("permissions") or {}).get(permission) == "write"
+    ]
+    assert not autres, f"{permission}: write accordé aussi à {autres}"

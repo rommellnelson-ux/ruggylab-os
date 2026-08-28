@@ -8,10 +8,15 @@ on:
     branches: [ main, feat/acquisition-3-flux ]
   workflow_dispatch:
 
+# Moindre privilège par défaut : chaque job qui a besoin de plus le déclare
+# lui-même. Accorder `security-events: write` et `packages: write` globalement
+# les donnait à TOUS les jobs, y compris ceux qui exécutent du code de test —
+# une élévation inutile sur la surface la plus exposée du pipeline.
+#   security-events: write -> job `codeql` seul
+#   packages: write        -> job `deploy` seul
+#   contents: write        -> job `release` seul
 permissions:
   contents: read
-  security-events: write
-  packages: write
 
 jobs:
   test:
@@ -55,9 +60,18 @@ jobs:
       - name: Actionlint (validation des workflows)
         env:
           ACTIONLINT_VERSION: "1.7.7"
+          # SHA-256 de actionlint_1.7.7_linux_amd64.tar.gz, INSCRIT EN DUR ICI.
+          # Un tag de release GitHub est mutable : télécharger le checksum depuis
+          # la même release ne prouverait rien, puisqu'un attaquant capable de
+          # remplacer l'archive remplacerait aussi le fichier de checksums.
+          # Cette valeur a été vérifiée deux fois : calcul local sur l'archive
+          # téléchargée, et comparaison au `actionlint_1.7.7_checksums.txt`
+          # publié. Toute mise à jour de version doit la recalculer.
+          ACTIONLINT_SHA256: "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757"
         run: |
           curl -sSfL -o actionlint.tar.gz \
             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum --check --strict
           tar -xzf actionlint.tar.gz actionlint
           # `-shellcheck=` désactive l'intégration shellcheck. Ce qu'on veut ici,
           # c'est valider la SYNTAXE et les EXPRESSIONS des workflows — le
@@ -549,6 +563,65 @@ jobs:
         if: failure()
         run: docker compose logs --tail 200
 
+  # ── Garde de tag (avant toute publication) ─────────────────────────────────
+  # Placée AVANT `deploy` : un tag malformé ne doit pas même déclencher une
+  # construction d'image. Deux contrôles.
+  #
+  # 1. FORME. Seuls `vX.Y.Z`, `vX.Y.Z-alpha.N`, `-beta.N`, `-rc.N` sont admis.
+  #    Sans cela, `v0.8` ou `v0.8.0-beta` (sans numéro) auraient produit une
+  #    image et une release aux identifiants ambigus.
+  #
+  # 2. GOUVERNANCE. Tant que `docs/governance/CLINICAL_STATUS` vaut
+  #    REAL_DATA_NO_GO, un tag STABLE (sans suffixe) est refusé : publier une
+  #    version présentée comme stable contredirait la décision clinique en
+  #    vigueur. Le statut vit dans un fichier versionné, et non en dur ici :
+  #    lever le NO-GO devient une modification tracée et relue, pas un
+  #    contournement de CI.
+  tag-guard:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.check.outputs.prerelease }}
+      make_latest: ${{ steps.check.outputs.make_latest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Contrôler la forme du tag et le statut de gouvernance
+        id: check
+        run: |
+          # Le job tourne sur TOUS les déclencheurs, pour rester une dépendance
+          # satisfaite de `deploy` (un `needs` sauté sauterait aussi `deploy`).
+          # Hors tag, il n'y a simplement rien à valider.
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            echo "Déclenchement hors tag : aucune version à valider."
+            exit 0
+          fi
+          tag="${GITHUB_REF_NAME}"
+          stable='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          pre='^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$'
+
+          if [[ "$tag" =~ $pre ]]; then
+            echo "prerelease=true"   >> "$GITHUB_OUTPUT"
+            echo "make_latest=false" >> "$GITHUB_OUTPUT"
+            echo "$tag : pré-version valide -> prerelease=true, make_latest=false"
+          elif [[ "$tag" =~ $stable ]]; then
+            statut="$(tr -d '[:space:]' < docs/governance/CLINICAL_STATUS)"
+            echo "statut de gouvernance : $statut"
+            if [[ "$statut" == "REAL_DATA_NO_GO" ]]; then
+              echo "::error::Tag stable '$tag' refusé : le statut clinique est REAL_DATA_NO_GO."
+              echo "::error::Utiliser une pré-version (-alpha.N / -beta.N / -rc.N), ou faire lever"
+              echo "::error::le NO-GO par une décision signée modifiant docs/governance/CLINICAL_STATUS."
+              exit 1
+            fi
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "make_latest=true" >> "$GITHUB_OUTPUT"
+            echo "$tag : version stable -> prerelease=false, make_latest=true"
+          else
+            echo "::error::Tag '$tag' malformé. Formes admises : vX.Y.Z, vX.Y.Z-alpha.N, vX.Y.Z-beta.N, vX.Y.Z-rc.N."
+            exit 1
+          fi
+
   deploy:
     name: Build and publish Docker image
     # Déploiement uniquement sur tag de version (vX.Y.Z) ou déclenchement manuel —
@@ -559,7 +632,7 @@ jobs:
     # (test-postgres), stack Docker de production (docker-stack), analyse CodeQL,
     # et **restauration de sauvegarde** (backup-restore). Publier une image dont
     # on n'a pas démontré que la base se restaure reviendrait à livrer sans filet.
-    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore]
+    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore, tag-guard]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -619,7 +692,10 @@ jobs:
   release:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [deploy]
+    # `tag-guard` est la SOURCE UNIQUE de la nature de la version : dupliquer la
+    # règle ici la ferait diverger un jour, et c'est précisément la classification
+    # prerelease/stable qu'il ne faut pas se tromper.
+    needs: [deploy, tag-guard]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -627,27 +703,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      # Un suffixe SemVer (`-beta.1`, `-alpha.1`, `-rc.1`) désigne une
-      # pré-version : elle ne doit ni être marquée stable, ni devenir « latest ».
-      - name: Déterminer la nature de la version
-        id: kind
-        run: |
-          tag="${GITHUB_REF_NAME}"
-          if [[ "$tag" == *-* ]]; then
-            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
-            echo "make_latest=false" >> "$GITHUB_OUTPUT"
-            echo "$tag : pré-version -> prerelease=true, make_latest=false"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "make_latest=true"  >> "$GITHUB_OUTPUT"
-            echo "$tag : version stable -> prerelease=false, make_latest=true"
-          fi
-
       # L'avertissement est préfixé aux notes générées : l'API GitHub place le
       # `body` fourni AVANT les notes qu'elle génère.
       - name: Composer l'avertissement de pré-version
         id: body
-        if: steps.kind.outputs.prerelease == 'true'
+        if: needs.tag-guard.outputs.prerelease == 'true'
         run: |
           {
             echo 'text<<RELEASE_BODY_EOF'
@@ -668,8 +728,8 @@ jobs:
         with:
           body: ${{ steps.body.outputs.text }}
           generate_release_notes: true
-          prerelease: ${{ steps.kind.outputs.prerelease }}
-          make_latest: ${{ steps.kind.outputs.make_latest }}
+          prerelease: ${{ needs.tag-guard.outputs.prerelease }}
+          make_latest: ${{ needs.tag-guard.outputs.make_latest }}
           files: |
             CHANGELOG.md
           fail_on_unmatched_files: false
