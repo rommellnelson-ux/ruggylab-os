@@ -155,7 +155,16 @@ Corrigé : le client ne reçoit plus que `"Database check failed."` et un
 `incident_id` de 12 caractères. La trace complète part dans le journal serveur
 via `logger.exception`, corrélée par ce même identifiant.
 
-### #14, #15, #16 — imports en masse : faux positifs neutralisés
+### #14, #15, #16 — imports en masse : deux passes ont été nécessaires
+
+> **Correction du 2026-08-28.** La première passe est déclarée « corrigée »
+> ci-dessous ; **elle ne l'était pas**. CodeQL a refermé #6, #14 et #15, puis
+> **rouvert la même constatation** en #25 et #26 aux nouvelles lignes (#16
+> n'avait jamais bougé). Retirer `str(exc)` du `detail` ne suffisait pas : dans
+> le modèle de la règle, c'est le **chaînage** `raise ... from exc` qui fait
+> remonter l'exception jusqu'à la réponse. La chaîne est désormais coupée
+> (`from None`) et le rejet journalisé côté serveur. Alertes concernées après
+> renumérotation : **#16, #25, #26**.
 
 Ces trois handlers ne capturaient qu'une exception **applicative dédiée**, dont
 le message est un littéral entièrement contrôlé
