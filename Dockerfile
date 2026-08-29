@@ -2,7 +2,12 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 1 – builder : install Python deps in an isolated venv
 # ──────────────────────────────────────────────────────────────────────────────
-FROM python:3.13-slim AS builder
+# Base ÉPINGLÉE par version exacte ET par digest. `3.13-slim` est un tag
+# FLOTTANT : il suit les correctifs et change de contenu sans prévenir. Une
+# release construite sur une base flottante n'est pas reproductible, et les
+# preuves de conformité de ses composants GPL/LGPL ne décriraient plus
+# l'image livrée. Voir docs/compliance/SOURCE_COMPLIANCE.md.
+FROM python:3.13.15-slim-trixie@sha256:7ce4b6dfe35e55397b7cda544f8a13f191b7ae28dc5aad71fe664dbc9bc2623f AS builder
 
 WORKDIR /app
 
@@ -23,7 +28,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ──────────────────────────────────────────────────────────────────────────────
 # Stage 2 – runtime : minimal image, non-root user, no build tools
 # ──────────────────────────────────────────────────────────────────────────────
-FROM python:3.13-slim AS runtime
+FROM python:3.13.15-slim-trixie@sha256:7ce4b6dfe35e55397b7cda544f8a13f191b7ae28dc5aad71fe664dbc9bc2623f AS runtime
 
 # OCI standard labels
 LABEL org.opencontainers.image.title="RuggyLab OS" \

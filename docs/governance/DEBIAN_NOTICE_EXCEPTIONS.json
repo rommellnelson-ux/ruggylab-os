@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Registre des defauts de notice constates dans l'image de base Debian.",
+    "Chaque entree est une decision ecrite, datee et justifiee. Un defaut absent",
+    "de ce registre fait echouer la conformite.",
+    "Une entree n'est PAS une conclusion juridique : elle constate le fait et dit",
+    "pourquoi le defaut ne prive pas le destinataire de la notice."
+  ],
+  "exceptions": [
+    {
+      "binary_package": "gzip",
+      "missing_reference": "GFDL-3",
+      "constat": "Le fichier /usr/share/doc/gzip/copyright renvoie au texte /usr/share/common-licenses/GFDL-3, qui n'existe pas dans l'image.",
+      "qualification": "Defaut de POINTEUR dans le paquet Debian amont, non un texte reellement absent. Le repertoire /usr/share/common-licenses contient GFDL, GFDL-1.2 et GFDL-1.3 ; le nom GFDL-3 n'a jamais existe dans la nomenclature Debian. La GFDL couvre ici la DOCUMENTATION de gzip, pas son code, qui est sous GPL-3 dont le texte est bien present.",
+      "portee": "Le destinataire de l'image dispose du texte de la GFDL sous /usr/share/common-licenses/GFDL-1.3. La notice est materiellement disponible ; seule la reference est perimee.",
+      "hors_de_notre_controle": "Corriger ce pointeur reviendrait a modifier un paquet Debian amont dans notre image, ce qui creerait une divergence bien plus genante que le defaut lui-meme.",
+      "decision": "Accepte et consigne. A signaler en amont si l'occasion se presente ; sans effet sur la disponibilite reelle de la notice.",
+      "date": "2026-08-28"
+    }
+  ]
+}
