@@ -61,7 +61,7 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 | `postgres` | postgres:16-alpine | aucun | backend |
 | `redis` | redis:7-alpine | aucun | backend |
 | `prometheus` | prom/prometheus | aucun (accès VPN/bastion) | backend, management |
-| `grafana` | grafana:11.0.0 | aucun (accès VPN/bastion) | management |
+| `grafana` | *(overlay optionnel — hors du cœur)* | aucun (accès VPN/bastion) | management |
 | `migrate` | ruggylab-os | run-once manuel (`--profile migrate`) | backend |
 
 - TLS : Caddy, CA interne par défaut (LAN sans Internet) ; ACME/certificats
@@ -211,7 +211,7 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
   absent de la CLI courante et pointe vers un checkout mutable. Elle ne doit pas
   être utilisée comme preuve du rôle outbox préproduction ; voir
   `docs/INCIDENT_WORKER_PLANIFIE_2026-07-23.md`.
-- **Prometheus/Grafana « accès VPN/bastion »** : le réseau management existe,
+- **Prometheus « accès VPN/bastion »** : le réseau management existe,
   mais aucun VPN/bastion n'est livré par le dépôt — TARGET (accès via
   `docker exec` local en attendant).
 - **Multi-worker non testé en intégration** (le gating par rôle est testé
