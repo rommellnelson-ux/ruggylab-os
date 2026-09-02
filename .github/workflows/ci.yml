@@ -466,7 +466,7 @@ jobs:
           if-no-files-found: ignore
 
   docker-stack:
-    name: Stack Docker production (compose réel)
+    name: Stack Docker production — cœur sans Grafana
     # Démarre la VRAIE stack de production (image runtime + docker-compose.yml
     # seul, sans fichier dev) et vérifie ce que les tests unitaires ne voient
     # pas : démarrage du conteneur non-root, healthchecks par rôle, seuls 80/443
@@ -487,7 +487,6 @@ jobs:
           FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
           POSTGRES_PASSWORD=ci_pg_password_123
           DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
-          GRAFANA_PASSWORD=ci_grafana_password_123
           RUGGYLAB_DOMAIN=localhost
           EOF
 
@@ -513,6 +512,23 @@ jobs:
           if [ -n "$leaked" ]; then
             echo "::error::Ports publiés hors du proxy :"; echo "$leaked"; exit 1
           fi
+
+      # Grafana est hors du cœur distribué. Ce n'est pas une préférence de
+      # déploiement : c'est ce qui fait que RUGGYLAB ne distribue pas d'œuvre
+      # AGPL-3.0. Une réintroduction silencieuse dans la stack principale
+      # remettrait l'obligation en place sans que personne s'en aperçoive.
+      - name: Assert the core stack ships no Grafana
+        run: |
+          if docker compose ps --services | grep -qx grafana; then
+            echo "::error::le service grafana est revenu dans la stack principale"; exit 1
+          fi
+          if docker image ls --format '{{.Repository}}' | grep -q '^grafana/'; then
+            echo "::error::une image Grafana a été téléchargée par le scénario principal"; exit 1
+          fi
+          if grep -qi grafana .env; then
+            echo "::error::le scénario principal exige encore une variable Grafana"; exit 1
+          fi
+          echo "Cœur RUGGYLAB : aucun service, aucune image, aucune variable Grafana."
 
       - name: Assert technical paths are blocked at the proxy (§14)
         run: |
@@ -562,6 +578,78 @@ jobs:
       - name: Compose logs on failure
         if: failure()
         run: docker compose logs --tail 200
+
+  # ── Overlay de supervision (NON bloquant) ──────────────────────────────────
+  # Grafana est une intégration OPTIONNELLE et EXTERNE. Ce job vérifie qu'elle
+  # fonctionne pour qui la veut — il ne conditionne pas la qualification du
+  # cœur, qui est prouvée par `docker-stack` sans lui. Il n'est donc PAS dans
+  # les `needs` de `deploy` : un cœur sain ne doit pas dépendre d'un composant
+  # que RUGGYLAB ne distribue pas.
+  monitoring-overlay:
+    name: Overlay de supervision optionnel (Grafana)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Build production image
+        run: docker build -t ruggylab-os:ci .
+
+      - name: Create .env with the overlay credentials
+        run: |
+          cat > .env <<'EOF'
+          RUGGYLAB_IMAGE=ruggylab-os:ci
+          SECRET_KEY=ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
+          POSTGRES_PASSWORD=ci_pg_password_123
+          DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
+          GRAFANA_PASSWORD=ci_grafana_password_123
+          RUGGYLAB_DOMAIN=localhost
+          EOF
+
+      - name: Start the core stack plus the monitoring overlay
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d postgres valkey
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --profile migrate run --rm migrate
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+      - name: Wait for Grafana to become healthy
+        run: |
+          for i in $(seq 1 40); do
+            st=$(docker inspect -f '{{.State.Health.Status}}'                  "$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml ps -q grafana)" 2>/dev/null || echo starting)
+            [ "$st" = "healthy" ] && break || sleep 3
+          done
+          [ "$st" = "healthy" ] || {
+            echo "::error::Grafana = $st"
+            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml logs --tail 80 grafana
+            exit 1
+          }
+
+      - name: Assert the Prometheus datasource is provisioned
+        run: |
+          reponse=$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml exec -T grafana             wget -qO- --header "Content-Type: application/json"             "http://admin:ci_grafana_password_123@localhost:3000/api/datasources")
+          echo "$reponse"
+          echo "$reponse" | grep -q '"type":"prometheus"'             || { echo "::error::datasource Prometheus absente"; exit 1; }
+
+      - name: Assert the RUGGYLAB dashboards are loaded
+        run: |
+          reponse=$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml exec -T grafana             wget -qO- "http://admin:ci_grafana_password_123@localhost:3000/api/search?type=dash-db")
+          echo "$reponse"
+          echo "$reponse" | grep -q '"uid"'             || { echo "::error::aucun tableau de bord chargé"; exit 1; }
+
+      # Le vrai test de l'externalisation : retirer Grafana ne doit rien casser.
+      - name: Remove Grafana and assert RUGGYLAB is unaffected
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml rm -sf grafana
+          docker volume rm -f "$(docker volume ls -q | grep grafana_data | head -1)" || true
+          curl -skf https://localhost/api/v1/health
+          docker compose -f docker-compose.yml exec -T prometheus wget -qO- http://app:8000/metrics | head -1
+          echo "RUGGYLAB reste sain sans Grafana."
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.monitoring.yml logs --tail 200
 
   # ── Garde de tag (avant toute publication) ─────────────────────────────────
   # Placée AVANT `deploy` : un tag malformé ne doit pas même déclencher une

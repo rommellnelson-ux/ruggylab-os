@@ -84,7 +84,10 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
 
-  grafana:
-    # Restrict Grafana to localhost in dev
-    ports:
-      - "127.0.0.1:3000:3000"
+# Grafana n'est plus dans la stack principale : le surcharger ici produirait un
+# service sans image. Pour l'utiliser en développement, ajouter l'overlay et son
+# override de port :
+#
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.monitoring.yml \
+#                  -f docker-compose.monitoring.dev.yml up -d

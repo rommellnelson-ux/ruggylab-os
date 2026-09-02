@@ -17,4 +17,11 @@ Error tracking
 - Add Sentry integration (DSN in secrets) for capturing exceptions and performance traces.
 
 Dashboards & Alerts
-- Configure Grafana dashboards for key metrics and set up alerting for high error rates, elevated latency, and job failures.
+- Prometheus is part of the core stack and scrapes `/metrics` directly; RUGGYLAB is fully
+  supported without any dashboarding layer.
+- Grafana is an **optional external overlay**, not a distributed component of RUGGYLAB OS.
+  Operators who want dashboards pull the image from its own publisher and run it
+  themselves: `docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d`.
+  Provisioning and RUGGYLAB dashboards are supplied read-only by that overlay.
+- Set up alerting for high error rates, elevated latency, and job failures — in Grafana if
+  the overlay is used, or directly in Prometheus/Alertmanager otherwise.

@@ -92,12 +92,44 @@ In practice, this keeps request handling thin while making domain workflows easi
 At runtime, background work is separated from the web workers via `PROCESS_ROLE`
 (`web` / `scheduler` / `analyzer-gateway`, default `all` for single-process dev).
 In production (Docker Compose), only the Caddy reverse proxy publishes ports
-(80/443); the app, PostgreSQL, Valkey, Prometheus and Grafana stay on internal
+(80/443); the app, PostgreSQL, Valkey and Prometheus stay on internal
 networks.
 
 The authoritative description of the **system as actually built** (services,
 ports, migration head, verified vs. target status of each capability) lives in
 [docs/ARCHITECTURE_AS_BUILT.md](docs/ARCHITECTURE_AS_BUILT.md).
+
+### What ships, and what does not
+
+**RUGGYLAB Core** — the supported nominal deployment, started with
+`docker compose -f docker-compose.yml up -d`:
+
+| Component | Notes |
+| --- | --- |
+| Application | API, UI, WebSocket fan-out |
+| PostgreSQL 16 | clinical and accounting data |
+| **Valkey 8.1** | cache, rate limiting, token denylist, queues — BSD-3-Clause fork of Redis. The client stays `redis-py` (MIT) and URLs keep the `redis://` scheme, which names the protocol, not the server product |
+| Prometheus | scrapes `/metrics` directly, no dashboarding layer required |
+| Automated backups | verified `pg_dump` with checksum |
+| Caddy reverse proxy | the only service publishing ports (80/443) |
+| Business services | patients, samples, results, worklist, quality, stock, equipment, billing, audit — with dashboards built into the application |
+
+**Optional monitoring** — not part of the distributed core:
+
+| Component | Notes |
+| --- | --- |
+| Grafana | **AGPL-3.0, a distinct third-party component.** Lives only in `docker-compose.monitoring.yml`; the operator pulls the image from its own publisher. RUGGYLAB neither copies, repackages nor republishes it |
+
+```bash
+# core only — pulls no Grafana image, needs no GRAFANA_* variable
+docker compose -f docker-compose.yml up -d
+
+# with optional dashboards, at the operator's choice
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+```
+
+Running without Grafana is **not a degraded mode**: it is the mode the project
+supports and tests.
 
 ## Quick start
 

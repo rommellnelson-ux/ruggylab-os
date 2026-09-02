@@ -32,7 +32,9 @@ app/models (44 tables)                          → persistance
 ```
 
 - Base de données : **PostgreSQL 16** en production, SQLite en développement/tests.
-- Cache & fan-out temps réel : **Redis 7** (backend `memory` en dev).
+- Cache & fan-out temps réel : **Valkey 8.1** (fork BSD-3-Clause de Redis).
+  Le client reste `redis-py` (MIT) et les URL gardent le schéma `redis://`,
+  qui désigne le protocole et non le produit serveur. Backend `memory` en dev.
 - Frontend : cockpit HTML/JS servi par l'app (pas de framework SPA — choix assumé,
   cf. §31 des Instructions maîtres).
 
@@ -42,7 +44,7 @@ Depuis le commit `64e228c`, chaque process déclare un rôle via `PROCESS_ROLE` 
 
 | Rôle | Entrypoint | Responsabilités | Statut |
 |---|---|---|---|
-| `web` | `uvicorn app.main:app` | API/UI, WebSocket, fan-out Redis (dans **chaque** worker) | VERIFIED (tests de gating) |
+| `web` | `uvicorn app.main:app` | API/UI, WebSocket, fan-out par le protocole Redis servi par Valkey (dans **chaque** worker) | VERIFIED (tests de gating) |
 | `scheduler` | `python -m app.scheduler` | Purge des jetons (1 h) — exemplaire unique | VERIFIED (tests) / CONFIGURED (runtime compose) |
 | `analyzer-gateway` | `python -m app.analyzer_gateway` | Héberge les interfaces explicitement qualifiées ; aucune par défaut ; heartbeat de process | VERIFIED (tests + compose), interfaces DISABLED |
 | `all` (défaut) | `uvicorn app.main:app` | Tout-en-un (dev / mono-poste) | VERIFIED |
@@ -61,8 +63,23 @@ workers web** quand `PROCESS_ROLE=web` (cf. `tests/test_process_role_and_metrics
 | `postgres` | postgres:16-alpine | aucun | backend |
 | `valkey` | valkey/valkey:8.1.9-alpine (digest épinglé) | aucun | backend |
 | `prometheus` | prom/prometheus | aucun (accès VPN/bastion) | backend, management |
-| `grafana` | grafana:11.0.0 | aucun (accès VPN/bastion) | management |
+| ~~`grafana`~~ | **hors du cœur** — voir « Intégration optionnelle externe » | — | — |
 | `migrate` | ruggylab-os | run-once manuel (`--profile migrate`) | backend |
+
+### Intégration optionnelle externe
+
+**Grafana ne fait pas partie du cœur distribué.** Le mode nominal supporté est
+RUGGYLAB Core sans Grafana : Prometheus reste dans la stack principale et
+collecte `/metrics` directement, et les tableaux de bord métier sont intégrés à
+l'application. Son absence n'est pas un mode dégradé.
+
+| Composant | Image | Où | Licence |
+| --- | --- | --- | --- |
+| `grafana` | `grafana/grafana:11.0.0` (digest épinglé) | `docker-compose.monitoring.yml` seulement | **AGPL-3.0** — composant tiers distinct |
+
+L'exploitant qui la souhaite récupère l'image auprès de son éditeur :
+`docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d`.
+RUGGYLAB ne la copie pas, ne la reconditionne pas et ne la republie pas.
 
 - TLS : Caddy, CA interne par défaut (LAN sans Internet) ; ACME/certificats
   fournis en option (`deploy/Caddyfile`). — **VERIFIED en CI** : le job
@@ -211,7 +228,7 @@ Le job `deploy` (publication d'image) **exige** `test`, `test-postgres`,
   absent de la CLI courante et pointe vers un checkout mutable. Elle ne doit pas
   être utilisée comme preuve du rôle outbox préproduction ; voir
   `docs/INCIDENT_WORKER_PLANIFIE_2026-07-23.md`.
-- **Prometheus/Grafana « accès VPN/bastion »** : le réseau management existe,
+- **Prometheus « accès VPN/bastion »** : le réseau management existe,
   mais aucun VPN/bastion n'est livré par le dépôt — TARGET (accès via
   `docker exec` local en attendant).
 - **Multi-worker non testé en intégration** (le gating par rôle est testé
