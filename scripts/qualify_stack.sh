@@ -21,7 +21,7 @@ echo "Qualification RuggyLab OS — domaine: $DOMAIN — $(date -u +%Y-%m-%dT%H:
 step "1. Services démarrés et sains"
 # Grafana est un overlay optionnel et externe : il ne fait pas partie du cœur
 # qualifié. Sa présence ou son absence ne change pas le verdict.
-for svc in proxy app scheduler analyzer-gateway postgres redis prometheus db-backup; do
+for svc in proxy app scheduler analyzer-gateway postgres valkey prometheus db-backup; do
   cid=$(docker compose ps -q "$svc" 2>/dev/null)
   if [ -z "$cid" ]; then fail "$svc absent"; continue; fi
   status=$(docker inspect -f '{{.State.Status}}' "$cid")

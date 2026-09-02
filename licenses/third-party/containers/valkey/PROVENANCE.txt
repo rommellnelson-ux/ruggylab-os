@@ -1,0 +1,11 @@
+Texte de licence de Valkey.
+
+Source  : https://raw.githubusercontent.com/valkey-io/valkey/8.1.9/COPYING
+Tag     : 8.1.9
+Licence : BSD-3-Clause (SPDX-License-Identifier en tête du fichier)
+SHA-256 : 1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0
+Relevé  : 2026-08-28
+
+Récupéré depuis le dépôt officiel valkey-io/valkey, jamais depuis un miroir
+ou une source secondaire. L'image `valkey/valkey:8.1.9-alpine` n'embarque pas
+ce texte : il est versionné ici pour que la notice soit disponible.

@@ -492,7 +492,7 @@ jobs:
 
       - name: Start dependencies and run migrations
         run: |
-          docker compose up -d postgres redis
+          docker compose up -d postgres valkey
           docker compose --profile migrate run --rm migrate
 
       - name: Start full production stack
@@ -610,7 +610,7 @@ jobs:
 
       - name: Start the core stack plus the monitoring overlay
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d postgres redis
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d postgres valkey
           docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --profile migrate run --rm migrate
           docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 
