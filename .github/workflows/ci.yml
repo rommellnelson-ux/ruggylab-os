@@ -384,6 +384,156 @@ jobs:
             restore-manifest.json
           if-no-files-found: ignore
 
+  # ── Conformité de licence et de distribution (bloquant) ────────────────────
+  # Une image distribuée sans ses conditions d'usage ni les notices de ses
+  # composants est incomplète — et plusieurs licences tierces l'exigent. Ce job
+  # vérifie que les preuves existent réellement, au lieu de faire confiance aux
+  # déclarations : il construit le paquet et l'image, puis regarde dedans.
+  license-compliance:
+    name: License and distribution compliance
+    runs-on: ubuntu-latest
+    env:
+      # Syft épinglé par version : `latest` rendrait l'audit non reproductible,
+      # et une chaîne d'approvisionnement non auditable ne prouve rien.
+      SYFT_VERSION: "1.20.0"
+      # SHA-256 de syft_1.20.0_linux_amd64.tar.gz, INSCRIT EN DUR ICI — même
+      # raison que pour actionlint : un tag de release GitHub est mutable, et
+      # télécharger `syft_1.20.0_checksums.txt` depuis la release qu'il vérifie
+      # ne prouverait rien. Valeur vérifiée deux fois : fichier de checksums
+      # officiel, et calcul local sur l'archive téléchargée.
+      SYFT_SHA256: "689e12c5cbf67521ce61b9c126068f9eaabe1223e77971b2fede50033ff6b5cc"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      # ── 1. Présence et cohérence des déclarations ─────────────────────────
+      - name: "1. Fichiers de licence présents"
+        run: |
+          test -f LICENSE.md            || { echo "::error::LICENSE.md absent"; exit 1; }
+          test -f THIRD_PARTY_NOTICES.md || { echo "::error::THIRD_PARTY_NOTICES.md absent"; exit 1; }
+          test -d licenses/third-party   || { echo "::error::licenses/third-party absent"; exit 1; }
+
+      - name: "2. Aucune déclaration GPL-2.0 active pour RUGGYLAB"
+        run: |
+          # Les documents d'audit citent l'ancien état à dessein : ils sont exclus.
+          fautifs=$(grep -lE 'GPL-2\.0|GPLv2|General Public License' \
+            pyproject.toml Dockerfile README.md LICENSE.md 2>/dev/null || true)
+          if [ -n "$fautifs" ]; then
+            echo "::error::déclaration GPL-2.0 active dans : $fautifs"; exit 1
+          fi
+
+      - name: "3. LicenseRef cohérent partout"
+        env:
+          REF: LicenseRef-RuggyLab-Evaluation-1.0
+        run: |
+          for f in pyproject.toml Dockerfile README.md LICENSE.md; do
+            grep -q "$REF" "$f" || { echo "::error::$f ne porte pas $REF"; exit 1; }
+          done
+          echo "LicenseRef cohérent dans les 4 déclarations."
+
+      # ── 2. Le paquet Python embarque bien les licences ────────────────────
+      - name: "4. Construire le paquet et vérifier les licences embarquées"
+        run: |
+          python -m pip install --upgrade pip "setuptools>=77.0.3" build
+          python -m build --outdir dist_ci
+          python - <<'PY'
+          import glob, sys, tarfile, zipfile
+          whl = glob.glob("dist_ci/*.whl")[0]
+          zf = zipfile.ZipFile(whl)
+          noms = zf.namelist()
+          lic = [n for n in noms if "LICENSE" in n or "THIRD_PARTY" in n or "licenses/" in n]
+          meta = zf.read([n for n in noms if n.endswith("METADATA")][0]).decode()
+          if not lic:
+              print("::error::le wheel ne contient aucun fichier de licence"); sys.exit(1)
+          if "LicenseRef-RuggyLab-Evaluation-1.0" not in meta:
+              print("::error::METADATA du wheel sans License-Expression attendue"); sys.exit(1)
+          sd = glob.glob("dist_ci/*.tar.gz")[0]
+          with tarfile.open(sd) as t:
+              slic = [n for n in t.getnames() if "LICENSE" in n or "THIRD_PARTY" in n]
+          if not slic:
+              print("::error::le sdist ne contient aucun fichier de licence"); sys.exit(1)
+          print(f"wheel : {len(lic)} fichiers de licence — sdist : {len(slic)}")
+          PY
+
+      # ── 3. Inventaire depuis un environnement PROPRE ──────────────────────
+      # Sur un poste de développement, l'inventaire remonte des outils absents
+      # de requirements.txt (dont plusieurs sous GPL) et ferait apparaître un
+      # risque copyleft qui n'existe pas dans l'image livrée.
+      - name: "5. Inventaire des licences Python (environnement propre)"
+        run: |
+          python -m venv .venv-audit
+          ./.venv-audit/bin/python -m pip install --quiet --upgrade pip
+          ./.venv-audit/bin/python -m pip install --quiet -r requirements.txt
+          ./.venv-audit/bin/python scripts/inventory_python_licenses.py \
+            --root . \
+            --json artifacts/python-licenses.json \
+            --copy-licenses \
+            --fail-on-unknown
+
+      # ── 4. L'image contient réellement les licences ───────────────────────
+      - name: "6. Construire l'image et vérifier les licences à l'intérieur"
+        run: |
+          docker build -t ruggylab-os:license-check .
+          for f in /app/LICENSE.md /app/THIRD_PARTY_NOTICES.md; do
+            docker run --rm --entrypoint sh ruggylab-os:license-check -c "test -f $f" \
+              || { echo "::error::$f absent de l'image"; exit 1; }
+          done
+          docker run --rm --entrypoint sh ruggylab-os:license-check \
+            -c "test -d /app/licenses/third-party && ls /app/licenses/third-party" \
+            || { echo "::error::/app/licenses/third-party absent de l'image"; exit 1; }
+          echo "Licences présentes dans l'image."
+
+      # ── 5. SBOM ───────────────────────────────────────────────────────────
+      - name: "7. Installer Syft (version et empreinte épinglées)"
+        run: |
+          url="https://github.com/anchore/syft/releases/download"
+          curl -sSfL -o syft.tar.gz "${url}/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          echo "${SYFT_SHA256}  syft.tar.gz" | sha256sum --check --strict
+          tar -xzf syft.tar.gz syft
+          ./syft version
+
+      - name: "8. Générer les SBOM CycloneDX et SPDX"
+        run: |
+          mkdir -p artifacts
+          ./syft ruggylab-os:license-check -o cyclonedx-json=artifacts/sbom.cyclonedx.json
+          ./syft ruggylab-os:license-check -o spdx-json=artifacts/sbom.spdx.json
+          test -s artifacts/sbom.cyclonedx.json || { echo "::error::SBOM CycloneDX vide"; exit 1; }
+          test -s artifacts/sbom.spdx.json      || { echo "::error::SBOM SPDX vide"; exit 1; }
+
+      # L'inventaire Python ne couvre que les distributions Python. L'image, elle,
+      # embarque toute la base système : c'est ce que l'on distribue réellement.
+      - name: "9. Auditer le SBOM de l'image (aucune licence indéterminée)"
+        run: |
+          python scripts/audit_sbom_licenses.py artifacts/sbom.cyclonedx.json             --exceptions docs/governance/SBOM_LICENSE_EXCEPTIONS.json
+
+      # ── 6. Les composants à revue obligatoire restent au registre ─────────
+      - name: "10. Registre des décisions de licence"
+        run: |
+          for marqueur in MANUAL_LICENSE_REVIEW_REQUIRED AGPL_DISTRIBUTION_REVIEW_REQUIRED \n                          BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED "Redis 7.4" "Grafana 11"; do
+            grep -q "$marqueur" THIRD_PARTY_NOTICES.md \
+              || { echo "::error::'$marqueur' absent du registre des décisions"; exit 1; }
+          done
+          echo "Composants à revue obligatoire correctement signalés."
+
+      # Artefacts de CI seulement : aucune release, aucun tag.
+      - name: Publier les preuves de conformité
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: third-party-evidence
+          path: |
+            THIRD_PARTY_NOTICES.md
+            docs/governance/SBOM_LICENSE_EXCEPTIONS.json
+            artifacts/python-licenses.json
+            artifacts/sbom.cyclonedx.json
+            artifacts/sbom.spdx.json
+          if-no-files-found: warn
+
   codeql:
     name: CodeQL security analysis
     needs: test
@@ -720,7 +870,8 @@ jobs:
     # (test-postgres), stack Docker de production (docker-stack), analyse CodeQL,
     # et **restauration de sauvegarde** (backup-restore). Publier une image dont
     # on n'a pas démontré que la base se restaure reviendrait à livrer sans filet.
-    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore, tag-guard]
+    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore,
+            tag-guard, license-compliance]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -783,13 +934,47 @@ jobs:
     # `tag-guard` est la SOURCE UNIQUE de la nature de la version : dupliquer la
     # règle ici la ferait diverger un jour, et c'est précisément la classification
     # prerelease/stable qu'il ne faut pas se tromper.
-    needs: [deploy, tag-guard]
+    needs: [deploy, tag-guard, license-compliance]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      # Les SBOM ne sont pas régénérés ici : on rattache EXACTEMENT ceux que le
+      # job de conformité a produits et qui ont fait passer les gates. Les
+      # reconstruire ici publierait un inventaire que rien n'a vérifié.
+      - name: Récupérer les preuves de conformité
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: third-party-evidence
+          path: artifacts-evidence
+
+      # Le digest est la seule référence immuable de l'image : un tag peut être
+      # redirigé, un digest non. Il est écrit dans un fichier joint à la Release
+      # pour rester lisible même quand les notes sont regénérées.
+      - name: Composer la provenance de la version
+        env:
+          DIGEST: ${{ needs.deploy.outputs.digest }}
+        run: |
+          mkdir -p artifacts
+          cp artifacts-evidence/artifacts/sbom.cyclonedx.json artifacts/sbom.cyclonedx.json
+          cp artifacts-evidence/artifacts/sbom.spdx.json      artifacts/sbom.spdx.json
+          cp artifacts-evidence/artifacts/python-licenses.json artifacts/python-licenses.json
+          {
+            echo "# Provenance — ${GITHUB_REF_NAME}"
+            echo
+            echo "- Image      : \`ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_REF_NAME}\`"
+            echo "- Digest     : \`${DIGEST}\`"
+            echo "- Commit     : \`${GITHUB_SHA}\`"
+            echo "- Licence    : \`LicenseRef-RuggyLab-Evaluation-1.0\`"
+            echo "- Statut     : \`$(cat docs/governance/CLINICAL_STATUS)\`"
+            echo
+            echo "Composants tiers en revue de licence obligatoire : voir"
+            echo "\`THIRD_PARTY_NOTICES.md\` §6. Ils bloquent toute distribution externe."
+          } > artifacts/RELEASE_PROVENANCE.md
+          cat artifacts/RELEASE_PROVENANCE.md
 
       # L'avertissement est préfixé aux notes générées : l'API GitHub place le
       # `body` fourni AVANT les notes qu'elle génère.
@@ -820,6 +1005,16 @@ jobs:
           make_latest: ${{ needs.tag-guard.outputs.make_latest }}
           files: |
             CHANGELOG.md
-          fail_on_unmatched_files: false
+            LICENSE.md
+            THIRD_PARTY_NOTICES.md
+            artifacts/sbom.cyclonedx.json
+            artifacts/sbom.spdx.json
+            artifacts/python-licenses.json
+            artifacts/RELEASE_PROVENANCE.md
+          # Strict : une Release publiée SANS son SBOM ni son texte de licence
+          # serait une distribution sans preuve de conformité. Mieux vaut
+          # échouer que publier une version dont on ne peut pas dire ce
+          # qu'elle contient.
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

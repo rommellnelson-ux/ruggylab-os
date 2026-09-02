@@ -3,7 +3,8 @@
 [![Release](https://img.shields.io/github/v/release/rommellnelson-ux/ruggylab-os?display_name=tag)](https://github.com/rommellnelson-ux/ruggylab-os/releases)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688.svg)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/license-GPL--2.0-lightgrey.svg)](https://github.com/rommellnelson-ux/ruggylab-os)
+[![License](https://img.shields.io/badge/license-Proprietary%20Evaluation-lightgrey.svg)](LICENSE.md)
+[![Clinical status](https://img.shields.io/badge/clinical-REAL__DATA__NO__GO-red.svg)](docs/governance/CLINICAL_STATUS)
 
 RuggyLab OS is a FastAPI-based laboratory information backend designed for clinical workflows such as patient intake, sample tracking, result validation, reagent monitoring, reporting, and device-oriented operations.
 
@@ -28,6 +29,7 @@ RuggyLab OS is a FastAPI-based laboratory information backend designed for clini
 - [Deployment notes](#deployment-notes)
 - [Branding](#branding)
 - [Roadmap ideas](#roadmap-ideas)
+- [Licence](#licence)
 
 ## Why RuggyLab OS
 
@@ -345,3 +347,33 @@ If you want to generate a visual banner or cover image for the repository, use t
 - Background jobs for device ingestion and reporting automation
 - Richer validation workflows for additional analyzers
 - CI pipeline for linting, tests, and release automation
+
+## Licence
+
+**RUGGYLAB OS est un logiciel propriétaire.** Il n'est pas open source.
+
+Copyright © 2026 **WOGNIN Nelson Rommell Boni Ruggairrhye**. Tous droits réservés.
+
+Licence : **RuggyLab Evaluation License 1.0**
+(`LicenseRef-RuggyLab-Evaluation-1.0`) — voir [`LICENSE.md`](LICENSE.md).
+
+- La visibilité publique de ce dépôt **ne confère aucun droit d'utilisation**.
+  Toute évaluation requiert une **autorisation écrite** identifiant le
+  bénéficiaire, le site, la version et la durée.
+- **Aucune utilisation clinique réelle n'est autorisée.** Statut en vigueur :
+  **`REAL_DATA_NO_GO`**. Seules des données fictives ou synthétiques peuvent
+  être utilisées ; le traitement de données de patients réels, l'usage
+  diagnostique ou thérapeutique et le déploiement de production sont interdits.
+- RUGGYLAB OS n'est pas un dispositif médical et n'a fait l'objet d'aucune
+  certification à ce titre.
+
+### Composants tiers
+
+Les composants tiers **ne sont pas couverts** par cette licence et restent
+soumis aux leurs. Ils sont recensés dans
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), avec les textes intégraux
+dans [`licenses/third-party/`](licenses/third-party/).
+
+Certains composants — notamment **Redis 7.4** et **Grafana 11** — font l'objet
+d'une **revue de licence obligatoire** encore ouverte, qui bloque toute
+distribution externe de la pile.
