@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Overlay OPTIONNEL — Grafana
+#
+# Grafana ne fait PAS partie du cœur distribué de RUGGYLAB OS. Le mode nominal
+# supporté est « RUGGYLAB Core sans Grafana » : son absence n'est pas un mode
+# dégradé. Prometheus, lui, reste dans la stack principale et collecte
+# `/metrics` sans intermédiaire.
+#
+# Pourquoi séparé
+#   Grafana est sous AGPL-3.0. En le sortant du cœur, RUGGYLAB ne distribue plus
+#   d'œuvre AGPL : l'exploitant qui veut des tableaux de bord récupère l'image
+#   DIRECTEMENT auprès de son éditeur et l'exécute pour son propre compte.
+#   RUGGYLAB ne la copie pas, ne la reconditionne pas, ne la republie pas.
+#
+# Usage
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# Le scénario principal — `docker compose -f docker-compose.yml up -d` — ne
+# télécharge aucune image Grafana et ne demande aucune variable Grafana.
+#
+# Variables requises par CET overlay seulement
+#   GRAFANA_PASSWORD   (obligatoire)
+#   GRAFANA_USER       (défaut : admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  grafana:
+    # Composant TIERS sous AGPL-3.0, distinct de RUGGYLAB OS et non couvert par
+    # sa licence. Tiré du registre officiel de son éditeur, non modifié.
+    # Épinglé par version ET par digest : un tag est mutable, un digest non.
+    image: grafana/grafana:11.0.0@sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Set GRAFANA_PASSWORD to use the monitoring overlay}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/ruggylab-os.json
+    volumes:
+      # Provisioning et tableaux de bord : données de CONFIGURATION propres au
+      # projet, pas des œuvres dérivées de Grafana. Montés en lecture seule.
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    # Pas de `ports:` — accès via VPN/bastion uniquement, jamais le VLAN clinique.
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    networks:
+      - management_net
+
+volumes:
+  grafana_data:

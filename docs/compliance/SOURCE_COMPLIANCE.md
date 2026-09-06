@@ -39,40 +39,61 @@ Générées par [`../../scripts/debian_source_manifest.py`](../../scripts/debian
 **depuis l'image réellement construite** — jamais depuis un fichier de
 configuration, jamais depuis une supposition.
 
+Chacun porte un **en-tête de provenance** : version du générateur, horodatage
+UTC, commit Git, référence et identifiant de l'image, référence et digest de la
+base, plateforme, architecture, distribution. Sans lui, un manifeste est
+ininterprétable — on ignore de quelle image et de quelle architecture il parle,
+et deux manifestes de plateformes différentes se confondraient.
+
 | Fichier | Contenu |
 | --- | --- |
 | `artifacts/debian-binary-packages.json` | 87 paquets binaires : nom, version, architecture, paquet source, version source, taille |
-| `artifacts/debian-source-packages.json` | 61 paquets sources : binaires produits, licences copyleft, URL de snapshot, disponibilité constatée |
-| `artifacts/debian-license-manifest.json` | par paquet : licences déclarées, fichier `copyright`, textes référencés, textes manquants, obligation |
+| `artifacts/debian-source-packages.json` | 61 paquets sources : binaires produits, familles de licences, **fichiers sources exacts** avec URL, taille et SHA-256, disponibilité constatée |
+| `artifacts/debian-license-manifest.json` | par paquet : licences déclarées, **famille**, fichier `copyright`, textes référencés, textes manquants |
 
 ### Ce que les preuves établissent
 
 | Constat | Valeur |
 | --- | --- |
+| Plateforme décrite | `linux/amd64` — Debian GNU/Linux 13 « trixie » |
 | Paquets binaires Debian dans l'image | **87** |
 | Paquets sources correspondants | **61** |
-| Paquets binaires portant une obligation de source | **76** |
+| Paquets binaires où une **famille copyleft est détectée** | **76** |
 | Paquets **sans** fichier `copyright` dans l'image | **0** |
 | Textes de licence référencés et manquants, non qualifiés | **0** |
-| **Sources vérifiées disponibles sur `snapshot.debian.org`** | **61 / 61** |
+| **Paquets sources vérifiés disponibles** | **61 / 61** |
+| **Fichiers sources résolus** (`.dsc`, `.orig.tar.*`, `.debian.tar.*`…) | **194** |
+| **Fichiers sources vérifiés joignables** | **194 / 194** |
+| **Fichiers sans SHA-256 attendu** | **0** |
 
-La dernière ligne n'est pas une affirmation : chaque URL a été **interrogée**
-(`--check-availability`), et le code HTTP est inscrit dans le manifeste. Une URL
-écrite dans un document ne prouve rien tant que personne ne l'a ouverte.
+Ces lignes ne sont pas des affirmations. Chaque URL a été **interrogée**, chaque
+`.dsc` **téléchargé**, et les SHA-256 des archives proviennent du bloc
+`Checksums-Sha256` que **Debian** y déclare — aucune valeur n'est inventée ni
+recalculée en silence. Le SHA-256 du `.dsc` lui-même est, lui, calculé sur le
+fichier reçu, et le manifeste le dit (`sha256_source`).
 
-### Licences copyleft les plus représentées
+> **Un cas instructif, et la raison de ne pas se contenter d'un HTTP 200.**
+> `debianutils` est publié via *dgit* : l'archive contient un fichier
+> `debianutils_5.23.2.git.tar.xz` que le `.dsc` **ne référence pas** dans ses
+> `Checksums-Sha256`. Ce n'est pas un hash manquant — c'est un fichier qui ne
+> fait pas partie du source correspondant déclaré par Debian. Le manifeste le
+> range donc sous `related_archive_files`, avec le motif. Le compter comme
+> source aurait produit un faux défaut ; lui inventer un hash aurait été pire.
 
-| Licence | Paquets |
-| --- | --- |
-| GPL-2+ | 50 |
-| GPL-2 | 31 |
-| GPL-3+ | 24 |
-| LGPL-2.1+ | 22 |
-| LGPL-2+ | 20 |
-| LGPL-3+ | 16 |
+### Familles de licences détectées
 
-Un même paquet peut déclarer plusieurs licences ; ces nombres mesurent la
-présence, pas des composants distincts.
+Le générateur classe chaque expression de licence en famille : `GPL`, `LGPL`,
+`AGPL`, `MPL`, `EPL`, `CDDL`, `PERMISSIVE` ou `UNKNOWN`. Une licence non
+reconnue est marquée `UNKNOWN` plutôt que rangée par défaut du côté rassurant.
+
+> **Cette classification est un signal de revue, pas une qualification
+> juridique.** Les familles copyleft **n'imposent pas la même forme** de mise à
+> disposition : la portée de la MPL est le *fichier*, celle de la GPL l'*œuvre*,
+> celle de l'AGPL s'étend à l'*usage en réseau*, et la LGPL distingue le lien de
+> la dérivation. Les regrouper sous une conclusion unique serait faux. Le
+> manifeste porte donc `copyleft_detected`, `license_family` et
+> `source_compliance_review_required` — jamais une obligation affirmée — et
+> `written_offer_applicability` vaut invariablement `LEGAL_REVIEW_REQUIRED`.
 
 ## 4. Ce qui est déjà satisfait : la NOTICE
 
@@ -128,8 +149,16 @@ suffisante. Le choix relève du titulaire, après validation juridique.
 
 ```
 BASE_IMAGE_SOURCE_EVIDENCE_PREPARED   ✅ preuves produites et vérifiées
+RELEASE_PIPELINE_SOURCE_EVIDENCE_GATED ✅ `deploy` dépend du job de preuves
 LEGAL_SOURCE_OFFER_REVIEW_REQUIRED    ⛔ bloquant pour la distribution externe
 ```
+
+Le job `debian-source-evidence` figure dans les `needs` de `deploy` : aucune
+image ne peut être publiée sans que les preuves aient été produites et
+vérifiées. Un job qui produit des preuves sans rien bloquer serait décoratif.
+`monitoring-overlay` n'y figure pas et ne doit pas y figurer — Grafana est
+externe, et un cœur sain ne dépend pas d'un composant que RUGGYLAB ne
+distribue pas.
 
 Ces deux statuts coexistent : les preuves sont prêtes, la décision ne l'est pas.
 L'usage d'évaluation interne, seul autorisé à ce stade, n'est pas concerné.

@@ -466,7 +466,7 @@ jobs:
           if-no-files-found: ignore
 
   docker-stack:
-    name: Stack Docker production (compose réel)
+    name: Stack Docker production — cœur sans Grafana
     # Démarre la VRAIE stack de production (image runtime + docker-compose.yml
     # seul, sans fichier dev) et vérifie ce que les tests unitaires ne voient
     # pas : démarrage du conteneur non-root, healthchecks par rôle, seuls 80/443
@@ -487,13 +487,12 @@ jobs:
           FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
           POSTGRES_PASSWORD=ci_pg_password_123
           DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
-          GRAFANA_PASSWORD=ci_grafana_password_123
           RUGGYLAB_DOMAIN=localhost
           EOF
 
       - name: Start dependencies and run migrations
         run: |
-          docker compose up -d postgres redis
+          docker compose up -d postgres valkey
           docker compose --profile migrate run --rm migrate
 
       - name: Start full production stack
@@ -513,6 +512,23 @@ jobs:
           if [ -n "$leaked" ]; then
             echo "::error::Ports publiés hors du proxy :"; echo "$leaked"; exit 1
           fi
+
+      # Grafana est hors du cœur distribué. Ce n'est pas une préférence de
+      # déploiement : c'est ce qui fait que RUGGYLAB ne distribue pas d'œuvre
+      # AGPL-3.0. Une réintroduction silencieuse dans la stack principale
+      # remettrait l'obligation en place sans que personne s'en aperçoive.
+      - name: Assert the core stack ships no Grafana
+        run: |
+          if docker compose ps --services | grep -qx grafana; then
+            echo "::error::le service grafana est revenu dans la stack principale"; exit 1
+          fi
+          if docker image ls --format '{{.Repository}}' | grep -q '^grafana/'; then
+            echo "::error::une image Grafana a été téléchargée par le scénario principal"; exit 1
+          fi
+          if grep -qi grafana .env; then
+            echo "::error::le scénario principal exige encore une variable Grafana"; exit 1
+          fi
+          echo "Cœur RUGGYLAB : aucun service, aucune image, aucune variable Grafana."
 
       - name: Assert technical paths are blocked at the proxy (§14)
         run: |
@@ -563,6 +579,78 @@ jobs:
         if: failure()
         run: docker compose logs --tail 200
 
+  # ── Overlay de supervision (NON bloquant) ──────────────────────────────────
+  # Grafana est une intégration OPTIONNELLE et EXTERNE. Ce job vérifie qu'elle
+  # fonctionne pour qui la veut — il ne conditionne pas la qualification du
+  # cœur, qui est prouvée par `docker-stack` sans lui. Il n'est donc PAS dans
+  # les `needs` de `deploy` : un cœur sain ne doit pas dépendre d'un composant
+  # que RUGGYLAB ne distribue pas.
+  monitoring-overlay:
+    name: Overlay de supervision optionnel (Grafana)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Build production image
+        run: docker build -t ruggylab-os:ci .
+
+      - name: Create .env with the overlay credentials
+        run: |
+          cat > .env <<'EOF'
+          RUGGYLAB_IMAGE=ruggylab-os:ci
+          SECRET_KEY=ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
+          POSTGRES_PASSWORD=ci_pg_password_123
+          DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
+          GRAFANA_PASSWORD=ci_grafana_password_123
+          RUGGYLAB_DOMAIN=localhost
+          EOF
+
+      - name: Start the core stack plus the monitoring overlay
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d postgres valkey
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --profile migrate run --rm migrate
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+      - name: Wait for Grafana to become healthy
+        run: |
+          for i in $(seq 1 40); do
+            st=$(docker inspect -f '{{.State.Health.Status}}'                  "$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml ps -q grafana)" 2>/dev/null || echo starting)
+            [ "$st" = "healthy" ] && break || sleep 3
+          done
+          [ "$st" = "healthy" ] || {
+            echo "::error::Grafana = $st"
+            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml logs --tail 80 grafana
+            exit 1
+          }
+
+      - name: Assert the Prometheus datasource is provisioned
+        run: |
+          reponse=$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml exec -T grafana             wget -qO- --header "Content-Type: application/json"             "http://admin:ci_grafana_password_123@localhost:3000/api/datasources")
+          echo "$reponse"
+          echo "$reponse" | grep -q '"type":"prometheus"'             || { echo "::error::datasource Prometheus absente"; exit 1; }
+
+      - name: Assert the RUGGYLAB dashboards are loaded
+        run: |
+          reponse=$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml exec -T grafana             wget -qO- "http://admin:ci_grafana_password_123@localhost:3000/api/search?type=dash-db")
+          echo "$reponse"
+          echo "$reponse" | grep -q '"uid"'             || { echo "::error::aucun tableau de bord chargé"; exit 1; }
+
+      # Le vrai test de l'externalisation : retirer Grafana ne doit rien casser.
+      - name: Remove Grafana and assert RUGGYLAB is unaffected
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml rm -sf grafana
+          docker volume rm -f "$(docker volume ls -q | grep grafana_data | head -1)" || true
+          curl -skf https://localhost/api/v1/health
+          docker compose -f docker-compose.yml exec -T prometheus wget -qO- http://app:8000/metrics | head -1
+          echo "RUGGYLAB reste sain sans Grafana."
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.monitoring.yml logs --tail 200
+
   # ── Preuves de source correspondante (base Debian) ─────────────────────────
   # Distribuer une image, c'est distribuer les binaires qu'elle contient. Une
   # partie de la base Debian est sous GPL/LGPL. Ce job produit les PREUVES —
@@ -603,27 +691,48 @@ jobs:
       # Une URL écrite dans un manifeste ne prouve rien tant que personne ne
       # l'a ouverte. `--check-availability` l'ouvre ; on vérifie ici qu'aucune
       # source n'est restée introuvable.
-      - name: Assert every corresponding source is reachable
+      # Un 200 sur la page d'un paquet ne prouve rien sur ses FICHIERS : la page
+      # peut exister sans que l'archive source soit récupérable. Le générateur
+      # descend donc jusqu'au fichier ; on vérifie ici qu'aucun n'est resté sans
+      # empreinte ni sans réponse. Une panne externe bloque et fait relancer le
+      # workflow — elle ne doit pas produire une preuve verte.
+      - name: Assert every corresponding source file is reachable and hashed
         run: |
           python - <<'PY'
           import json, pathlib, sys
-          sources = json.loads(
+
+          charge = json.loads(
               pathlib.Path("artifacts/debian-source-packages.json").read_text(encoding="utf-8")
           )
-          introuvables = [
-              s for s in sources if s["source_availability"].startswith("indisponible:")
-          ]
-          non_verifies = [
-              s for s in sources if s["source_availability"].startswith("non verifie:")
-          ]
-          print(f"{len(sources)} paquets sources, {len(introuvables)} introuvables, "
-                f"{len(non_verifies)} non vérifiés")
-          for s in introuvables:
-              print(f"::error::source introuvable : {s['source_package']} {s['source_version']}")
-          if introuvables:
+          provenance = charge["provenance"]
+          sources = charge["source_packages"]
+          fichiers = [f for s in sources for f in s["source_files"]]
+
+          print(f"plateforme  : {provenance['platform']}")
+          print(f"base        : {provenance['base_image_reference']}")
+          print(f"commit      : {provenance['git_sha'][:12]}")
+          print(f"{len(sources)} paquets sources, {len(fichiers)} fichiers sources")
+
+          bloquants = []
+          for source in sources:
+              if source["source_availability"] != "verified":
+                  bloquants.append(
+                      f"{source['source_package']} {source['source_version']}"
+                      f" -> {source['source_availability']}"
+                  )
+              if source["source_files_resolution"] != "resolved":
+                  bloquants.append(f"{source['source_package']} -> fichiers non résolus")
+          for fichier in fichiers:
+              if fichier["availability"] != "verified":
+                  bloquants.append(f"{fichier['name']} -> {fichier['availability']}")
+              if not fichier.get("sha256"):
+                  bloquants.append(f"{fichier['name']} -> aucun sha256")
+
+          for message in bloquants:
+              print(f"::error::source non prouvée : {message}")
+          if bloquants:
               sys.exit(1)
-          if non_verifies:
-              print("::warning::certaines vérifications n'ont pas abouti (réseau)")
+          print("Toutes les sources correspondantes sont résolues, joignables et empreintées.")
           PY
 
       - name: Publier les preuves de source correspondante
@@ -708,7 +817,22 @@ jobs:
     # (test-postgres), stack Docker de production (docker-stack), analyse CodeQL,
     # et **restauration de sauvegarde** (backup-restore). Publier une image dont
     # on n'a pas démontré que la base se restaure reviendrait à livrer sans filet.
-    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore, tag-guard]
+    # `monitoring-overlay` n'y figure PAS, et ne doit pas y figurer : Grafana
+    # est une intégration optionnelle et externe, un cœur sain ne dépend pas
+    # d'un composant que RUGGYLAB ne distribue pas. `debian-source-evidence`,
+    # lui, conditionne bien la publication : distribuer l'image sans savoir
+    # quels paquets GPL elle contient ni où leurs sources se trouvent, c'est
+    # distribuer sans preuve. Cette liste est explicite et destinée à croître —
+    # `license-compliance` la rejoindra avec la PR #142.
+    needs:
+      - test
+      - test-postgres
+      - codeql
+      - e2e
+      - docker-stack
+      - backup-restore
+      - debian-source-evidence
+      - tag-guard
     runs-on: ubuntu-latest
     permissions:
       contents: read
