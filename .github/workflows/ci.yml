@@ -575,7 +575,7 @@ jobs:
           gunzip -c artifacts/candidate-image.tar.gz | docker load
           docker tag ruggylab-os:candidate ruggylab-os:license-check
           attendu="${{ needs.build-candidate.outputs.image_id }}"
-          obtenu=$(docker image inspect ruggylab-os:license-check --format '{{{{.Id}}}}')
+          obtenu=$(docker image inspect ruggylab-os:license-check --format '{{.Id}}')
           if [ "$obtenu" != "$attendu" ]; then
             echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
             exit 1
@@ -752,7 +752,7 @@ jobs:
           gunzip -c artifacts/candidate-image.tar.gz | docker load
           docker tag ruggylab-os:candidate ruggylab-os:ci
           attendu="${{ needs.build-candidate.outputs.image_id }}"
-          obtenu=$(docker image inspect ruggylab-os:ci --format '{{{{.Id}}}}')
+          obtenu=$(docker image inspect ruggylab-os:ci --format '{{.Id}}')
           if [ "$obtenu" != "$attendu" ]; then
             echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
             exit 1
@@ -893,7 +893,7 @@ jobs:
           gunzip -c artifacts/candidate-image.tar.gz | docker load
           docker tag ruggylab-os:candidate ruggylab-os:ci
           attendu="${{ needs.build-candidate.outputs.image_id }}"
-          obtenu=$(docker image inspect ruggylab-os:ci --format '{{{{.Id}}}}')
+          obtenu=$(docker image inspect ruggylab-os:ci --format '{{.Id}}')
           if [ "$obtenu" != "$attendu" ]; then
             echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
             exit 1
@@ -994,7 +994,7 @@ jobs:
           gunzip -c artifacts/candidate-image.tar.gz | docker load
           docker tag ruggylab-os:candidate ruggylab-os:source-evidence
           attendu="${{ needs.build-candidate.outputs.image_id }}"
-          obtenu=$(docker image inspect ruggylab-os:source-evidence --format '{{{{.Id}}}}')
+          obtenu=$(docker image inspect ruggylab-os:source-evidence --format '{{.Id}}')
           if [ "$obtenu" != "$attendu" ]; then
             echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
             exit 1

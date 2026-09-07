@@ -709,3 +709,18 @@ def test_the_release_regenerates_nothing(jobs):
         if str(e.get("uses", "")).startswith("actions/download-artifact")
     }
     assert {"third-party-evidence", "debian-source-evidence", "artifact-identity"} <= telecharges
+
+
+def test_docker_format_templates_are_well_formed(ci):
+    """Un gabarit `--format` mal échappé fait échouer le job, pas le test.
+
+    Les tests d'identité vérifiaient que le script COMPARE bien l'image ID ;
+    aucun ne vérifiait que la commande qui le lit est syntaxiquement valide. Un
+    échappement de trop — `{{{{.Id}}}}` au lieu de `{{.Id}}` — passait donc les
+    tests et cassait quatre jobs en CI.
+    """
+    contenu = CI_PATH.read_text(encoding="utf-8")
+    for gabarit in re.findall(r"--format\s+'([^']+)'", contenu):
+        assert "{{{" not in gabarit, f"accolades en trop dans le gabarit Docker : {gabarit}"
+        assert gabarit.count("{{") == gabarit.count("}}"), f"gabarit déséquilibré : {gabarit}"
+        assert not re.search(r"\{\{\{|\}\}\}", gabarit), f"gabarit malformé : {gabarit}"
