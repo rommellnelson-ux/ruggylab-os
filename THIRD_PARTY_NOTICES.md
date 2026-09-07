@@ -19,8 +19,43 @@ officielle.
 | SBOM | Syft, version épinglée dans `.github/workflows/ci.yml` |
 | Formats SBOM | CycloneDX JSON, SPDX JSON |
 
-> **Cet inventaire n'est pas encore complet.** Les éléments du §6 bloquent la
-> distribution externe tant qu'ils ne sont pas tranchés.
+> **Cet inventaire n'est pas complet.** Les éléments du §6 restent ouverts et
+> bloquent la distribution externe — laquelle est de toute façon verrouillée par
+> [`DISTRIBUTION_STATUS`](docs/governance/DISTRIBUTION_STATUS) = `DISTRIBUTION_NO_GO`.
+
+---
+
+## 0. Ce que RUGGYLAB distribue, et ce qu'il ne fait que référencer
+
+La distinction commande toute la suite. Une obligation de notice ou de source ne
+naît que de ce qu'on **distribue** ; référencer une image que l'exploitant tire
+lui-même n'est pas la distribuer.
+
+### Distribué par RUGGYLAB
+
+| Élément | Contenu |
+| --- | --- |
+| **Image applicative** `ghcr.io/<owner>/ruggylab-os` | code RUGGYLAB + dépendances Python + base Debian |
+| Paquet Python (wheel / sdist) | code RUGGYLAB + textes de licence |
+| Code source et documentation de la version | dépôt |
+| Licences et notices | `LICENSE.md`, ce document, `licenses/third-party/` |
+| SBOM | CycloneDX, SPDX |
+| Manifestes Debian | binaires, sources, licences |
+
+### Référencé dans Docker Compose, tiré par l'exploitant depuis l'amont
+
+`caddy`, `postgres`, `valkey`, `prom/prometheus`. **RUGGYLAB ne les republie
+pas** : le workflow ne pousse qu'une seule image, la sienne. Ces conteneurs sont
+exécutés séparément, non modifiés, à partir des registres de leurs éditeurs.
+
+### Intégration optionnelle externe
+
+`grafana/grafana`, via `docker-compose.monitoring.yml` uniquement — voir §6.2.
+
+> **Une distribution hors ligne changerait ce périmètre.** Regrouper les images
+> tierces dans une archive livrée au client ferait de RUGGYLAB leur
+> redistributeur, avec les obligations qui s'y attachent. Ce serait un
+> changement de périmètre de conformité, et il exigerait un nouvel audit.
 
 ---
 
@@ -85,17 +120,32 @@ Les digests sont résolus par la CI au moment du build et publiés dans l'artefa
 `third-party-evidence`. Un tag est mutable ; **seul le digest identifie
 réellement l'image livrée**.
 
-| Image | Tag | Rôle | Licence | Décision |
-| --- | --- | --- | --- | --- |
-| **`python`** | **`3.13-slim`** | base applicative | PSF-2.0 (Python) + **87 paquets Debian 13, majoritairement GPL/LGPL** | **REVUE OBLIGATOIRE — §6.4** |
-| `caddy` | `2.8-alpine` | proxy TLS | Apache-2.0 | compatible — notice + NOTICE requis |
-| `postgres` | `16.6-alpine` | base de données | PostgreSQL License (type BSD) | compatible — conteneur séparé, non modifié |
-| **`redis`** | **`7.4-alpine`** | cache / files | **voir §6.1** | **REVUE OBLIGATOIRE** |
-| `prom/prometheus` | `v3.1.0` | métriques | Apache-2.0 | compatible — notice + NOTICE requis |
-| **`grafana/grafana`** | **`11.0.0`** | tableaux de bord | **AGPL-3.0** | **REVUE OBLIGATOIRE — §6.2** |
+**Distribuée par RUGGYLAB — l'image applicative, et elle seule :**
 
-Aucune de ces images n'est modifiée : elles sont utilisées telles que publiées
-par leurs éditeurs, dans des conteneurs séparés.
+| Élément | Valeur |
+| --- | --- |
+| Base | `python:3.13.15-slim-trixie` |
+| Digest de la base | `sha256:7ce4b6dfe35e55397b7cda544f8a13f191b7ae28dc5aad71fe664dbc9bc2623f` |
+| Distribution | Debian GNU/Linux 13 « trixie » |
+| Licences | PSF-2.0 (CPython) + **87 paquets Debian**, dont une majorité de familles copyleft |
+| Preuves | 61 paquets sources, **194 fichiers sources** avec URL et SHA-256 — voir §6.3 |
+
+**Référencées dans Compose, tirées par l'exploitant :**
+
+| Image | Tag | Rôle | Licence | Constat |
+| --- | --- | --- | --- | --- |
+| `caddy` | `2.8-alpine` | proxy TLS | Apache-2.0 | non modifiée, conteneur séparé, notice + NOTICE |
+| `postgres` | `16.6-alpine` | base de données | PostgreSQL License (type BSD) | non modifiée, conteneur séparé |
+| **`valkey/valkey`** | **`8.1.9-alpine`** (digest épinglé) | cache, files, verrous | **BSD-3-Clause** | non modifiée ; texte versionné par RUGGYLAB — voir §6.1 |
+| `prom/prometheus` | `v3.1.0` | métriques | Apache-2.0 | non modifiée, conteneur séparé |
+
+**Intégration optionnelle externe** — hors du cœur, voir §6.2 :
+
+| Image | Tag | Licence | Où |
+| --- | --- | --- | --- |
+| `grafana/grafana` | `11.0.0` (digest épinglé) | **AGPL-3.0** | `docker-compose.monitoring.yml` seulement |
+
+Aucune de ces images n'est modifiée, et **aucune n'est republiée par RUGGYLAB**.
 
 ## 4. Ressources chargées à l'exécution depuis des CDN
 
@@ -107,14 +157,21 @@ portent des obligations d'attribution.
 | --- | --- | --- | --- | --- |
 | Leaflet | 1.9.4 | cdnjs | BSD-2-Clause | attribution |
 | JsBarcode | — | jsDelivr | MIT | attribution |
-| Google Fonts | — | fonts.googleapis.com | dépend de la police (souvent OFL 1.1) | **à préciser** |
 | Tuiles OpenStreetMap | — | tile.openstreetmap.org | données ODbL | attribution **présente** dans `ehm_map.html` ✓ + politique d'usage des tuiles |
 
-> **Point d'exploitation, hors licence.** Ces quatre ressources créent une
-> dépendance réseau sortante depuis le poste client. Dans un déploiement en
-> environnement contraint ou hors ligne, la carte, les codes-barres et les
-> polices ne s'afficheront pas. À traiter séparément si un fonctionnement
-> déconnecté est visé.
+Ces ressources **ne sont pas embarquées dans l'image** : le navigateur du poste
+client les récupère directement. RUGGYLAB ne les redistribue donc pas ; il les
+référence, et leurs obligations sont d'attribution.
+
+> **Google Fonts a été supprimé.** L'interface utilise désormais une **pile de
+> polices système** — aucune police n'est téléchargée ni embarquée, et aucune
+> licence de police n'est à qualifier. Un test interdit qu'un service de polices
+> tiers réapparaisse, `@font-face` distante comprise.
+
+> **Point d'exploitation, hors licence.** Les trois ressources restantes créent
+> une dépendance réseau sortante depuis le poste client. En environnement
+> contraint ou hors ligne, la carte et les codes-barres ne s'afficheront pas.
+> L'interface, elle, reste lisible : les polices ne dépendent plus du réseau.
 
 ## 5. Licences copyleft, source-available ou particulières
 
@@ -150,185 +207,116 @@ confusion entre LGPL et GPL est courante et conduirait à une conclusion fausse.
 > (type BSD, permissive). Leur licence est conservée dans
 > `licenses/third-party/python/psycopg-binary/`.
 
-## 6. Éléments non résolus — bloquants pour la distribution
+## 6. Composants qualifiés, et ce qui reste ouvert
 
-### 6.1 Redis 7.4 — décision prise : **écarté de la distribution**
+Trois des quatre points ouverts au 2026-08-28 sont **résolus dans le code**, et
+ne le sont que parce que le dépôt le démontre — chaque levée de marqueur ci-
+dessous a été vérifiée sur l'arbre courant avant d'être écrite.
 
-> ## ✅ Décision du titulaire — 2026-08-28
->
-> ```
-> REDIS_7_4_DISTRIBUTION = REJECTED
-> REDIS_REPLACEMENT      = VALKEY
-> ```
->
-> **Redis 7.4 ne sera pas retenu dans la distribution de la bêta.** Le
-> remplacement technique prévu est **Valkey**, fork BSD-3-Clause maintenu par la
-> Linux Foundation. C'est l'**option D combinée à l'option C** du tableau
-> ci-dessous : le composant sous licence source-available sort de la
-> distribution, remplacé par un composant sous licence permissive.
->
-> **Ce que cette décision ne dit pas encore.** Le statut
-> `REDIS_REPLACED_BY_VALKEY` **n'est pas prononcé** : il suppose la migration
-> technique réalisée, testée et fusionnée. Tant que la PR de migration n'est pas
-> fusionnée et le présent document requalifié, la pile décrite ici embarque
-> encore Redis 7.4 et **la distribution externe reste bloquée par ce point**.
->
-> **Marqueur maintenu : `MANUAL_LICENSE_REVIEW_REQUIRED`.** Une décision n'est
-> pas une mise en œuvre. Le marqueur ne tombera qu'avec la fusion de la
-> migration et la requalification de ce document — le lever plus tôt
-> laisserait croire que la pile livrée est déjà propre.
->
-> L'analyse qui a conduit à la décision est conservée ci-dessous : elle
-> documente le raisonnement, et les options écartées redeviendraient utiles si
-> la question était rouverte.
+### 6.1 Valkey 8.1.9 — Redis 7.4 écarté ✅
 
-Redis a changé de licence à partir de la version 7.4 : il n'est plus distribué
-sous BSD-3-Clause mais sous un **double régime source-available**, au choix du
-destinataire, entre :
+Redis avait quitté BSD-3-Clause à partir de la 7.4 pour un double régime
+source-available (RSALv2 / SSPLv1) restreignant la redistribution. Le titulaire
+a décidé de l'écarter ; la migration est **faite et fusionnée**.
 
-- **RSALv2** (Redis Source Available License v2) ;
-- **SSPLv1** (Server Side Public License v1).
-
-Ni l'une ni l'autre n'est une licence open source au sens de l'OSI. Ce qu'il
-faut retenir pour une distribution :
-
-- elles **restreignent** la fourniture de Redis « en tant que service » à des
-  tiers ;
-- la **SSPLv1** comporte une clause de divulgation étendue si le logiciel est
-  proposé comme service ;
-- un **usage interne** — cache d'une application déployée pour son propre compte
-  — est le cas le moins contraignant, mais **redistribuer l'image** avec la pile
-  n'est pas la même chose que l'exécuter.
-
-**Options prudentes, à trancher par le titulaire :**
-
-| Option | Ce qu'elle implique |
+| | |
 | --- | --- |
-| A. Conserver Redis 7.4 | après lecture des conditions RSALv2/SSPLv1 et confirmation que l'usage projeté y satisfait |
-| B. Version ou licence différente | par exemple une version antérieure encore sous BSD-3-Clause, avec vérification du support de sécurité |
-| C. Alternative compatible | un cache sous licence permissive, au prix d'une migration et de tests |
-| D. Exclure Redis de la distribution | ne pas livrer l'image ; l'exploitant fournit son propre Redis |
+| Image | `valkey/valkey:8.1.9-alpine` |
+| Digest | `sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84` |
+| Licence | **BSD-3-Clause** — `COPYING` de `valkey-io/valkey` @ 8.1.9 |
+| Texte versionné | [`licenses/third-party/containers/valkey/COPYING`](licenses/third-party/containers/valkey/COPYING) |
+| Rôle | serveur de cache, files, verrous — service du cœur |
+| Runtime | **vérifié** : 17 contrôles, dont `valkey_version = 8.1.9` lu sur le binaire et la persistance AOF après redémarrage |
 
-**Option retenue : D + C.** Redis 7.4 sort de la distribution, remplacé par
-Valkey. La migration est portée par une **PR technique distincte**, comme il se
-doit : le cache porte les compteurs de rate-limiting, la file de trames
-automates et le verrou de numérotation — cela ne se remplace pas dans une PR de
-licence, et pas sans une campagne de tests complète.
+**Le client Python ne change pas.** `redis-py` reste **MIT** : le changement de
+licence de 2024 visait le *serveur*, pas ce client. Les URL gardent le schéma
+`redis://`, qui nomme le protocole et non le produit.
 
-### 6.2 Grafana 11 — décision prise : **hors du cœur distribué**
+**Constat signalé** : l'image Valkey **n'embarque pas** son texte de licence.
+RUGGYLAB le versionne donc depuis la source officielle — sans quoi la notice ne
+serait disponible nulle part côté exploitant.
 
-> ## ✅ Décision du titulaire — 2026-08-28
->
-> ```
-> GRAFANA_CORE_DEPENDENCY          = FALSE
-> GRAFANA_DISTRIBUTED_BY_RUGGYLAB  = FALSE
-> GRAFANA_OPTIONAL_EXTERNAL_SERVICE = TRUE
-> PROMETHEUS_RETAINED              = TRUE
-> ```
->
-> **Grafana ne fera pas partie du cœur distribué de RUGGYLAB OS.** Il devient une
-> **intégration optionnelle et externe** : l'exploitant qui la souhaite récupère
-> l'image directement auprès de son éditeur et l'exécute pour son propre compte.
-> RUGGYLAB ne la copie pas, ne la reconditionne pas et ne la publie pas.
->
-> Cela répond à la question laissée ouverte plus bas — *la pile est-elle
-> distribuée, ou seulement déployée ?* — en supprimant le cas : la pile
-> distribuée ne contient plus Grafana.
->
-> Prometheus, lui, **reste dans la stack principale** (Apache-2.0, sans
-> difficulté de licence). L'absence de Grafana n'est **pas un mode dégradé** :
-> le fonctionnement nominal de RUGGYLAB est défini sans lui.
->
-> **Ce que cette décision ne dit pas encore.** Le statut `GRAFANA_EXTERNALIZED`
-> **n'est pas prononcé** : il suppose l'externalisation réalisée, testée et
-> fusionnée. Tant que la PR technique n'est pas fusionnée et ce document
-> requalifié, `docker-compose.yml` embarque encore Grafana.
->
-> **Marqueur maintenu : `AGPL_DISTRIBUTION_REVIEW_REQUIRED`.** Tant que
-> `docker-compose.yml` embarque le service Grafana, la pile telle qu'elle est
-> versionnée aujourd'hui contient bien un composant AGPL-3.0. Le marqueur
-> décrit l'état du dépôt, pas l'intention.
+> Marqueur `MANUAL_LICENSE_REVIEW_REQUIRED` **levé**. Vérifié sur l'arbre : plus
+> aucune image serveur Redis dans les fichiers de distribution, et un test
+> l'interdit.
 
-Grafana 11 est sous **AGPL-3.0**. Les obligations diffèrent radicalement selon
-l'usage, et **aucune conclusion n'est tirée ici sans preuve écrite** :
+### 6.2 Grafana 11 — hors du cœur distribué ✅
 
-| Situation | Obligation AGPL — à confirmer juridiquement |
+Grafana est sous **AGPL-3.0** et le reste : rien ici ne prétend le contraire. Ce
+qui change, c'est que **RUGGYLAB ne le distribue pas**.
+
+| | |
 | --- | --- |
-| Conteneur séparé, **non modifié**, exécuté par l'exploitant pour son propre compte | usage, non distribution — l'AGPL n'impose alors rien de plus que le respect de la licence |
-| **Distribution de la pile** incluant l'image Grafana | mise à disposition d'une œuvre AGPL : licence et source correspondante doivent être accessibles au destinataire |
-| Grafana **modifié** (plugins, thèmes, patches) | les modifications relèvent de l'AGPL et doivent être publiées |
-| Grafana **mis à disposition en réseau** à des tiers | clause réseau de l'AGPL : la source correspondante doit être offerte aux utilisateurs distants |
+| Image | `grafana/grafana:11.0.0`, digest épinglé, **non modifiée** |
+| Où | `docker-compose.monitoring.yml` **uniquement** |
+| Qui la récupère | l'**exploitant**, directement depuis le registre de l'éditeur |
+| Republication par RUGGYLAB | **aucune** — le workflow ne pousse que l'image applicative |
+| Impact de son absence | **aucun** : le cœur est qualifié sans elle |
 
-État constaté : Grafana est utilisé **non modifié**, dans un conteneur séparé,
-avec des tableaux de bord provisionnés. Les tableaux de bord sont des **données
-de configuration** propres au projet, pas des œuvres dérivées de Grafana.
+Le mode nominal supporté est **RUGGYLAB Core sans Grafana** : Prometheus reste
+dans la stack principale et collecte `/metrics` directement, les tableaux de
+bord métier sont intégrés à l'application. Son absence n'est pas un mode
+dégradé — c'est le mode que le projet teste et supporte.
 
-Ce qui restait à trancher — la pile est-elle **distribuée** à des tiers, ou
-seulement déployée par le titulaire ? — est tranché par la décision ci-dessus :
-la pile distribuée ne contiendra pas Grafana. La ligne du tableau qui
-s'appliquera est la première, et elle s'appliquera **chez l'exploitant**, pas
-chez le titulaire.
+Les tableaux de bord provisionnés sont des **données de configuration** propres
+au projet, montés en lecture seule ; ce ne sont pas des œuvres dérivées de
+Grafana.
 
-### 6.3 Google Fonts — provenance à préciser
+> Marqueur `AGPL_DISTRIBUTION_REVIEW_REQUIRED` **levé pour la distribution
+> RUGGYLAB**, parce que la distribution n'a plus lieu. **L'AGPL continue de
+> s'appliquer à Grafana lui-même**, entre son éditeur et l'exploitant qui
+> l'exécute. Réintroduire Grafana dans le cœur, ou livrer une archive hors ligne
+> le contenant, rouvrirait entièrement la question.
 
-La ou les familles chargées depuis `fonts.googleapis.com` ne sont pas
-identifiées dans cet inventaire. La plupart sont sous **OFL 1.1**, mais cela doit
-être **vérifié police par police**, pas supposé.
+### 6.3 Google Fonts — supprimé ✅
 
-### 6.4 Base Debian de l'image applicative — `BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED`
+La dépendance d'exécution à `fonts.googleapis.com` est **retirée**. L'interface
+utilise une pile de polices système ; aucune police n'est téléchargée ni
+embarquée, aucune licence de police n'est à qualifier. Vérifié dans un
+navigateur : zéro requête vers un service de polices, zéro occurrence dans le
+DOM rendu. Un test interdit la réapparition d'un service tiers, `@font-face`
+distante comprise.
 
-**Découvert par le SBOM, pas supposé.** Le SBOM CycloneDX de l'image
-(`artifacts/sbom.cyclonedx.json`, artefact `third-party-evidence`) recense
-**155 composants** hors entrées de fichier, dont **87 paquets Debian 13
-« trixie »** hérités de `python:3.13-slim`. Le recensement des licences
-copyleft, produit par `scripts/audit_sbom_licenses.py` :
+### 6.4 Sources correspondantes de la base Debian — **ouvert** ⛔
 
-| Famille | Occurrences relevées |
+`LEGAL_SOURCE_OFFER_REVIEW_REQUIRED`
+
+C'est le seul point de cette section qui reste ouvert, et il ne peut pas être
+fermé par du code.
+
+**Ce qui est démontré**, mesuré en CI sur l'image candidate
+(`linux/amd64`, Debian 13) :
+
+| Constat | Valeur |
 | --- | --- |
-| GPL-2.0 (`-only` / `-or-later`) | 111 |
-| GPL-3.0 (`-only` / `-or-later`) | 64 |
-| LGPL-2.0 / 2.1 (`-only` / `-or-later`) | 92 |
-| LGPL-3.0 (`-only` / `-or-later`) | 34 |
-| GPL-1.0, GPL générique, exceptions de liaison | 29 |
-| MPL-1.1 / MPL-2.0 | 3 |
+| Paquets binaires Debian | **87** |
+| Paquets sources correspondants | **61** |
+| Paquets sources vérifiés disponibles | **61 / 61** |
+| **Fichiers sources résolus** (`.dsc`, `.orig.tar.*`, `.debian.tar.*`…) | **194** |
+| **Fichiers sources vérifiés joignables** | **194 / 194** |
+| Fichiers sans SHA-256 attendu | **0** |
+| Paquets sans fichier `copyright` | **0** |
+| Textes de licence référencés manquants, non qualifiés | **0** |
 
-Une même licence peut être comptée pour plusieurs paquets ; ces nombres
-mesurent la présence, pas un nombre de composants distincts.
+Les SHA-256 des archives proviennent du bloc `Checksums-Sha256` que **Debian**
+déclare dans le `.dsc` ; aucune valeur n'est inventée. Détail et méthode :
+[`docs/compliance/SOURCE_COMPLIANCE.md`](docs/compliance/SOURCE_COMPLIANCE.md).
 
-**Ce qui est démontré.** Deux constats, vérifiés dans l'image construite :
+**Ce qui n'est pas résolu.** La forme de mise à disposition des sources n'a pas
+été instruite. Les manifestes portent une terminologie **non conclusive** —
+`copyleft_detected`, `license_family`, `source_compliance_review_required`, et
+`written_offer_applicability = LEGAL_REVIEW_REQUIRED` — parce que
+l'automatisation ne peut pas trancher : les familles copyleft **n'imposent pas
+la même forme** de mise à disposition, la portée de la MPL étant le fichier,
+celle de la GPL l'œuvre, celle de l'AGPL s'étendant à l'usage en réseau.
 
-- les **87 fichiers `copyright` Debian sont présents** dans l'image
-  (`/usr/share/doc/*/copyright`) ;
-- les **textes de licence référencés sont présents** eux aussi
-  (`/usr/share/common-licenses/` contient GPL-1, GPL-2, GPL-3, LGPL-2,
-  LGPL-2.1, LGPL-3, MPL-1.1, MPL-2.0, Apache-2.0, BSD…), et 77 des
-  87 fichiers `copyright` y renvoient.
+**Aucune des formes A, B, C ou D** de `SOURCE_COMPLIANCE.md` §5 n'est retenue.
+**Aucun modèle n'est signé.** Il n'est conclu ni à la conformité, ni à la
+non-conformité.
 
-L'obligation de **notice** est donc satisfaite par l'image elle-même.
-
-**Ce qui n'est PAS résolu.** La GPL-2.0 (§3) et la GPL-3.0 (§6) attachent, à
-qui **distribue** des binaires, une obligation d'**offre du code source
-correspondant**. Publier l'image sur un registre accessible à des tiers est une
-distribution. Trois voies existent — offre écrite valable trois ans, mise à
-disposition depuis la même source, ou transmission de l'offre reçue de l'amont —
-et **aucune n'est tranchée ici**. Il n'est conclu ni que l'obligation est
-satisfaite, ni qu'elle est violée : elle n'a pas été instruite.
-
-**Ce que cela ne veut pas dire.** La présence de paquets GPL dans l'image de
-base **ne rend pas RUGGYLAB OS open source**. Ces paquets sont des programmes
-séparés, non modifiés, exécutés comme tels ; RUGGYLAB OS ne les incorpore pas
-dans son propre code.
-
-**Conduite à tenir.** Marqueur `BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED`.
-Bloquant pour toute **distribution externe** de l'image, sans effet sur l'usage
-d'évaluation interne. Options à instruire, sans préférence exprimée ici :
-
-| Option | Ce qu'elle implique |
-| --- | --- |
-| A. Offre écrite de source | rédiger et honorer une offre valable trois ans pour les composants GPL de la base |
-| B. Renvoi à l'amont Debian | s'appuyer sur les sources publiées par Debian ; à confirmer par écrit, ce n'est pas automatique |
-| C. Base à empreinte réduite | réduire la surface copyleft ; décision d'ingénierie distincte, avec tests complets |
-| D. Pas de distribution externe de l'image | statu quo actuel : l'image reste interne |
+La présence de paquets GPL dans une base **ne rend pas RUGGYLAB OS open
+source** : ce sont des programmes séparés, non modifiés, que RUGGYLAB
+n'incorpore pas.
 
 ## 7. Éléments explicitement absents de la distribution
 
@@ -351,14 +339,22 @@ Vérifié dans cette PR :
 | Statut | Valeur |
 | --- | --- |
 | `THIRD_PARTY_NOTICES_GENERATED` | ✅ |
-| Licences indéterminées | **0** |
+| Licences Python indéterminées | **0** |
 | Composants du SBOM d'image sans licence, non qualifiés | **0** |
 | Exceptions qualifiées au registre | **4** — `SBOM_LICENSE_EXCEPTIONS.json` |
-| Décisions du titulaire prises | **§6.1 Redis → écarté ; §6.2 Grafana → hors du cœur** |
-| Mises en œuvre correspondantes | **non fusionnées** — les marqueurs restent |
-| `THIRD_PARTY_LICENSES_QUALIFIED` | ❌ — §6.1, §6.2, §6.3, §6.4 ouverts |
-| Effet | **la distribution externe reste bloquée** |
+| §6.1 Redis 7.4 → **Valkey 8.1.9** | ✅ fusionné, runtime vérifié |
+| §6.2 Grafana → **hors du cœur distribué** | ✅ fusionné, cœur qualifié sans lui |
+| §6.3 Google Fonts | ✅ **supprimé** |
+| §6.4 Sources correspondantes Debian | ⛔ **`LEGAL_SOURCE_OFFER_REVIEW_REQUIRED`** |
+| `THIRD_PARTY_LICENSES_QUALIFIED` | ❌ — §6.4 ouvert |
+| Validation juridique du texte de `LICENSE.md` §12 | ⛔ **`LEGAL_LICENSE_REVIEW_REQUIRED`** |
+| `DISTRIBUTION_STATUS` | **`DISTRIBUTION_NO_GO`** |
 
-Les quatre éléments ouverts bloquent la **distribution externe**. Aucun ne
-bloque l'usage d'évaluation interne sur données fictives, qui est le seul usage
-autorisé par la licence à ce stade.
+Trois des quatre points ouverts sont fermés **par le code**, et seulement parce
+que le dépôt le démontre. Les deux qui restent — la forme de mise à disposition
+des sources Debian, et la validation juridique du texte de licence — **ne
+peuvent pas être fermés par du code**. Ils demandent un juriste et une décision
+du titulaire.
+
+Aucun de ces points ne bloque l'usage d'évaluation interne sur données
+fictives, qui est le seul usage autorisé à ce stade.

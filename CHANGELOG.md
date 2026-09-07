@@ -5,18 +5,71 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 
 ## [Non publié]
 
-## [0.8.0-beta.1] - 2026-08-28
+## [0.8.0-beta.1] — À PUBLIER
 
-> ⚠️ **BÊTA TECHNIQUE — `REAL_DATA_NO_GO`.** Version destinée au développement,
-> à la qualification technique et aux essais sur données fictives ou
-> synthétiques. Elle ne constitue **pas** une autorisation d'utilisation
-> clinique réelle. La synchronisation CSA et les interfaces automates restent
+> **Cette version n'est pas publiée.** Aucun tag, aucune image, aucune Release
+> n'existe. La date réelle sera inscrite au moment du tag ; y porter une date
+> maintenant laisserait croire à une publication qui n'a pas eu lieu.
+
+> ⚠️ **BÊTA TECHNIQUE — `REAL_DATA_NO_GO` et `DISTRIBUTION_NO_GO`.** Version
+> destinée au développement, à la qualification technique et aux essais sur
+> données fictives ou synthétiques. Elle ne constitue **pas** une autorisation
+> d'utilisation clinique réelle, et **pas davantage** une autorisation de
+> distribution. La synchronisation CSA et les interfaces automates restent
 > désactivées par défaut.
 
-Première version consolidée depuis `v0.7.4` (2026-06-18) : 173 commits,
-283 fichiers, 14 migrations. Le détail fonctionnel est repris dans la section
+Première version consolidée depuis `v0.7.4` (2026-06-18) : **195 commits**,
+**334 fichiers**, **+49 812 / −6 557 lignes**, **14 migrations** jusqu'à la tête
+unique `20260826_0043`. Le détail fonctionnel est repris dans la section
 « Non publié » ci-dessus, conservée telle quelle ; cette section en résume la
 portée, les limites et la conduite à tenir.
+
+### Runtime et distribution
+
+- **Valkey 8.1.9 remplace le serveur Redis 7.4.** Redis avait quitté
+  BSD-3-Clause pour un double régime source-available restreignant la
+  redistribution. Valkey est le fork BSD-3-Clause du même serveur, épinglé par
+  digest. Le client `redis-py` (MIT), le protocole et le schéma `redis://` ne
+  changent pas. Volume **neuf** : aucune compatibilité de format n'est affirmée
+  sans test.
+- **Grafana sort du cœur distribué.** Il devient une intégration optionnelle et
+  externe (`docker-compose.monitoring.yml`), récupérée par l'exploitant auprès
+  de son éditeur. **Prometheus reste dans le cœur** et collecte `/metrics`
+  directement. Fonctionner sans Grafana n'est **pas un mode dégradé** : c'est le
+  mode nominal supporté et testé.
+- **Dépendance à Google Fonts supprimée.** L'interface utilise une pile de
+  polices système ; aucune police n'est téléchargée ni embarquée.
+- **Base Python épinglée** par version exacte et digest
+  (`python:3.13.15-slim-trixie@sha256:7ce4b6df…`), dans les deux étapes du
+  Dockerfile. Un tag flottant rendait la version non reproductible.
+- **Image candidate construite une seule fois** et réutilisée par tous les jobs
+  de qualification, puis publiée telle quelle : le SBOM, les preuves Debian et
+  la qualification Docker portent sur l'artefact qui sera livré.
+
+### Conformité
+
+- **Licence propriétaire d'évaluation** — RuggyLab Evaluation License 1.0
+  (`LicenseRef-RuggyLab-Evaluation-1.0`), durée de six mois sans reconduction
+  tacite. Le texte est neutre à la visibilité du dépôt : accéder au code n'a
+  jamais valu licence.
+- **Preuves de source correspondante Debian** : 87 paquets binaires, 61 paquets
+  sources, **194 fichiers sources** avec URL, taille et SHA-256 déclarés par
+  Debian, tous vérifiés joignables. Terminologie non conclusive
+  (`copyleft_detected`, `written_offer_applicability = LEGAL_REVIEW_REQUIRED`) :
+  l'automatisation constate, elle ne qualifie pas juridiquement.
+- **SBOM CycloneDX et SPDX**, inventaire Python, audit des licences d'image et
+  registre d'exceptions, tous régénérés sur l'image candidate.
+- **Deux gates bloquants pour la publication** : `license-compliance` et
+  `debian-source-evidence`. `monitoring-overlay` reste hors des gates.
+
+### Distribution — NO-GO
+
+`DISTRIBUTION_STATUS = DISTRIBUTION_NO_GO`, distinct de `REAL_DATA_NO_GO`. Le
+premier interdit de **remettre** le logiciel, le second de **soigner** avec.
+`tag-guard` refuse tout tag, y compris une pré-version correctement formée, tant
+que la distribution n'est pas autorisée. Le chemin `workflow_dispatch` de
+`deploy` a été retiré : il permettait de publier sans tag, donc sans passer par
+ce verrou.
 
 ### Sécurité
 
@@ -73,18 +126,18 @@ défaut** : `CSA_SYNC_ENABLED=false`, `ANALYZER_BIND_IP=127.0.0.1`,
 - Le compte technique CSA est **sur-privilégié côté `csa-plateau`** ; la
   correction est préparée mais non déployée. `CSA_SYNC_ENABLED` doit rester
   `false`.
-- **Composants tiers non entièrement qualifiés** — **bloquant pour toute
-  distribution externe.** Deux composants sont en revue de licence obligatoire :
-  **Redis 7.4** (source-available RSALv2/SSPLv1 depuis cette version, et non
-  plus BSD-3-Clause) et **Grafana 11** (AGPL-3.0, dont les obligations diffèrent
-  selon que la pile est seulement déployée ou réellement distribuée). Le SBOM de
-  l'image a fait apparaître un troisième point : la base `python:3.13-slim`
-  embarque **87 paquets Debian, majoritairement sous GPL/LGPL**. Les notices et
-  les textes de licence sont bien présents dans l'image — vérifié —, mais
-  l'obligation d'**offre du code source** attachée à la distribution de binaires
-  GPL n'a pas été instruite. Cela ne rend pas RUGGYLAB OS open source. La police
-  chargée depuis Google Fonts reste à préciser. Options et détail dans
+- **Deux points de conformité restent ouverts**, et **aucun ne peut être fermé
+  par du code** : la **forme de mise à disposition des sources correspondantes**
+  de la base Debian (87 paquets, familles copyleft détectées ; notices et textes
+  présents dans l'image, mais la forme de mise à disposition n'a pas été
+  instruite), et la **validation juridique** des clauses du §12 de `LICENSE.md`.
+  Les blocages Redis 7.4, Grafana et Google Fonts sont **fermés**. Détail dans
   `THIRD_PARTY_NOTICES.md` §6.
+- **Protection de branche plus permissive que le pipeline** : 2 checks requis
+  sur `main` contre 9 gates avant publication — voir
+  `docs/governance/BRANCH_PROTECTION_PRE_TAG_REQUIRED_CHECKS.md`.
+- **Dépôt encore public** alors que la décision est de le passer en privé avant
+  le tag.
 
 ### Licence
 

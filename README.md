@@ -374,6 +374,9 @@ soumis aux leurs. Ils sont recensés dans
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), avec les textes intégraux
 dans [`licenses/third-party/`](licenses/third-party/).
 
-Certains composants — notamment **Redis 7.4** et **Grafana 11** — font l'objet
-d'une **revue de licence obligatoire** encore ouverte, qui bloque toute
-distribution externe de la pile.
+Redis 7.4 a été **écarté** au profit de **Valkey 8.1.9** (BSD-3-Clause), et
+Grafana **sorti du cœur distribué**. Reste ouvert : la forme de mise à
+disposition des **sources correspondantes de la base Debian**, et la validation
+juridique du texte de licence. Ces deux points, plus
+[`DISTRIBUTION_STATUS`](docs/governance/DISTRIBUTION_STATUS) = `DISTRIBUTION_NO_GO`,
+interdisent toute distribution externe.

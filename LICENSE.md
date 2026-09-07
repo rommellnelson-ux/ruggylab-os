@@ -27,9 +27,10 @@ Le Logiciel a été conçu et développé à titre personnel et indépendant.
 **La consultation, la possession, le téléchargement, le clonage ou toute autre
 obtention d'une copie du Logiciel ne confèrent aucun droit d'utilisation.**
 
-Le dépôt est visible publiquement pour des raisons de transparence technique et
-d'auditabilité. Cette visibilité n'est **pas** une mise à disposition : aucune
-licence, expresse ou tacite, n'en découle.
+Le fait que le code soit **accessible, consultable, cloné ou détenu** — quel
+qu'en soit le moyen, et quel que soit le régime de visibilité du dépôt à un
+moment donné — ne constitue **pas** une mise à disposition et **ne confère
+aucune licence**, expresse ou tacite.
 
 ## 3. Autorisation écrite préalable
 
