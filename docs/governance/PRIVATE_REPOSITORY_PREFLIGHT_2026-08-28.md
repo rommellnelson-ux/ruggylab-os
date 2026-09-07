@@ -74,9 +74,16 @@ C'est le point le plus concret, et le seul qui coûte de l'argent.
 
 | Mesure | Valeur relevée |
 | --- | --- |
-| Durée cumulée des jobs, dernier run complet | **~15 minutes** (10 jobs) |
+| Durée cumulée des jobs, dernier run complet | **~19 minutes** (11 jobs) |
 | Runs déclenchés en août 2026 | **66** |
 | Consommation facturée aujourd'hui | **0** — les dépôts publics sont gratuits |
+
+> **Actualisé le 2026-09-06.** Le pipeline a gagné trois jobs depuis la première
+> mesure : `monitoring-overlay`, `debian-source-evidence` et `build-candidate`.
+> Ce dernier construit l'image une seule fois, ce qui **retire** une
+> construction à chacun des quatre jobs qui la consommaient — le coût total
+> augmente moins que le nombre de jobs ne le suggère. Le job Debian, lui,
+> ajoute plusieurs minutes de vérifications réseau.
 
 **Estimation après bascule**, en incluant les jobs ajoutés par les PR en cours
 (`license-compliance`, `monitoring-overlay`, `debian-source-evidence`), soit
@@ -84,8 +91,8 @@ environ 25 minutes cumulées par run :
 
 | Hypothèse | Minutes / mois |
 | --- | --- |
-| 66 runs × 15 min (rythme et périmètre actuels) | ~990 |
-| 66 runs × 25 min (périmètre après fusion des PR) | **~1 650** |
+| 66 runs × 19 min (périmètre mesuré au 2026-09-06) | **~1 254** |
+| 66 runs × 25 min (marge pour un mois chargé) | ~1 650 |
 
 L'inclusion `GitHub Free` pour un compte personnel est de **2 000 minutes par
 mois** sur dépôt privé. L'estimation haute en consomme **plus de 80 %**, sans
@@ -169,7 +176,15 @@ elle-même mais **un tag créé pendant que la CI est cassée**. D'où le verrou
 
 ```
 PRIVATE_REPOSITORY_PREFLIGHT_READY
+PRIVATE_REPOSITORY_CHANGE_REQUIRED
 ```
+
+Le premier statut dit que **la mesure est faite** ; le second, que **le
+changement ne l'est pas**. Le dépôt est toujours public, et le passage en privé
+est l'une des six preuves exigées par
+[`DISTRIBUTION_STATUS.md`](DISTRIBUTION_STATUS.md) §4 avant que la distribution
+soit autorisée. **Le tag reste interdit tant que le dépôt n'est pas privé et
+requalifié.**
 
 Le préflight est **prêt** : les mesures sont faites, les risques identifiés et
 chiffrés. Trois d'entre eux appellent une décision **avant** la bascule, et
