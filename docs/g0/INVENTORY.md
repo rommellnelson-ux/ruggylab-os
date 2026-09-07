@@ -78,15 +78,32 @@ réelles. Il est requalifié au §6.
 | `docker-compose.monitoring.dev.yml` | `dev_override` | 1 | port loopback pour l'overlay |
 | `docker-compose.analyzers.yml` | `optional_overlay` | 1 | interfaces automates, **désactivées** |
 
-### Services du cœur
+### Services du cœur — définitions et exécution nominale
 
-```
-analyzer-gateway · app · db-backup · migrate · postgres · prometheus · proxy · scheduler · valkey
-```
+| | Nombre | Services |
+| --- | --- | --- |
+| **Définitions de services** | **9** | `analyzer-gateway` `app` `db-backup` `migrate` `postgres` `prometheus` `proxy` `scheduler` `valkey` |
+| **Services nominaux continus** | **8** | les mêmes, **sauf `migrate`** |
+| **Tâches ponctuelles sous profil** | **1** | `migrate` |
 
-**Neuf services.** Variables obligatoires pour les démarrer : `SECRET_KEY`,
+> **Une définition n'est pas un conteneur qui tourne.** `migrate` porte le
+> profil `migrate` et aucune politique de redémarrage : un `docker compose up`
+> nominal ne le démarre pas, et lorsqu'il est lancé explicitement il s'exécute
+> une fois puis s'arrête. La première rédaction de cette preuve écrivait
+> « 9 services dans le cœur » — vrai au sens des définitions, faux au sens de
+> ce qui s'exécute, et surestimant d'un conteneur la surface permanente.
+>
+> `migrate` reste inventorié : le retirer masquerait un point d'entrée réel.
+
+Variables obligatoires pour démarrer le cœur : `SECRET_KEY`,
 `POSTGRES_PASSWORD`, `FIRST_SUPERUSER_PASSWORD`, `RUGGYLAB_IMAGE`. **Aucune
 variable Grafana.**
+
+> **Les images du cœur ne portent pas toutes un tag.** Quatre services —
+> `app`, `scheduler`, `analyzer-gateway`, `migrate` — reçoivent leur image par
+> l'expansion `${RUGGYLAB_IMAGE:?…}`, résolue au démarrage. L'inventaire les
+> marque `dynamic_environment_expression` avec `tag: null` et nomme la variable
+> requise, au lieu de leur inventer un tag.
 
 ### Deux vérifications explicites
 

@@ -319,6 +319,13 @@ def _compose() -> list[dict[str, Any]]:
                 "file": nom,
                 "status": statut,
                 "role": role,
+                "service_definitions": len(services),
+                "nominal_running_services": sum(
+                    1 for s in services if s["runtime_kind"] == "continuous"
+                ),
+                "one_shot_profile_services": sorted(
+                    s["service"] for s in services if s["runtime_kind"] == "one_shot_profile_task"
+                ),
                 "services": services,
                 "volumes": sorted(contenu.get("volumes") or {}),
                 "networks": sorted(contenu.get("networks") or {}),
@@ -608,14 +615,15 @@ def construire(app) -> dict[str, dict[str, Any]]:
             "governance_defaults": _reglages_par_defaut(),
         },
         "compose": compose,
-        "expected_processes": sorted(
-            {
-                service["service"]
-                for fichier in compose
-                if fichier["status"] == "core"
-                for service in fichier["services"]
-            }
-        ),
+        # « Neuf services dans le cœur » était vrai au sens des définitions et
+        # faux au sens de ce qui tourne : `migrate` est une tâche ponctuelle
+        # sous profil, jamais démarrée par un `docker compose up` nominal.
+        # Confondre les deux surestime la surface permanente.
+        "core_services": {
+            "service_definitions": sorted(_services_coeur(compose)),
+            "nominal_running_services": sorted(_services_coeur(compose, "continuous")),
+            "one_shot_profile_services": sorted(_services_coeur(compose, "one_shot_profile_task")),
+        },
     }
 
     entrypoints = {
@@ -698,7 +706,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Lignes (app/)                  : {inv['application']['total_lines']}")
         print(f"Scripts CLI                    : {len(inv['application']['cli_scripts'])}")
         print(f"Fichiers Compose               : {len(inv['compose'])}")
-        print(f"Services du cœur               : {len(inv['expected_processes'])}")
+        coeur = inv["core_services"]
+        print(f"Définitions de services (cœur) : {len(coeur['service_definitions'])}")
+        print(f"  dont services nominaux       : {len(coeur['nominal_running_services'])}")
+        print(f"  dont tâches ponctuelles      : {coeur['one_shot_profile_services']}")
         print(f"Chemins OpenAPI                : {rte['openapi_paths']}")
         print(f"Opérations OpenAPI             : {rte['openapi_operations']}")
         print(f"Routes runtime                 : {ent['http']['runtime_routes']}")
