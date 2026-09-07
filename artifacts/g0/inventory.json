@@ -75,6 +75,12 @@
           "type": "cli_script"
         },
         {
+          "docstring_first_line": "Provenance des artefacts G0 — dire de quoi la baseline parle, et le prouver.",
+          "has_main_guard": false,
+          "path": "scripts/g0_provenance.py",
+          "type": "cli_script"
+        },
+        {
           "docstring_first_line": "Inventaire G0 — schéma PostgreSQL réellement créé, et graphe Alembic.",
           "has_main_guard": true,
           "path": "scripts/g0_schema_inventory.py",
@@ -1385,7 +1391,10 @@
       {
         "file": "docker-compose.analyzers.yml",
         "networks": [],
+        "nominal_running_services": 0,
+        "one_shot_profile_services": [],
         "role": "Interfaces automates — désactivées",
+        "service_definitions": 1,
         "services": [
           {
             "command": "",
@@ -1393,9 +1402,10 @@
               "postgres",
               "valkey"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": true,
-            "image": "(construite depuis le Dockerfile)",
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
             "networks": [],
             "profiles": [],
             "published_ports": [
@@ -1404,11 +1414,18 @@
               "${ANALYZER_BIND_IP}:${ANALYZER_IMMUNO_PORT:-9002}:9002",
               "${ANALYZER_BIND_IP}:${DH36_LISTENER_PORT:-5001}:5001"
             ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
             "required_variables": [
               "ANALYZER_BIND_IP"
             ],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
             "service": "analyzer-gateway",
-            "tag": "",
+            "started_by_default": true,
+            "tag": null,
             "volumes": []
           }
         ],
@@ -1418,21 +1435,35 @@
       {
         "file": "docker-compose.dev.yml",
         "networks": [],
+        "nominal_running_services": 0,
+        "one_shot_profile_services": [
+          "analyzer-gateway",
+          "scheduler"
+        ],
         "role": "Surcharge de développement",
+        "service_definitions": 7,
         "services": [
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "ruggylab-os:dev",
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
             "networks": [],
             "profiles": [
               "workers"
             ],
             "published_ports": [],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot_profile_task",
             "service": "analyzer-gateway",
+            "started_by_default": false,
             "tag": "dev",
             "volumes": []
           },
@@ -1447,16 +1478,24 @@
               "--reload"
             ],
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "ruggylab-os:dev",
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
             "networks": [],
             "profiles": [],
             "published_ports": [
               "127.0.0.1:8000:8000"
             ],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
             "service": "app",
+            "started_by_default": true,
             "tag": "dev",
             "volumes": [
               "./alembic.ini:/app/alembic.ini:ro",
@@ -1469,79 +1508,119 @@
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "ruggylab-os:dev",
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
             "networks": [],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
             "service": "migrate",
+            "started_by_default": true,
             "tag": "dev",
             "volumes": []
           },
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "(construite depuis le Dockerfile)",
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
             "networks": [],
             "profiles": [],
             "published_ports": [
               "127.0.0.1:5432:5432"
             ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
             "service": "postgres",
-            "tag": "",
+            "started_by_default": true,
+            "tag": null,
             "volumes": []
           },
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "(construite depuis le Dockerfile)",
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
             "networks": [],
             "profiles": [],
             "published_ports": [
               "127.0.0.1:9090:9090"
             ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
             "service": "prometheus",
-            "tag": "",
+            "started_by_default": true,
+            "tag": null,
             "volumes": []
           },
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "ruggylab-os:dev",
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
             "networks": [],
             "profiles": [
               "workers"
             ],
             "published_ports": [],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot_profile_task",
             "service": "scheduler",
+            "started_by_default": false,
             "tag": "dev",
             "volumes": []
           },
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "(construite depuis le Dockerfile)",
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
             "networks": [],
             "profiles": [],
             "published_ports": [
               "127.0.0.1:6379:6379"
             ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
             "service": "valkey",
-            "tag": "",
+            "started_by_default": true,
+            "tag": null,
             "volumes": []
           }
         ],
@@ -1551,22 +1630,33 @@
       {
         "file": "docker-compose.monitoring.dev.yml",
         "networks": [],
+        "nominal_running_services": 0,
+        "one_shot_profile_services": [],
         "role": "Port loopback pour l'overlay",
+        "service_definitions": 1,
         "services": [
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "(construite depuis le Dockerfile)",
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
             "networks": [],
             "profiles": [],
             "published_ports": [
               "127.0.0.1:3000:3000"
             ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
             "service": "grafana",
-            "tag": "",
+            "started_by_default": true,
+            "tag": null,
             "volumes": []
           }
         ],
@@ -1576,7 +1666,10 @@
       {
         "file": "docker-compose.monitoring.yml",
         "networks": [],
+        "nominal_running_services": 1,
+        "one_shot_profile_services": [],
         "role": "Supervision Grafana, hors du cœur",
+        "service_definitions": 1,
         "services": [
           {
             "command": "",
@@ -1585,16 +1678,24 @@
             ],
             "digest": "sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54",
             "has_healthcheck": true,
-            "image": "grafana/grafana:11.0.0@sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54",
+            "image_reference_kind": "static",
+            "image_template": "grafana/grafana:11.0.0@sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54",
             "networks": [
               "management_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": "grafana/grafana",
+            "required_variable": null,
             "required_variables": [
               "GRAFANA_PASSWORD"
             ],
+            "resolved_image": "grafana/grafana:11.0.0@sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "grafana",
+            "started_by_default": true,
             "tag": "11.0.0",
             "volumes": [
               "./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro",
@@ -1616,7 +1717,12 @@
           "frontend_net",
           "management_net"
         ],
+        "nominal_running_services": 8,
+        "one_shot_profile_services": [
+          "migrate"
+        ],
         "role": "Stack de production — mode nominal supporté",
+        "service_definitions": 9,
         "services": [
           {
             "command": [
@@ -1627,21 +1733,29 @@
             "depends_on": [
               "postgres"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": true,
-            "image": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
             "networks": [
               "analyzer_net",
               "backend_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
             "required_variables": [
               "RUGGYLAB_IMAGE",
               "SECRET_KEY"
             ],
+            "resolved_image": null,
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "analyzer-gateway",
-            "tag": "?RUGGYLAB_IMAGE must be set}",
+            "started_by_default": true,
+            "tag": null,
             "volumes": []
           },
           {
@@ -1650,22 +1764,30 @@
               "postgres",
               "valkey"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": true,
-            "image": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set (immutable tag, e.g. ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha>)}",
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set (immutable tag, e.g. ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha>)}",
             "networks": [
               "backend_net",
               "frontend_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
             "required_variables": [
               "FIRST_SUPERUSER_PASSWORD",
               "RUGGYLAB_IMAGE",
               "SECRET_KEY"
             ],
+            "resolved_image": null,
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "app",
-            "tag": "<git-sha>)}",
+            "started_by_default": true,
+            "tag": null,
             "volumes": [
               "app_data:/app/data",
               "app_models:/app/models"
@@ -1678,18 +1800,26 @@
             "depends_on": [
               "postgres"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": true,
-            "image": "postgres:16.6-alpine",
+            "image_reference_kind": "static",
+            "image_template": "postgres:16.6-alpine",
             "networks": [
               "backend_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": "postgres",
+            "required_variable": null,
             "required_variables": [
               "POSTGRES_PASSWORD"
             ],
+            "resolved_image": "postgres:16.6-alpine",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "db-backup",
+            "started_by_default": true,
             "tag": "16.6-alpine",
             "volumes": [
               "${BACKUP_HOST_DIR:-./backups}:/backups"
@@ -1704,9 +1834,10 @@
             "depends_on": [
               "postgres"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": true,
-            "image": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
             "networks": [
               "backend_net"
             ],
@@ -1714,28 +1845,43 @@
               "migrate"
             ],
             "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
             "required_variables": [
               "RUGGYLAB_IMAGE"
             ],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot_profile_task",
             "service": "migrate",
-            "tag": "?RUGGYLAB_IMAGE must be set}",
+            "started_by_default": false,
+            "tag": null,
             "volumes": []
           },
           {
             "command": "",
             "depends_on": [],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": true,
-            "image": "postgres:16.6-alpine",
+            "image_reference_kind": "static",
+            "image_template": "postgres:16.6-alpine",
             "networks": [
               "backend_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": "postgres",
+            "required_variable": null,
             "required_variables": [
               "POSTGRES_PASSWORD"
             ],
+            "resolved_image": "postgres:16.6-alpine",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "postgres",
+            "started_by_default": true,
             "tag": "16.6-alpine",
             "volumes": [
               "postgres_data:/var/lib/postgresql/data"
@@ -1751,17 +1897,25 @@
             "depends_on": [
               "app"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "prom/prometheus:v3.1.0",
+            "image_reference_kind": "static",
+            "image_template": "prom/prometheus:v3.1.0",
             "networks": [
               "backend_net",
               "management_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": "prom/prometheus",
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": "prom/prometheus:v3.1.0",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "prometheus",
+            "started_by_default": true,
             "tag": "v3.1.0",
             "volumes": [
               "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro",
@@ -1773,9 +1927,10 @@
             "depends_on": [
               "app"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": false,
-            "image": "caddy:2.8-alpine",
+            "image_reference_kind": "static",
+            "image_template": "caddy:2.8-alpine",
             "networks": [
               "frontend_net"
             ],
@@ -1784,8 +1939,15 @@
               "443:443",
               "80:80"
             ],
+            "registry": null,
+            "repository": "caddy",
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": "caddy:2.8-alpine",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "proxy",
+            "started_by_default": true,
             "tag": "2.8-alpine",
             "volumes": [
               "./deploy/Caddyfile:/etc/caddy/Caddyfile:ro",
@@ -1802,20 +1964,28 @@
             "depends_on": [
               "postgres"
             ],
-            "digest": "",
+            "digest": null,
             "has_healthcheck": true,
-            "image": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
             "networks": [
               "backend_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
             "required_variables": [
               "RUGGYLAB_IMAGE",
               "SECRET_KEY"
             ],
+            "resolved_image": null,
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "scheduler",
-            "tag": "?RUGGYLAB_IMAGE must be set}",
+            "started_by_default": true,
+            "tag": null,
             "volumes": []
           },
           {
@@ -1823,14 +1993,22 @@
             "depends_on": [],
             "digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
             "has_healthcheck": true,
-            "image": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+            "image_reference_kind": "static",
+            "image_template": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
             "networks": [
               "backend_net"
             ],
             "profiles": [],
             "published_ports": [],
+            "registry": null,
+            "repository": "valkey/valkey",
+            "required_variable": null,
             "required_variables": [],
+            "resolved_image": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
             "service": "valkey",
+            "started_by_default": true,
             "tag": "8.1.9-alpine",
             "volumes": [
               "valkey_data:/data"
@@ -1849,17 +2027,32 @@
         ]
       }
     ],
-    "expected_processes": [
-      "analyzer-gateway",
-      "app",
-      "db-backup",
-      "migrate",
-      "postgres",
-      "prometheus",
-      "proxy",
-      "scheduler",
-      "valkey"
-    ]
+    "core_services": {
+      "nominal_running_services": [
+        "analyzer-gateway",
+        "app",
+        "db-backup",
+        "postgres",
+        "prometheus",
+        "proxy",
+        "scheduler",
+        "valkey"
+      ],
+      "one_shot_profile_services": [
+        "migrate"
+      ],
+      "service_definitions": [
+        "analyzer-gateway",
+        "app",
+        "db-backup",
+        "migrate",
+        "postgres",
+        "prometheus",
+        "proxy",
+        "scheduler",
+        "valkey"
+      ]
+    }
   },
-  "schema_version": "1.0.0"
+  "schema_version": "2.0.0"
 }

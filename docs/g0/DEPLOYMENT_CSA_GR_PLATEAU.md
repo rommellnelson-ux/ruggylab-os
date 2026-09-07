@@ -1,5 +1,17 @@
 # G0 — Vue de déploiement : CSA GR Plateau
 
+> **INTERNAL — SECURITY ARCHITECTURE**
+> **BASELINE TECHNIQUE — NOT FOR OPERATIONAL DEPLOYMENT**
+>
+> Ce document décrit une architecture de référence, pas une installation. Il ne
+> contient aucune adresse IP réelle de site, aucun identifiant, aucun secret,
+> aucun nom de compte, aucune topologie VLAN réelle et aucune donnée patient —
+> et il ne doit pas en recevoir tant que le dépôt reste public.
+>
+> Ce bandeau est une **mention de classification, pas un contrôle d'accès** : il
+> n'empêche personne de lire ce fichier. Le seul contrôle réel serait la
+> visibilité du dépôt.
+
 > **Ce document décrit une cible d'évaluation, pas une installation en
 > service.** `CLINICAL_STATUS = REAL_DATA_NO_GO` et
 > `DISTRIBUTION_STATUS = DISTRIBUTION_NO_GO` : à ce jour, **rien n'est

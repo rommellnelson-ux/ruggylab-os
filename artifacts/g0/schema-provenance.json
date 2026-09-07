@@ -1,11 +1,25 @@
 {
-  "_comment": "La version du serveur et le nom de la base dependent de l'environnement de mesure : ils sont exclus du payload compare.",
-  "database_name": "g0_baseline",
-  "generated_at": "2026-09-07T14:58:40Z",
-  "generation_command": "python scripts/g0_schema_inventory.py --database-url <postgres> --generate",
-  "generator_version": "1.0.0",
-  "platform": "windows/amd64",
-  "postgres_server_version": "PostgreSQL 16.14",
-  "schema_version": "1.0.0",
-  "source_git_sha": "18bf868c1ffe599c591c3b55b9b4088b01d1336d"
+  "_comment": "deterministic est compare par --check ; volatile ne l'est pas. baseline_input_commit est DECLARE (reference permanente), jamais derive de la branche de travail. relevant_input_tree_sha256 est la preuve verifiable : l'empreinte des octets reellement lus.",
+  "deterministic": {
+    "baseline_input_commit": "f7abd7e10eb8acc22e3e13775a43172e7a90261e",
+    "baseline_input_ref": "main",
+    "generation_command": "python scripts/g0_schema_inventory.py --database-url <postgres> --generate",
+    "generator_version": "2.0.0",
+    "relevant_input_file_count": 48,
+    "relevant_input_patterns": [
+      "alembic/**/*",
+      "alembic.ini",
+      "requirements.txt"
+    ],
+    "relevant_input_set": "schema",
+    "relevant_input_tree_sha256": "5915d011eb706883d98f8c99ce024e8b01c1cd8c42897c18743ece281853784b",
+    "schema_version": "2.0.0"
+  },
+  "volatile": {
+    "database_name": "g0_baseline",
+    "generated_at": "2026-09-07T17:46:15Z",
+    "platform": "windows/amd64",
+    "postgres_server_version": "PostgreSQL 16.14",
+    "python_version": "3.13.13"
+  }
 }

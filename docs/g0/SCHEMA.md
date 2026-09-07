@@ -1,5 +1,17 @@
 # G0 — Schéma PostgreSQL et graphe des migrations
 
+> **INTERNAL — SECURITY ARCHITECTURE**
+> **BASELINE TECHNIQUE — NOT FOR OPERATIONAL DEPLOYMENT**
+>
+> Ce document décrit une architecture de référence, pas une installation. Il ne
+> contient aucune adresse IP réelle de site, aucun identifiant, aucun secret,
+> aucun nom de compte, aucune topologie VLAN réelle et aucune donnée patient —
+> et il ne doit pas en recevoir tant que le dépôt reste public.
+>
+> Ce bandeau est une **mention de classification, pas un contrôle d'accès** : il
+> n'empêche personne de lire ce fichier. Le seul contrôle réel serait la
+> visibilité du dépôt.
+
 > **Introspecté sur une base réellement migrée**, jamais lu dans les modèles
 > Python. Les deux peuvent diverger — une migration écrite à la main, un
 > `server_default` oublié, un index créé hors modèle. Décrire les modèles

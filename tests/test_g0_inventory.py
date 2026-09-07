@@ -86,23 +86,11 @@ def test_volatile_fields_live_outside_the_compared_payload():
     from scripts.g0_inventory import provenance
 
     entete = provenance("test")
-    assert "generated_at" in entete
+    assert "generated_at" in entete["volatile"]
+    assert "generated_at" not in entete["deterministic"]
     for nom in ("inventory", "entrypoints", "routes"):
         corps = json.dumps(_payload(nom))
         assert "generated_at" not in corps, f"{nom}.json porte un champ volatil"
-
-
-def test_provenance_identifies_what_it_describes():
-    provenance = json.loads(_lire(ARTEFACTS / "provenance.json"))
-    for champ in (
-        "schema_version",
-        "generator_version",
-        "generated_at",
-        "source_git_sha",
-        "generation_command",
-        "platform",
-    ):
-        assert provenance.get(champ), f"champ de provenance vide : {champ}"
 
 
 def test_check_detects_a_divergence(tmp_path):
@@ -245,7 +233,22 @@ def test_every_compose_file_is_classified(inventaire):
 def test_every_compose_service_carries_its_details(inventaire):
     for fichier in inventaire["compose"]:
         for service in fichier["services"]:
-            for champ in ("service", "image", "networks", "volumes", "published_ports"):
+            for champ in (
+                "service",
+                "image_reference_kind",
+                "image_template",
+                "resolved_image",
+                "registry",
+                "repository",
+                "tag",
+                "digest",
+                "required_variable",
+                "runtime_kind",
+                "started_by_default",
+                "networks",
+                "volumes",
+                "published_ports",
+            ):
                 assert champ in service, f"{fichier['file']}/{service.get('service')} : {champ}"
 
 
@@ -289,7 +292,7 @@ def test_the_core_services_match_the_c4_container_diagram(inventaire, compose_co
         assert re.search(rf"\b{re.escape(service)}\b", coeur), (
             f"service `{service}` du cœur absent du sous-graphe CORE du C4"
         )
-    for service in inventaire["expected_processes"]:
+    for service in inventaire["core_services"]["service_definitions"]:
         assert service in compose_coeur["services"], (
             f"`{service}` figure dans l'inventaire mais plus dans le Compose"
         )
@@ -312,7 +315,8 @@ def test_no_redis_server_and_valkey_present(inventaire, compose_coeur):
     assert "valkey" in compose_coeur["services"]
     coeur = [f for f in inventaire["compose"] if f["status"] == "core"][0]
     valkey = next(s for s in coeur["services"] if s["service"] == "valkey")
-    assert valkey["image"].startswith("valkey/valkey:")
+    assert valkey["image_reference_kind"] == "static"
+    assert valkey["resolved_image"].startswith("valkey/valkey:")
     assert valkey["digest"], "l'image Valkey doit être épinglée par digest"
 
 
@@ -527,3 +531,414 @@ def test_the_inventory_records_the_governance_defaults(inventaire):
     assert reglages["CSA_SYNC_ENABLED"] == "False"
     assert reglages["ENABLE_DH36_LISTENER"] == "False"
     assert reglages["ANALYZER_RAW_LISTENER_ENABLED"] == "False"
+
+
+# ── /app/map : ce que la page révèle réellement ─────────────────────────────
+#
+# La première rédaction de cette preuve affirmait que la page « ne révèle que
+# l'existence de la fonctionnalité ». La réponse réellement servie contient
+# davantage. Une qualification qui minimise ce qu'elle qualifie est pire qu'une
+# absence de qualification : elle clôt l'examen.
+
+#: Éléments présents dans le HTML public, vérifiés dans la réponse HTTP.
+_CONTENU_PUBLIC_CARTE = (
+    "Cartographie des EHM et Gendarmerie",
+    "Établissements Hospitaliers Militaires",
+    "DIVISION SANTÉ",
+    "HMA",
+    "CMA",
+    "CSA",
+    "Gendarmerie",
+)
+
+#: Effectifs agrégés, écrits en dur dans le gabarit.
+_EFFECTIFS_PUBLICS = ("60", "1", "8", "51", "37", "22")
+
+
+@pytest.fixture(scope="module")
+def reponse_carte_sans_jeton():
+    """`GET /app/map` sans en-tête `Authorization`, tel qu'un anonyme la reçoit."""
+    from fastapi.testclient import TestClient
+
+    from scripts.g0_inventory import _charger_application
+
+    # Pas de `with` : le cycle de vie complet exigerait une configuration de
+    # production. Ce qui est mesuré ici est la réponse du gabarit, pas le
+    # démarrage de l'application.
+    return TestClient(_charger_application()).get("/app/map")
+
+
+def test_the_military_map_answers_unauthenticated_clients(reponse_carte_sans_jeton):
+    assert reponse_carte_sans_jeton.status_code == 200
+
+
+@pytest.mark.parametrize("element", _CONTENU_PUBLIC_CARTE)
+def test_the_military_map_exposes_institutional_content(element, reponse_carte_sans_jeton):
+    assert element in reponse_carte_sans_jeton.text, (
+        f"« {element} » attendu dans la réponse publique de /app/map"
+    )
+
+
+def test_the_military_map_exposes_aggregate_headcounts(reponse_carte_sans_jeton):
+    """Des effectifs en dur donnent un ordre de grandeur du dispositif."""
+    corps = reponse_carte_sans_jeton.text
+    for effectif in _EFFECTIFS_PUBLICS:
+        assert f">{effectif}<" in corps, (
+            f"effectif agrégé {effectif} attendu dans le gabarit public"
+        )
+
+
+def test_the_map_qualification_records_the_public_static_content():
+    """La qualification doit citer ce qui est réellement exposé.
+
+    Ce test échoue si la mention des contenus statiques est retirée du
+    registre : c'est exactement la régression que la revue a relevée.
+    """
+    registre = json.loads(_lire(DOCS / "ROUTE_EXPOSURE_QUALIFICATION.json"))
+    entree = next(e for e in registre["qualified_routes"] if e["path"] == "/app/map")
+
+    assert entree.get("public_static_content"), (
+        "la qualification de /app/map ne cite aucun contenu statique public"
+    )
+    cite = " ".join(entree["public_static_content"]) + " " + entree["constat"]
+    for terme in ("Cartographie", "Militaires", "HMA", "CMA", "CSA", "Gendarmerie"):
+        assert terme in cite, f"contenu public non cité dans la qualification : {terme}"
+    for effectif in _EFFECTIFS_PUBLICS:
+        assert effectif in cite, f"effectif agrégé non cité dans la qualification : {effectif}"
+
+
+def test_the_map_qualification_does_not_minimise_the_finding():
+    """« Révèle seulement l'existence de la fonctionnalité » est faux ici."""
+    registre = json.loads(_lire(DOCS / "ROUTE_EXPOSURE_QUALIFICATION.json"))
+    entree = next(e for e in registre["qualified_routes"] if e["path"] == "/app/map")
+    texte = " ".join(
+        (entree["constat"], entree["justification"], entree["risque_residuel"])
+    ).lower()
+    assert "revele la fonctionnalite" not in texte, (
+        "la qualification minimise le constat : la page expose plus que l'existence "
+        "de la fonctionnalité"
+    )
+    assert "categories institutionnelles" in texte
+    assert "effectifs agreges" in texte
+
+
+def test_the_map_finding_is_p1_and_not_invented_as_p0():
+    """P0 exigerait une règle de classification institutionnelle qui n'existe pas."""
+    registre = json.loads(_lire(DOCS / "ROUTE_EXPOSURE_QUALIFICATION.json"))
+    entree = next(e for e in registre["qualified_routes"] if e["path"] == "/app/map")
+    assert entree["classement"] == "P1"
+    assert "lot D" in entree.get("remediation_owner", ""), (
+        "la remédiation doit rester une action séparée"
+    )
+
+
+def test_the_routes_document_states_what_the_map_really_exposes():
+    aplati = _aplati(DOCS / "ROUTES.md")
+    assert "Le gabarit ne contient pas les coordonnées ni la liste détaillée des" in aplati
+    assert "Il expose néanmoins publiquement la nature militaire de la" in aplati
+    for effectif in ("60", "51", "37", "22"):
+        assert effectif in aplati, f"effectif {effectif} absent de ROUTES.md"
+
+
+def test_lot_a_does_not_remediate_the_map():
+    """Le lot A photographie. Protéger la route ici masquerait le constat."""
+    from scripts.g0_inventory import _charger_application, _dependances_de_route
+
+    app = _charger_application()
+    route = next(r for r in app.routes if getattr(r, "path", "") == "/app/map")
+    assert not _dependances_de_route(route), (
+        "/app/map a reçu une garde dans cette PR : la remédiation appartient au lot D, "
+        "et corriger ici rendrait la preuve fausse"
+    )
+
+
+# ── provenance de qualité audit ─────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("fichier", ["provenance", "schema-provenance"])
+def test_provenance_separates_what_is_compared_from_what_varies(fichier):
+    entete = json.loads(_lire(ARTEFACTS / f"{fichier}.json"))
+    assert set(entete) >= {"deterministic", "volatile"}, entete.keys()
+    for champ in (
+        "schema_version",
+        "generator_version",
+        "generation_command",
+        "baseline_input_commit",
+        "baseline_input_ref",
+        "relevant_input_set",
+        "relevant_input_file_count",
+        "relevant_input_tree_sha256",
+    ):
+        assert entete["deterministic"].get(champ) not in (None, "", 0), (
+            f"{fichier}.json : champ déterministe vide — {champ}"
+        )
+    assert entete["volatile"].get("generated_at")
+
+
+@pytest.mark.parametrize("fichier", ["provenance", "schema-provenance"])
+def test_provenance_never_cites_a_temporary_reference(fichier):
+    """`tmp/g0-architecture-work` avait été inscrit comme source permanente."""
+    entete = json.loads(_lire(ARTEFACTS / f"{fichier}.json"))["deterministic"]
+    reference = entete["baseline_input_ref"]
+    assert not reference.startswith(("tmp/", "wip/", "temp/")), (
+        f"référence temporaire inscrite comme source permanente : {reference}"
+    )
+    assert reference in ("main", "master"), reference
+    assert "source_git_ref" not in entete and "source_git_sha" not in entete, (
+        "la nomenclature ambiguë subsiste"
+    )
+
+
+@pytest.mark.parametrize("fichier", ["provenance", "schema-provenance"])
+def test_provenance_declares_an_explicit_baseline_commit(fichier):
+    from scripts.g0_provenance import BASELINE_INPUT_COMMIT
+
+    entete = json.loads(_lire(ARTEFACTS / f"{fichier}.json"))["deterministic"]
+    commit = entete["baseline_input_commit"]
+    assert re.fullmatch(r"[0-9a-f]{40}", commit), f"commit non résolu : {commit}"
+    assert commit == BASELINE_INPUT_COMMIT
+
+
+@pytest.mark.parametrize("fichier", ["provenance", "schema-provenance"])
+def test_the_input_fingerprint_is_a_sha256(fichier):
+    empreinte = json.loads(_lire(ARTEFACTS / f"{fichier}.json"))["deterministic"][
+        "relevant_input_tree_sha256"
+    ]
+    assert re.fullmatch(r"[0-9a-f]{64}", empreinte), empreinte
+
+
+@pytest.mark.parametrize("ensemble", ["inventory", "schema"])
+def test_two_fingerprints_of_the_same_tree_are_equal(ensemble):
+    from scripts.g0_provenance import empreinte_entrees
+
+    assert empreinte_entrees(ensemble) == empreinte_entrees(ensemble)
+
+
+def _faux_depot(racine):
+    (racine / "alembic").mkdir(parents=True)
+    (racine / "alembic" / "env.py").write_text("x = 1\n", encoding="utf-8")
+    (racine / "alembic.ini").write_text("[alembic]\n", encoding="utf-8")
+    (racine / "requirements.txt").write_text("alembic==1.0\n", encoding="utf-8")
+    return racine
+
+
+def test_changing_an_input_file_changes_the_fingerprint(tmp_path, monkeypatch):
+    """Une empreinte insensible aux entrées ne prouverait rien."""
+    import scripts.g0_provenance as provenance_module
+
+    depot = _faux_depot(tmp_path / "depot")
+    monkeypatch.setattr(provenance_module, "RACINE", depot)
+
+    avant, nombre = provenance_module.empreinte_entrees("schema")
+    (depot / "alembic" / "env.py").write_text("x = 2\n", encoding="utf-8")
+    apres, nombre_apres = provenance_module.empreinte_entrees("schema")
+
+    assert avant != apres, "un fichier d'entrée modifié laisse l'empreinte inchangée"
+    assert nombre == nombre_apres == 3
+
+
+def test_files_outside_the_input_set_do_not_change_the_fingerprint(tmp_path, monkeypatch):
+    """Une empreinte qui bouge sans raison finit par être régénérée sans être lue."""
+    import scripts.g0_provenance as provenance_module
+
+    depot = _faux_depot(tmp_path / "depot2")
+    monkeypatch.setattr(provenance_module, "RACINE", depot)
+
+    avant, _ = provenance_module.empreinte_entrees("schema")
+    (depot / "README.md").write_text("hors périmètre\n", encoding="utf-8")
+    (depot / "docs").mkdir()
+    (depot / "docs" / "note.md").write_text("hors périmètre\n", encoding="utf-8")
+
+    assert provenance_module.empreinte_entrees("schema")[0] == avant
+
+
+def test_build_artifacts_never_enter_the_fingerprint():
+    """Sinon l'empreinte varierait selon qu'un test a tourné ou non."""
+    from scripts.g0_provenance import fichiers_entree
+
+    for ensemble in ("inventory", "schema"):
+        for chemin in fichiers_entree(ensemble):
+            assert "__pycache__" not in chemin.parts
+            assert chemin.suffix not in (".pyc", ".pyo")
+
+
+def test_check_detects_a_stale_provenance(tmp_path):
+    """Une provenance figée décrirait un état révolu, en silence."""
+    from scripts.g0_inventory import main, provenance
+
+    for nom in ("inventory", "entrypoints", "routes"):
+        (tmp_path / f"{nom}.json").write_text(_lire(ARTEFACTS / f"{nom}.json"), encoding="utf-8")
+    perimee = provenance("python scripts/g0_inventory.py --generate")
+    perimee["deterministic"]["relevant_input_tree_sha256"] = "0" * 64
+    (tmp_path / "provenance.json").write_text(json.dumps(perimee), encoding="utf-8")
+
+    assert main(["--check", "--output-dir", str(tmp_path)]) == 1
+
+
+# ── références d'image Compose ──────────────────────────────────────────────
+
+_VARIABLE = "RUGGYLAB_IMAGE"
+_MESSAGE_AVEC_EXEMPLE = "${" + _VARIABLE + ":?must be set (e.g. ghcr.io/org/app:<git-sha>)}"
+
+
+@pytest.mark.parametrize(
+    ("reference", "attendu"),
+    [
+        (
+            "postgres:16.6-alpine",
+            {"kind": "static", "registry": None, "repository": "postgres", "tag": "16.6-alpine"},
+        ),
+        (
+            "ghcr.io/rommellnelson-ux/ruggylab-os:v0.8.0",
+            {
+                "kind": "static",
+                "registry": "ghcr.io",
+                "repository": "rommellnelson-ux/ruggylab-os",
+                "tag": "v0.8.0",
+            },
+        ),
+        ("valkey/valkey:8.1.9-alpine", {"kind": "static", "repository": "valkey/valkey"}),
+        ("postgres", {"kind": "static", "tag": None, "repository": "postgres"}),
+        ("registry.local:5000/equipe/service", {"kind": "static", "tag": None}),
+        ("${" + _VARIABLE + "}", {"kind": "dynamic_environment_expression", "tag": None}),
+        (
+            "${" + _VARIABLE + ":-ruggylab:dev}",
+            {"kind": "dynamic_environment_expression", "tag": None},
+        ),
+        (
+            "${" + _VARIABLE + ":?" + _VARIABLE + " must be set}",
+            {"kind": "dynamic_environment_expression", "tag": None},
+        ),
+        (_MESSAGE_AVEC_EXEMPLE, {"kind": "dynamic_environment_expression", "tag": None}),
+        ("", {"kind": "built_from_dockerfile", "tag": None}),
+    ],
+)
+def test_image_references_are_parsed_or_declared_dynamic(reference, attendu):
+    """Découper sur le dernier « : » traitait un message d'erreur comme un tag."""
+    from scripts.g0_inventory import _analyser_reference_image
+
+    obtenu = _analyser_reference_image(reference)
+    assert obtenu["image_reference_kind"] == attendu["kind"], reference
+    for cle, valeur in attendu.items():
+        if cle != "kind":
+            assert obtenu[cle] == valeur, f"{reference} : {cle} = {obtenu[cle]!r}"
+
+
+def test_a_digest_is_extracted_alongside_its_tag():
+    from scripts.g0_inventory import _analyser_reference_image
+
+    analyse = _analyser_reference_image("valkey/valkey:8.1.9-alpine@sha256:" + "e" * 64)
+    assert analyse["tag"] == "8.1.9-alpine"
+    assert analyse["digest"] == "sha256:" + "e" * 64
+
+
+def test_a_dynamic_reference_names_its_variable_and_invents_nothing():
+    from scripts.g0_inventory import _analyser_reference_image
+
+    modele = "${" + _VARIABLE + ":?" + _VARIABLE + " must be set}"
+    analyse = _analyser_reference_image(modele)
+    assert analyse["required_variable"] == _VARIABLE
+    assert analyse["image_template"] == modele
+    assert analyse["resolved_image"] is None
+    assert analyse["registry"] is analyse["repository"] is analyse["tag"] is None
+
+
+def test_no_compose_service_carries_a_fabricated_tag(inventaire):
+    """Un tag issu d'un message Compose est un fait inventé."""
+    fautifs = [
+        (fichier["file"], service["service"], service["tag"])
+        for fichier in inventaire["compose"]
+        for service in fichier["services"]
+        if service["tag"] and any(c in service["tag"] for c in " ${}?<>()")
+    ]
+    assert not fautifs, f"tags fabriqués : {fautifs}"
+
+
+def test_dynamic_references_are_declared_as_such(inventaire):
+    dynamiques = [
+        service
+        for fichier in inventaire["compose"]
+        for service in fichier["services"]
+        if service["image_reference_kind"] == "dynamic_environment_expression"
+    ]
+    assert dynamiques, "aucune référence dynamique recensée alors que le cœur en contient"
+    for service in dynamiques:
+        assert service["tag"] is None and service["resolved_image"] is None
+        assert service["required_variable"], service["service"]
+
+
+# ── définitions de services contre services nominaux ────────────────────────
+
+
+def test_core_counts_distinguish_definitions_from_running_services(inventaire, compose_coeur):
+    """« 9 services dans le cœur » surestimait la surface permanente d'un conteneur."""
+    coeur = inventaire["core_services"]
+    assert len(coeur["service_definitions"]) == len(compose_coeur["services"]) == 9
+    assert len(coeur["nominal_running_services"]) == 8
+    assert coeur["one_shot_profile_services"] == ["migrate"]
+    assert set(coeur["nominal_running_services"]) | set(coeur["one_shot_profile_services"]) == set(
+        coeur["service_definitions"]
+    )
+
+
+def test_a_profiled_service_is_not_counted_as_a_permanent_container(inventaire):
+    assert "migrate" not in inventaire["core_services"]["nominal_running_services"]
+
+
+def test_a_profiled_service_is_still_inventoried(inventaire):
+    """Le retirer masquerait un point d'entrée réel."""
+    assert "migrate" in inventaire["core_services"]["service_definitions"]
+    fichier = next(f for f in inventaire["compose"] if f["status"] == "core")
+    migrate = next(s for s in fichier["services"] if s["service"] == "migrate")
+    assert migrate["runtime_kind"] == "one_shot_profile_task"
+    assert migrate["started_by_default"] is False
+    assert migrate["profiles"] == ["migrate"]
+
+
+def test_every_compose_file_reports_both_counts(inventaire):
+    for fichier in inventaire["compose"]:
+        assert fichier["service_definitions"] == len(fichier["services"])
+        assert fichier["nominal_running_services"] <= fichier["service_definitions"]
+
+
+def test_the_c4_marks_the_migration_task_as_one_shot():
+    """Un diagramme qui montre `migrate` comme un service permanent ment."""
+    diagramme = _diagramme_conteneurs()
+    ligne = next(ligne for ligne in diagramme.splitlines() if ligne.strip().startswith("MIG["))
+    assert "ponctuelle" in ligne, ligne
+    assert "NON DÉMARRÉ PAR DÉFAUT" in ligne
+
+
+def test_the_documents_no_longer_claim_nine_running_services():
+    for nom in ("INVENTORY.md", "C4.md"):
+        aplati = _aplati(DOCS / nom)
+        assert "Neuf services" not in aplati, f"{nom} : comptage non qualifié"
+        assert "définitions de services" in aplati.lower(), nom
+
+
+# ── classification documentaire ─────────────────────────────────────────────
+
+_DOCUMENTS_ARCHITECTURE = ["C4.md", "DEPLOYMENT_CSA_GR_PLATEAU.md", "ROUTES.md", "SCHEMA.md"]
+
+
+@pytest.mark.parametrize("document", _DOCUMENTS_ARCHITECTURE)
+def test_architecture_documents_carry_their_classification(document):
+    entete = _aplati(DOCS / document)[:900]
+    assert "INTERNAL — SECURITY ARCHITECTURE" in entete, document
+    assert "BASELINE TECHNIQUE — NOT FOR OPERATIONAL DEPLOYMENT" in entete, document
+
+
+@pytest.mark.parametrize("document", _DOCUMENTS_ARCHITECTURE)
+def test_the_classification_banner_does_not_pretend_to_be_a_control(document):
+    """Un bandeau n'empêche personne de lire un dépôt public."""
+    assert "mention de classification, pas un contrôle d'accès" in _aplati(DOCS / document)
+
+
+@pytest.mark.parametrize("document", _DOCUMENTS_ARCHITECTURE)
+def test_no_real_site_address_in_the_architecture_documents(document):
+    """Tant que le dépôt est public, aucun détail opérationnel réel."""
+    contenu = _lire(DOCS / document)
+    for adresse in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", contenu):
+        assert adresse in ("127.0.0.1", "0.0.0.0", "255.255.255.255"), (
+            f"{document} : adresse IP potentiellement réelle — {adresse}"
+        )

@@ -1,5 +1,17 @@
 # G0 — Surfaces d'entrée
 
+> **INTERNAL — SECURITY ARCHITECTURE**
+> **BASELINE TECHNIQUE — NOT FOR OPERATIONAL DEPLOYMENT**
+>
+> Ce document décrit une architecture de référence, pas une installation. Il ne
+> contient aucune adresse IP réelle de site, aucun identifiant, aucun secret,
+> aucun nom de compte, aucune topologie VLAN réelle et aucune donnée patient —
+> et il ne doit pas en recevoir tant que le dépôt reste public.
+>
+> Ce bandeau est une **mention de classification, pas un contrôle d'accès** : il
+> n'empêche personne de lire ce fichier. Le seul contrôle réel serait la
+> visibilité du dépôt.
+
 > **246 surfaces, dont 231 seulement dans l'OpenAPI.** Un inventaire limité au
 > contrat documenté aurait laissé 15 portes hors champ.
 >
