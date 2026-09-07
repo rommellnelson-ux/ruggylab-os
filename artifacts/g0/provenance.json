@@ -1,0 +1,11 @@
+{
+  "_comment": "Champs volatils, deliberement separes du payload : les inclure dans la comparaison de --check produirait un diff permanent.",
+  "generated_at": "2026-09-07T14:58:34Z",
+  "generation_command": "python scripts/g0_inventory.py --generate",
+  "generator_version": "1.0.0",
+  "platform": "windows/amd64",
+  "python_version": "3.13.13",
+  "schema_version": "1.0.0",
+  "source_git_ref": "tmp/g0-architecture-work",
+  "source_git_sha": "18bf868c1ffe599c591c3b55b9b4088b01d1336d"
+}

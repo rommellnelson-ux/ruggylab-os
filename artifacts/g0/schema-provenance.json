@@ -1,0 +1,11 @@
+{
+  "_comment": "La version du serveur et le nom de la base dependent de l'environnement de mesure : ils sont exclus du payload compare.",
+  "database_name": "g0_baseline",
+  "generated_at": "2026-09-07T14:58:40Z",
+  "generation_command": "python scripts/g0_schema_inventory.py --database-url <postgres> --generate",
+  "generator_version": "1.0.0",
+  "platform": "windows/amd64",
+  "postgres_server_version": "PostgreSQL 16.14",
+  "schema_version": "1.0.0",
+  "source_git_sha": "18bf868c1ffe599c591c3b55b9b4088b01d1336d"
+}
