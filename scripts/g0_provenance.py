@@ -27,6 +27,13 @@ génération. Sans cela, modifier un fichier d'entrée aurait laissé la provena
 versionnée intacte : elle aurait continué à désigner un état révolu, sans que
 rien ne le signale.
 
+Elle doit donc être **identique sur toute machine** à contenu égal. Deux pièges
+ont été rencontrés et traités : les fins de ligne, qu'un dépôt cloné sous
+Windows reçoit en CRLF, et l'**ordre des chemins**, que `sorted()` sur des
+objets `Path` calcule casse repliée sous Windows et casse exacte sous Linux.
+Le second n'a été trouvé que parce que la CI Linux a refusé une baseline
+générée sous Windows dont le contenu était pourtant identique.
+
 Aucun sous-processus, aucun appel réseau, aucun secret, aucune donnée patient.
 """
 
@@ -76,8 +83,21 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
 _EXCLUS = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache")
 
 
+def chemin_relatif(chemin: Path) -> str:
+    """Le chemin d'un fichier tel qu'il entre dans l'empreinte."""
+    return chemin.relative_to(RACINE).as_posix()
+
+
 def fichiers_entree(ensemble: str) -> list[Path]:
-    """Les fichiers d'un ensemble d'entrée, triés, sans les produits de build."""
+    """Les fichiers d'un ensemble d'entrée, triés, sans les produits de build.
+
+    Le tri porte sur la **chaîne POSIX** du chemin, jamais sur l'objet `Path`.
+    Comparer deux `Path` emploie la casse repliée sous Windows et la casse
+    exacte sous Linux : `Dockerfile` passe avant `alembic/env.py` sur l'un et
+    après sur l'autre. Comme l'ordre entre dans l'empreinte, la même
+    arborescence produisait deux valeurs selon la machine — la CI Linux a
+    refusé une baseline générée sous Windows, à contenu pourtant identique.
+    """
     if ensemble not in ENSEMBLES_ENTREE:
         raise KeyError(f"ensemble d'entrée inconnu : {ensemble}")
     trouves: set[Path] = set()
@@ -91,7 +111,7 @@ def fichiers_entree(ensemble: str) -> list[Path]:
             if chemin.suffix in (".pyc", ".pyo"):
                 continue
             trouves.add(chemin)
-    return sorted(trouves)
+    return sorted(trouves, key=chemin_relatif)
 
 
 def _empreinte_fichier(chemin: Path) -> str:
@@ -121,8 +141,7 @@ def empreinte_entrees(ensemble: str) -> tuple[str, int]:
     accumulateur = hashlib.sha256()
     fichiers = fichiers_entree(ensemble)
     for chemin in fichiers:
-        relatif = chemin.relative_to(RACINE).as_posix()
-        accumulateur.update(relatif.encode("utf-8"))
+        accumulateur.update(chemin_relatif(chemin).encode("utf-8"))
         accumulateur.update(b"\0")
         accumulateur.update(_empreinte_fichier(chemin).encode("ascii"))
         accumulateur.update(b"\0")

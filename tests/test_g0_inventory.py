@@ -942,3 +942,40 @@ def test_no_real_site_address_in_the_architecture_documents(document):
         assert adresse in ("127.0.0.1", "0.0.0.0", "255.255.255.255"), (
             f"{document} : adresse IP potentiellement réelle — {adresse}"
         )
+
+
+def test_the_input_order_does_not_depend_on_the_platform():
+    """L'ordre entre dans l'empreinte : il doit être identique partout.
+
+    `sorted()` sur des objets `Path` replie la casse sous Windows et la
+    respecte sous Linux — `Dockerfile` passe alors avant ou après
+    `alembic/env.py` selon la machine, pour un contenu identique. La CI Linux a
+    refusé une baseline générée sous Windows pour cette seule raison.
+    """
+    from scripts.g0_provenance import chemin_relatif, fichiers_entree
+
+    for ensemble in ("inventory", "schema"):
+        chemins = [chemin_relatif(p) for p in fichiers_entree(ensemble)]
+        assert chemins == sorted(chemins), (
+            f"{ensemble} : ordre dépendant de la plateforme — "
+            f"premier écart vers {next(a for a, b in zip(chemins, sorted(chemins), strict=True) if a != b)}"
+        )
+
+
+def test_the_fingerprint_covers_the_path_as_well_as_the_content(tmp_path, monkeypatch):
+    """Deux fichiers dont on échange le contenu doivent changer l'empreinte."""
+    import scripts.g0_provenance as provenance_module
+
+    depot = tmp_path / "depot3"
+    (depot / "alembic").mkdir(parents=True)
+    (depot / "alembic" / "a.py").write_text("contenu A\n", encoding="utf-8")
+    (depot / "alembic" / "b.py").write_text("contenu B\n", encoding="utf-8")
+    (depot / "alembic.ini").write_text("[alembic]\n", encoding="utf-8")
+    (depot / "requirements.txt").write_text("alembic==1.0\n", encoding="utf-8")
+    monkeypatch.setattr(provenance_module, "RACINE", depot)
+
+    avant, _ = provenance_module.empreinte_entrees("schema")
+    (depot / "alembic" / "a.py").write_text("contenu B\n", encoding="utf-8")
+    (depot / "alembic" / "b.py").write_text("contenu A\n", encoding="utf-8")
+
+    assert provenance_module.empreinte_entrees("schema")[0] != avant
