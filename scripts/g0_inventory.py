@@ -197,6 +197,74 @@ def _reglages_par_defaut() -> list[dict[str, Any]]:
 
 # ── inventaire Compose ──────────────────────────────────────────────────────
 
+#: Une expansion Compose : ``${VAR}``, ``${VAR:-defaut}``, ``${VAR:?message}``.
+#: Le message d'erreur d'un ``:?`` est du texte libre — il contient volontiers
+#: des deux-points, et jusqu'à un exemple de référence d'image.
+_EXPANSION = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)([:-]|:-|:\?|\?|-)?")
+
+
+def _analyser_reference_image(image: str) -> dict[str, Any]:
+    """Décompose une référence d'image, ou constate qu'elle n'en est pas une.
+
+    Découper naïvement sur le dernier ``:`` traite le message d'un
+    ``${VAR:?message}`` comme un tag. Le dépôt en donnait deux exemples :
+    ``${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}`` produisait le tag
+    ``?RUGGYLAB_IMAGE must be set}``, et la variante dont le message cite un
+    exemple d'image produisait ``<git-sha>)}``. Un inventaire qui affirme
+    qu'une image porte un tag inexistant est faux là où on le consulte
+    précisément pour savoir ce qui est épinglé.
+
+    Une référence contenant une expansion n'a pas de valeur au repos : elle est
+    résolue au démarrage. On le dit, plutôt que d'inventer.
+    """
+    if not image:
+        return {
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
+            "required_variable": None,
+            "resolved_image": None,
+            "registry": None,
+            "repository": None,
+            "tag": None,
+            "digest": None,
+        }
+
+    expansion = _EXPANSION.search(image)
+    if expansion is not None:
+        return {
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": image,
+            "required_variable": expansion.group(1),
+            "resolved_image": None,
+            "registry": None,
+            "repository": None,
+            "tag": None,
+            "digest": None,
+        }
+
+    sans_digest, _, digest = image.partition("@")
+    # Un ``:`` n'introduit un tag que dans le dernier segment du chemin :
+    # ``registre:5000/depot`` porte un port, pas un tag.
+    chemin, separateur, apres = sans_digest.rpartition(":")
+    if separateur and "/" not in apres:
+        depot, tag = chemin, apres
+    else:
+        depot, tag = sans_digest, ""
+
+    premier, _, reste = depot.partition("/")
+    a_un_registre = reste and ("." in premier or ":" in premier or premier == "localhost")
+
+    return {
+        "image_reference_kind": "static",
+        "image_template": image,
+        "required_variable": None,
+        "resolved_image": image,
+        "registry": premier if a_un_registre else None,
+        "repository": reste if a_un_registre else depot,
+        "tag": tag or None,
+        "digest": digest or None,
+    }
+
 
 def _compose() -> list[dict[str, Any]]:
     """Services de chaque fichier Compose, avec leur classement.
@@ -215,25 +283,32 @@ def _compose() -> list[dict[str, Any]]:
         contenu = yaml.safe_load(chemin.read_text(encoding="utf-8")) or {}
         services = []
         for service, definition in sorted((contenu.get("services") or {}).items()):
-            image = definition.get("image", "")
-            tag, digest = "", ""
-            if image:
-                sans_digest, _, digest = image.partition("@")
-                _, _, tag = sans_digest.rpartition(":")
+            reference = _analyser_reference_image(definition.get("image", "") or "")
+            profils = sorted(definition.get("profiles") or [])
             depends = definition.get("depends_on") or {}
             services.append(
                 {
                     "service": service,
-                    "image": image or "(construite depuis le Dockerfile)",
-                    "tag": tag,
-                    "digest": digest,
+                    **reference,
+                    # Un service sous profil n'est pas démarré par un
+                    # `docker compose up` nominal ; sans politique de
+                    # redémarrage, il s'exécute une fois et s'arrête. Le
+                    # compter comme un conteneur permanent surestimerait la
+                    # surface qui tourne en continu.
+                    "runtime_kind": (
+                        "one_shot_profile_task"
+                        if profils
+                        else ("continuous" if definition.get("restart") else "one_shot")
+                    ),
+                    "restart_policy": definition.get("restart", ""),
+                    "started_by_default": not profils,
                     "command": definition.get("command", ""),
                     "networks": sorted(definition.get("networks") or []),
                     "volumes": sorted(str(v) for v in (definition.get("volumes") or [])),
                     "published_ports": sorted(str(p) for p in (definition.get("ports") or [])),
                     "has_healthcheck": "healthcheck" in definition,
                     "depends_on": sorted(depends) if isinstance(depends, dict) else sorted(depends),
-                    "profiles": sorted(definition.get("profiles") or []),
+                    "profiles": profils,
                     "required_variables": sorted(
                         _variables_requises(json.dumps(definition, ensure_ascii=False))
                     ),
@@ -252,10 +327,19 @@ def _compose() -> list[dict[str, Any]]:
     return fichiers
 
 
+def _services_coeur(compose: list[dict[str, Any]], nature: str | None = None) -> set[str]:
+    """Services du Compose cœur, éventuellement filtrés par nature d'exécution."""
+    return {
+        service["service"]
+        for fichier in compose
+        if fichier["status"] == "core"
+        for service in fichier["services"]
+        if nature is None or service["runtime_kind"] == nature
+    }
+
+
 def _variables_requises(texte: str) -> set[str]:
     """Variables d'environnement sans valeur par défaut : elles sont obligatoires."""
-    import re
-
     requises = set()
     for correspondance in re.finditer(r"\$\{([A-Z_][A-Z0-9_]*)(:?[-?])?", texte):
         nom, operateur = correspondance.group(1), correspondance.group(2)
