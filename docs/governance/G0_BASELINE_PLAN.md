@@ -45,6 +45,16 @@ par les preuves correspondantes.
 | Modules faisant des appels sortants | **14** |
 | Couverture de tests | **non mesurée** — `pytest-cov` absent |
 
+> **Ces chiffres sont des observations, pas des valeurs à atteindre.** Ils ont
+> été relevés par des comptages approximatifs, avant tout inventaire outillé.
+> Le résultat **généré depuis le runtime et depuis PostgreSQL devient la source
+> de vérité**, et lui seul.
+>
+> Tout écart entre ces nombres préliminaires et le résultat généré doit être
+> **affiché, expliqué, référencé et transmis au backlog** — jamais masqué pour
+> préserver l'apparence d'une prévision juste. Un inventaire ajusté pour
+> retomber sur un chiffre annoncé n'est plus un inventaire.
+
 Deux constats orientent le plan : **la couverture n'est pas mesurable en
 l'état**, et **le scan de secrets est en mode advisory** (`continue-on-error`),
 donc non bloquant.
@@ -79,7 +89,18 @@ Branche : `g0/architecture-inventory`
   de `docker-compose.yml`, et réciproquement — vérifié par test.
 - **Faux si** : le diagramme montre Grafana dans le cœur, ou un serveur Redis.
 
-#### 3. Inventaire des routes
+#### 3. Inventaire des surfaces d'entrée
+
+> **OpenAPI ne suffit pas.** Il décrit le contrat HTTP documenté ; il ignore
+> tout ce qui entre dans le système par une autre porte. Un inventaire limité à
+> l'OpenAPI donnerait une fausse impression de complétude — et c'est justement
+> ce que G0 doit empêcher.
+>
+> La preuve doit couvrir : routes HTTP présentes dans l'OpenAPI **et celles qui
+> en sont absentes** (`include_in_schema=False`), WebSockets, montages
+> Starlette (`Mount`), fichiers statiques, workers, scheduler,
+> analyzer-gateway, listeners d'automates, scripts CLI, tâches de maintenance,
+> endpoints techniques, et le filtrage opéré par le proxy.
 
 - **Livrable** : `artifacts/g0/routes.json` + tableau dans `docs/g0/ROUTES.md`
 - **Méthode** : extraction depuis l'OpenAPI de l'application, pas depuis les
@@ -246,6 +267,49 @@ index ne peut être complété qu'après eux.
 - **Aucune modification de la protection de branche** — G0 la *propose*.
 - **Aucun tag, aucune image, aucune release.**
 
+## Ce que `G0_PASS` ne signifie pas
+
+Trois confusions sont à écarter d'emblée, parce qu'elles coûteraient cher :
+
+```
+G0_PASS != REAL_DATA_GO
+G0_PASS != SITE_PRODUCTION_GO
+G0_PASS != DISTRIBUTION_GO
+```
+
+`G0_PASS` signifie **une seule chose** : la baseline est complète,
+reproductible et revue. Elle dit ce que le logiciel *est*, pas ce qu'on a le
+droit d'en faire.
+
+Un **P0 découvert pendant G0 est documenté, pas corrigé en silence** — et il
+peut bloquer la marche vers un pilote réel **même si les douze preuves sont
+complètes**. Une baseline peut être parfaite et le logiciel inutilisable ; ce
+sont deux constats indépendants.
+
+## Reproductibilité — ce qui la rend vérifiable
+
+Chaque artefact doit porter, ou être relié à, une **preuve de provenance** :
+
+| Champ | Pourquoi |
+| --- | --- |
+| `schema_version` | deux artefacts de structures différentes seraient indiscernables |
+| `source_git_sha` | on saura de quel état du code il parle |
+| `generator_version` | un changement d'outil explique un changement de résultat |
+| commande de génération | quelqu'un d'autre doit pouvoir la rejouer |
+| plateforme | les paquets diffèrent d'une architecture à l'autre |
+| base PostgreSQL utilisée | un schéma introspecté dépend de la base qui l'a produit |
+| configuration | une variable change ce que le runtime expose |
+| date UTC de génération | situe la mesure dans le temps |
+
+**Les fichiers versionnés doivent rester déterministes.** Deux générations
+successives, sur le même commit, doivent produire des octets identiques.
+
+> **Piège à éviter, et raison d'être de la séparation.** L'heure de génération
+> change à chaque exécution. La laisser dans le corps comparé par `--check`
+> produirait un diff permanent : le contrôle échouerait toujours, on
+> l'ignorerait, et il ne servirait plus à rien. Les champs volatils vivent donc
+> dans un **fichier de provenance distinct**, comparé séparément ou normalisé.
+
 ## Critère de sortie
 
 ```
@@ -262,4 +326,11 @@ Statut actuel :
 ```
 G0_PLAN_READY
 G0_EVIDENCE_PENDING   (0 / 12 produites)
+```
+
+Et ce que G0 ne prononcera jamais, quoi qu'il produise :
+
+```
+REAL_DATA_GO · SITE_PRODUCTION_GO · DISTRIBUTION_GO
+ARCHITECTURE_SECURITY_APPROVED
 ```
