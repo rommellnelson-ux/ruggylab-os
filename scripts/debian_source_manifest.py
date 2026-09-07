@@ -153,20 +153,19 @@ def provenance(image: str, racine: Path) -> dict:
     plateformes différentes se ressembleraient, et l'un passerait pour l'autre.
     """
     reference_base, digest_base = base_du_dockerfile(racine)
-    inspect = _commande(
-        [
-            "docker",
-            "image",
-            "inspect",
-            image,
-            "--format",
-            "{{.Id}}\t{{.Os}}\t{{.Architecture}}",
-        ]
-    )
-    morceaux = inspect.split("\t") if inspect else []
-    image_id = morceaux[0] if morceaux else ""
-    systeme = morceaux[1] if len(morceaux) > 1 else ""
-    architecture = morceaux[2] if len(morceaux) > 2 else ""
+
+    # Un appel par champ. Regrouper trois valeurs derrière un séparateur passé
+    # en argument de ligne de commande est fragile : il suffit que le séparateur
+    # ne survive pas au passage pour que la découpe rende des chaînes vides — et
+    # un manifeste sans plateforme ni image ID ne décrit plus rien, sans que
+    # personne s'en aperçoive. Trois appels coûtent quelques millisecondes et ne
+    # peuvent pas se tromper.
+    def _champ(gabarit: str) -> str:
+        return _commande(["docker", "image", "inspect", image, "--format", gabarit])
+
+    image_id = _champ("{{.Id}}")
+    systeme = _champ("{{.Os}}")
+    architecture = _champ("{{.Architecture}}")
 
     # L'OS VU DANS l'image, et non déduit du tag.
     distribution = ""
@@ -613,6 +612,22 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     entete = provenance(args.image, args.root)
+
+    # Un champ de provenance vide passerait inaperçu et rendrait le manifeste
+    # ininterprétable : on ne saurait plus de quelle image ni de quelle
+    # architecture il parle. Mieux vaut échouer ici que produire une preuve
+    # muette.
+    incomplets = [
+        cle
+        for cle in ("image_id", "platform", "os", "architecture", "base_image_digest", "git_sha")
+        if not entete.get(cle)
+    ]
+    if incomplets:
+        print(
+            f"ECHEC : provenance incomplète, champs vides : {incomplets}",
+            file=sys.stderr,
+        )
+        return 1
     binaires = paquets_binaires(args.image)
     manifeste = manifeste_licences(args.image, binaires)
     sources = paquets_sources(binaires, manifeste)

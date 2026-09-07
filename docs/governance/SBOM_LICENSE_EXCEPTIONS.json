@@ -1,0 +1,56 @@
+{
+  "_comment": [
+    "Registre des composants que le SBOM de l'image rapporte SANS licence.",
+    "Chaque entrée est une décision écrite, datée et justifiée : aucune licence",
+    "indéterminée n'est acceptée en silence. Tout composant sans licence absent",
+    "de ce registre fait échouer la conformité.",
+    "Une entrée n'est PAS une conclusion de compatibilité : elle dit ce qui a été",
+    "constaté et pourquoi le composant n'est pas un composant tiers de plus."
+  ],
+  "exceptions": [
+    {
+      "name": "Simple Launcher",
+      "version": "1.1.0.14",
+      "purl": "pkg:nuget/Simple%20Launcher@1.1.0.14",
+      "constat": "12 occurrences, toutes situées dans pip/_vendor/distlib/{t32,t64,t64-arm,w32,w64,w64-arm}.exe",
+      "qualification": "Faux positif de classification. Ce ne sont pas des paquets NuGet mais les lanceurs Windows fournis par distlib, vendorisé dans pip. Syft lit les métadonnées de ressource PE, qui portent le nom produit « Simple Launcher » et aucune licence.",
+      "licence_reelle": "BSD-3-Clause (distlib, PyPA) — texte dans le paquet pip installé",
+      "portee": "Exécutables Windows inertes dans une image Linux : jamais exécutés, jamais chargés.",
+      "decision": "Accepté comme artefact de classification, pas comme composant tiers distinct.",
+      "date": "2026-08-28"
+    },
+    {
+      "name": "libcrypt1",
+      "version": "1:4.4.38-1",
+      "purl": "pkg:deb/debian/libcrypt1@1%3A4.4.38-1",
+      "constat": "Paquet Debian de la base python:3.13-slim. Syft ne rapporte aucune licence.",
+      "qualification": "Verifie dans l'image : /usr/share/doc/libcrypt1/copyright existe mais est redige en format libre, sans champ machine-lisible « License: » — d'ou l'absence de detection. Le paquet est la version Debian de libxcrypt.",
+      "licence_reelle": "Voir /usr/share/doc/libcrypt1/copyright dans l'image ; les textes reference sont dans /usr/share/common-licenses/, presents.",
+      "portee": "Bibliotheque systeme de la base, non modifiee, distribuee telle que publiee par Debian.",
+      "decision": "Accepte : notice presente dans l'image. L'obligation d'offre de source de la base reste traitee au §6.4 de THIRD_PARTY_NOTICES.md.",
+      "date": "2026-08-28"
+    },
+    {
+      "name": "python",
+      "version": "3.13.15",
+      "purl": "pkg:generic/python@3.13.15",
+      "constat": "Interprete CPython detecte par le classificateur de binaires de Syft, sans metadonnee de licence.",
+      "qualification": "Doublon de l'image de base python:3.13-slim, deja recensee au §3. Le texte de licence est embarque : /usr/local/lib/python3.13/LICENSE.txt, verifie present dans l'image.",
+      "licence_reelle": "PSF-2.0",
+      "portee": "Interprete de l'application.",
+      "decision": "Accepte : composant deja recense sous une autre forme, notice presente.",
+      "date": "2026-08-28"
+    },
+    {
+      "name": "debian",
+      "version": "13",
+      "purl": "",
+      "constat": "Entree CycloneDX de type « operating-system », sans licence.",
+      "qualification": "Ce n'est pas un composant logiciel mais l'identifiant de la distribution de base (Debian 13 « trixie »). Les 87 paquets qui la composent sont enumeres individuellement dans le meme SBOM et portent, eux, leurs licences.",
+      "licence_reelle": "sans objet — agregat, non un composant",
+      "portee": "Base de l'image applicative.",
+      "decision": "Accepte : agregat identifie, composants enumeres separement. Obligations traitees au §6.4.",
+      "date": "2026-08-28"
+    }
+  ]
+}

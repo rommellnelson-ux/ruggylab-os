@@ -4,6 +4,8 @@ import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.version import VERSION
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +45,7 @@ DEFAULT_FIRST_SUPERUSER_PASSWORD = _load_secret_from_manager("FIRST_SUPERUSER_PA
 
 class Settings(BaseSettings):
     APP_NAME: str = "RuggyLab OS"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = VERSION
     API_V1_PREFIX: str = "/api/v1"
     DATABASE_URL: str = "sqlite:///./ruggylab_os.db"
     SECRET_KEY: str = DEFAULT_SECRET_KEY

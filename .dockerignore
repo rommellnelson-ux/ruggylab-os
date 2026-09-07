@@ -65,6 +65,12 @@ docs/
 assets/
 *.md
 !README.md
+# Les licences, elles, DOIVENT entrer dans l'image : une image distribuee sans
+# le texte de sa licence ni celui de ses composants tiers ne satisfait aucune
+# obligation de notice. Sans ces exceptions, `*.md` les excluait en silence.
+!LICENSE.md
+!THIRD_PARTY_NOTICES.md
+!licenses/
 
 # Miscellaneous
 .DS_Store

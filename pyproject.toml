@@ -1,22 +1,54 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+# setuptools >= 77.0.3 est requis pour l'expression de licence PEP 639
+# (`license` en chaîne SPDX et `license-files`). Une version antérieure
+# ignorerait silencieusement ces champs : la distribution partirait sans licence
+# déclarée, ce qui est précisément le défaut que cette version corrige.
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ruggylab-os"
-version = "0.1.0"
+version = "0.8.0b1"
 description = "RuggyLab OS - Laboratory Management System"
 readme = "README.md"
 requires-python = ">=3.11"
+# Licence propriétaire d'évaluation. Pas de classifier `License :: OSI Approved`,
+# réservé aux licences approuvées par l'Open Source Initiative : l'annoncer
+# serait faux. `LicenseRef-…` est la forme SPDX prévue pour une licence non
+# répertoriée.
+license = "LicenseRef-RuggyLab-Evaluation-1.0"
+license-files = [
+    "LICENSE.md",
+    "THIRD_PARTY_NOTICES.md",
+    # Glob récursif : `licenses/third-party/*` ne prendrait que les fichiers
+    # à la racine du dossier, pas les textes rangés par paquet — c'est-à-dire
+    # justement ceux que les licences tierces exigent de conserver.
+    "licenses/third-party/**/*",
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Healthcare Industry",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
-    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+]
+
+# Découverte explicite : le dépôt contient plusieurs répertoires racine (`app`,
+# `tests`, `scripts`, `alembic`) et l'auto-détection de setuptools échoue faute
+# de savoir lequel est le paquet. Seul `app` est distribué.
+[tool.setuptools.packages.find]
+include = ["app*"]
+namespaces = false
+
+# Fichiers non-Python à embarquer : templates, statiques et référentiels sont
+# nécessaires au fonctionnement, et leur absence ne se verrait qu'à l'exécution.
+[tool.setuptools.package-data]
+app = [
+    "templates/**/*",
+    "static/**/*",
+    "data/**/*",
 ]
 
 [tool.mypy]
