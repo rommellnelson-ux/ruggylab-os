@@ -94,6 +94,89 @@ jobs:
         continue-on-error: true
         run: python -m detect_secrets.pre_commit_hook --baseline .secrets.baseline $(git ls-files)
 
+  # ── Image candidate : construite UNE SEULE FOIS ────────────────────────────
+  # Une image auditée par un job et reconstruite par un autre ne sont pas la
+  # même image. Deux constructions successives du même Dockerfile peuvent
+  # différer — horodatages, résolution de paquets, couches de cache — et les
+  # preuves décriraient alors une image qui n'est pas celle qu'on publie.
+  #
+  # Ce job produit donc UN artefact, que tous les autres chargent sans
+  # reconstruire, et que `deploy` pousse tel quel. L'archive n'est publiée que
+  # comme artefact interne de la CI : rien n'est poussé sur GHCR depuis une PR.
+  build-candidate:
+    name: Image candidate (construite une seule fois)
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image_id: ${{ steps.identity.outputs.image_id }}
+      archive_sha256: ${{ steps.identity.outputs.archive_sha256 }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Build the candidate image
+        run: docker build -t ruggylab-os:candidate .
+
+      - name: Export the candidate image and record its identity
+        id: identity
+        run: |
+          mkdir -p artifacts
+          docker save ruggylab-os:candidate | gzip -1 > artifacts/candidate-image.tar.gz
+
+          image_id=$(docker image inspect ruggylab-os:candidate --format '{{.Id}}')
+          archive_sha256=$(sha256sum artifacts/candidate-image.tar.gz | cut -d' ' -f1)
+          base=$(grep -m1 '^FROM python:' Dockerfile | awk '{print $2}')
+          read -r os arch < <(docker image inspect ruggylab-os:candidate \
+            --format '{{.Os}} {{.Architecture}}')
+
+          {
+            echo "image_id=$image_id"
+            echo "archive_sha256=$archive_sha256"
+          } >> "$GITHUB_OUTPUT"
+
+          python - <<PY
+          import json, os, pathlib
+          pathlib.Path("artifacts/candidate-image.json").write_text(
+              json.dumps(
+                  {
+                      "image_id": "$image_id",
+                      "archive_file": "candidate-image.tar.gz",
+                      "archive_sha256": "$archive_sha256",
+                      "base_image_reference": "$base",
+                      "git_sha": os.environ["GITHUB_SHA"],
+                      "git_ref": os.environ["GITHUB_REF"],
+                      "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+                      "platform": "$os/$arch",
+                      "os": "$os",
+                      "architecture": "$arch",
+                      "builder": "docker build (BuildKit)",
+                      "_comment": (
+                          "Identite de l'artefact candidat. Tous les jobs de "
+                          "qualification chargent CETTE archive ; deploy pousse "
+                          "CETTE image, sans reconstruire."
+                      ),
+                  },
+                  indent=2,
+                  ensure_ascii=False,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+          cat artifacts/candidate-image.json
+
+      - name: Publier l'image candidate (artefact interne, jamais GHCR)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: candidate-image
+          path: |
+            artifacts/candidate-image.tar.gz
+            artifacts/candidate-image.json
+          # Courte : l'archive pese ~130 Mo et ne sert qu'a ce run.
+          retention-days: 1
+          if-no-files-found: error
+
   test-postgres:
     name: Migrations + flux clinique E2E (PostgreSQL)
     runs-on: ubuntu-latest
@@ -391,6 +474,7 @@ jobs:
   # déclarations : il construit le paquet et l'image, puis regarde dedans.
   license-compliance:
     name: License and distribution compliance
+    needs: build-candidate
     runs-on: ubuntu-latest
     env:
       # Syft épinglé par version : `latest` rendrait l'audit non reproductible,
@@ -476,9 +560,35 @@ jobs:
             --fail-on-unknown
 
       # ── 4. L'image contient réellement les licences ───────────────────────
-      - name: "6. Construire l'image et vérifier les licences à l'intérieur"
+      # L'image n'est PAS reconstruite : on charge l'artefact candidat, et l'on
+      # verifie que son identifiant est bien celui que `build-candidate` a
+      # publie. Une image differente ferait echouer ce job plutot que produire
+      # une preuve portant sur autre chose.
+      - name: Load the candidate image
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: candidate-image
+          path: artifacts
+
+      - name: Verify the loaded image is the audited candidate
         run: |
-          docker build -t ruggylab-os:license-check .
+          gunzip -c artifacts/candidate-image.tar.gz | docker load
+          docker tag ruggylab-os:candidate ruggylab-os:license-check
+          attendu="${{ needs.build-candidate.outputs.image_id }}"
+          obtenu=$(docker image inspect ruggylab-os:license-check --format '{{{{.Id}}}}')
+          if [ "$obtenu" != "$attendu" ]; then
+            echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
+            exit 1
+          fi
+          sha=$(sha256sum artifacts/candidate-image.tar.gz | cut -d' ' -f1)
+          if [ "$sha" != "${{ needs.build-candidate.outputs.archive_sha256 }}" ]; then
+            echo "::error::archive alteree : $sha"
+            exit 1
+          fi
+          echo "identite confirmee : $obtenu"
+
+      - name: "6. Vérifier les licences à l'intérieur de l'image candidate"
+        run: |
           for f in /app/LICENSE.md /app/THIRD_PARTY_NOTICES.md; do
             docker run --rm --entrypoint sh ruggylab-os:license-check -c "test -f $f" \
               || { echo "::error::$f absent de l'image"; exit 1; }
@@ -616,18 +726,43 @@ jobs:
           if-no-files-found: ignore
 
   docker-stack:
-    name: Stack Docker production (compose réel)
+    name: Stack Docker production — cœur sans Grafana
     # Démarre la VRAIE stack de production (image runtime + docker-compose.yml
     # seul, sans fichier dev) et vérifie ce que les tests unitaires ne voient
     # pas : démarrage du conteneur non-root, healthchecks par rôle, seuls 80/443
     # publiés, flux clinique à travers le proxy TLS.
+    needs: [test, build-candidate]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - name: Build production image
-        run: docker build -t ruggylab-os:ci .
+      # L'image n'est PAS reconstruite : on charge l'artefact candidat, et l'on
+      # verifie que son identifiant est bien celui que `build-candidate` a
+      # publie. Une image differente ferait echouer ce job plutot que produire
+      # une preuve portant sur autre chose.
+      - name: Load the candidate image
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: candidate-image
+          path: artifacts
+
+      - name: Verify the loaded image is the audited candidate
+        run: |
+          gunzip -c artifacts/candidate-image.tar.gz | docker load
+          docker tag ruggylab-os:candidate ruggylab-os:ci
+          attendu="${{ needs.build-candidate.outputs.image_id }}"
+          obtenu=$(docker image inspect ruggylab-os:ci --format '{{{{.Id}}}}')
+          if [ "$obtenu" != "$attendu" ]; then
+            echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
+            exit 1
+          fi
+          sha=$(sha256sum artifacts/candidate-image.tar.gz | cut -d' ' -f1)
+          if [ "$sha" != "${{ needs.build-candidate.outputs.archive_sha256 }}" ]; then
+            echo "::error::archive alteree : $sha"
+            exit 1
+          fi
+          echo "identite confirmee : $obtenu"
 
       - name: Create production .env
         run: |
@@ -637,13 +772,12 @@ jobs:
           FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
           POSTGRES_PASSWORD=ci_pg_password_123
           DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
-          GRAFANA_PASSWORD=ci_grafana_password_123
           RUGGYLAB_DOMAIN=localhost
           EOF
 
       - name: Start dependencies and run migrations
         run: |
-          docker compose up -d postgres redis
+          docker compose up -d postgres valkey
           docker compose --profile migrate run --rm migrate
 
       - name: Start full production stack
@@ -663,6 +797,23 @@ jobs:
           if [ -n "$leaked" ]; then
             echo "::error::Ports publiés hors du proxy :"; echo "$leaked"; exit 1
           fi
+
+      # Grafana est hors du cœur distribué. Ce n'est pas une préférence de
+      # déploiement : c'est ce qui fait que RUGGYLAB ne distribue pas d'œuvre
+      # AGPL-3.0. Une réintroduction silencieuse dans la stack principale
+      # remettrait l'obligation en place sans que personne s'en aperçoive.
+      - name: Assert the core stack ships no Grafana
+        run: |
+          if docker compose ps --services | grep -qx grafana; then
+            echo "::error::le service grafana est revenu dans la stack principale"; exit 1
+          fi
+          if docker image ls --format '{{.Repository}}' | grep -q '^grafana/'; then
+            echo "::error::une image Grafana a été téléchargée par le scénario principal"; exit 1
+          fi
+          if grep -qi grafana .env; then
+            echo "::error::le scénario principal exige encore une variable Grafana"; exit 1
+          fi
+          echo "Cœur RUGGYLAB : aucun service, aucune image, aucune variable Grafana."
 
       - name: Assert technical paths are blocked at the proxy (§14)
         run: |
@@ -713,6 +864,223 @@ jobs:
         if: failure()
         run: docker compose logs --tail 200
 
+  # ── Overlay de supervision (NON bloquant) ──────────────────────────────────
+  # Grafana est une intégration OPTIONNELLE et EXTERNE. Ce job vérifie qu'elle
+  # fonctionne pour qui la veut — il ne conditionne pas la qualification du
+  # cœur, qui est prouvée par `docker-stack` sans lui. Il n'est donc PAS dans
+  # les `needs` de `deploy` : un cœur sain ne doit pas dépendre d'un composant
+  # que RUGGYLAB ne distribue pas.
+  monitoring-overlay:
+    name: Overlay de supervision optionnel (Grafana)
+    needs: [test, build-candidate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      # L'image n'est PAS reconstruite : on charge l'artefact candidat, et l'on
+      # verifie que son identifiant est bien celui que `build-candidate` a
+      # publie. Une image differente ferait echouer ce job plutot que produire
+      # une preuve portant sur autre chose.
+      - name: Load the candidate image
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: candidate-image
+          path: artifacts
+
+      - name: Verify the loaded image is the audited candidate
+        run: |
+          gunzip -c artifacts/candidate-image.tar.gz | docker load
+          docker tag ruggylab-os:candidate ruggylab-os:ci
+          attendu="${{ needs.build-candidate.outputs.image_id }}"
+          obtenu=$(docker image inspect ruggylab-os:ci --format '{{{{.Id}}}}')
+          if [ "$obtenu" != "$attendu" ]; then
+            echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
+            exit 1
+          fi
+          sha=$(sha256sum artifacts/candidate-image.tar.gz | cut -d' ' -f1)
+          if [ "$sha" != "${{ needs.build-candidate.outputs.archive_sha256 }}" ]; then
+            echo "::error::archive alteree : $sha"
+            exit 1
+          fi
+          echo "identite confirmee : $obtenu"
+
+      - name: Create .env with the overlay credentials
+        run: |
+          cat > .env <<'EOF'
+          RUGGYLAB_IMAGE=ruggylab-os:ci
+          SECRET_KEY=ci-secret-key-minimum-32-characters-long
+          FIRST_SUPERUSER_PASSWORD=CiPassword123!Secure
+          POSTGRES_PASSWORD=ci_pg_password_123
+          DATABASE_URL=postgresql+psycopg://ruggylab:ci_pg_password_123@postgres:5432/ruggylab
+          GRAFANA_PASSWORD=ci_grafana_password_123
+          RUGGYLAB_DOMAIN=localhost
+          EOF
+
+      - name: Start the core stack plus the monitoring overlay
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d postgres valkey
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --profile migrate run --rm migrate
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+
+      - name: Wait for Grafana to become healthy
+        run: |
+          for i in $(seq 1 40); do
+            st=$(docker inspect -f '{{.State.Health.Status}}'                  "$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml ps -q grafana)" 2>/dev/null || echo starting)
+            [ "$st" = "healthy" ] && break || sleep 3
+          done
+          [ "$st" = "healthy" ] || {
+            echo "::error::Grafana = $st"
+            docker compose -f docker-compose.yml -f docker-compose.monitoring.yml logs --tail 80 grafana
+            exit 1
+          }
+
+      - name: Assert the Prometheus datasource is provisioned
+        run: |
+          reponse=$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml exec -T grafana             wget -qO- --header "Content-Type: application/json"             "http://admin:ci_grafana_password_123@localhost:3000/api/datasources")
+          echo "$reponse"
+          echo "$reponse" | grep -q '"type":"prometheus"'             || { echo "::error::datasource Prometheus absente"; exit 1; }
+
+      - name: Assert the RUGGYLAB dashboards are loaded
+        run: |
+          reponse=$(docker compose -f docker-compose.yml -f docker-compose.monitoring.yml exec -T grafana             wget -qO- "http://admin:ci_grafana_password_123@localhost:3000/api/search?type=dash-db")
+          echo "$reponse"
+          echo "$reponse" | grep -q '"uid"'             || { echo "::error::aucun tableau de bord chargé"; exit 1; }
+
+      # Le vrai test de l'externalisation : retirer Grafana ne doit rien casser.
+      - name: Remove Grafana and assert RUGGYLAB is unaffected
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.monitoring.yml rm -sf grafana
+          docker volume rm -f "$(docker volume ls -q | grep grafana_data | head -1)" || true
+          curl -skf https://localhost/api/v1/health
+          docker compose -f docker-compose.yml exec -T prometheus wget -qO- http://app:8000/metrics | head -1
+          echo "RUGGYLAB reste sain sans Grafana."
+
+      - name: Compose logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.monitoring.yml logs --tail 200
+
+  # ── Preuves de source correspondante (base Debian) ─────────────────────────
+  # Distribuer une image, c'est distribuer les binaires qu'elle contient. Une
+  # partie de la base Debian est sous GPL/LGPL. Ce job produit les PREUVES —
+  # quels paquets, quelles versions, quelles sources, disponibles où — sans rien
+  # conclure juridiquement. Il échoue si la NOTICE est incomplète dans l'image,
+  # ce qui se constate sans avis juridique.
+  debian-source-evidence:
+    name: Preuves de source correspondante (base Debian)
+    needs: [test, build-candidate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+
+      # L'image n'est PAS reconstruite : on charge l'artefact candidat, et l'on
+      # verifie que son identifiant est bien celui que `build-candidate` a
+      # publie. Une image differente ferait echouer ce job plutot que produire
+      # une preuve portant sur autre chose.
+      - name: Load the candidate image
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: candidate-image
+          path: artifacts
+
+      - name: Verify the loaded image is the audited candidate
+        run: |
+          gunzip -c artifacts/candidate-image.tar.gz | docker load
+          docker tag ruggylab-os:candidate ruggylab-os:source-evidence
+          attendu="${{ needs.build-candidate.outputs.image_id }}"
+          obtenu=$(docker image inspect ruggylab-os:source-evidence --format '{{{{.Id}}}}')
+          if [ "$obtenu" != "$attendu" ]; then
+            echo "::error::image chargee ($obtenu) differente du candidat ($attendu)"
+            exit 1
+          fi
+          sha=$(sha256sum artifacts/candidate-image.tar.gz | cut -d' ' -f1)
+          if [ "$sha" != "${{ needs.build-candidate.outputs.archive_sha256 }}" ]; then
+            echo "::error::archive alteree : $sha"
+            exit 1
+          fi
+          echo "identite confirmee : $obtenu"
+
+      # La base est référencée par digest dans le Dockerfile. Si le digest
+      # bougeait, ce serait un changement délibéré, pas une dérive silencieuse.
+      - name: Assert the base image is pinned by digest
+        run: |
+          if ! grep -qE '^FROM python:[0-9]+\.[0-9]+\.[0-9]+-slim[a-z-]*@sha256:[0-9a-f]{64}' Dockerfile; then
+            echo "::error::la base Python n'est pas épinglée par version exacte ET digest"
+            grep -n '^FROM' Dockerfile
+            exit 1
+          fi
+          grep -c '^FROM python:.*@sha256:' Dockerfile
+
+      - name: Generate the Debian source and licence manifests
+        run: |
+          python scripts/debian_source_manifest.py ruggylab-os:source-evidence             --out artifacts             --exceptions docs/governance/DEBIAN_NOTICE_EXCEPTIONS.json             --check-availability
+
+      # Une URL écrite dans un manifeste ne prouve rien tant que personne ne
+      # l'a ouverte. `--check-availability` l'ouvre ; on vérifie ici qu'aucune
+      # source n'est restée introuvable.
+      # Un 200 sur la page d'un paquet ne prouve rien sur ses FICHIERS : la page
+      # peut exister sans que l'archive source soit récupérable. Le générateur
+      # descend donc jusqu'au fichier ; on vérifie ici qu'aucun n'est resté sans
+      # empreinte ni sans réponse. Une panne externe bloque et fait relancer le
+      # workflow — elle ne doit pas produire une preuve verte.
+      - name: Assert every corresponding source file is reachable and hashed
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+
+          charge = json.loads(
+              pathlib.Path("artifacts/debian-source-packages.json").read_text(encoding="utf-8")
+          )
+          provenance = charge["provenance"]
+          sources = charge["source_packages"]
+          fichiers = [f for s in sources for f in s["source_files"]]
+
+          print(f"plateforme  : {provenance['platform']}")
+          print(f"base        : {provenance['base_image_reference']}")
+          print(f"commit      : {provenance['git_sha'][:12]}")
+          print(f"{len(sources)} paquets sources, {len(fichiers)} fichiers sources")
+
+          bloquants = []
+          for source in sources:
+              if source["source_availability"] != "verified":
+                  bloquants.append(
+                      f"{source['source_package']} {source['source_version']}"
+                      f" -> {source['source_availability']}"
+                  )
+              if source["source_files_resolution"] != "resolved":
+                  bloquants.append(f"{source['source_package']} -> fichiers non résolus")
+          for fichier in fichiers:
+              if fichier["availability"] != "verified":
+                  bloquants.append(f"{fichier['name']} -> {fichier['availability']}")
+              if not fichier.get("sha256"):
+                  bloquants.append(f"{fichier['name']} -> aucun sha256")
+
+          for message in bloquants:
+              print(f"::error::source non prouvée : {message}")
+          if bloquants:
+              sys.exit(1)
+          print("Toutes les sources correspondantes sont résolues, joignables et empreintées.")
+          PY
+
+      - name: Publier les preuves de source correspondante
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: debian-source-evidence
+          path: |
+            artifacts/debian-binary-packages.json
+            artifacts/debian-source-packages.json
+            artifacts/debian-license-manifest.json
+            docs/compliance/SOURCE_COMPLIANCE.md
+            docs/governance/DEBIAN_NOTICE_EXCEPTIONS.json
+          if-no-files-found: error
+
   # ── Garde de tag (avant toute publication) ─────────────────────────────────
   # Placée AVANT `deploy` : un tag malformé ne doit pas même déclencher une
   # construction d'image. Deux contrôles.
@@ -748,6 +1116,27 @@ jobs:
             exit 0
           fi
           tag="${GITHUB_REF_NAME}"
+
+          # ── Gate de DISTRIBUTION, distinct du gate clinique ────────────────
+          # REAL_DATA_NO_GO interdit l'usage clinique réel ; il n'interdit pas
+          # de publier une image d'évaluation. DISTRIBUTION_NO_GO interdit la
+          # publication elle-même : image, GitHub Release, remise à un tiers.
+          # Deux questions distinctes, deux verrous distincts — un seul fichier
+          # laisserait croire que lever l'un lève l'autre.
+          #
+          # Ce contrôle passe AVANT l'examen de la forme : une pré-version
+          # parfaitement formée est refusée elle aussi tant que la distribution
+          # n'est pas autorisée.
+          distribution="$(tr -d '[:space:]' < docs/governance/DISTRIBUTION_STATUS)"
+          echo "statut de distribution : $distribution"
+          if [[ "$distribution" != "CONTROLLED_EVALUATION_DISTRIBUTION_GO" ]]; then
+            echo "::error::Tag '$tag' refusé : DISTRIBUTION_STATUS = $distribution."
+            echo "::error::Aucune version ne peut être publiée tant que la distribution n'est pas"
+            echo "::error::autorisée, y compris une pré-version correctement formée."
+            echo "::error::Lever ce verrou exige une PR distincte et les preuves listées dans"
+            echo "::error::docs/governance/DISTRIBUTION_STATUS."
+            exit 1
+          fi
           stable='^v[0-9]+\.[0-9]+\.[0-9]+$'
           pre='^v[0-9]+\.[0-9]+\.[0-9]+-(alpha|beta|rc)\.[0-9]+$'
 
@@ -776,14 +1165,41 @@ jobs:
     name: Build and publish Docker image
     # Déploiement uniquement sur tag de version (vX.Y.Z) ou déclenchement manuel —
     # pas sur chaque commit poussé sur main.
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    # `workflow_dispatch` retiré : il permettait de publier une image sur GHCR
+    # d'un simple clic, sans tag, donc sans passer par `tag-guard` — le gate de
+    # distribution aurait été contournable par l'interface. `deploy` ne
+    # s'exécute plus QUE sur un tag, et un tag n'existe que si `tag-guard`
+    # l'accepte. Pour construire et tester sans publier, la CI de PR le fait
+    # déjà à chaque poussée.
+    if: startsWith(github.ref, 'refs/tags/v')
     # Tous bloquants : aucune image n'est publiée si l'un de ces contrôles
     # échoue — parcours navigateur (e2e), flux clinique PostgreSQL
     # (test-postgres), stack Docker de production (docker-stack), analyse CodeQL,
     # et **restauration de sauvegarde** (backup-restore). Publier une image dont
     # on n'a pas démontré que la base se restaure reviendrait à livrer sans filet.
-    needs: [test, test-postgres, codeql, e2e, docker-stack, backup-restore,
-            tag-guard, license-compliance]
+    # `monitoring-overlay` n'y figure PAS, et ne doit pas y figurer : Grafana
+    # est une intégration optionnelle et externe, un cœur sain ne dépend pas
+    # d'un composant que RUGGYLAB ne distribue pas.
+    #
+    # Les DEUX gates de conformité y figurent, et c'est le point de cette PR :
+    #   `debian-source-evidence` — distribuer l'image sans savoir quels paquets
+    #     copyleft elle contient ni où leurs sources se trouvent, c'est
+    #     distribuer sans preuve ;
+    #   `license-compliance`     — la distribuer sans son texte de licence ni
+    #     les notices de ses composants ne satisfait aucune obligation.
+    # Perdre l'un des deux lors d'une fusion rouvrirait le trou qu'il ferme :
+    # `tests/test_release_pipeline.py` refuse toute liste qui s'en écarte.
+    needs:
+      - test
+      - test-postgres
+      - codeql
+      - e2e
+      - docker-stack
+      - backup-restore
+      - build-candidate
+      - debian-source-evidence
+      - license-compliance
+      - tag-guard
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -794,8 +1210,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      # L'image n'est PAS reconstruite ici. Reconstruire publierait un artefact
+      # que ni le SBOM, ni les preuves Debian, ni la qualification Docker n'ont
+      # examiné : deux constructions du même Dockerfile peuvent différer, et les
+      # preuves décriraient alors une image qui n'est pas celle qu'on livre.
+      # On pousse EXACTEMENT l'archive que `build-candidate` a produite et que
+      # les gates ont validée.
+      - name: Load the audited candidate image
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: candidate-image
+          path: artifacts
+
+      - name: Verify the artefact is the one the gates audited
+        run: |
+          sha=$(sha256sum artifacts/candidate-image.tar.gz | cut -d' ' -f1)
+          attendu_sha="${{ needs.build-candidate.outputs.archive_sha256 }}"
+          if [ "$sha" != "$attendu_sha" ]; then
+            echo "::error::archive alterée depuis sa construction : $sha != $attendu_sha"
+            exit 1
+          fi
+          gunzip -c artifacts/candidate-image.tar.gz | docker load
+          image_id=$(docker image inspect ruggylab-os:candidate --format '{{.Id}}')
+          attendu_id="${{ needs.build-candidate.outputs.image_id }}"
+          if [ "$image_id" != "$attendu_id" ]; then
+            echo "::error::image chargée ($image_id) différente du candidat ($attendu_id)"
+            exit 1
+          fi
+          echo "artefact confirmé : $image_id"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
@@ -804,24 +1246,51 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish Docker image
+      # Chemin aligné sur docker-compose (ghcr.io/<owner>/<repo>:<tag>).
+      # `deploy` ne s'exécute que sur un tag, et un tag n'existe que si
+      # `tag-guard` l'a accepté — donc que si DISTRIBUTION_STATUS l'autorise.
+      - name: Push the audited image
         id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        run: |
+          reference="ghcr.io/${GITHUB_REPOSITORY}"
+          docker tag ruggylab-os:candidate "${reference}:${GITHUB_SHA}"
+          docker tag ruggylab-os:candidate "${reference}:${GITHUB_REF_NAME}"
+          docker push "${reference}:${GITHUB_SHA}"
+          docker push "${reference}:${GITHUB_REF_NAME}"
+          format='{{index .RepoDigests 0}}'
+          digest=$(docker image inspect "${reference}:${GITHUB_REF_NAME}" --format "$format" | cut -d'@' -f2)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "digest publié : $digest"
+
+      # La provenance relie les trois identifiants : ce qui a été construit, ce
+      # qui a été audité, ce qui a été publié. Sans ce lien écrit, « l'image
+      # auditée » et « l'image publiée » ne sont que deux affirmations.
+      - name: Record the artefact identity chain
+        run: |
+          mkdir -p artifacts
+          {
+            echo "# Chaîne d'identité de l'artefact"
+            echo
+            echo "| Étape | Identifiant |"
+            echo "| --- | --- |"
+            echo "| Image construite (image ID) | \`${{ needs.build-candidate.outputs.image_id }}\` |"
+            echo "| Archive auditée (SHA-256)   | \`${{ needs.build-candidate.outputs.archive_sha256 }}\` |"
+            echo "| Image publiée (digest OCI)  | \`${{ steps.build.outputs.digest }}\` |"
+            echo "| Commit                      | \`${GITHUB_SHA}\` |"
+            echo "| Tag                         | \`${GITHUB_REF_NAME}\` |"
+            echo
+            echo "Les gates \`docker-stack\`, \`license-compliance\` et"
+            echo "\`debian-source-evidence\` ont examiné l'image portant cet image ID."
+            echo "Aucune reconstruction n'a eu lieu entre l'audit et la publication."
+          } > artifacts/ARTIFACT_IDENTITY.md
+          cat artifacts/ARTIFACT_IDENTITY.md
+
+      - name: Publier la chaîne d'identité
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          context: .
-          push: true
-          # Chemin aligné sur docker-compose (ghcr.io/<owner>/<repo>:<tag>).
-          # L'ancien motif ghcr.io/<owner>/<repo>/ruggylab-os:<sha> doublait le
-          # nom du dépôt : l'image publiée n'était jamais celle attendue.
-          # Déploiement : RUGGYLAB_IMAGE=ghcr.io/${{ github.repository }}:<sha|vX.Y.Z>
-          # Une branche peut contenir "/" (interdit dans un tag OCI) : les
-          # déclenchements manuels sur branche publient donc uniquement le SHA.
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}:{1}', github.repository, github.ref_name) || '' }}
-          labels: |
-            org.opencontainers.image.title=RuggyLab OS
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          name: artifact-identity
+          path: artifacts/ARTIFACT_IDENTITY.md
+          if-no-files-found: error
 
       - name: Récapitulatif de l'image publiée
         run: |
@@ -846,7 +1315,7 @@ jobs:
     # `tag-guard` est la SOURCE UNIQUE de la nature de la version : dupliquer la
     # règle ici la ferait diverger un jour, et c'est précisément la classification
     # prerelease/stable qu'il ne faut pas se tromper.
-    needs: [deploy, tag-guard, license-compliance]
+    needs: [deploy, tag-guard, license-compliance, debian-source-evidence]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -857,11 +1326,23 @@ jobs:
       # Les SBOM ne sont pas régénérés ici : on rattache EXACTEMENT ceux que le
       # job de conformité a produits et qui ont fait passer les gates. Les
       # reconstruire ici publierait un inventaire que rien n'a vérifié.
-      - name: Récupérer les preuves de conformité
+      - name: Récupérer les preuves de conformité de licence
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: third-party-evidence
           path: artifacts-evidence
+
+      - name: Récupérer les preuves de source correspondante
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: debian-source-evidence
+          path: artifacts-debian
+
+      - name: Récupérer la chaîne d'identité de l'artefact
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: artifact-identity
+          path: artifacts-identity
 
       # Le digest est la seule référence immuable de l'image : un tag peut être
       # redirigé, un digest non. Il est écrit dans un fichier joint à la Release
@@ -871,9 +1352,18 @@ jobs:
           DIGEST: ${{ needs.deploy.outputs.digest }}
         run: |
           mkdir -p artifacts
-          cp artifacts-evidence/artifacts/sbom.cyclonedx.json artifacts/sbom.cyclonedx.json
-          cp artifacts-evidence/artifacts/sbom.spdx.json      artifacts/sbom.spdx.json
-          cp artifacts-evidence/artifacts/python-licenses.json artifacts/python-licenses.json
+          # Rien n'est REGENERE ici : on rattache exactement les pieces que les
+          # gates ont produites et validees. Les reconstruire publierait des
+          # preuves que rien n'a verifiees.
+          cp artifacts-evidence/artifacts/sbom.cyclonedx.json   artifacts/
+          cp artifacts-evidence/artifacts/sbom.spdx.json        artifacts/
+          cp artifacts-evidence/artifacts/python-licenses.json  artifacts/
+          cp artifacts-debian/artifacts/debian-binary-packages.json  artifacts/
+          cp artifacts-debian/artifacts/debian-source-packages.json  artifacts/
+          cp artifacts-debian/artifacts/debian-license-manifest.json artifacts/
+          cp artifacts-debian/docs/compliance/SOURCE_COMPLIANCE.md   artifacts/
+          cp artifacts-debian/docs/governance/DEBIAN_NOTICE_EXCEPTIONS.json artifacts/
+          cp artifacts-identity/ARTIFACT_IDENTITY.md artifacts/
           {
             echo "# Provenance — ${GITHUB_REF_NAME}"
             echo
@@ -923,6 +1413,12 @@ jobs:
             artifacts/sbom.spdx.json
             artifacts/python-licenses.json
             artifacts/RELEASE_PROVENANCE.md
+            artifacts/ARTIFACT_IDENTITY.md
+            artifacts/debian-binary-packages.json
+            artifacts/debian-source-packages.json
+            artifacts/debian-license-manifest.json
+            artifacts/SOURCE_COMPLIANCE.md
+            artifacts/DEBIAN_NOTICE_EXCEPTIONS.json
           # Strict : une Release publiée SANS son SBOM ni son texte de licence
           # serait une distribution sans preuve de conformité. Mieux vaut
           # échouer que publier une version dont on ne peut pas dire ce

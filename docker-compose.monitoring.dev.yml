@@ -1,0 +1,13 @@
+# Override de développement pour l'overlay de supervision.
+#
+# À n'utiliser QU'AVEC docker-compose.monitoring.yml :
+#
+#   docker compose -f docker-compose.yml #                  -f docker-compose.monitoring.yml #                  -f docker-compose.monitoring.dev.yml up -d
+#
+# Publie Grafana sur la boucle locale uniquement — jamais sur 0.0.0.0, jamais
+# sur le VLAN clinique.
+
+services:
+  grafana:
+    ports:
+      - "127.0.0.1:3000:3000"

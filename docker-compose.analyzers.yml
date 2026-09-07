@@ -51,7 +51,7 @@ services:
       ANALYZER_IMMUNO_PORT: ${ANALYZER_IMMUNO_PORT:-9002}
       # Les listeners bruts archivent chaque trame dans Redis (LPUSH) : sans
       # REDIS_URL ils refusent de démarrer.
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_URL: ${REDIS_URL:-redis://valkey:6379/0}
 
     # Publication bornée à UNE interface nommée. Pas de valeur par défaut
     # permissive : `ANALYZER_BIND_IP` est obligatoire (`:?` ci-dessus), donc
@@ -75,5 +75,5 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy

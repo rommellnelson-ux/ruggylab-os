@@ -79,6 +79,10 @@ def test_exactly_one_release_step(jobs):
 
 # ── la release est le dernier maillon ───────────────────────────────────────
 
+# Cette liste est volontairement exhaustive : toute modification des gates de
+# publication doit être déclarée ici, sinon le test échoue. C'est le but — un
+# gate ajouté par mégarde, ou retiré lors d'une fusion, ne doit pas passer
+# inaperçu.
 _JOBS_BLOQUANTS = {
     "test",
     "test-postgres",
@@ -86,9 +90,15 @@ _JOBS_BLOQUANTS = {
     "e2e",
     "docker-stack",
     "backup-restore",
+    # Publier l'image sans savoir quels paquets copyleft elle contient ni où
+    # leurs sources se trouvent, ce serait distribuer sans preuve.
+    "debian-source-evidence",
     "tag-guard",
     "license-compliance",
 }
+
+#: Jobs qui tournent mais ne conditionnent PAS la publication du cœur.
+_JOBS_NON_BLOQUANTS = {"monitoring-overlay"}
 
 
 def test_release_depends_on_docker_publication(jobs):
@@ -99,6 +109,19 @@ def test_release_depends_on_docker_publication(jobs):
 def test_docker_publication_depends_on_every_blocking_job(jobs):
     """Tests, PostgreSQL, restauration, CodeQL, Playwright, stack Docker."""
     assert set(_needs(jobs["deploy"])) == _JOBS_BLOQUANTS
+
+
+def test_optional_jobs_never_gate_the_image(jobs):
+    """Grafana est externe : un cœur sain ne dépend pas de lui."""
+    besoins = set(_needs(jobs["deploy"]))
+    assert not (besoins & _JOBS_NON_BLOQUANTS), (
+        f"un job optionnel bloque la publication : {besoins & _JOBS_NON_BLOQUANTS}"
+    )
+
+
+def test_source_evidence_gates_the_image(jobs):
+    """Régression visée : publier sans preuve des sources correspondantes."""
+    assert "debian-source-evidence" in _needs(jobs["deploy"])
 
 
 def test_backup_restore_gates_the_image(jobs):
