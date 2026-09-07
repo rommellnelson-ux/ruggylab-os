@@ -116,9 +116,19 @@ def test_changelog_has_an_entry_for_this_version():
     )
 
 
-def test_changelog_entry_is_dated():
-    trouve = re.search(rf"## \[{re.escape(VERSION)}\] - (\d{{4}}-\d{{2}}-\d{{2}})", _changelog())
-    assert trouve is not None, "la section doit porter une date ISO"
+def test_changelog_entry_is_not_dated_before_publication():
+    """Dater une version non publiée laisserait croire à une publication.
+
+    Ce test remplace celui qui EXIGEAIT une date : tant qu'aucun tag n'existe,
+    aucune date ne doit figurer. La date réelle sera inscrite au moment du tag.
+    """
+    changelog = _changelog()
+    date_posee = re.search(rf"## \[{re.escape(VERSION)}\] - (\d{{4}}-\d{{2}}-\d{{2}})", changelog)
+    assert date_posee is None, (
+        f"la version porte une date de publication ({date_posee.group(1) if date_posee else ''}) "
+        "alors qu'elle n'est pas publiée"
+    )
+    assert f"## [{VERSION}] — À PUBLIER" in changelog
 
 
 def test_changelog_keeps_an_unreleased_section():

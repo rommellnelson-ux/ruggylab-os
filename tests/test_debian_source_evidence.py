@@ -244,11 +244,17 @@ def ci() -> dict:
     return yaml.safe_load(_lire(".github/workflows/ci.yml"))
 
 
-def test_the_evidence_job_exists_and_builds_the_real_image(ci):
+def test_the_evidence_job_inventories_the_audited_candidate(ci):
+    """Le job ne reconstruit plus : il charge l'image que `deploy` publiera.
+
+    Inventorier une image reconstruite produirait des preuves portant sur un
+    artefact qui n'est pas celui qu'on livre.
+    """
     etapes = ci["jobs"]["debian-source-evidence"]["steps"]
-    noms = [str(s.get("name", "")) for s in etapes]
-    assert "Build the image whose packages will be inventoried" in noms
+    noms = [str(e.get("name", "")) for e in etapes]
     assert "Assert the base image is pinned by digest" in noms
+    assert any("Load the candidate image" in n for n in noms)
+    assert not any("docker build -t" in str(e.get("run", "")) for e in etapes)
 
 
 def test_the_evidence_job_actually_opens_the_source_urls(ci):
@@ -418,12 +424,18 @@ def test_a_multiplatform_deploy_would_need_one_manifest_per_platform(ci):
     une seule plateforme, un manifeste suffit ; le jour où `platforms:` apparaît,
     ce test échoue et force à produire un manifeste par plateforme.
     """
-    etape = next(
-        e
+    # `deploy` pousse désormais une archive préconstruite : une publication
+    # multiplateforme se verrait soit dans un `platforms:` d'action, soit dans
+    # un `--platform` de commande.
+    script = " ".join(str(e.get("run", "")) for e in ci["jobs"]["deploy"]["steps"])
+    actions = [
+        (e.get("with") or {}).get("platforms")
         for e in ci["jobs"]["deploy"]["steps"]
         if str(e.get("uses", "")).startswith("docker/build-push-action")
+    ]
+    plateformes = next((p for p in actions if p), None) or (
+        "--platform" if "--platform" in script else None
     )
-    plateformes = (etape.get("with") or {}).get("platforms")
     if plateformes:
         job = ci["jobs"]["debian-source-evidence"]
         script = " ".join(str(e.get("run", "")) for e in job["steps"])
@@ -561,3 +573,19 @@ def test_the_compliance_document_explains_the_dgit_case():
     contenu = _phrase(CONFORMITE)
     assert "related_archive_files" in contenu
     assert "lui inventer un hash aurait été pire" in contenu
+
+
+def test_an_incomplete_provenance_fails_rather_than_passes():
+    """Un champ vide rendrait le manifeste ininterprétable, sans rien signaler."""
+    source = (REPO_ROOT / "scripts" / "debian_source_manifest.py").read_text(encoding="utf-8")
+    assert "provenance incomplète, champs vides" in source
+    for champ in ("image_id", "platform", "architecture", "base_image_digest", "git_sha"):
+        assert f'"{champ}"' in source
+
+
+def test_each_provenance_field_is_read_separately():
+    """Un séparateur qui ne survit pas au passage viderait trois champs d'un coup."""
+    source = (REPO_ROOT / "scripts" / "debian_source_manifest.py").read_text(encoding="utf-8")
+    assert '_champ("{{.Id}}")' in source
+    assert '_champ("{{.Os}}")' in source
+    assert '_champ("{{.Architecture}}")' in source

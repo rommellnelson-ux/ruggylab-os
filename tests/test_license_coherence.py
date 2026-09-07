@@ -12,6 +12,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -376,23 +377,31 @@ def test_repository_visibility_is_not_claimed_to_have_changed():
 # ── décisions Redis et Grafana : prises, mais pas encore mises en œuvre ─────
 
 
-def test_redis_and_grafana_decisions_are_recorded():
+def test_the_redis_and_grafana_decisions_are_now_implemented():
+    """Les deux décisions ne sont plus des intentions : le code les porte.
+
+    Ce test remplace celui qui vérifiait qu'elles n'étaient PAS encore mises en
+    œuvre. Les marqueurs de revue ne sont levés que parce que l'arbre le
+    démontre — d'où les contrôles sur les fichiers, pas sur la prose.
+    """
+    compose = yaml.safe_load(_lire("docker-compose.yml"))
+    assert "valkey" in compose["services"] and "redis" not in compose["services"]
+    assert "grafana" not in compose["services"]
+    assert (REPO_ROOT / "docker-compose.monitoring.yml").is_file()
+
     notices = _lire("THIRD_PARTY_NOTICES.md")
-    assert "REDIS_7_4_DISTRIBUTION = REJECTED" in notices
-    assert "REDIS_REPLACEMENT      = VALKEY" in notices
-    assert "GRAFANA_CORE_DEPENDENCY          = FALSE" in notices
-    assert "GRAFANA_OPTIONAL_EXTERNAL_SERVICE = TRUE" in notices
+    assert "### 6.1 Valkey 8.1.9 — Redis 7.4 écarté ✅" in notices
+    assert "### 6.2 Grafana 11 — hors du cœur distribué ✅" in notices
+    assert "### 6.3 Google Fonts — supprimé ✅" in notices
 
 
-def test_implementation_statuses_are_not_claimed_before_the_work_lands():
-    """`REDIS_REPLACED_BY_VALKEY` et `GRAFANA_EXTERNALIZED` ne se déclarent pas d'avance."""
+def test_the_remaining_blockers_are_still_declared_open():
+    """Deux points restent ouverts, et aucun ne se ferme par du code."""
     notices = _lire("THIRD_PARTY_NOTICES.md")
-    for statut in ("REDIS_REPLACED_BY_VALKEY", "GRAFANA_EXTERNALIZED"):
-        assert f"`{statut}`\n> **n'est pas prononcé**" in notices or (
-            statut in notices and "n'est pas prononcé" in notices
-        ), f"{statut} doit être explicitement non prononcé"
-    assert "MANUAL_LICENSE_REVIEW_REQUIRED" in notices
-    assert "AGPL_DISTRIBUTION_REVIEW_REQUIRED" in notices
+    assert "### 6.4 Sources correspondantes de la base Debian — **ouvert** ⛔" in notices
+    assert "LEGAL_SOURCE_OFFER_REVIEW_REQUIRED" in notices
+    assert "LEGAL_LICENSE_REVIEW_REQUIRED" in notices
+    assert "`THIRD_PARTY_LICENSES_QUALIFIED` | ❌" in notices
 
 
 _PREFLIGHT_PRIVE = "docs/governance/PRIVATE_REPOSITORY_PREFLIGHT_2026-08-28.md"
@@ -431,3 +440,155 @@ def test_the_preflight_says_going_private_does_not_undo_the_past():
     contenu = " ".join(brut.split())
     assert "Le passage en privé protège l'avenir, pas le passé" in contenu
     assert "doit être révoqué" in contenu
+
+
+# ── le gate de distribution, distinct du gate clinique ──────────────────────
+
+
+def test_the_distribution_gate_is_documented():
+    doc = _lire("docs/governance/DISTRIBUTION_STATUS.md")
+    assert "DISTRIBUTION_NO_GO" in doc
+    assert "CONTROLLED_EVALUATION_DISTRIBUTION_GO" in doc
+    for preuve in (
+        "Validation juridique du texte de licence",
+        "Choix du mécanisme de source Debian",
+        "Préflight dépôt privé terminé",
+        "Dépôt effectivement privé",
+        "Protection de branche mise à jour",
+        "Autorisation explicite du titulaire",
+    ):
+        assert preuve in doc, f"preuve de levée absente : {preuve}"
+
+
+def test_the_two_gates_answer_different_questions():
+    """Un seul verrou laisserait croire que lever l'un lève l'autre."""
+    doc = " ".join(_lire("docs/governance/DISTRIBUTION_STATUS.md").replace("*", "").split())
+    assert "Peut-on soigner avec ?" in doc
+    assert "Peut-on le remettre à quelqu'un ?" in doc
+    assert "Aucun des deux statuts n'implique l'autre" in doc
+
+
+# ── notices réconciliées avec le runtime réel ───────────────────────────────
+
+
+def test_the_notices_describe_valkey_not_redis_as_the_server():
+    notices = _lire("THIRD_PARTY_NOTICES.md")
+    assert "valkey/valkey" in notices and "8.1.9-alpine" in notices
+    assert "BSD-3-Clause" in notices
+    assert "MANUAL_LICENSE_REVIEW_REQUIRED" not in notices.split("### 6.1")[1].split("### 6.2")[
+        0
+    ] or ("levé" in notices)
+
+
+def test_redis_py_is_still_named_as_the_mit_client():
+    """Le changement de licence de 2024 visait le serveur, pas ce client."""
+    notices = " ".join(_lire("THIRD_PARTY_NOTICES.md").replace("*", "").split())
+    assert "redis-py" in notices and "MIT" in notices
+
+
+def test_the_notices_no_longer_list_google_fonts_as_active():
+    notices = _lire("THIRD_PARTY_NOTICES.md")
+    tableau_cdn = notices.split("## 4.")[1].split("## 5.")[0]
+    assert "fonts.googleapis.com" not in tableau_cdn.split(">")[0], (
+        "Google Fonts figure encore parmi les ressources actives"
+    )
+    assert "Google Fonts a été supprimé" in tableau_cdn
+
+
+def test_the_notices_keep_the_remaining_cdn_resources_qualified():
+    notices = _lire("THIRD_PARTY_NOTICES.md")
+    for ressource in ("Leaflet", "JsBarcode", "OpenStreetMap"):
+        assert ressource in notices, f"ressource CDN non qualifiée : {ressource}"
+    assert "ne sont pas embarquées dans l'image" in notices
+
+
+def test_the_notices_do_not_claim_the_agpl_stops_applying():
+    """Sortir Grafana du cœur ne suspend pas l'AGPL entre son éditeur et l'exploitant."""
+    brut = _lire("THIRD_PARTY_NOTICES.md").replace("*", "").replace(">", " ")
+    notices = " ".join(brut.split())
+    assert "L'AGPL continue de s'appliquer à Grafana lui-même" in notices
+
+
+def test_the_notices_separate_distributed_from_referenced():
+    notices = _lire("THIRD_PARTY_NOTICES.md")
+    assert "## 0. Ce que RUGGYLAB distribue" in notices
+    assert "### Distribué par RUGGYLAB" in notices
+    assert "### Référencé dans Docker Compose" in notices
+    assert "### Intégration optionnelle externe" in notices
+    aplati = " ".join(notices.replace("*", "").split())
+    assert "RUGGYLAB ne les republie pas" in aplati
+
+
+def test_the_notices_warn_about_an_offline_distribution():
+    aplati = " ".join(_lire("THIRD_PARTY_NOTICES.md").replace("*", "").split())
+    assert "Une distribution hors ligne changerait ce périmètre" in aplati
+    assert "exigerait un nouvel audit" in aplati
+
+
+def test_the_debian_point_keeps_neutral_terminology():
+    notices = _lire("THIRD_PARTY_NOTICES.md")
+    assert "written_offer_applicability = LEGAL_REVIEW_REQUIRED" in notices
+    assert "LEGAL_SOURCE_OFFER_REVIEW_REQUIRED" in notices
+    aplati = " ".join(notices.replace("*", "").split())
+    assert "Aucune des formes A, B, C ou D" in aplati
+    assert "n'imposent pas la même forme" in aplati
+
+
+# ── la licence ne dépend plus d'un réglage de plateforme ────────────────────
+
+
+def test_the_licence_text_is_neutral_about_repository_visibility():
+    """La visibilité peut changer ; un texte permanent qui la décrit deviendrait faux."""
+    licence = " ".join(_lire("LICENSE.md").replace("*", "").split())
+    assert "accessible, consultable, cloné ou détenu" in licence
+    assert "quel que soit le régime de visibilité du dépôt" in licence
+    assert "Le dépôt est visible publiquement" not in licence
+
+
+# ── audit de la protection de branche ───────────────────────────────────────
+
+
+def test_the_branch_protection_audit_lists_the_missing_checks():
+    doc = _lire("docs/governance/BRANCH_PROTECTION_PRE_TAG_REQUIRED_CHECKS.md")
+    assert "BRANCH_PROTECTION_UPDATE_REQUIRED" in doc
+    for controle in (
+        "Sauvegarde et restauration PostgreSQL",
+        "CodeQL security analysis",
+        "E2E navigateur (Playwright)",
+        "Stack Docker production",
+        "Preuves de source correspondante",
+        "License and distribution compliance",
+        "Validate release tag",
+    ):
+        assert controle in doc, f"contrôle absent de la cible : {controle}"
+
+
+def test_the_optional_overlay_stays_out_of_the_required_checks():
+    aplati = " ".join(
+        _lire("docs/governance/BRANCH_PROTECTION_PRE_TAG_REQUIRED_CHECKS.md")
+        .replace("*", "")
+        .split()
+    )
+    assert "ne doit pas devenir un check requis" in aplati
+
+
+# ── le CHANGELOG ne date pas une publication qui n'a pas eu lieu ────────────
+
+
+def test_the_changelog_does_not_date_an_unpublished_version():
+    changelog = _lire("CHANGELOG.md")
+    assert "## [0.8.0-beta.1] — À PUBLIER" in changelog
+    aplati = " ".join(changelog.replace("*", "").split())
+    assert "Cette version n'est pas publiée" in aplati
+
+
+def test_the_changelog_records_the_runtime_changes():
+    changelog = _lire("CHANGELOG.md")
+    for evolution in (
+        "Valkey 8.1.9 remplace le serveur Redis 7.4",
+        "Grafana sort du cœur distribué",
+        "Google Fonts supprimée",
+        "Base Python épinglée",
+        "DISTRIBUTION_NO_GO",
+    ):
+        assert evolution in changelog, f"évolution absente du CHANGELOG : {evolution}"

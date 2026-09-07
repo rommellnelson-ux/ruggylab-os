@@ -93,8 +93,12 @@ _JOBS_BLOQUANTS = {
     # Publier l'image sans savoir quels paquets copyleft elle contient ni où
     # leurs sources se trouvent, ce serait distribuer sans preuve.
     "debian-source-evidence",
-    "tag-guard",
+    # La distribuer sans son texte de licence ni les notices de ses composants
+    # ne satisfait aucune obligation.
     "license-compliance",
+    # Sans ce job, `deploy` n'aurait pas l'archive auditée à pousser.
+    "build-candidate",
+    "tag-guard",
 }
 
 #: Jobs qui tournent mais ne conditionnent PAS la publication du cœur.
@@ -103,7 +107,14 @@ _JOBS_NON_BLOQUANTS = {"monitoring-overlay"}
 
 def test_release_depends_on_docker_publication(jobs):
     """Une release ne peut pas précéder la publication de l'image."""
-    assert set(_needs(jobs["release"])) == {"deploy", "tag-guard", "license-compliance"}
+    assert set(_needs(jobs["release"])) == {
+        "deploy",
+        "tag-guard",
+        "license-compliance",
+        # La release rattache les manifestes Debian : elle doit dépendre du job
+        # qui les produit, sinon l'artefact serait absent au téléchargement.
+        "debian-source-evidence",
+    }
 
 
 def test_docker_publication_depends_on_every_blocking_job(jobs):
@@ -210,26 +221,34 @@ def test_body_precedes_generated_notes(jobs):
 # ── image Docker ────────────────────────────────────────────────────────────
 
 
+def _etape_de_publication(jobs) -> dict:
+    """L'étape qui pousse l'image.
+
+    `deploy` ne construit plus : il pousse l'archive auditée. Les garanties de
+    tag se lisent donc sur ses commandes, non sur une action de construction.
+    """
+    return next(e for e in _steps(jobs["deploy"]) if "docker push" in str(e.get("run", "")))
+
+
 def test_image_never_receives_the_latest_tag(jobs):
     """Une bêta ne doit jamais devenir l'image `latest`."""
-    build = _uses(jobs["deploy"], "docker/build-push-action")[0]
-    tags = str(build["with"]["tags"])
-    assert ":latest" not in tags
-    assert "latest" not in tags.replace("make_latest", "")
+    script = _etape_de_publication(jobs)["run"]
+    assert ":latest" not in script
+    assert "latest" not in script.replace("make_latest", "")
 
 
 def test_image_is_tagged_with_the_exact_version(jobs):
-    build = _uses(jobs["deploy"], "docker/build-push-action")[0]
-    tags = str(build["with"]["tags"])
-    assert "github.ref_name" in tags, "le tag exact de version doit être appliqué"
-    assert "github.sha" in tags, "le SHA doit rester traçable"
+    script = _etape_de_publication(jobs)["run"]
+    assert "GITHUB_REF_NAME" in script, "le tag exact de version doit être appliqué"
+    assert "GITHUB_SHA" in script, "le SHA doit rester traçable"
 
 
 def test_immutable_digest_is_exposed(jobs):
     """Le digest est le seul identifiant réellement immuable de l'image."""
     assert jobs["deploy"]["outputs"]["digest"] == "${{ steps.build.outputs.digest }}"
-    build = _uses(jobs["deploy"], "docker/build-push-action")[0]
-    assert build.get("id") == "build"
+    etape = _etape_de_publication(jobs)
+    assert etape.get("id") == "build"
+    assert "RepoDigests" in etape["run"], "le digest doit être relevé APRÈS la poussée"
 
 
 # ── le workflow ne crée jamais de tag ───────────────────────────────────────
@@ -473,3 +492,220 @@ def test_the_audit_runs_after_the_sboms_are_generated(jobs):
     generation = next(i for i, n in enumerate(noms) if "Générer les SBOM" in n)
     audit = next(i for i, n in enumerate(noms) if "Auditer le SBOM" in n)
     assert generation < audit, "auditer un SBOM avant de le produire ne prouve rien"
+
+
+# ── les deux gates de conformité, et rien qui les contourne ─────────────────
+#
+# Perdre l'un des deux lors d'une fusion rouvrirait exactement le trou qu'il
+# ferme. Ces tests nomment chacun explicitement plutôt que de se fier au
+# comptage : un message d'échec doit dire lequel manque.
+
+
+@pytest.mark.parametrize("gate", ["debian-source-evidence", "license-compliance"])
+def test_both_compliance_gates_block_publication(jobs, gate):
+    assert gate in _needs(jobs["deploy"]), f"gate de conformité perdu : {gate}"
+
+
+def test_no_job_publishes_outside_the_gated_chain(jobs):
+    """Toute publication passe par `deploy`, donc par les deux gates."""
+    marqueurs = ("docker/build-push-action", "docker push", "action-gh-release")
+    publiants = {
+        nom
+        for nom, job in jobs.items()
+        if any(
+            marqueur in str(etape.get("uses", "")) + str(etape.get("run", ""))
+            for etape in _steps(job)
+            for marqueur in marqueurs
+        )
+    }
+    assert publiants <= {"deploy", "release"}, f"chemin de publication parallèle : {publiants}"
+
+
+# ── le gate de DISTRIBUTION, distinct du gate clinique ──────────────────────
+
+
+def test_the_distribution_status_file_exists_and_forbids_distribution():
+    statut = (REPO_ROOT / "docs" / "governance" / "DISTRIBUTION_STATUS").read_text(encoding="utf-8")
+    assert statut.strip() == "DISTRIBUTION_NO_GO"
+
+
+def test_the_two_statuses_are_separate_files():
+    """Un seul fichier laisserait croire que lever l'un lève l'autre."""
+    clinique = REPO_ROOT / "docs" / "governance" / "CLINICAL_STATUS"
+    distribution = REPO_ROOT / "docs" / "governance" / "DISTRIBUTION_STATUS"
+    assert clinique.is_file() and distribution.is_file()
+    assert clinique.read_text(encoding="utf-8").strip() == "REAL_DATA_NO_GO"
+    assert clinique.read_text(encoding="utf-8") != distribution.read_text(encoding="utf-8")
+
+
+def test_tag_guard_reads_the_distribution_status(jobs):
+    etape = next(
+        e for e in _steps(jobs["tag-guard"]) if "statut de gouvernance" in str(e.get("name", ""))
+    )
+    script = etape["run"]
+    assert "DISTRIBUTION_STATUS" in script
+    assert "CONTROLLED_EVALUATION_DISTRIBUTION_GO" in script
+
+
+def test_a_well_formed_prerelease_is_refused_while_distribution_is_blocked(jobs):
+    """Le contrôle de distribution passe AVANT l'examen de la forme du tag.
+
+    Sans cela, une pré-version correctement formée serait acceptée : la forme du
+    tag n'a rien à voir avec l'autorisation de distribuer.
+    """
+    etape = next(
+        e for e in _steps(jobs["tag-guard"]) if "statut de gouvernance" in str(e.get("name", ""))
+    )
+    script = etape["run"]
+    position_distribution = script.index("DISTRIBUTION_STATUS")
+    position_forme = script.index("pre='^v")
+    assert position_distribution < position_forme, (
+        "le gate de distribution doit précéder l'examen de la forme du tag"
+    )
+
+
+# ── `workflow_dispatch` ne peut plus publier ────────────────────────────────
+
+
+def test_manual_dispatch_cannot_publish_an_image(ci):
+    """Il permettait de publier sans tag, donc sans passer par `tag-guard`."""
+    condition = ci["jobs"]["deploy"].get("if", "")
+    assert "workflow_dispatch" not in condition, (
+        "un déclenchement manuel contournerait le gate de distribution"
+    )
+    assert "refs/tags/v" in condition
+
+
+def test_release_also_requires_a_tag(ci):
+    assert "refs/tags/v" in ci["jobs"]["release"].get("if", "")
+
+
+# ── identité de l'artefact : construit une fois, audité, publié tel quel ────
+
+
+def test_the_candidate_image_is_built_exactly_once(ci):
+    """Deux constructions du même Dockerfile peuvent différer."""
+    constructions = [
+        (nom, etape.get("name"))
+        for nom, job in ci["jobs"].items()
+        for etape in (job.get("steps") or [])
+        # `docker build -t` : la commande réelle. Une mention de « docker build »
+        # dans un commentaire ou une métadonnée n'est pas une construction.
+        if "docker build -t" in str(etape.get("run", ""))
+    ]
+    assert len(constructions) == 1, (
+        f"l'image est construite {len(constructions)} fois : {constructions}"
+    )
+    assert constructions[0][0] == "build-candidate"
+
+
+@pytest.mark.parametrize(
+    "job",
+    [
+        "docker-stack",
+        "monitoring-overlay",
+        "license-compliance",
+        "debian-source-evidence",
+        "deploy",
+    ],
+)
+def test_every_consumer_loads_the_candidate_instead_of_rebuilding(ci, job):
+    besoins = ci["jobs"][job].get("needs", [])
+    besoins = [besoins] if isinstance(besoins, str) else besoins
+    assert "build-candidate" in besoins, f"{job} ne dépend pas de l'image candidate"
+    etapes = ci["jobs"][job]["steps"]
+    assert any(
+        str(e.get("uses", "")).startswith("actions/download-artifact")
+        and (e.get("with") or {}).get("name") == "candidate-image"
+        for e in etapes
+    ), f"{job} ne charge pas l'archive candidate"
+
+
+@pytest.mark.parametrize(
+    "job",
+    [
+        "docker-stack",
+        "monitoring-overlay",
+        "license-compliance",
+        "debian-source-evidence",
+        "deploy",
+    ],
+)
+def test_every_consumer_verifies_the_identity_it_loaded(ci, job):
+    """Charger une archive sans vérifier son identité ne prouve rien."""
+    script = " ".join(str(e.get("run", "")) for e in ci["jobs"][job]["steps"])
+    assert "outputs.image_id" in script, f"{job} ne compare pas l'image ID"
+    assert "outputs.archive_sha256" in script, f"{job} ne compare pas l'empreinte de l'archive"
+
+
+def test_deploy_pushes_without_rebuilding(ci):
+    etapes = ci["jobs"]["deploy"]["steps"]
+    script = " ".join(str(e.get("run", "")) for e in etapes)
+    assert "docker push" in script
+    assert "docker build -t" not in script, (
+        "deploy reconstruit : l'image publiée ne serait pas celle qui a été auditée"
+    )
+    assert not any(str(e.get("uses", "")).startswith("docker/build-push-action") for e in etapes)
+
+
+def test_the_identity_chain_is_recorded(ci):
+    etape = next(
+        e for e in ci["jobs"]["deploy"]["steps"] if "identity chain" in str(e.get("name", ""))
+    )
+    script = etape["run"]
+    for element in ("image_id", "archive_sha256", "outputs.digest"):
+        assert element in script, f"la provenance n'inscrit pas {element}"
+
+
+def test_the_candidate_archive_never_reaches_a_registry(ci):
+    """Sur une PR, l'artefact candidat reste interne à la CI."""
+    etape = next(
+        e
+        for e in ci["jobs"]["build-candidate"]["steps"]
+        if str(e.get("uses", "")).startswith("actions/upload-artifact")
+    )
+    assert (etape.get("with") or {}).get("name") == "candidate-image"
+    script = " ".join(str(e.get("run", "")) for e in ci["jobs"]["build-candidate"]["steps"])
+    assert "docker push" not in script and "ghcr.io" not in script
+
+
+# ── les artefacts de la release viennent des gates, pas d'une régénération ──
+
+_PIECES_ATTENDUES = (
+    "CHANGELOG.md",
+    "LICENSE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "sbom.cyclonedx.json",
+    "sbom.spdx.json",
+    "python-licenses.json",
+    "RELEASE_PROVENANCE.md",
+    "ARTIFACT_IDENTITY.md",
+    "debian-binary-packages.json",
+    "debian-source-packages.json",
+    "debian-license-manifest.json",
+    "SOURCE_COMPLIANCE.md",
+    "DEBIAN_NOTICE_EXCEPTIONS.json",
+)
+
+
+@pytest.mark.parametrize("piece", _PIECES_ATTENDUES)
+def test_the_release_attaches_every_required_piece(jobs, piece):
+    etape = next(
+        e
+        for e in _steps(jobs["release"])
+        if str(e.get("uses", "")).startswith("softprops/action-gh-release")
+    )
+    assert piece in etape["with"]["files"], f"pièce absente de la Release : {piece}"
+
+
+def test_the_release_regenerates_nothing(jobs):
+    """Régénérer après les gates publierait des preuves que rien n'a validées."""
+    script = " ".join(str(e.get("run", "")) for e in _steps(jobs["release"]))
+    for interdit in ("syft", "python -m build", "docker build", "inventory_python_licenses"):
+        assert interdit not in script, f"la release régénère : {interdit}"
+    telecharges = {
+        (e.get("with") or {}).get("name")
+        for e in _steps(jobs["release"])
+        if str(e.get("uses", "")).startswith("actions/download-artifact")
+    }
+    assert {"third-party-evidence", "debian-source-evidence", "artifact-identity"} <= telecharges

@@ -106,13 +106,19 @@ def test_every_exception_is_a_written_dated_decision(registre, champ):
 def test_the_base_image_finding_is_recorded(registre):
     """Le §6.4 doit rester ouvert tant que l'offre de source n'est pas instruite."""
     notices = (REPO_ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
-    assert "BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED" in notices
-    assert "ne rend pas RUGGYLAB OS open source" in notices
-    assert "87 paquets Debian" in notices
+    # Le marqueur a été renommé lors de la réconciliation : la terminologie
+    # `LEGAL_SOURCE_OFFER_REVIEW_REQUIRED` ne conclut pas qu'une offre écrite
+    # est due, là où l'ancienne le laissait entendre.
+    assert "LEGAL_SOURCE_OFFER_REVIEW_REQUIRED" in notices
+    aplati = " ".join(notices.replace("*", "").split())
+    assert "ne rend pas RUGGYLAB OS open source" in aplati
+    assert "87 paquets" in aplati
 
 
 def test_no_conclusion_is_drawn_without_evidence():
     """Ni compatibilité ni incompatibilité n'est affirmée sur les points ouverts."""
     notices = (REPO_ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
-    assert "elle n'a pas été instruite" in notices
-    assert "REVUE OBLIGATOIRE — §6.4" in notices
+    assert "### 6.4 Sources correspondantes de la base Debian — **ouvert** ⛔" in notices
+    aplati = " ".join(notices.replace("*", "").split())
+    assert "n'a pas été instruite" in aplati
+    assert "Il n'est conclu ni à la conformité, ni à la non-conformité" in aplati
