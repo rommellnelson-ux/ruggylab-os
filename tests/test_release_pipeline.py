@@ -724,3 +724,24 @@ def test_docker_format_templates_are_well_formed(ci):
         assert "{{{" not in gabarit, f"accolades en trop dans le gabarit Docker : {gabarit}"
         assert gabarit.count("{{") == gabarit.count("}}"), f"gabarit déséquilibré : {gabarit}"
         assert not re.search(r"\{\{\{|\}\}\}", gabarit), f"gabarit malformé : {gabarit}"
+
+
+def test_the_licence_register_check_tracks_the_open_points_only(ci):
+    """Exiger un marqueur levé reviendrait à demander au document de mentir.
+
+    Trois blocages ont été fermés — Redis, Grafana, Google Fonts — et leurs
+    marqueurs retirés après vérification de l'arbre. Le contrôle doit suivre
+    l'état réel, pas un état figé.
+    """
+    etape = next(
+        e
+        for e in _steps(ci["jobs"]["license-compliance"])
+        if "Registre des décisions" in str(e.get("name", ""))
+    )
+    script = etape["run"]
+    for ouvert in ("LEGAL_SOURCE_OFFER_REVIEW_REQUIRED", "LEGAL_LICENSE_REVIEW_REQUIRED"):
+        assert ouvert in script, f"point ouvert non surveillé : {ouvert}"
+    for leve in ("MANUAL_LICENSE_REVIEW_REQUIRED", "AGPL_DISTRIBUTION_REVIEW_REQUIRED"):
+        assert leve not in script, f"marqueur levé encore exigé : {leve}"
+    assert "written_offer_applicability = LEGAL_REVIEW_REQUIRED" in script
+    assert "DISTRIBUTION_STATUS" in script, "le verrou de distribution doit être vérifié"

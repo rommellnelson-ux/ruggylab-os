@@ -622,13 +622,33 @@ jobs:
           python scripts/audit_sbom_licenses.py artifacts/sbom.cyclonedx.json             --exceptions docs/governance/SBOM_LICENSE_EXCEPTIONS.json
 
       # ── 6. Les composants à revue obligatoire restent au registre ─────────
+      # Ce contrôle protège les points ENCORE OUVERTS. Les marqueurs des points
+      # fermés — Redis écarté, Grafana externalisé, Google Fonts supprimé — ont
+      # été levés à dessein, chacun après vérification de l'arbre. Continuer à
+      # les exiger reviendrait à demander au document de mentir sur son état.
       - name: "10. Registre des décisions de licence"
         run: |
-          for marqueur in MANUAL_LICENSE_REVIEW_REQUIRED AGPL_DISTRIBUTION_REVIEW_REQUIRED \n                          BASE_IMAGE_SOURCE_OFFER_REVIEW_REQUIRED "Redis 7.4" "Grafana 11"; do
-            grep -q "$marqueur" THIRD_PARTY_NOTICES.md \
-              || { echo "::error::'$marqueur' absent du registre des décisions"; exit 1; }
+          echouer() { echo "::error::$1"; exit 1; }
+
+          # Points ENCORE OUVERTS. Les marqueurs des points fermés — Redis
+          # écarté, Grafana externalisé, Google Fonts supprimé — ont été levés
+          # à dessein, chacun après vérification de l'arbre. Continuer à les
+          # exiger reviendrait à demander au document de mentir sur son état.
+          for marqueur in LEGAL_SOURCE_OFFER_REVIEW_REQUIRED LEGAL_LICENSE_REVIEW_REQUIRED; do
+            grep -q "$marqueur" THIRD_PARTY_NOTICES.md || echouer "$marqueur absent des notices"
           done
-          echo "Composants à revue obligatoire correctement signalés."
+
+          # La terminologie doit rester non conclusive : l'automatisation
+          # constate un signal, elle ne qualifie pas juridiquement.
+          grep -q "written_offer_applicability = LEGAL_REVIEW_REQUIRED" THIRD_PARTY_NOTICES.md || echouer "terminologie conclusive réintroduite"
+
+          # Et le verrou de distribution doit rester lisible dans les notices.
+          grep -q "DISTRIBUTION_NO_GO" THIRD_PARTY_NOTICES.md || echouer "statut de distribution absent des notices"
+
+          # Le fichier de statut lui-même, source de vérité du verrou.
+          test "$(tr -d "[:space:]" < docs/governance/DISTRIBUTION_STATUS)" = "DISTRIBUTION_NO_GO" || echouer "DISTRIBUTION_STATUS modifié sans décision"
+
+          echo "Points ouverts signalés, terminologie non conclusive, verrou de distribution en place."
 
       # Artefacts de CI seulement : aucune release, aucun tag.
       - name: Publier les preuves de conformité
