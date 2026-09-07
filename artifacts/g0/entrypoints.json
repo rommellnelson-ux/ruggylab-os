@@ -1,0 +1,2476 @@
+{
+  "payload": {
+    "http": {
+      "mounts": 1,
+      "openapi_operations": 231,
+      "routes": [
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "root",
+          "path": "/",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "ratios_admin_ui",
+          "path": "/api/v1/admin/ratios",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_aes",
+          "path": "/api/v1/aes",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "declare_aes",
+          "path": "/api/v1/aes",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_aes",
+          "path": "/api/v1/aes/{aes_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "update_aes",
+          "path": "/api/v1/aes/{aes_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "receive_analyzer_results",
+          "path": "/api/v1/analyzer/results",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_audit_events",
+          "path": "/api/v1/audit-events",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "export_audit_events_csv",
+          "path": "/api/v1/audit-events/export.csv",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_auto_validation_configs",
+          "path": "/api/v1/auto-validation/config",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_auto_validation_config",
+          "path": "/api/v1/auto-validation/config",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_auto_validation_config",
+          "path": "/api/v1/auto-validation/config/{config_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "run_auto_validation",
+          "path": "/api/v1/auto-validation/run",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "bench_radar",
+          "path": "/api/v1/bench/radar",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_overdue",
+          "path": "/api/v1/billing/bnpl/overdue",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_schedule",
+          "path": "/api/v1/billing/bnpl/schedule",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_schedule",
+          "path": "/api/v1/billing/bnpl/schedule/{schedule_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "record_payment",
+          "path": "/api/v1/billing/bnpl/schedule/{schedule_id}/pay",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_summary",
+          "path": "/api/v1/billing/bnpl/summary/{schedule_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "calculate_bill",
+          "path": "/api/v1/billing/calculate",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "cmm_report",
+          "path": "/api/v1/billing/cmm-report",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "interpret_result",
+          "path": "/api/v1/bioref/interpret",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_ranges",
+          "path": "/api/v1/bioref/ranges",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "seed_defaults",
+          "path": "/api/v1/bioref/seed-defaults",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "bulk_import_patients",
+          "path": "/api/v1/bulk-import/patients",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "bulk_import_reagents",
+          "path": "/api/v1/bulk-import/reagents",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_mappings",
+          "path": "/api/v1/code-mappings",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_mapping",
+          "path": "/api/v1/code-mappings",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_orphan_codes",
+          "path": "/api/v1/code-mappings/orphans",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "seed_defaults",
+          "path": "/api/v1/code-mappings/seed-defaults",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "test_mapping",
+          "path": "/api/v1/code-mappings/test",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_mapping",
+          "path": "/api/v1/code-mappings/{mapping_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "trigger_notification_check",
+          "path": "/api/v1/critical-alerts/check",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_notif_configs",
+          "path": "/api/v1/critical-alerts/config",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_notif_config",
+          "path": "/api/v1/critical-alerts/config",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_notif_config",
+          "path": "/api/v1/critical-alerts/config/{config_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_expiry_alerts",
+          "path": "/api/v1/critical-alerts/expiry-alerts",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "trigger_expiry_notification",
+          "path": "/api/v1/critical-alerts/expiry-check",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_pending_criticals",
+          "path": "/api/v1/critical-alerts/pending",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_critical_ranges",
+          "path": "/api/v1/critical-ranges",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_critical_range",
+          "path": "/api/v1/critical-ranges",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_critical_range",
+          "path": "/api/v1/critical-ranges/{range_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_delta_rules",
+          "path": "/api/v1/delta-check-rules",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_delta_rule",
+          "path": "/api/v1/delta-check-rules",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_delta_rule",
+          "path": "/api/v1/delta-check-rules/{rule_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "ingest_message",
+          "path": "/api/v1/dh36/ingest",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_notifications",
+          "path": "/api/v1/epi-notifications",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "declare_notification",
+          "path": "/api/v1/epi-notifications",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "transmit_to_district",
+          "path": "/api/v1/epi-notifications/{notif_id}/transmit",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "epidemiology_dashboard",
+          "path": "/api/v1/epidemiology/dashboard",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_maintenances",
+          "path": "/api/v1/equipment-maintenance",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_maintenance",
+          "path": "/api/v1/equipment-maintenance",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_due_maintenances",
+          "path": "/api/v1/equipment-maintenance/due",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "delete_maintenance",
+          "path": "/api/v1/equipment-maintenance/{maintenance_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "complete_maintenance",
+          "path": "/api/v1/equipment-maintenance/{maintenance_id}/complete",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_ratios",
+          "path": "/api/v1/equipment-reagent-ratios",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_ratio",
+          "path": "/api/v1/equipment-reagent-ratios",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "delete_ratio",
+          "path": "/api/v1/equipment-reagent-ratios/{ratio_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PUT"
+          ],
+          "name": "update_ratio",
+          "path": "/api/v1/equipment-reagent-ratios/{ratio_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_ratio_versions",
+          "path": "/api/v1/equipment-reagent-ratios/{ratio_id}/versions",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_equipments",
+          "path": "/api/v1/equipments",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_equipment_endpoint",
+          "path": "/api/v1/equipments",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "patch_equipment_document",
+          "path": "/api/v1/equipments/documents/{document_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "patch_equipment_interface",
+          "path": "/api/v1/equipments/interfaces/{interface_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "disable_equipment_interface",
+          "path": "/api/v1/equipments/interfaces/{interface_id}/disable",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "enable_equipment_interface",
+          "path": "/api/v1/equipments/interfaces/{interface_id}/enable",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "patch_equipment_qualification",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_equipment_approved_analyte",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}/analytes",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "patch_equipment_approved_analyte",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}/analytes/{analyte_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "approve_equipment_qualification",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}/approve",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "new_equipment_qualification_version",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}/new-version",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "submit_equipment_qualification",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}/submit",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "suspend_equipment_qualification",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}/suspend",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "transition_equipment_qualification_technical_status",
+          "path": "/api/v1/equipments/qualifications/{qualification_id}/technical-status",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "patch_equipment_identity",
+          "path": "/api/v1/equipments/{equipment_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_equipment_details",
+          "path": "/api/v1/equipments/{equipment_id}/details",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_documents",
+          "path": "/api/v1/equipments/{equipment_id}/documents",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_equipment_document",
+          "path": "/api/v1/equipments/{equipment_id}/documents",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_interfaces",
+          "path": "/api/v1/equipments/{equipment_id}/interfaces",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_equipment_interface",
+          "path": "/api/v1/equipments/{equipment_id}/interfaces",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_qualifications",
+          "path": "/api/v1/equipments/{equipment_id}/qualifications",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_equipment_qualification",
+          "path": "/api/v1/equipments/{equipment_id}/qualifications",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_equipment_readiness",
+          "path": "/api/v1/equipments/{equipment_id}/readiness",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_exam_orders",
+          "path": "/api/v1/exam-orders",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_exam_order",
+          "path": "/api/v1/exam-orders",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_exam_order",
+          "path": "/api/v1/exam-orders/{order_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "update_exam_order_status",
+          "path": "/api/v1/exam-orders/{order_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "collect_exam_order",
+          "path": "/api/v1/exam-orders/{order_id}/collect",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "generate_invoice_from_order",
+          "path": "/api/v1/exam-orders/{order_id}/invoice",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "order_report_pdf",
+          "path": "/api/v1/exam-orders/{order_id}/report.pdf",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_exam_order_thread",
+          "path": "/api/v1/exam-orders/{order_id}/thread",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_medication_dispense",
+          "path": "/api/v1/fhir/medication-dispense",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_supply_delivery",
+          "path": "/api/v1/fhir/supply-delivery",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "healthcheck",
+          "path": "/api/v1/health",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "trigger_microscope_capture",
+          "path": "/api/v1/imaging/capture-microscope",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "submit_malaria_analysis",
+          "path": "/api/v1/imaging/malaria/analyze/{result_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_malaria_analysis_job",
+          "path": "/api/v1/imaging/malaria/jobs/{job_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "process_malaria_analysis_job",
+          "path": "/api/v1/imaging/malaria/jobs/{job_id}/process",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_invoices",
+          "path": "/api/v1/invoices",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_invoice",
+          "path": "/api/v1/invoices",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_aging_report",
+          "path": "/api/v1/invoices/aging",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "export_invoices_csv",
+          "path": "/api/v1/invoices/export.csv",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_overdue_invoices",
+          "path": "/api/v1/invoices/overdue",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_finance_summary",
+          "path": "/api/v1/invoices/summary",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_invoice",
+          "path": "/api/v1/invoices/{invoice_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "cancel_invoice",
+          "path": "/api/v1/invoices/{invoice_id}/cancel",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_payment_plan",
+          "path": "/api/v1/invoices/{invoice_id}/payment-plan",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "record_payment",
+          "path": "/api/v1/invoices/{invoice_id}/payments",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "invoice_receipt_pdf",
+          "path": "/api/v1/invoices/{invoice_id}/receipt.pdf",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "refund_credit",
+          "path": "/api/v1/invoices/{invoice_id}/refund",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "login_access_token",
+          "path": "/api/v1/login/access-token",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "logout",
+          "path": "/api/v1/login/logout",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "refresh_access_token",
+          "path": "/api/v1/login/refresh",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "cleanup_expired_tokens",
+          "path": "/api/v1/maintenance/refresh-tokens/expired",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_military_facilities",
+          "path": "/api/v1/military-facilities",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "notifications_feed",
+          "path": "/api/v1/notifications/feed",
+          "undocumented": false
+        },
+        {
+          "in_openapi": false,
+          "kind": "WebSocketRoute",
+          "methods": [
+            "WEBSOCKET"
+          ],
+          "name": "notifications_ws",
+          "path": "/api/v1/notifications/ws",
+          "undocumented": true
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "validate_reagent_order",
+          "path": "/api/v1/operations/validate-order",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_patients",
+          "path": "/api/v1/patients",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_patient",
+          "path": "/api/v1/patients",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_patient",
+          "path": "/api/v1/patients/{patient_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "update_patient",
+          "path": "/api/v1/patients/{patient_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_patient_fhir_bundle",
+          "path": "/api/v1/patients/{patient_id}/fhir-bundle",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_patient_history",
+          "path": "/api/v1/patients/{patient_id}/history",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "check_interactions",
+          "path": "/api/v1/prescription/interactions",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "generate_prescription_report",
+          "path": "/api/v1/prescription/report",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "scan_prescription",
+          "path": "/api/v1/prescription/scan",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_controls",
+          "path": "/api/v1/qc/controls",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_control",
+          "path": "/api/v1/qc/controls",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_control",
+          "path": "/api/v1/qc/controls/{control_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_results",
+          "path": "/api/v1/qc/controls/{control_id}/results",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "add_result",
+          "path": "/api/v1/qc/results",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "update_corrective_action",
+          "path": "/api/v1/quality/actions/{action_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "quality_dashboard",
+          "path": "/api/v1/quality/dashboard",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_non_conformities",
+          "path": "/api/v1/quality/non-conformities",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_non_conformity",
+          "path": "/api/v1/quality/non-conformities",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_non_conformity",
+          "path": "/api/v1/quality/non-conformities/{nc_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "add_corrective_action",
+          "path": "/api/v1/quality/non-conformities/{nc_id}/actions",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "transition_non_conformity",
+          "path": "/api/v1/quality/non-conformities/{nc_id}/transition",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_presets",
+          "path": "/api/v1/ratio-presets",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_preset",
+          "path": "/api/v1/ratio-presets",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_preset_item",
+          "path": "/api/v1/ratio-presets/items",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "apply_preset",
+          "path": "/api/v1/ratio-presets/{preset_id}/apply",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_preset_items",
+          "path": "/api/v1/ratio-presets/{preset_id}/items",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_lots",
+          "path": "/api/v1/reagent-lots",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "add_lot",
+          "path": "/api/v1/reagent-lots",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "consume_fefo",
+          "path": "/api/v1/reagent-lots/consume",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_reagents",
+          "path": "/api/v1/reagents",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_reagent",
+          "path": "/api/v1/reagents",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_expiring_reagents",
+          "path": "/api/v1/reagents/expiring",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "delete_reagent",
+          "path": "/api/v1/reagents/{reagent_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_reagent",
+          "path": "/api/v1/reagents/{reagent_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PUT"
+          ],
+          "name": "update_reagent",
+          "path": "/api/v1/reagents/{reagent_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_reference_ranges",
+          "path": "/api/v1/reference-ranges",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_reference_range",
+          "path": "/api/v1/reference-ranges",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_reference_range",
+          "path": "/api/v1/reference-ranges/{range_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "registre_analytics",
+          "path": "/api/v1/registre/analytics",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "registre_import",
+          "path": "/api/v1/registre/import",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "registre_preview",
+          "path": "/api/v1/registre/preview",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "audit_activity_dashboard",
+          "path": "/api/v1/reports/audit-activity",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "audit_dashboard",
+          "path": "/api/v1/reports/audit-dashboard",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "compliance_html_report",
+          "path": "/api/v1/reports/compliance-report",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "compliance_summary",
+          "path": "/api/v1/reports/compliance-summary",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "compliance_trend",
+          "path": "/api/v1/reports/compliance-trend",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "critical_compliance_report",
+          "path": "/api/v1/reports/critical-compliance",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "critical_compliance_export_csv",
+          "path": "/api/v1/reports/critical-compliance/export.csv",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "critical_threshold_dashboard",
+          "path": "/api/v1/reports/critical-thresholds",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "epidemiology_export_csv",
+          "path": "/api/v1/reports/epidemiology-export.csv",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "epidemiology_summary",
+          "path": "/api/v1/reports/epidemiology-summary",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "monthly_consumption_dashboard",
+          "path": "/api/v1/reports/monthly-consumption",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "qc_html_report",
+          "path": "/api/v1/reports/qc-report",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "qc_summary",
+          "path": "/api/v1/reports/qc-summary",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "result_report_pdf",
+          "path": "/api/v1/reports/results/{result_id}/pdf",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "release_result_report_endpoint",
+          "path": "/api/v1/reports/results/{result_id}/release",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "sign_result_report",
+          "path": "/api/v1/reports/results/{result_id}/sign",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result_report_signature",
+          "path": "/api/v1/reports/results/{result_id}/signature",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_result_report_snapshots",
+          "path": "/api/v1/reports/results/{result_id}/snapshots",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "report_snapshot_pdf",
+          "path": "/api/v1/reports/snapshots/{snapshot_id}/pdf",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "revoke_report_snapshot",
+          "path": "/api/v1/reports/snapshots/{snapshot_id}/revoke",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "stock_dashboard",
+          "path": "/api/v1/reports/stock-dashboard",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "verify_report_snapshot",
+          "path": "/api/v1/reports/verify/{token}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_results",
+          "path": "/api/v1/results",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_result",
+          "path": "/api/v1/results",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "ack_critical_batch",
+          "path": "/api/v1/results/ack-critical-batch",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_results_cockpit",
+          "path": "/api/v1/results/cockpit",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "submit_poct_batch",
+          "path": "/api/v1/results/poct-batch",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "submit_precis_expert_results",
+          "path": "/api/v1/results/precis-expert",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "submit_qualitative_result",
+          "path": "/api/v1/results/qualitative",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result",
+          "path": "/api/v1/results/{result_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "ack_critical",
+          "path": "/api/v1/results/{result_id}/ack-critical",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "amend_result",
+          "path": "/api/v1/results/{result_id}/amend",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result_bioref",
+          "path": "/api/v1/results/{result_id}/bioref",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result_clinical_audit",
+          "path": "/api/v1/results/{result_id}/clinical-audit",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result_detail",
+          "path": "/api/v1/results/{result_id}/detail",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result_fhir",
+          "path": "/api/v1/results/{result_id}/fhir",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result_history",
+          "path": "/api/v1/results/{result_id}/history",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_samples",
+          "path": "/api/v1/samples",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_sample",
+          "path": "/api/v1/samples",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_sample_by_barcode",
+          "path": "/api/v1/samples/by-barcode/{barcode}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "sample_quality_summary",
+          "path": "/api/v1/samples/quality-summary",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "update_sample",
+          "path": "/api/v1/samples/{sample_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "stats_summary",
+          "path": "/api/v1/stats/summary",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "compute_cmm_from_history",
+          "path": "/api/v1/stock/cmm-history",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "trigger_stock_notification",
+          "path": "/api/v1/stock/notify",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "predict_stock",
+          "path": "/api/v1/stock/predict",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_tariffs",
+          "path": "/api/v1/tariffs",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "seed_default_tariffs",
+          "path": "/api/v1/tariffs/seed-defaults",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PUT"
+          ],
+          "name": "upsert_tariff",
+          "path": "/api/v1/tariffs/{exam_code}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "tat_alerts",
+          "path": "/api/v1/tat/alerts",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "exam_catalog",
+          "path": "/api/v1/tat/catalog",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "exam_catalog_detail",
+          "path": "/api/v1/tat/catalog/{exam_code}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "tat_dashboard",
+          "path": "/api/v1/tat/dashboard",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "get_result_tat",
+          "path": "/api/v1/tat/results/{result_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "update_result_tat",
+          "path": "/api/v1/tat/results/{result_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_targets",
+          "path": "/api/v1/tat/targets",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_target",
+          "path": "/api/v1/tat/targets",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "seed_defaults",
+          "path": "/api/v1/tat/targets/seed-defaults",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "DELETE"
+          ],
+          "name": "deactivate_target",
+          "path": "/api/v1/tat/targets/{target_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "list_users",
+          "path": "/api/v1/users",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "POST"
+          ],
+          "name": "create_user",
+          "path": "/api/v1/users",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "read_current_user",
+          "path": "/api/v1/users/me",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "PATCH"
+          ],
+          "name": "update_user",
+          "path": "/api/v1/users/{user_id}",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "my_worklist",
+          "path": "/api/v1/worklist/my",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "cockpit",
+          "path": "/app",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "bench_radar",
+          "path": "/app/bench",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "cockpit_express",
+          "path": "/app/express",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "ehm_map",
+          "path": "/app/map",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "cockpit_microscopy",
+          "path": "/app/microscopy",
+          "undocumented": false
+        },
+        {
+          "in_openapi": false,
+          "kind": "Route",
+          "methods": [
+            "GET",
+            "HEAD"
+          ],
+          "name": "swagger_ui_html",
+          "path": "/docs",
+          "undocumented": true
+        },
+        {
+          "in_openapi": false,
+          "kind": "Route",
+          "methods": [
+            "GET",
+            "HEAD"
+          ],
+          "name": "swagger_ui_redirect",
+          "path": "/docs/oauth2-redirect",
+          "undocumented": true
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "health",
+          "path": "/health",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "liveness",
+          "path": "/health/live",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "metrics_summary",
+          "path": "/health/metrics",
+          "undocumented": false
+        },
+        {
+          "in_openapi": true,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "readiness",
+          "path": "/health/ready",
+          "undocumented": false
+        },
+        {
+          "in_openapi": false,
+          "kind": "APIRoute",
+          "methods": [
+            "GET"
+          ],
+          "name": "metrics",
+          "path": "/metrics",
+          "undocumented": true
+        },
+        {
+          "in_openapi": false,
+          "kind": "Route",
+          "methods": [
+            "GET",
+            "HEAD"
+          ],
+          "name": "openapi",
+          "path": "/openapi.json",
+          "undocumented": true
+        },
+        {
+          "in_openapi": false,
+          "kind": "Route",
+          "methods": [
+            "GET",
+            "HEAD"
+          ],
+          "name": "redoc_html",
+          "path": "/redoc",
+          "undocumented": true
+        },
+        {
+          "in_openapi": false,
+          "kind": "StaticFiles",
+          "methods": [],
+          "name": "static",
+          "path": "/static",
+          "undocumented": true
+        },
+        {
+          "in_openapi": false,
+          "kind": "APIRoute",
+          "methods": [
+            "OPTIONS"
+          ],
+          "name": "cors_preflight",
+          "path": "/{path_name:path}",
+          "undocumented": true
+        }
+      ],
+      "runtime_routes": 239,
+      "undocumented_runtime_routes": 8,
+      "websockets": 1
+    },
+    "non_http": [
+      {
+        "default_state": "enabled",
+        "guard": "process unique, heartbeat",
+        "handles": "jetons expirés, tâches de maintenance",
+        "name": "scheduler",
+        "network_exposure": "aucune",
+        "trigger": "périodique (intervalle interne)",
+        "type": "background_process"
+      },
+      {
+        "default_state": "enabled_with_all_interfaces_disabled",
+        "guard": "ENABLE_DH36_LISTENER=false, ANALYZER_RAW_LISTENER_ENABLED=false",
+        "handles": "trames d'équipement — aucune par défaut",
+        "name": "analyzer-gateway",
+        "network_exposure": "aucun port publié par la stack de base",
+        "trigger": "démarrage du conteneur",
+        "type": "background_process"
+      },
+      {
+        "default_state": "disabled",
+        "guard": "désactivé par défaut",
+        "handles": "trames analyseur d'hématologie",
+        "name": "listener DH36",
+        "network_exposure": "ANALYZER_BIND_IP, jamais 0.0.0.0 (refus au démarrage)",
+        "trigger": "ENABLE_DH36_LISTENER=true",
+        "type": "tcp_listener"
+      },
+      {
+        "default_state": "disabled",
+        "guard": "désactivé par défaut ; file bornée par LTRIM",
+        "handles": "trames brutes archivées",
+        "name": "listener trames brutes",
+        "network_exposure": "ANALYZER_BIND_IP",
+        "trigger": "ANALYZER_RAW_LISTENER_ENABLED=true",
+        "type": "tcp_listener"
+      },
+      {
+        "default_state": "manual",
+        "guard": "verrou de migration au démarrage de l'application",
+        "handles": "schéma de la base",
+        "name": "migrations Alembic",
+        "network_exposure": "aucune",
+        "trigger": "profil `migrate`, manuel",
+        "type": "one_shot_job"
+      },
+      {
+        "default_state": "enabled",
+        "guard": "dump vérifié par somme SHA-256",
+        "handles": "copie complète de la base",
+        "name": "sauvegarde PostgreSQL",
+        "network_exposure": "aucune",
+        "trigger": "service `db-backup`",
+        "type": "scheduled_job"
+      },
+      {
+        "default_state": "enabled",
+        "guard": "non exposé publiquement",
+        "handles": "métriques techniques, aucune donnée patient",
+        "name": "collecte Prometheus",
+        "network_exposure": "réseau interne uniquement ; /metrics bloqué au proxy",
+        "trigger": "Prometheus interroge /metrics",
+        "type": "scrape_target"
+      }
+    ],
+    "totals": {
+      "all_surfaces": 246,
+      "http_surfaces": 239,
+      "non_http_surfaces": 7
+    }
+  },
+  "schema_version": "2.0.0"
+}

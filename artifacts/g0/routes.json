@@ -1,0 +1,5190 @@
+{
+  "payload": {
+    "by_exposure": {
+      "ADMIN_ONLY": 33,
+      "AUTHENTICATED": 182,
+      "A_QUALIFIER": 6,
+      "INTERNAL": 4,
+      "PUBLIC": 6
+    },
+    "openapi_operations": 231,
+    "openapi_paths": 198,
+    "operations": [
+      {
+        "authenticated": false,
+        "exposure": "PUBLIC",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "root__get",
+        "path": "/",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "health"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "ratios_admin_ui_api_v1_admin_ratios_get",
+        "path": "/api/v1/admin/ratios",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.admin_ui",
+        "tags": [
+          "admin-ui"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_aes_api_v1_aes_get",
+        "path": "/api/v1/aes",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.aes",
+        "tags": [
+          "Registre AES"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "declare_aes_api_v1_aes_post",
+        "path": "/api/v1/aes",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.aes",
+        "tags": [
+          "Registre AES"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_aes_api_v1_aes__aes_id__get",
+        "path": "/api/v1/aes/{aes_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.aes",
+        "tags": [
+          "Registre AES"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "update_aes_api_v1_aes__aes_id__patch",
+        "path": "/api/v1/aes/{aes_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.aes",
+        "tags": [
+          "Registre AES"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "A_QUALIFIER",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "receive_analyzer_results_api_v1_analyzer_results_post",
+        "path": "/api/v1/analyzer/results",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "_verify_analyzer_security",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.analyzer",
+        "tags": [
+          "Ingestion automates"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_audit_events_api_v1_audit_events_get",
+        "path": "/api/v1/audit-events",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.audit_events",
+        "tags": [
+          "audit-events"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "export_audit_events_csv_api_v1_audit_events_export_csv_get",
+        "path": "/api/v1/audit-events/export.csv",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.audit_events",
+        "tags": [
+          "audit-events"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_auto_validation_configs_api_v1_auto_validation_config_get",
+        "path": "/api/v1/auto-validation/config",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.auto_validation",
+        "tags": [
+          "Auto-Validation"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_auto_validation_config_api_v1_auto_validation_config_post",
+        "path": "/api/v1/auto-validation/config",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.auto_validation",
+        "tags": [
+          "Auto-Validation"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_auto_validation_config_api_v1_auto_validation_config__config_id__delete",
+        "path": "/api/v1/auto-validation/config/{config_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.auto_validation",
+        "tags": [
+          "Auto-Validation"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "run_auto_validation_api_v1_auto_validation_run_post",
+        "path": "/api/v1/auto-validation/run",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.auto_validation",
+        "tags": [
+          "Auto-Validation"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "bench_radar_api_v1_bench_radar_get",
+        "path": "/api/v1/bench/radar",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.bench",
+        "tags": [
+          "Vue Paillasse"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_overdue_api_v1_billing_bnpl_overdue_get",
+        "path": "/api/v1/billing/bnpl/overdue",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.bnpl",
+        "tags": [
+          "BNPL CMU",
+          "BNPL CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_schedule_api_v1_billing_bnpl_schedule_post",
+        "path": "/api/v1/billing/bnpl/schedule",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.bnpl",
+        "tags": [
+          "BNPL CMU",
+          "BNPL CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_schedule_api_v1_billing_bnpl_schedule__schedule_id__get",
+        "path": "/api/v1/billing/bnpl/schedule/{schedule_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.bnpl",
+        "tags": [
+          "BNPL CMU",
+          "BNPL CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "record_payment_api_v1_billing_bnpl_schedule__schedule_id__pay_post",
+        "path": "/api/v1/billing/bnpl/schedule/{schedule_id}/pay",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.bnpl",
+        "tags": [
+          "BNPL CMU",
+          "BNPL CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_summary_api_v1_billing_bnpl_summary__schedule_id__get",
+        "path": "/api/v1/billing/bnpl/summary/{schedule_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.bnpl",
+        "tags": [
+          "BNPL CMU",
+          "BNPL CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "calculate_bill_api_v1_billing_calculate_post",
+        "path": "/api/v1/billing/calculate",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_billing_engine",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.billing",
+        "tags": [
+          "Billing CMU",
+          "Billing CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "cmm_report_api_v1_billing_cmm_report_post",
+        "path": "/api/v1/billing/cmm-report",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_billing_engine",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.billing",
+        "tags": [
+          "Billing CMU",
+          "Billing CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "interpret_result_api_v1_bioref_interpret_post",
+        "path": "/api/v1/bioref/interpret",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.bioref",
+        "tags": [
+          "Référentiel biologique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_ranges_api_v1_bioref_ranges_get",
+        "path": "/api/v1/bioref/ranges",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.bioref",
+        "tags": [
+          "Référentiel biologique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "seed_defaults_api_v1_bioref_seed_defaults_post",
+        "path": "/api/v1/bioref/seed-defaults",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.bioref",
+        "tags": [
+          "Référentiel biologique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "bulk_import_patients_api_v1_bulk_import_patients_post",
+        "path": "/api/v1/bulk-import/patients",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.bulk_import",
+        "tags": [
+          "Import en lot"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "bulk_import_reagents_api_v1_bulk_import_reagents_post",
+        "path": "/api/v1/bulk-import/reagents",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.bulk_import",
+        "tags": [
+          "Import en lot"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_mappings_api_v1_code_mappings_get",
+        "path": "/api/v1/code-mappings",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.code_mappings",
+        "tags": [
+          "Unification vocabulaires"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_mapping_api_v1_code_mappings_post",
+        "path": "/api/v1/code-mappings",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.code_mappings",
+        "tags": [
+          "Unification vocabulaires"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_orphan_codes_api_v1_code_mappings_orphans_get",
+        "path": "/api/v1/code-mappings/orphans",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.code_mappings",
+        "tags": [
+          "Unification vocabulaires"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "seed_defaults_api_v1_code_mappings_seed_defaults_post",
+        "path": "/api/v1/code-mappings/seed-defaults",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.code_mappings",
+        "tags": [
+          "Unification vocabulaires"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "test_mapping_api_v1_code_mappings_test_post",
+        "path": "/api/v1/code-mappings/test",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.code_mappings",
+        "tags": [
+          "Unification vocabulaires"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_mapping_api_v1_code_mappings__mapping_id__delete",
+        "path": "/api/v1/code-mappings/{mapping_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.code_mappings",
+        "tags": [
+          "Unification vocabulaires"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "trigger_notification_check_api_v1_critical_alerts_check_post",
+        "path": "/api/v1/critical-alerts/check",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_alerts",
+        "tags": [
+          "Critical Alerts"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_notif_configs_api_v1_critical_alerts_config_get",
+        "path": "/api/v1/critical-alerts/config",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_alerts",
+        "tags": [
+          "Critical Alerts"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_notif_config_api_v1_critical_alerts_config_post",
+        "path": "/api/v1/critical-alerts/config",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_alerts",
+        "tags": [
+          "Critical Alerts"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_notif_config_api_v1_critical_alerts_config__config_id__delete",
+        "path": "/api/v1/critical-alerts/config/{config_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_alerts",
+        "tags": [
+          "Critical Alerts"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_expiry_alerts_api_v1_critical_alerts_expiry_alerts_get",
+        "path": "/api/v1/critical-alerts/expiry-alerts",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_alerts",
+        "tags": [
+          "Critical Alerts"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "trigger_expiry_notification_api_v1_critical_alerts_expiry_check_post",
+        "path": "/api/v1/critical-alerts/expiry-check",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_alerts",
+        "tags": [
+          "Critical Alerts"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_pending_criticals_api_v1_critical_alerts_pending_get",
+        "path": "/api/v1/critical-alerts/pending",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_alerts",
+        "tags": [
+          "Critical Alerts"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_critical_ranges_api_v1_critical_ranges_get",
+        "path": "/api/v1/critical-ranges",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_ranges",
+        "tags": [
+          "Critical Ranges"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_critical_range_api_v1_critical_ranges_post",
+        "path": "/api/v1/critical-ranges",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_ranges",
+        "tags": [
+          "Critical Ranges"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_critical_range_api_v1_critical_ranges__range_id__delete",
+        "path": "/api/v1/critical-ranges/{range_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.critical_ranges",
+        "tags": [
+          "Critical Ranges"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_delta_rules_api_v1_delta_check_rules_get",
+        "path": "/api/v1/delta-check-rules",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.delta_check",
+        "tags": [
+          "Delta-Check"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_delta_rule_api_v1_delta_check_rules_post",
+        "path": "/api/v1/delta-check-rules",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.delta_check",
+        "tags": [
+          "Delta-Check"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_delta_rule_api_v1_delta_check_rules__rule_id__delete",
+        "path": "/api/v1/delta-check-rules/{rule_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.delta_check",
+        "tags": [
+          "Delta-Check"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "ingest_message_api_v1_dh36_ingest_post",
+        "path": "/api/v1/dh36/ingest",
+        "response_codes": [
+          "202",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.dh36",
+        "tags": [
+          "dh36"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_notifications_api_v1_epi_notifications_get",
+        "path": "/api/v1/epi-notifications",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.epi_notifications",
+        "tags": [
+          "Notifications épidémiologiques"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "declare_notification_api_v1_epi_notifications_post",
+        "path": "/api/v1/epi-notifications",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.epi_notifications",
+        "tags": [
+          "Notifications épidémiologiques"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "transmit_to_district_api_v1_epi_notifications__notif_id__transmit_post",
+        "path": "/api/v1/epi-notifications/{notif_id}/transmit",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.epi_notifications",
+        "tags": [
+          "Notifications épidémiologiques"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "epidemiology_dashboard_api_v1_epidemiology_dashboard_post",
+        "path": "/api/v1/epidemiology/dashboard",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.epidemiology",
+        "tags": [
+          "Epidemiology"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_maintenances_api_v1_equipment_maintenance_get",
+        "path": "/api/v1/equipment-maintenance",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_maintenance",
+        "tags": [
+          "Equipment Maintenance"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_maintenance_api_v1_equipment_maintenance_post",
+        "path": "/api/v1/equipment-maintenance",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_maintenance",
+        "tags": [
+          "Equipment Maintenance"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_due_maintenances_api_v1_equipment_maintenance_due_get",
+        "path": "/api/v1/equipment-maintenance/due",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_maintenance",
+        "tags": [
+          "Equipment Maintenance"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "delete_maintenance_api_v1_equipment_maintenance__maintenance_id__delete",
+        "path": "/api/v1/equipment-maintenance/{maintenance_id}",
+        "response_codes": [
+          "204",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_maintenance",
+        "tags": [
+          "Equipment Maintenance"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "PATCH",
+        "operation_id": "complete_maintenance_api_v1_equipment_maintenance__maintenance_id__complete_patch",
+        "path": "/api/v1/equipment-maintenance/{maintenance_id}/complete",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_maintenance",
+        "tags": [
+          "Equipment Maintenance"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_ratios_api_v1_equipment_reagent_ratios_get",
+        "path": "/api/v1/equipment-reagent-ratios",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_reagent_ratios",
+        "tags": [
+          "equipment-reagent-ratios"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_ratio_api_v1_equipment_reagent_ratios_post",
+        "path": "/api/v1/equipment-reagent-ratios",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_reagent_ratios",
+        "tags": [
+          "equipment-reagent-ratios"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "delete_ratio_api_v1_equipment_reagent_ratios__ratio_id__delete",
+        "path": "/api/v1/equipment-reagent-ratios/{ratio_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_reagent_ratios",
+        "tags": [
+          "equipment-reagent-ratios"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "PUT",
+        "operation_id": "update_ratio_api_v1_equipment_reagent_ratios__ratio_id__put",
+        "path": "/api/v1/equipment-reagent-ratios/{ratio_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_reagent_ratios",
+        "tags": [
+          "equipment-reagent-ratios"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_ratio_versions_api_v1_equipment_reagent_ratios__ratio_id__versions_get",
+        "path": "/api/v1/equipment-reagent-ratios/{ratio_id}/versions",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipment_reagent_ratios",
+        "tags": [
+          "equipment-reagent-ratios"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_equipments_api_v1_equipments_get",
+        "path": "/api/v1/equipments",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_equipment_endpoint_api_v1_equipments_post",
+        "path": "/api/v1/equipments",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "patch_equipment_document_api_v1_equipments_documents__document_id__patch",
+        "path": "/api/v1/equipments/documents/{document_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "patch_equipment_interface_api_v1_equipments_interfaces__interface_id__patch",
+        "path": "/api/v1/equipments/interfaces/{interface_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "disable_equipment_interface_api_v1_equipments_interfaces__interface_id__disable_post",
+        "path": "/api/v1/equipments/interfaces/{interface_id}/disable",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "enable_equipment_interface_api_v1_equipments_interfaces__interface_id__enable_post",
+        "path": "/api/v1/equipments/interfaces/{interface_id}/enable",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "patch_equipment_qualification_api_v1_equipments_qualifications__qualification_id__patch",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_equipment_approved_analyte_api_v1_equipments_qualifications__qualification_id__analytes_post",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}/analytes",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "patch_equipment_approved_analyte_api_v1_equipments_qualifications__qualification_id__analytes__analyte_id__patch",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}/analytes/{analyte_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "approve_equipment_qualification_api_v1_equipments_qualifications__qualification_id__approve_post",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}/approve",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "new_equipment_qualification_version_api_v1_equipments_qualifications__qualification_id__new_version_post",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}/new-version",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "submit_equipment_qualification_api_v1_equipments_qualifications__qualification_id__submit_post",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}/submit",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "suspend_equipment_qualification_api_v1_equipments_qualifications__qualification_id__suspend_post",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}/suspend",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "transition_equipment_qualification_technical_status_api_v1_equipments_qualifications__qualification_id__technical_status_post",
+        "path": "/api/v1/equipments/qualifications/{qualification_id}/technical-status",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "patch_equipment_identity_api_v1_equipments__equipment_id__patch",
+        "path": "/api/v1/equipments/{equipment_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_equipment_details_api_v1_equipments__equipment_id__details_get",
+        "path": "/api/v1/equipments/{equipment_id}/details",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_documents_api_v1_equipments__equipment_id__documents_get",
+        "path": "/api/v1/equipments/{equipment_id}/documents",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_equipment_document_api_v1_equipments__equipment_id__documents_post",
+        "path": "/api/v1/equipments/{equipment_id}/documents",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_interfaces_api_v1_equipments__equipment_id__interfaces_get",
+        "path": "/api/v1/equipments/{equipment_id}/interfaces",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_equipment_interface_api_v1_equipments__equipment_id__interfaces_post",
+        "path": "/api/v1/equipments/{equipment_id}/interfaces",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_qualifications_api_v1_equipments__equipment_id__qualifications_get",
+        "path": "/api/v1/equipments/{equipment_id}/qualifications",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_equipment_qualification_api_v1_equipments__equipment_id__qualifications_post",
+        "path": "/api/v1/equipments/{equipment_id}/qualifications",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_equipment_readiness_api_v1_equipments__equipment_id__readiness_get",
+        "path": "/api/v1/equipments/{equipment_id}/readiness",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.equipments",
+        "tags": [
+          "equipments"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_exam_orders_api_v1_exam_orders_get",
+        "path": "/api/v1/exam-orders",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_exam_order_api_v1_exam_orders_post",
+        "path": "/api/v1/exam-orders",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_exam_order_api_v1_exam_orders__order_id__get",
+        "path": "/api/v1/exam-orders/{order_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "update_exam_order_status_api_v1_exam_orders__order_id__patch",
+        "path": "/api/v1/exam-orders/{order_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "collect_exam_order_api_v1_exam_orders__order_id__collect_post",
+        "path": "/api/v1/exam-orders/{order_id}/collect",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "generate_invoice_from_order_api_v1_exam_orders__order_id__invoice_post",
+        "path": "/api/v1/exam-orders/{order_id}/invoice",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "order_report_pdf_api_v1_exam_orders__order_id__report_pdf_get",
+        "path": "/api/v1/exam-orders/{order_id}/report.pdf",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_exam_order_thread_api_v1_exam_orders__order_id__thread_get",
+        "path": "/api/v1/exam-orders/{order_id}/thread",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.exam_orders",
+        "tags": [
+          "Prescription d'examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_medication_dispense_api_v1_fhir_medication_dispense_post",
+        "path": "/api/v1/fhir/medication-dispense",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.fhir_pharmacy",
+        "tags": [
+          "FHIR R4 Pharmacy",
+          "FHIR R4 Pharmacy"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_supply_delivery_api_v1_fhir_supply_delivery_post",
+        "path": "/api/v1/fhir/supply-delivery",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.fhir_pharmacy",
+        "tags": [
+          "FHIR R4 Pharmacy",
+          "FHIR R4 Pharmacy"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "A_QUALIFIER",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "healthcheck_api_v1_health_get",
+        "path": "/api/v1/health",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.api.v1.endpoints.health",
+        "tags": [
+          "health"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "trigger_microscope_capture_api_v1_imaging_capture_microscope_post",
+        "path": "/api/v1/imaging/capture-microscope",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.imaging",
+        "tags": [
+          "imaging"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "submit_malaria_analysis_api_v1_imaging_malaria_analyze__result_id__post",
+        "path": "/api/v1/imaging/malaria/analyze/{result_id}",
+        "response_codes": [
+          "202",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.imaging",
+        "tags": [
+          "imaging"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_malaria_analysis_job_api_v1_imaging_malaria_jobs__job_id__get",
+        "path": "/api/v1/imaging/malaria/jobs/{job_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.imaging",
+        "tags": [
+          "imaging"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "process_malaria_analysis_job_api_v1_imaging_malaria_jobs__job_id__process_post",
+        "path": "/api/v1/imaging/malaria/jobs/{job_id}/process",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.imaging",
+        "tags": [
+          "imaging"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_invoices_api_v1_invoices_get",
+        "path": "/api/v1/invoices",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_invoice_api_v1_invoices_post",
+        "path": "/api/v1/invoices",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_aging_report_api_v1_invoices_aging_get",
+        "path": "/api/v1/invoices/aging",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "export_invoices_csv_api_v1_invoices_export_csv_get",
+        "path": "/api/v1/invoices/export.csv",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_overdue_invoices_api_v1_invoices_overdue_get",
+        "path": "/api/v1/invoices/overdue",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_finance_summary_api_v1_invoices_summary_get",
+        "path": "/api/v1/invoices/summary",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_invoice_api_v1_invoices__invoice_id__get",
+        "path": "/api/v1/invoices/{invoice_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "cancel_invoice_api_v1_invoices__invoice_id__cancel_post",
+        "path": "/api/v1/invoices/{invoice_id}/cancel",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_payment_plan_api_v1_invoices__invoice_id__payment_plan_post",
+        "path": "/api/v1/invoices/{invoice_id}/payment-plan",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "record_payment_api_v1_invoices__invoice_id__payments_post",
+        "path": "/api/v1/invoices/{invoice_id}/payments",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "invoice_receipt_pdf_api_v1_invoices__invoice_id__receipt_pdf_get",
+        "path": "/api/v1/invoices/{invoice_id}/receipt.pdf",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "refund_credit_api_v1_invoices__invoice_id__refund_post",
+        "path": "/api/v1/invoices/{invoice_id}/refund",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.invoices",
+        "tags": [
+          "Comptabilité"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "A_QUALIFIER",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "login_access_token_api_v1_login_access_token_post",
+        "path": "/api/v1/login/access-token",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordRequestForm",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.login",
+        "tags": [
+          "auth"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "A_QUALIFIER",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "logout_api_v1_login_logout_post",
+        "path": "/api/v1/login/logout",
+        "response_codes": [
+          "204",
+          "422"
+        ],
+        "security_dependencies": [
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.login",
+        "tags": [
+          "auth"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "A_QUALIFIER",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "refresh_access_token_api_v1_login_refresh_post",
+        "path": "/api/v1/login/refresh",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.login",
+        "tags": [
+          "auth"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "cleanup_expired_tokens_api_v1_maintenance_refresh_tokens_expired_delete",
+        "path": "/api/v1/maintenance/refresh-tokens/expired",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.maintenance",
+        "tags": [
+          "maintenance",
+          "maintenance"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_military_facilities_api_v1_military_facilities_get",
+        "path": "/api/v1/military-facilities",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.military_facilities",
+        "tags": [
+          "military-facilities"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "notifications_feed_api_v1_notifications_feed_get",
+        "path": "/api/v1/notifications/feed",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.notifications",
+        "tags": [
+          "Notifications temps-réel"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "validate_reagent_order_api_v1_operations_validate_order_post",
+        "path": "/api/v1/operations/validate-order",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.operations",
+        "tags": [
+          "operations"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_patients_api_v1_patients_get",
+        "path": "/api/v1/patients",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.patients",
+        "tags": [
+          "patients"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_patient_api_v1_patients_post",
+        "path": "/api/v1/patients",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.patients",
+        "tags": [
+          "patients"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_patient_api_v1_patients__patient_id__get",
+        "path": "/api/v1/patients/{patient_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.patients",
+        "tags": [
+          "patients"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "update_patient_api_v1_patients__patient_id__patch",
+        "path": "/api/v1/patients/{patient_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.patients",
+        "tags": [
+          "patients"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_patient_fhir_bundle_api_v1_patients__patient_id__fhir_bundle_get",
+        "path": "/api/v1/patients/{patient_id}/fhir-bundle",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.patients",
+        "tags": [
+          "patients"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_patient_history_api_v1_patients__patient_id__history_get",
+        "path": "/api/v1/patients/{patient_id}/history",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.patients",
+        "tags": [
+          "patients"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "check_interactions_api_v1_prescription_interactions_post",
+        "path": "/api/v1/prescription/interactions",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "get_prescription_scanner"
+        ],
+        "source_module": "app.api.v1.endpoints.prescription_scanner",
+        "tags": [
+          "Prescription Scanner CMU",
+          "Prescription Scanner CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "generate_prescription_report_api_v1_prescription_report_post",
+        "path": "/api/v1/prescription/report",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "get_prescription_scanner"
+        ],
+        "source_module": "app.api.v1.endpoints.pdf_prescription",
+        "tags": [
+          "Prescription Scanner CMU",
+          "Prescription Scanner CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "scan_prescription_api_v1_prescription_scan_post",
+        "path": "/api/v1/prescription/scan",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "get_prescription_scanner"
+        ],
+        "source_module": "app.api.v1.endpoints.prescription_scanner",
+        "tags": [
+          "Prescription Scanner CMU",
+          "Prescription Scanner CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_controls_api_v1_qc_controls_get",
+        "path": "/api/v1/qc/controls",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.qc",
+        "tags": [
+          "QC Analytique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_control_api_v1_qc_controls_post",
+        "path": "/api/v1/qc/controls",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.qc",
+        "tags": [
+          "QC Analytique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_control_api_v1_qc_controls__control_id__delete",
+        "path": "/api/v1/qc/controls/{control_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.qc",
+        "tags": [
+          "QC Analytique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_results_api_v1_qc_controls__control_id__results_get",
+        "path": "/api/v1/qc/controls/{control_id}/results",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.qc",
+        "tags": [
+          "QC Analytique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "add_result_api_v1_qc_results_post",
+        "path": "/api/v1/qc/results",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.qc",
+        "tags": [
+          "QC Analytique"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "update_corrective_action_api_v1_quality_actions__action_id__patch",
+        "path": "/api/v1/quality/actions/{action_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.quality",
+        "tags": [
+          "Qualité NC/CAPA"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "quality_dashboard_api_v1_quality_dashboard_get",
+        "path": "/api/v1/quality/dashboard",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.quality",
+        "tags": [
+          "Qualité NC/CAPA"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_non_conformities_api_v1_quality_non_conformities_get",
+        "path": "/api/v1/quality/non-conformities",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.quality",
+        "tags": [
+          "Qualité NC/CAPA"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_non_conformity_api_v1_quality_non_conformities_post",
+        "path": "/api/v1/quality/non-conformities",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.quality",
+        "tags": [
+          "Qualité NC/CAPA"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_non_conformity_api_v1_quality_non_conformities__nc_id__get",
+        "path": "/api/v1/quality/non-conformities/{nc_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.quality",
+        "tags": [
+          "Qualité NC/CAPA"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "add_corrective_action_api_v1_quality_non_conformities__nc_id__actions_post",
+        "path": "/api/v1/quality/non-conformities/{nc_id}/actions",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.quality",
+        "tags": [
+          "Qualité NC/CAPA"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "transition_non_conformity_api_v1_quality_non_conformities__nc_id__transition_post",
+        "path": "/api/v1/quality/non-conformities/{nc_id}/transition",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.quality",
+        "tags": [
+          "Qualité NC/CAPA"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_presets_api_v1_ratio_presets_get",
+        "path": "/api/v1/ratio-presets",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.ratio_presets",
+        "tags": [
+          "ratio-presets"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_preset_api_v1_ratio_presets_post",
+        "path": "/api/v1/ratio-presets",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.ratio_presets",
+        "tags": [
+          "ratio-presets"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_preset_item_api_v1_ratio_presets_items_post",
+        "path": "/api/v1/ratio-presets/items",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.ratio_presets",
+        "tags": [
+          "ratio-presets"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "apply_preset_api_v1_ratio_presets__preset_id__apply_post",
+        "path": "/api/v1/ratio-presets/{preset_id}/apply",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.ratio_presets",
+        "tags": [
+          "ratio-presets"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_preset_items_api_v1_ratio_presets__preset_id__items_get",
+        "path": "/api/v1/ratio-presets/{preset_id}/items",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.ratio_presets",
+        "tags": [
+          "ratio-presets"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_lots_api_v1_reagent_lots_get",
+        "path": "/api/v1/reagent-lots",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reagent_lots",
+        "tags": [
+          "Lots réactifs (FEFO)"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "add_lot_api_v1_reagent_lots_post",
+        "path": "/api/v1/reagent-lots",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reagent_lots",
+        "tags": [
+          "Lots réactifs (FEFO)"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "consume_fefo_api_v1_reagent_lots_consume_post",
+        "path": "/api/v1/reagent-lots/consume",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reagent_lots",
+        "tags": [
+          "Lots réactifs (FEFO)"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_reagents_api_v1_reagents_get",
+        "path": "/api/v1/reagents",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reagents",
+        "tags": [
+          "reagents"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_reagent_api_v1_reagents_post",
+        "path": "/api/v1/reagents",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reagents",
+        "tags": [
+          "reagents"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_expiring_reagents_api_v1_reagents_expiring_get",
+        "path": "/api/v1/reagents/expiring",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reagents",
+        "tags": [
+          "reagents"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "delete_reagent_api_v1_reagents__reagent_id__delete",
+        "path": "/api/v1/reagents/{reagent_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reagents",
+        "tags": [
+          "reagents"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_reagent_api_v1_reagents__reagent_id__get",
+        "path": "/api/v1/reagents/{reagent_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reagents",
+        "tags": [
+          "reagents"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PUT",
+        "operation_id": "update_reagent_api_v1_reagents__reagent_id__put",
+        "path": "/api/v1/reagents/{reagent_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reagents",
+        "tags": [
+          "reagents"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_reference_ranges_api_v1_reference_ranges_get",
+        "path": "/api/v1/reference-ranges",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reference_ranges",
+        "tags": [
+          "Reference Ranges"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_reference_range_api_v1_reference_ranges_post",
+        "path": "/api/v1/reference-ranges",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reference_ranges",
+        "tags": [
+          "Reference Ranges"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_reference_range_api_v1_reference_ranges__range_id__delete",
+        "path": "/api/v1/reference-ranges/{range_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reference_ranges",
+        "tags": [
+          "Reference Ranges"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "registre_analytics_api_v1_registre_analytics_post",
+        "path": "/api/v1/registre/analytics",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.registre",
+        "tags": [
+          "Registre maître"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "registre_import_api_v1_registre_import_post",
+        "path": "/api/v1/registre/import",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.registre",
+        "tags": [
+          "Registre maître"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "registre_preview_api_v1_registre_preview_post",
+        "path": "/api/v1/registre/preview",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.registre",
+        "tags": [
+          "Registre maître"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "audit_activity_dashboard_api_v1_reports_audit_activity_get",
+        "path": "/api/v1/reports/audit-activity",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "audit_dashboard_api_v1_reports_audit_dashboard_get",
+        "path": "/api/v1/reports/audit-dashboard",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "compliance_html_report_api_v1_reports_compliance_report_get",
+        "path": "/api/v1/reports/compliance-report",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "compliance_summary_api_v1_reports_compliance_summary_get",
+        "path": "/api/v1/reports/compliance-summary",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "compliance_trend_api_v1_reports_compliance_trend_get",
+        "path": "/api/v1/reports/compliance-trend",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "critical_compliance_report_api_v1_reports_critical_compliance_get",
+        "path": "/api/v1/reports/critical-compliance",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "critical_compliance_export_csv_api_v1_reports_critical_compliance_export_csv_get",
+        "path": "/api/v1/reports/critical-compliance/export.csv",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "critical_threshold_dashboard_api_v1_reports_critical_thresholds_get",
+        "path": "/api/v1/reports/critical-thresholds",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "epidemiology_export_csv_api_v1_reports_epidemiology_export_csv_get",
+        "path": "/api/v1/reports/epidemiology-export.csv",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "epidemiology_summary_api_v1_reports_epidemiology_summary_get",
+        "path": "/api/v1/reports/epidemiology-summary",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "monthly_consumption_dashboard_api_v1_reports_monthly_consumption_get",
+        "path": "/api/v1/reports/monthly-consumption",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "qc_html_report_api_v1_reports_qc_report_get",
+        "path": "/api/v1/reports/qc-report",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "qc_summary_api_v1_reports_qc_summary_get",
+        "path": "/api/v1/reports/qc-summary",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "result_report_pdf_api_v1_reports_results__result_id__pdf_get",
+        "path": "/api/v1/reports/results/{result_id}/pdf",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "release_result_report_endpoint_api_v1_reports_results__result_id__release_post",
+        "path": "/api/v1/reports/results/{result_id}/release",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "sign_result_report_api_v1_reports_results__result_id__sign_post",
+        "path": "/api/v1/reports/results/{result_id}/sign",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_report_signature_api_v1_reports_results__result_id__signature_get",
+        "path": "/api/v1/reports/results/{result_id}/signature",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_result_report_snapshots_api_v1_reports_results__result_id__snapshots_get",
+        "path": "/api/v1/reports/results/{result_id}/snapshots",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "report_snapshot_pdf_api_v1_reports_snapshots__snapshot_id__pdf_get",
+        "path": "/api/v1/reports/snapshots/{snapshot_id}/pdf",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "revoke_report_snapshot_api_v1_reports_snapshots__snapshot_id__revoke_post",
+        "path": "/api/v1/reports/snapshots/{snapshot_id}/revoke",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "stock_dashboard_api_v1_reports_stock_dashboard_get",
+        "path": "/api/v1/reports/stock-dashboard",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "A_QUALIFIER",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "verify_report_snapshot_api_v1_reports_verify__token__get",
+        "path": "/api/v1/reports/verify/{token}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.reports",
+        "tags": [
+          "reports"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_results_api_v1_results_get",
+        "path": "/api/v1/results",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_result_api_v1_results_post",
+        "path": "/api/v1/results",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "ack_critical_batch_api_v1_results_ack_critical_batch_patch",
+        "path": "/api/v1/results/ack-critical-batch",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_results_cockpit_api_v1_results_cockpit_get",
+        "path": "/api/v1/results/cockpit",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "submit_poct_batch_api_v1_results_poct_batch_post",
+        "path": "/api/v1/results/poct-batch",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results_poct",
+        "tags": [
+          "poct"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "submit_precis_expert_results_api_v1_results_precis_expert_post",
+        "path": "/api/v1/results/precis-expert",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results_poct",
+        "tags": [
+          "poct"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "submit_qualitative_result_api_v1_results_qualitative_post",
+        "path": "/api/v1/results/qualitative",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results_qualitative",
+        "tags": [
+          "Résultats qualitatifs"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_api_v1_results__result_id__get",
+        "path": "/api/v1/results/{result_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "PATCH",
+        "operation_id": "ack_critical_api_v1_results__result_id__ack_critical_patch",
+        "path": "/api/v1/results/{result_id}/ack-critical",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "amend_result_api_v1_results__result_id__amend_patch",
+        "path": "/api/v1/results/{result_id}/amend",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_bioref_api_v1_results__result_id__bioref_get",
+        "path": "/api/v1/results/{result_id}/bioref",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_clinical_audit_api_v1_results__result_id__clinical_audit_get",
+        "path": "/api/v1/results/{result_id}/clinical-audit",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_detail_api_v1_results__result_id__detail_get",
+        "path": "/api/v1/results/{result_id}/detail",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_fhir_api_v1_results__result_id__fhir_get",
+        "path": "/api/v1/results/{result_id}/fhir",
+        "response_codes": [
+          "200",
+          "404",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_history_api_v1_results__result_id__history_get",
+        "path": "/api/v1/results/{result_id}/history",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.results",
+        "tags": [
+          "results"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_samples_api_v1_samples_get",
+        "path": "/api/v1/samples",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.samples",
+        "tags": [
+          "samples"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_sample_api_v1_samples_post",
+        "path": "/api/v1/samples",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.samples",
+        "tags": [
+          "samples"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_sample_by_barcode_api_v1_samples_by_barcode__barcode__get",
+        "path": "/api/v1/samples/by-barcode/{barcode}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.samples",
+        "tags": [
+          "samples"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "sample_quality_summary_api_v1_samples_quality_summary_get",
+        "path": "/api/v1/samples/quality-summary",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.samples",
+        "tags": [
+          "samples"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "update_sample_api_v1_samples__sample_id__patch",
+        "path": "/api/v1/samples/{sample_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.samples",
+        "tags": [
+          "samples"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "stats_summary_api_v1_stats_summary_get",
+        "path": "/api/v1/stats/summary",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.stats",
+        "tags": [
+          "Lab Stats"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "compute_cmm_from_history_api_v1_stock_cmm_history_post",
+        "path": "/api/v1/stock/cmm-history",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "get_stock_predictor"
+        ],
+        "source_module": "app.api.v1.endpoints.stock_predictor",
+        "tags": [
+          "Stock Predictor CMU",
+          "Stock Predictor CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "trigger_stock_notification_api_v1_stock_notify_post",
+        "path": "/api/v1/stock/notify",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "get_stock_notifier"
+        ],
+        "source_module": "app.api.v1.endpoints.stock_notifications",
+        "tags": [
+          "Stock Predictor CMU",
+          "Stock Predictor CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "predict_stock_api_v1_stock_predict_post",
+        "path": "/api/v1/stock/predict",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "get_stock_predictor"
+        ],
+        "source_module": "app.api.v1.endpoints.stock_predictor",
+        "tags": [
+          "Stock Predictor CMU",
+          "Stock Predictor CMU"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_tariffs_api_v1_tariffs_get",
+        "path": "/api/v1/tariffs",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tariffs",
+        "tags": [
+          "Tarifs examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "seed_default_tariffs_api_v1_tariffs_seed_defaults_post",
+        "path": "/api/v1/tariffs/seed-defaults",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.tariffs",
+        "tags": [
+          "Tarifs examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PUT",
+        "operation_id": "upsert_tariff_api_v1_tariffs__exam_code__put",
+        "path": "/api/v1/tariffs/{exam_code}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_finance"
+        ],
+        "source_module": "app.api.v1.endpoints.tariffs",
+        "tags": [
+          "Tarifs examens"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "tat_alerts_api_v1_tat_alerts_get",
+        "path": "/api/v1/tat/alerts",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "exam_catalog_api_v1_tat_catalog_get",
+        "path": "/api/v1/tat/catalog",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "exam_catalog_detail_api_v1_tat_catalog__exam_code__get",
+        "path": "/api/v1/tat/catalog/{exam_code}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "tat_dashboard_api_v1_tat_dashboard_get",
+        "path": "/api/v1/tat/dashboard",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "get_result_tat_api_v1_tat_results__result_id__get",
+        "path": "/api/v1/tat/results/{result_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "update_result_tat_api_v1_tat_results__result_id__patch",
+        "path": "/api/v1/tat/results/{result_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_targets_api_v1_tat_targets_get",
+        "path": "/api/v1/tat/targets",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_target_api_v1_tat_targets_post",
+        "path": "/api/v1/tat/targets",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "POST",
+        "operation_id": "seed_defaults_api_v1_tat_targets_seed_defaults_post",
+        "path": "/api/v1/tat/targets/seed-defaults",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "DELETE",
+        "operation_id": "deactivate_target_api_v1_tat_targets__target_id__delete",
+        "path": "/api/v1/tat/targets/{target_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_officer"
+        ],
+        "source_module": "app.api.v1.endpoints.tat",
+        "tags": [
+          "Suivi TAT"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "list_users_api_v1_users_get",
+        "path": "/api/v1/users",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.users",
+        "tags": [
+          "users"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "POST",
+        "operation_id": "create_user_api_v1_users_post",
+        "path": "/api/v1/users",
+        "response_codes": [
+          "201",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.users",
+        "tags": [
+          "users"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "read_current_user_api_v1_users_me_get",
+        "path": "/api/v1/users/me",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.users",
+        "tags": [
+          "users"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "ADMIN_ONLY",
+        "has_request_schema": true,
+        "method": "PATCH",
+        "operation_id": "update_user_api_v1_users__user_id__patch",
+        "path": "/api/v1/users/{user_id}",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db",
+          "require_admin"
+        ],
+        "source_module": "app.api.v1.endpoints.users",
+        "tags": [
+          "users"
+        ]
+      },
+      {
+        "authenticated": true,
+        "exposure": "AUTHENTICATED",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "my_worklist_api_v1_worklist_my_get",
+        "path": "/api/v1/worklist/my",
+        "response_codes": [
+          "200",
+          "422"
+        ],
+        "security_dependencies": [
+          "OAuth2PasswordBearer",
+          "forbid_accountant",
+          "get_current_active_user",
+          "get_current_user",
+          "get_db"
+        ],
+        "source_module": "app.api.v1.endpoints.worklist",
+        "tags": [
+          "File de travail"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "PUBLIC",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "cockpit_app_get",
+        "path": "/app",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "ui"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "PUBLIC",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "bench_radar_app_bench_get",
+        "path": "/app/bench",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "ui"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "PUBLIC",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "cockpit_express_app_express_get",
+        "path": "/app/express",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "ui"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "PUBLIC",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "ehm_map_app_map_get",
+        "path": "/app/map",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "ui"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "PUBLIC",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "cockpit_microscopy_app_microscopy_get",
+        "path": "/app/microscopy",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "ui"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "INTERNAL",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "health_health_get",
+        "path": "/health",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "get_db"
+        ],
+        "source_module": "app.main",
+        "tags": [
+          "health"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "INTERNAL",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "liveness_health_live_get",
+        "path": "/health/live",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "health"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "INTERNAL",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "metrics_summary_health_metrics_get",
+        "path": "/health/metrics",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [],
+        "source_module": "app.main",
+        "tags": [
+          "health"
+        ]
+      },
+      {
+        "authenticated": false,
+        "exposure": "INTERNAL",
+        "has_request_schema": false,
+        "method": "GET",
+        "operation_id": "readiness_health_ready_get",
+        "path": "/health/ready",
+        "response_codes": [
+          "200"
+        ],
+        "security_dependencies": [
+          "get_db"
+        ],
+        "source_module": "app.main",
+        "tags": [
+          "health"
+        ]
+      }
+    ]
+  },
+  "schema_version": "2.0.0"
+}

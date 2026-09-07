@@ -1,0 +1,157 @@
+{
+  "_comment": [
+    "Registre des routes qui ne portent PAS de dependance d'authentification.",
+    "Chacune doit etre qualifiee par ecrit : une route non authentifiee sans",
+    "justification est un defaut, pas une exception. Toute route classee PUBLIC",
+    "ou A_QUALIFIER par scripts/g0_inventory.py doit figurer ici, sinon le test",
+    "tests/test_g0_inventory.py echoue.",
+    "",
+    "Ce registre QUALIFIE ; il ne corrige rien. Une route jugee mal exposee",
+    "reste telle quelle dans la baseline et part au backlog du lot D."
+  ],
+  "schema_version": "2.0.0",
+  "reviewed_on": "2026-09-07",
+  "qualified_routes": [
+    {
+      "path": "/",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "PUBLIC",
+      "constat": "Redirection ou page d'accueil, sans dependance de securite.",
+      "justification": "Point d'entree de l'interface. Ne renvoie aucune donnee clinique : l'application charge ses donnees par des appels API authentifies.",
+      "risque_residuel": "Aucun tant que la page ne porte pas de donnee. A revalider si le gabarit venait a etre pre-rempli cote serveur.",
+      "classement": "P2"
+    },
+    {
+      "path": "/app",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "PUBLIC",
+      "constat": "Gabarit HTML du cockpit, servi sans authentification.",
+      "justification": "Le gabarit est une coquille statique. Toutes les donnees affichees proviennent d'appels API authentifies effectues par le navigateur ; sans jeton valide, l'interface reste vide.",
+      "risque_residuel": "Divulgation de la STRUCTURE de l'application (noms de champs, libelles). Acceptable pour une beta d'evaluation, a reconsiderer avant un deploiement expose.",
+      "classement": "P2"
+    },
+    {
+      "path": "/app/bench",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "PUBLIC",
+      "constat": "Gabarit paillasse, servi sans authentification.",
+      "justification": "Meme raisonnement que /app : coquille statique, donnees chargees par appels authentifies.",
+      "risque_residuel": "Identique a /app.",
+      "classement": "P2"
+    },
+    {
+      "path": "/app/express",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "PUBLIC",
+      "constat": "Gabarit de saisie rapide, servi sans authentification.",
+      "justification": "Meme raisonnement que /app.",
+      "risque_residuel": "Identique a /app.",
+      "classement": "P2"
+    },
+    {
+      "path": "/app/map",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "PUBLIC",
+      "constat": "Cartographie des etablissements militaires, servie sans authentification. Le gabarit HTML public contient deja, en dur : le titre « Cartographie des EHM et Gendarmerie », l'intitule « Etablissements Hospitaliers Militaires », la mention « DIVISION SANTE - 2026 », les categories institutionnelles HMA, CMA, CSA, Armees et Gendarmerie, et des effectifs agreges statiques : 60, 1, 8, 51, 37 et 22.",
+      "justification": "Les coordonnees et la liste detaillee des etablissements viennent de /api/v1/military-facilities, qui exige un jeton : elles ne sont pas dans le gabarit. Les elements ci-dessus, eux, y sont, et sont servis en HTTP 200 a un client non authentifie.",
+      "risque_residuel": "Le gabarit ne contient pas les coordonnees ni la liste detaillee des etablissements. Il expose neanmoins publiquement la nature militaire de la cartographie, ses categories institutionnelles et des effectifs agreges statiques. Un ordre de grandeur du dispositif de sante militaire est donc lisible sans authentification. A faire qualifier par l'autorite competente : P1 tant qu'aucune regle de classification institutionnelle n'a ete appliquee a ces elements.",
+      "classement": "P1",
+      "public_static_content": [
+        "Cartographie des EHM et Gendarmerie",
+        "Etablissements Hospitaliers Militaires",
+        "DIVISION SANTE - 2026",
+        "categories : HMA, CMA, CSA, Armees, Gendarmerie",
+        "effectifs agreges statiques : 60, 1, 8, 51, 37, 22"
+      ],
+      "evidence": "GET /app/map sans en-tete Authorization -> HTTP 200, corps contenant les elements listes dans public_static_content. Verifie par tests/test_g0_inventory.py.",
+      "remediation_owner": "lot D — hors perimetre du lot A, qui photographie sans corriger"
+    },
+    {
+      "path": "/app/microscopy",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "PUBLIC",
+      "constat": "Gabarit microscopie, servi sans authentification.",
+      "justification": "Meme raisonnement que /app.",
+      "risque_residuel": "Identique a /app.",
+      "classement": "P2"
+    },
+    {
+      "path": "/api/v1/health",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "A_QUALIFIER",
+      "constat": "Sonde de sante sans aucune dependance.",
+      "justification": "Une sonde doit repondre avant que l'authentification soit disponible ; l'exiger rendrait la sonde inutilisable. La reponse a ete durcie : elle n'expose plus les coordonnees de la base, et un identifiant d'incident remplace la trace.",
+      "risque_residuel": "Revele l'existence du service. Inevitable pour une sonde.",
+      "classement": "P2"
+    },
+    {
+      "path": "/api/v1/login/access-token",
+      "methods": [
+        "POST"
+      ],
+      "exposure": "A_QUALIFIER",
+      "constat": "Route d'obtention de jeton, non authentifiee par construction.",
+      "justification": "C'est la route qui DELIVRE l'authentification : exiger un jeton pour l'obtenir serait circulaire. Protegee par le rate limiting et le blocage temporaire apres echecs repetes (LOGIN_RATE_LIMIT_BLOCK_SECONDS).",
+      "risque_residuel": "Surface d'attaque par force brute, attenuee par le rate limiting.",
+      "classement": "P2"
+    },
+    {
+      "path": "/api/v1/login/logout",
+      "methods": [
+        "POST"
+      ],
+      "exposure": "A_QUALIFIER",
+      "constat": "Deconnexion sans dependance d'authentification declaree.",
+      "justification": "A EXAMINER : la route lit le jeton dans le corps ou l'en-tete pour le revoquer, mais ne declare pas de dependance de securite. Le comportement effectif doit etre confirme par le lot B.",
+      "risque_residuel": "Si un tiers peut revoquer le jeton d'un autre, c'est un deni de service cible. A verifier.",
+      "classement": "P1"
+    },
+    {
+      "path": "/api/v1/login/refresh",
+      "methods": [
+        "POST"
+      ],
+      "exposure": "A_QUALIFIER",
+      "constat": "Renouvellement de jeton sans dependance d'authentification declaree.",
+      "justification": "Le jeton de rafraichissement fait office d'authentification ; il est fourni dans la requete. Non authentifie au sens des dependances FastAPI, mais non anonyme en pratique.",
+      "risque_residuel": "Depend de la validation effective du jeton de rafraichissement. A confirmer par le lot B.",
+      "classement": "P1"
+    },
+    {
+      "path": "/api/v1/reports/verify/{token}",
+      "methods": [
+        "GET"
+      ],
+      "exposure": "A_QUALIFIER",
+      "constat": "Verification d'un compte rendu par jeton dans l'URL.",
+      "justification": "Destinee a la verification d'un QR code imprime : le porteur du document doit pouvoir verifier son authenticite sans compte. Le jeton EST l'autorisation.",
+      "risque_residuel": "Un jeton fuite (URL dans un journal, capture d'ecran) donne acces au compte rendu. La granularite et l'expiration du jeton doivent etre verifiees par le lot B.",
+      "classement": "P1"
+    },
+    {
+      "path": "/api/v1/analyzer/results",
+      "methods": [
+        "POST"
+      ],
+      "exposure": "A_QUALIFIER",
+      "constat": "Ingestion de resultats d'automate, protegee par une garde propre `_verify_analyzer_security` et non par une dependance FastAPI standard.",
+      "justification": "La garde existe et n'a simplement pas ete reconnue par les marqueurs de l'inventaire. Ce n'est donc PAS une route ouverte. Les interfaces automates sont par ailleurs desactivees par defaut.",
+      "risque_residuel": "Faible : garde presente et interfaces inactives. Le lot B doit confirmer ce que `_verify_analyzer_security` verifie exactement.",
+      "classement": "P2"
+    }
+  ]
+}

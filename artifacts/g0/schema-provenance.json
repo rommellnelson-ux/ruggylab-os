@@ -1,0 +1,25 @@
+{
+  "_comment": "deterministic est compare par --check ; volatile ne l'est pas. baseline_input_commit est DECLARE (reference permanente), jamais derive de la branche de travail. relevant_input_tree_sha256 est la preuve verifiable : l'empreinte des octets reellement lus.",
+  "deterministic": {
+    "baseline_input_commit": "f7abd7e10eb8acc22e3e13775a43172e7a90261e",
+    "baseline_input_ref": "main",
+    "generation_command": "python scripts/g0_schema_inventory.py --database-url <postgres> --generate",
+    "generator_version": "2.0.0",
+    "relevant_input_file_count": 48,
+    "relevant_input_patterns": [
+      "alembic/**/*",
+      "alembic.ini",
+      "requirements.txt"
+    ],
+    "relevant_input_set": "schema",
+    "relevant_input_tree_sha256": "79081df5279789a00687471aca036d6f793cd1d65fd1de9391976f475d42be81",
+    "schema_version": "2.0.0"
+  },
+  "volatile": {
+    "database_name": "g0_baseline",
+    "generated_at": "2026-09-07T18:15:37Z",
+    "platform": "windows/amd64",
+    "postgres_server_version": "PostgreSQL 16.14",
+    "python_version": "3.13.13"
+  }
+}

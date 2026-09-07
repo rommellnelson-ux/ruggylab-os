@@ -21,4 +21,11 @@ build/
 .coverage
 coverage.xml
 htmlcov/
-artifacts/
+artifacts/*
+# Les artefacts G0 font exception : ils sont VERSIONNÉS, et c'est le point.
+# `--check` compare le code au fichier versionné ; sans ce fichier, il n'y
+# aurait rien à comparer et la baseline dériverait sans que rien ne le dise.
+#
+# `artifacts/*` et non `artifacts/` : git n'applique pas une négation si le
+# RÉPERTOIRE parent est exclu — il ne descend même pas dedans.
+!artifacts/g0/

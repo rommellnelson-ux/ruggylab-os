@@ -1,0 +1,447 @@
+{
+  "payload": {
+    "branch_points": [],
+    "expected_head": "20260826_0043",
+    "head_count": 1,
+    "head_matches_expected": true,
+    "heads": [
+      "20260826_0043"
+    ],
+    "merge_points": [],
+    "revision_count": 43,
+    "revisions": [
+      {
+        "doc": "initial schema",
+        "down_revisions": [],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260428_0001"
+      },
+      {
+        "doc": "inventory and audit foundations",
+        "down_revisions": [
+          "20260428_0001"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260428_0002"
+      },
+      {
+        "doc": "equipment reagent ratios",
+        "down_revisions": [
+          "20260428_0002"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260428_0003"
+      },
+      {
+        "doc": "ratio presets and ratio versions",
+        "down_revisions": [
+          "20260428_0003"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260428_0004"
+      },
+      {
+        "doc": "stock movements",
+        "down_revisions": [
+          "20260428_0004"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260429_0005"
+      },
+      {
+        "doc": "dh36 inbound messages",
+        "down_revisions": [
+          "20260429_0005"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260429_0006"
+      },
+      {
+        "doc": "report signatures",
+        "down_revisions": [
+          "20260429_0006"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260429_0007"
+      },
+      {
+        "doc": "malaria analysis jobs",
+        "down_revisions": [
+          "20260429_0007"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260430_0008"
+      },
+      {
+        "doc": "epidemiology indexes",
+        "down_revisions": [
+          "20260430_0008"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260430_0009"
+      },
+      {
+        "doc": "user is_active field and validator_id foreign key on results",
+        "down_revisions": [
+          "20260430_0009"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260521_0010"
+      },
+      {
+        "doc": "add refresh_tokens table",
+        "down_revisions": [
+          "20260521_0010"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260521_0011"
+      },
+      {
+        "doc": "add bnpl_schedules and bnpl_payments tables",
+        "down_revisions": [
+          "20260521_0011"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260525_0001"
+      },
+      {
+        "doc": "add lot_number, expiry_date, supplier to reagents (ISO 15189 traceability)",
+        "down_revisions": [
+          "20260525_0001"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0012"
+      },
+      {
+        "doc": "add qc_controls and qc_results tables (Westgard / Levey-Jennings)",
+        "down_revisions": [
+          "20260603_0012"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0013"
+      },
+      {
+        "doc": "add critical_ranges table (panic values — ISO 15189)",
+        "down_revisions": [
+          "20260603_0013"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0014"
+      },
+      {
+        "doc": "add critical_ack_at and critical_ack_by_id to results",
+        "down_revisions": [
+          "20260603_0014"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0015"
+      },
+      {
+        "doc": "create delta_check_rules table",
+        "down_revisions": [
+          "20260603_0015"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0016"
+      },
+      {
+        "doc": "create reference_ranges table",
+        "down_revisions": [
+          "20260603_0016"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0017"
+      },
+      {
+        "doc": "create notif_configs table",
+        "down_revisions": [
+          "20260603_0017"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0018"
+      },
+      {
+        "doc": "add delta_exceeded, delta_analytes, flags to results",
+        "down_revisions": [
+          "20260603_0018"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0019"
+      },
+      {
+        "doc": "create equipment_maintenances table",
+        "down_revisions": [
+          "20260603_0019"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0020"
+      },
+      {
+        "doc": "add is_auto_validated, auto_validated_at, amendment_reason to results",
+        "down_revisions": [
+          "20260603_0020"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0021"
+      },
+      {
+        "doc": "create auto_validation_configs table",
+        "down_revisions": [
+          "20260603_0021"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0022"
+      },
+      {
+        "doc": "create revoked_tokens table (access-token denylist)",
+        "down_revisions": [
+          "20260603_0022"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0023"
+      },
+      {
+        "doc": "add unit column to users and patients (RBAC scoping)",
+        "down_revisions": [
+          "20260603_0023"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0024"
+      },
+      {
+        "doc": "create non_conformities and corrective_actions tables (QMS NC/CAPA)",
+        "down_revisions": [
+          "20260603_0024"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0025"
+      },
+      {
+        "doc": "TAT tracking: phase timestamps on results + tat_targets table",
+        "down_revisions": [
+          "20260603_0025"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0026"
+      },
+      {
+        "doc": "create biological_reference_ranges table",
+        "down_revisions": [
+          "20260603_0026"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0027"
+      },
+      {
+        "doc": "biological_code_mappings table + bioref interpretation columns on results",
+        "down_revisions": [
+          "20260603_0027"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260603_0028"
+      },
+      {
+        "doc": "Ajoute la valeur 'accountant' à l'enum userrole (rôle comptable / gestion)",
+        "down_revisions": [
+          "20260603_0028"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260618_0029"
+      },
+      {
+        "doc": "Prescriptions d'examens (exam_orders) + comptabilité (invoices)",
+        "down_revisions": [
+          "20260618_0029"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260618_0030"
+      },
+      {
+        "doc": "Tarifs d'examens (exam_tariffs) + lien plan de paiement sur les factures",
+        "down_revisions": [
+          "20260618_0030"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260622_0031"
+      },
+      {
+        "doc": "Snapshots versionnes de comptes-rendus + outbox de diffusion",
+        "down_revisions": [
+          "20260622_0031"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260622_0032"
+      },
+      {
+        "doc": "Registre des Accidents d'Exposition au Sang (AES)",
+        "down_revisions": [
+          "20260622_0032"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260623_0033"
+      },
+      {
+        "doc": "Aspect / qualité pré-analytique de l'échantillon (samples.aspect)",
+        "down_revisions": [
+          "20260623_0033"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260623_0034"
+      },
+      {
+        "doc": "Compléments registre : n° labo, préleveur, téléphone, quartier, service ;\nnotifications épidémiologiques (MADO) ; lots de réactifs (FEFO).",
+        "down_revisions": [
+          "20260623_0034"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260623_0035"
+      },
+      {
+        "doc": "Normalise users.role en minuscules (alignement StrEnum / type PG userrole)",
+        "down_revisions": [
+          "20260623_0035"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260625_0036"
+      },
+      {
+        "doc": "Discriminateur de nature du résultat (results.result_type) — Flux 3",
+        "down_revisions": [
+          "20260625_0036"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260708_0037"
+      },
+      {
+        "doc": "Version de sécurité des sessions utilisateur.",
+        "down_revisions": [
+          "20260708_0037"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260723_0038"
+      },
+      {
+        "doc": "Registre normalisé des équipements et qualifications.",
+        "down_revisions": [
+          "20260723_0038"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260724_0039"
+      },
+      {
+        "doc": "Intégration CSA (flux entrant) : csa_prescription_id, birth_date_estimee, csa_sync_state",
+        "down_revisions": [
+          "20260724_0039"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260826_0041"
+      },
+      {
+        "doc": "Intégration CSA (flux sortant) : exam_order_items.csa_pushed_at",
+        "down_revisions": [
+          "20260826_0041"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260826_0042"
+      },
+      {
+        "doc": "Intégration CSA (durcissement I4) : état du flux sortant dans csa_sync_state",
+        "down_revisions": [
+          "20260826_0042"
+        ],
+        "is_branch_point": false,
+        "is_merge_point": false,
+        "revision": "20260826_0043"
+      }
+    ],
+    "single_head": true,
+    "topological_order": [
+      "20260428_0001",
+      "20260428_0002",
+      "20260428_0003",
+      "20260428_0004",
+      "20260429_0005",
+      "20260429_0006",
+      "20260429_0007",
+      "20260430_0008",
+      "20260430_0009",
+      "20260521_0010",
+      "20260521_0011",
+      "20260525_0001",
+      "20260603_0012",
+      "20260603_0013",
+      "20260603_0014",
+      "20260603_0015",
+      "20260603_0016",
+      "20260603_0017",
+      "20260603_0018",
+      "20260603_0019",
+      "20260603_0020",
+      "20260603_0021",
+      "20260603_0022",
+      "20260603_0023",
+      "20260603_0024",
+      "20260603_0025",
+      "20260603_0026",
+      "20260603_0027",
+      "20260603_0028",
+      "20260618_0029",
+      "20260618_0030",
+      "20260622_0031",
+      "20260622_0032",
+      "20260623_0033",
+      "20260623_0034",
+      "20260623_0035",
+      "20260625_0036",
+      "20260708_0037",
+      "20260723_0038",
+      "20260724_0039",
+      "20260826_0041",
+      "20260826_0042",
+      "20260826_0043"
+    ]
+  },
+  "schema_version": "2.0.0"
+}

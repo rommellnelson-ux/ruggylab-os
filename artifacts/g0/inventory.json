@@ -1,0 +1,2058 @@
+{
+  "payload": {
+    "application": {
+      "cli_scripts": [
+        {
+          "docstring_first_line": "Driver ASTM TCP/IP autonome pour automates de biologie -> RuggyLab OS.",
+          "has_main_guard": true,
+          "path": "scripts/astm_tcp_driver.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Audit du SBOM de l'image : aucune licence indéterminée acceptée en silence.",
+          "has_main_guard": true,
+          "path": "scripts/audit_sbom_licenses.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Sauvegarde / restauration PostgreSQL — semis et vérification multiplateformes.",
+          "has_main_guard": true,
+          "path": "scripts/backup_restore_verify.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Fine-tune MobileNetV2 on malaria cell images and export to ONNX.",
+          "has_main_guard": true,
+          "path": "scripts/build_malaria_model.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Vérification de prêt-au-déploiement (pré go-live) de RuggyLab OS.",
+          "has_main_guard": true,
+          "path": "scripts/check_deploy_readiness.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "",
+          "has_main_guard": false,
+          "path": "scripts/check_pw.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Nettoyage des données UAT locales RuggyLab OS.",
+          "has_main_guard": true,
+          "path": "scripts/cleanup_uat_data.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Instance de TEST du flux SORTANT RuggyLab -> CSA (I2).",
+          "has_main_guard": true,
+          "path": "scripts/csa_sync_outbound_smoke.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Instance de TEST du flux entrant CSA -> RuggyLab (I0/I1).",
+          "has_main_guard": true,
+          "path": "scripts/csa_sync_smoke.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Statut de l'intégration CSA (I4) — lecture seule, aucun appel réseau.",
+          "has_main_guard": true,
+          "path": "scripts/csa_sync_status.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Manifeste des paquets Debian de l'image, et de leurs sources correspondantes.",
+          "has_main_guard": true,
+          "path": "scripts/debian_source_manifest.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Inventaire G0 — architecture, surfaces d'entrée et données.",
+          "has_main_guard": true,
+          "path": "scripts/g0_inventory.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Provenance des artefacts G0 — dire de quoi la baseline parle, et le prouver.",
+          "has_main_guard": false,
+          "path": "scripts/g0_provenance.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Inventaire G0 — schéma PostgreSQL réellement créé, et graphe Alembic.",
+          "has_main_guard": true,
+          "path": "scripts/g0_schema_inventory.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Inventaire reproductible des licences des dépendances Python installées.",
+          "has_main_guard": true,
+          "path": "scripts/inventory_python_licenses.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Simulateur de charge Dymind DH36 — trames factices HL7 (MLLP) et ASTM.",
+          "has_main_guard": true,
+          "path": "scripts/mock_dymind.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Traite la file de diffusion des comptes-rendus RuggyLab.",
+          "has_main_guard": true,
+          "path": "scripts/process_report_delivery_outbox.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "",
+          "has_main_guard": false,
+          "path": "scripts/query_users.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "",
+          "has_main_guard": false,
+          "path": "scripts/reset_admin_password.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Jeu de données de démonstration pour l'UAT.",
+          "has_main_guard": true,
+          "path": "scripts/seed_demo.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Test d'intégration : routage port -> Redis de la flotte d'automates.",
+          "has_main_guard": true,
+          "path": "scripts/test_fleet_ingestion.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Fine-tune MobileNetV2 on malaria blood-smear images and export to ONNX.",
+          "has_main_guard": true,
+          "path": "scripts/train_mobilenet.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Smoke test bout-en-bout d'une instance RuggyLab OS déjà démarrée.",
+          "has_main_guard": true,
+          "path": "scripts/uat_smoke.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "",
+          "has_main_guard": false,
+          "path": "scripts/verify_db_password.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "",
+          "has_main_guard": null,
+          "path": "scripts/qualify_stack.sh",
+          "type": "shell_script"
+        }
+      ],
+      "governance_defaults": [
+        {
+          "default": "\"127.0.0.1\"",
+          "setting": "ANALYZER_BIND_IP"
+        },
+        {
+          "default": "False",
+          "setting": "ANALYZER_RAW_LISTENER_ENABLED"
+        },
+        {
+          "default": "\"memory\"",
+          "setting": "CACHE_BACKEND"
+        },
+        {
+          "default": "False",
+          "setting": "CSA_SYNC_ENABLED"
+        },
+        {
+          "default": "False",
+          "setting": "ENABLE_DH36_LISTENER"
+        },
+        {
+          "default": "False",
+          "setting": "REQUIRE_VALIDATION_FOR_RELEASE"
+        }
+      ],
+      "module_count": 230,
+      "modules": [
+        {
+          "lines": 1,
+          "package": "app",
+          "path": "app/__init__.py"
+        },
+        {
+          "lines": 131,
+          "package": "app",
+          "path": "app/analyzer_gateway.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/api",
+          "path": "app/api/__init__.py"
+        },
+        {
+          "lines": 121,
+          "package": "app/api",
+          "path": "app/api/deps.py"
+        },
+        {
+          "lines": 53,
+          "package": "app/api/middleware",
+          "path": "app/api/middleware/rate_limit.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/api/v1",
+          "path": "app/api/v1/__init__.py"
+        },
+        {
+          "lines": 125,
+          "package": "app/api/v1",
+          "path": "app/api/v1/api.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/__init__.py"
+        },
+        {
+          "lines": 14,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/admin_ui.py"
+        },
+        {
+          "lines": 120,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/aes.py"
+        },
+        {
+          "lines": 113,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/analyzer.py"
+        },
+        {
+          "lines": 128,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/audit_events.py"
+        },
+        {
+          "lines": 109,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/auto_validation.py"
+        },
+        {
+          "lines": 25,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/bench.py"
+        },
+        {
+          "lines": 100,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/billing.py"
+        },
+        {
+          "lines": 52,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/bioref.py"
+        },
+        {
+          "lines": 173,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/bnpl.py"
+        },
+        {
+          "lines": 71,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/bulk_import.py"
+        },
+        {
+          "lines": 109,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/code_mappings.py"
+        },
+        {
+          "lines": 107,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/critical_alerts.py"
+        },
+        {
+          "lines": 67,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/critical_ranges.py"
+        },
+        {
+          "lines": 71,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/delta_check.py"
+        },
+        {
+          "lines": 55,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/dh36.py"
+        },
+        {
+          "lines": 98,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/epi_notifications.py"
+        },
+        {
+          "lines": 43,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/epidemiology.py"
+        },
+        {
+          "lines": 111,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/equipment_maintenance.py"
+        },
+        {
+          "lines": 177,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/equipment_reagent_ratios.py"
+        },
+        {
+          "lines": 657,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/equipments.py"
+        },
+        {
+          "lines": 338,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/exam_orders.py"
+        },
+        {
+          "lines": 130,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/fhir_pharmacy.py"
+        },
+        {
+          "lines": 13,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/health.py"
+        },
+        {
+          "lines": 186,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/imaging.py"
+        },
+        {
+          "lines": 391,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/invoices.py"
+        },
+        {
+          "lines": 139,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/login.py"
+        },
+        {
+          "lines": 46,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/maintenance.py"
+        },
+        {
+          "lines": 18,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/military_facilities.py"
+        },
+        {
+          "lines": 180,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/notifications.py"
+        },
+        {
+          "lines": 47,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/operations.py"
+        },
+        {
+          "lines": 195,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/patients.py"
+        },
+        {
+          "lines": 87,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/pdf_prescription.py"
+        },
+        {
+          "lines": 143,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/prescription_scanner.py"
+        },
+        {
+          "lines": 109,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/qc.py"
+        },
+        {
+          "lines": 273,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/quality.py"
+        },
+        {
+          "lines": 215,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/ratio_presets.py"
+        },
+        {
+          "lines": 102,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/reagent_lots.py"
+        },
+        {
+          "lines": 169,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/reagents.py"
+        },
+        {
+          "lines": 58,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/reference_ranges.py"
+        },
+        {
+          "lines": 72,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/registre.py"
+        },
+        {
+          "lines": 1235,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/reports.py"
+        },
+        {
+          "lines": 626,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/results.py"
+        },
+        {
+          "lines": 129,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/results_poct.py"
+        },
+        {
+          "lines": 120,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/results_qualitative.py"
+        },
+        {
+          "lines": 223,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/samples.py"
+        },
+        {
+          "lines": 32,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/stats.py"
+        },
+        {
+          "lines": 60,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/stock_notifications.py"
+        },
+        {
+          "lines": 115,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/stock_predictor.py"
+        },
+        {
+          "lines": 62,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/tariffs.py"
+        },
+        {
+          "lines": 213,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/tat.py"
+        },
+        {
+          "lines": 125,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/users.py"
+        },
+        {
+          "lines": 23,
+          "package": "app/api/v1/endpoints",
+          "path": "app/api/v1/endpoints/worklist.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/core",
+          "path": "app/core/__init__.py"
+        },
+        {
+          "lines": 83,
+          "package": "app/core",
+          "path": "app/core/cache_decorator.py"
+        },
+        {
+          "lines": 164,
+          "package": "app/core",
+          "path": "app/core/caching.py"
+        },
+        {
+          "lines": 64,
+          "package": "app/core",
+          "path": "app/core/compression.py"
+        },
+        {
+          "lines": 333,
+          "package": "app/core",
+          "path": "app/core/config.py"
+        },
+        {
+          "lines": 196,
+          "package": "app/core",
+          "path": "app/core/health_check.py"
+        },
+        {
+          "lines": 161,
+          "package": "app/core",
+          "path": "app/core/logging_config.py"
+        },
+        {
+          "lines": 157,
+          "package": "app/core",
+          "path": "app/core/login_rate_limit.py"
+        },
+        {
+          "lines": 221,
+          "package": "app/core",
+          "path": "app/core/metrics.py"
+        },
+        {
+          "lines": 15,
+          "package": "app/core",
+          "path": "app/core/middleware.py"
+        },
+        {
+          "lines": 121,
+          "package": "app/core",
+          "path": "app/core/observability_middleware.py"
+        },
+        {
+          "lines": 135,
+          "package": "app/core",
+          "path": "app/core/rate_limit.py"
+        },
+        {
+          "lines": 15,
+          "package": "app/core",
+          "path": "app/core/ratios.py"
+        },
+        {
+          "lines": 268,
+          "package": "app/core",
+          "path": "app/core/secrets_manager.py"
+        },
+        {
+          "lines": 51,
+          "package": "app/core",
+          "path": "app/core/security.py"
+        },
+        {
+          "lines": 36,
+          "package": "app/core",
+          "path": "app/core/security_headers.py"
+        },
+        {
+          "lines": 89,
+          "package": "app/core",
+          "path": "app/core/user_quota.py"
+        },
+        {
+          "lines": 32,
+          "package": "app/core",
+          "path": "app/core/version.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/db",
+          "path": "app/db/__init__.py"
+        },
+        {
+          "lines": 44,
+          "package": "app/db",
+          "path": "app/db/base.py"
+        },
+        {
+          "lines": 5,
+          "package": "app/db",
+          "path": "app/db/base_class.py"
+        },
+        {
+          "lines": 57,
+          "package": "app/db",
+          "path": "app/db/migration_guard.py"
+        },
+        {
+          "lines": 40,
+          "package": "app/db",
+          "path": "app/db/session.py"
+        },
+        {
+          "lines": 252,
+          "package": "app",
+          "path": "app/main.py"
+        },
+        {
+          "lines": 68,
+          "package": "app/ml",
+          "path": "app/ml/model_server.py"
+        },
+        {
+          "lines": 95,
+          "package": "app/models",
+          "path": "app/models/__init__.py"
+        },
+        {
+          "lines": 43,
+          "package": "app/models",
+          "path": "app/models/aes.py"
+        },
+        {
+          "lines": 50,
+          "package": "app/models",
+          "path": "app/models/bnpl.py"
+        },
+        {
+          "lines": 33,
+          "package": "app/models",
+          "path": "app/models/epi_notification.py"
+        },
+        {
+          "lines": 28,
+          "package": "app/models",
+          "path": "app/models/reagent_lot.py"
+        },
+        {
+          "lines": 1141,
+          "package": "app/models",
+          "path": "app/models/ruggylab_os.py"
+        },
+        {
+          "lines": 65,
+          "package": "app",
+          "path": "app/scheduler.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/schemas",
+          "path": "app/schemas/__init__.py"
+        },
+        {
+          "lines": 56,
+          "package": "app/schemas",
+          "path": "app/schemas/aes.py"
+        },
+        {
+          "lines": 25,
+          "package": "app/schemas",
+          "path": "app/schemas/analyzer.py"
+        },
+        {
+          "lines": 16,
+          "package": "app/schemas",
+          "path": "app/schemas/audit_event.py"
+        },
+        {
+          "lines": 17,
+          "package": "app/schemas",
+          "path": "app/schemas/auth.py"
+        },
+        {
+          "lines": 26,
+          "package": "app/schemas",
+          "path": "app/schemas/auto_validation.py"
+        },
+        {
+          "lines": 81,
+          "package": "app/schemas",
+          "path": "app/schemas/bench.py"
+        },
+        {
+          "lines": 307,
+          "package": "app/schemas",
+          "path": "app/schemas/billing.py"
+        },
+        {
+          "lines": 32,
+          "package": "app/schemas",
+          "path": "app/schemas/bioref.py"
+        },
+        {
+          "lines": 76,
+          "package": "app/schemas",
+          "path": "app/schemas/bnpl.py"
+        },
+        {
+          "lines": 19,
+          "package": "app/schemas",
+          "path": "app/schemas/bulk_import.py"
+        },
+        {
+          "lines": 33,
+          "package": "app/schemas",
+          "path": "app/schemas/code_mapping.py"
+        },
+        {
+          "lines": 25,
+          "package": "app/schemas",
+          "path": "app/schemas/critical_range.py"
+        },
+        {
+          "lines": 27,
+          "package": "app/schemas",
+          "path": "app/schemas/delta_check.py"
+        },
+        {
+          "lines": 17,
+          "package": "app/schemas",
+          "path": "app/schemas/dh36_ingestion.py"
+        },
+        {
+          "lines": 27,
+          "package": "app/schemas",
+          "path": "app/schemas/dh36_interfacing.py"
+        },
+        {
+          "lines": 39,
+          "package": "app/schemas",
+          "path": "app/schemas/epi_notification.py"
+        },
+        {
+          "lines": 77,
+          "package": "app/schemas",
+          "path": "app/schemas/epidemiology.py"
+        },
+        {
+          "lines": 463,
+          "package": "app/schemas",
+          "path": "app/schemas/equipment.py"
+        },
+        {
+          "lines": 29,
+          "package": "app/schemas",
+          "path": "app/schemas/equipment_maintenance.py"
+        },
+        {
+          "lines": 44,
+          "package": "app/schemas",
+          "path": "app/schemas/equipment_reagent_ratio.py"
+        },
+        {
+          "lines": 96,
+          "package": "app/schemas",
+          "path": "app/schemas/exam_order.py"
+        },
+        {
+          "lines": 287,
+          "package": "app/schemas",
+          "path": "app/schemas/fhir.py"
+        },
+        {
+          "lines": 136,
+          "package": "app/schemas",
+          "path": "app/schemas/invoice.py"
+        },
+        {
+          "lines": 23,
+          "package": "app/schemas",
+          "path": "app/schemas/malaria.py"
+        },
+        {
+          "lines": 34,
+          "package": "app/schemas",
+          "path": "app/schemas/military_facility.py"
+        },
+        {
+          "lines": 45,
+          "package": "app/schemas",
+          "path": "app/schemas/notif_config.py"
+        },
+        {
+          "lines": 94,
+          "package": "app/schemas",
+          "path": "app/schemas/notification.py"
+        },
+        {
+          "lines": 7,
+          "package": "app/schemas",
+          "path": "app/schemas/operations.py"
+        },
+        {
+          "lines": 93,
+          "package": "app/schemas",
+          "path": "app/schemas/pagination.py"
+        },
+        {
+          "lines": 73,
+          "package": "app/schemas",
+          "path": "app/schemas/patient.py"
+        },
+        {
+          "lines": 75,
+          "package": "app/schemas",
+          "path": "app/schemas/poct.py"
+        },
+        {
+          "lines": 28,
+          "package": "app/schemas",
+          "path": "app/schemas/precis_expert.py"
+        },
+        {
+          "lines": 224,
+          "package": "app/schemas",
+          "path": "app/schemas/prescription_scanner.py"
+        },
+        {
+          "lines": 75,
+          "package": "app/schemas",
+          "path": "app/schemas/qc.py"
+        },
+        {
+          "lines": 79,
+          "package": "app/schemas",
+          "path": "app/schemas/qualitative.py"
+        },
+        {
+          "lines": 86,
+          "package": "app/schemas",
+          "path": "app/schemas/quality.py"
+        },
+        {
+          "lines": 41,
+          "package": "app/schemas",
+          "path": "app/schemas/ratio_preset.py"
+        },
+        {
+          "lines": 24,
+          "package": "app/schemas",
+          "path": "app/schemas/reagent.py"
+        },
+        {
+          "lines": 32,
+          "package": "app/schemas",
+          "path": "app/schemas/reagent_lot.py"
+        },
+        {
+          "lines": 29,
+          "package": "app/schemas",
+          "path": "app/schemas/reference_range.py"
+        },
+        {
+          "lines": 13,
+          "package": "app/schemas",
+          "path": "app/schemas/registre.py"
+        },
+        {
+          "lines": 74,
+          "package": "app/schemas",
+          "path": "app/schemas/report_signature.py"
+        },
+        {
+          "lines": 79,
+          "package": "app/schemas",
+          "path": "app/schemas/reports.py"
+        },
+        {
+          "lines": 107,
+          "package": "app/schemas",
+          "path": "app/schemas/result.py"
+        },
+        {
+          "lines": 119,
+          "package": "app/schemas",
+          "path": "app/schemas/sample.py"
+        },
+        {
+          "lines": 179,
+          "package": "app/schemas",
+          "path": "app/schemas/stock_predictor.py"
+        },
+        {
+          "lines": 24,
+          "package": "app/schemas",
+          "path": "app/schemas/tariff.py"
+        },
+        {
+          "lines": 38,
+          "package": "app/schemas",
+          "path": "app/schemas/tat.py"
+        },
+        {
+          "lines": 36,
+          "package": "app/schemas",
+          "path": "app/schemas/user.py"
+        },
+        {
+          "lines": 37,
+          "package": "app/schemas",
+          "path": "app/schemas/worklist.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/services",
+          "path": "app/services/__init__.py"
+        },
+        {
+          "lines": 247,
+          "package": "app/services",
+          "path": "app/services/accounting_service.py"
+        },
+        {
+          "lines": 216,
+          "package": "app/services",
+          "path": "app/services/analyzer_ingestion.py"
+        },
+        {
+          "lines": 37,
+          "package": "app/services/analyzers",
+          "path": "app/services/analyzers/__init__.py"
+        },
+        {
+          "lines": 27,
+          "package": "app/services/analyzers",
+          "path": "app/services/analyzers/anbio_immuno.py"
+        },
+        {
+          "lines": 65,
+          "package": "app/services/analyzers",
+          "path": "app/services/analyzers/base.py"
+        },
+        {
+          "lines": 27,
+          "package": "app/services/analyzers",
+          "path": "app/services/analyzers/dymind_biochemistry.py"
+        },
+        {
+          "lines": 36,
+          "package": "app/services/analyzers",
+          "path": "app/services/analyzers/dymind_hematology.py"
+        },
+        {
+          "lines": 44,
+          "package": "app/services/analyzers",
+          "path": "app/services/analyzers/factory.py"
+        },
+        {
+          "lines": 91,
+          "package": "app/services/analyzers",
+          "path": "app/services/analyzers/registry.py"
+        },
+        {
+          "lines": 35,
+          "package": "app/services",
+          "path": "app/services/audit.py"
+        },
+        {
+          "lines": 121,
+          "package": "app/services",
+          "path": "app/services/auto_validator.py"
+        },
+        {
+          "lines": 189,
+          "package": "app/services",
+          "path": "app/services/bench_radar.py"
+        },
+        {
+          "lines": 343,
+          "package": "app/services",
+          "path": "app/services/billing_engine.py"
+        },
+        {
+          "lines": 1167,
+          "package": "app/services",
+          "path": "app/services/bioref_data.py"
+        },
+        {
+          "lines": 149,
+          "package": "app/services",
+          "path": "app/services/bioref_service.py"
+        },
+        {
+          "lines": 171,
+          "package": "app/services",
+          "path": "app/services/bnpl_tracker.py"
+        },
+        {
+          "lines": 56,
+          "package": "app/services",
+          "path": "app/services/bootstrap.py"
+        },
+        {
+          "lines": 188,
+          "package": "app/services",
+          "path": "app/services/bulk_import.py"
+        },
+        {
+          "lines": 524,
+          "package": "app/services",
+          "path": "app/services/code_mapping_data.py"
+        },
+        {
+          "lines": 366,
+          "package": "app/services",
+          "path": "app/services/code_mapping_service.py"
+        },
+        {
+          "lines": 54,
+          "package": "app/services",
+          "path": "app/services/critical_checker.py"
+        },
+        {
+          "lines": 120,
+          "package": "app/services",
+          "path": "app/services/critical_notifier.py"
+        },
+        {
+          "lines": 15,
+          "package": "app/services/csa_sync",
+          "path": "app/services/csa_sync/__init__.py"
+        },
+        {
+          "lines": 132,
+          "package": "app/services/csa_sync",
+          "path": "app/services/csa_sync/client.py"
+        },
+        {
+          "lines": 62,
+          "package": "app/services/csa_sync",
+          "path": "app/services/csa_sync/exam_map.py"
+        },
+        {
+          "lines": 91,
+          "package": "app/services/csa_sync",
+          "path": "app/services/csa_sync/health.py"
+        },
+        {
+          "lines": 224,
+          "package": "app/services/csa_sync",
+          "path": "app/services/csa_sync/inbound.py"
+        },
+        {
+          "lines": 263,
+          "package": "app/services/csa_sync",
+          "path": "app/services/csa_sync/outbound.py"
+        },
+        {
+          "lines": 114,
+          "package": "app/services",
+          "path": "app/services/delta_checker.py"
+        },
+        {
+          "lines": 212,
+          "package": "app/services",
+          "path": "app/services/epidemiology_service.py"
+        },
+        {
+          "lines": 1158,
+          "package": "app/services",
+          "path": "app/services/equipment_registry.py"
+        },
+        {
+          "lines": 588,
+          "package": "app/services",
+          "path": "app/services/exam_catalog.py"
+        },
+        {
+          "lines": 155,
+          "package": "app/services",
+          "path": "app/services/exam_order_service.py"
+        },
+        {
+          "lines": 91,
+          "package": "app/services",
+          "path": "app/services/expiry_notifier.py"
+        },
+        {
+          "lines": 578,
+          "package": "app/services",
+          "path": "app/services/fhir_builder.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/services/imaging",
+          "path": "app/services/imaging/__init__.py"
+        },
+        {
+          "lines": 18,
+          "package": "app/services/imaging",
+          "path": "app/services/imaging/capture_service.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/services/interfacing",
+          "path": "app/services/interfacing/__init__.py"
+        },
+        {
+          "lines": 269,
+          "package": "app/services/interfacing",
+          "path": "app/services/interfacing/dh36_ingestion.py"
+        },
+        {
+          "lines": 88,
+          "package": "app/services/interfacing",
+          "path": "app/services/interfacing/dymind_dh36.py"
+        },
+        {
+          "lines": 81,
+          "package": "app/services/interfacing",
+          "path": "app/services/interfacing/listener_dh36.py"
+        },
+        {
+          "lines": 352,
+          "package": "app/services/interfacing",
+          "path": "app/services/interfacing/raw_tcp_listener.py"
+        },
+        {
+          "lines": 109,
+          "package": "app/services",
+          "path": "app/services/inventory.py"
+        },
+        {
+          "lines": 54,
+          "package": "app/services",
+          "path": "app/services/invoice_pdf.py"
+        },
+        {
+          "lines": 122,
+          "package": "app/services",
+          "path": "app/services/lab_stats.py"
+        },
+        {
+          "lines": 304,
+          "package": "app/services",
+          "path": "app/services/malaria_ai.py"
+        },
+        {
+          "lines": 86,
+          "package": "app/services",
+          "path": "app/services/notification_bus.py"
+        },
+        {
+          "lines": 126,
+          "package": "app/services",
+          "path": "app/services/notification_hub.py"
+        },
+        {
+          "lines": 265,
+          "package": "app/services",
+          "path": "app/services/notifier.py"
+        },
+        {
+          "lines": 199,
+          "package": "app/services",
+          "path": "app/services/onmci_client.py"
+        },
+        {
+          "lines": 97,
+          "package": "app/services",
+          "path": "app/services/order_report.py"
+        },
+        {
+          "lines": 113,
+          "package": "app/services",
+          "path": "app/services/patient_access.py"
+        },
+        {
+          "lines": 124,
+          "package": "app/services",
+          "path": "app/services/patient_history.py"
+        },
+        {
+          "lines": 43,
+          "package": "app/services",
+          "path": "app/services/pdf.py"
+        },
+        {
+          "lines": 490,
+          "package": "app/services",
+          "path": "app/services/pdf_prescription.py"
+        },
+        {
+          "lines": 46,
+          "package": "app/services",
+          "path": "app/services/preanalytic.py"
+        },
+        {
+          "lines": 785,
+          "package": "app/services",
+          "path": "app/services/prescription_scanner.py"
+        },
+        {
+          "lines": 354,
+          "package": "app/services",
+          "path": "app/services/qc_pdf_report.py"
+        },
+        {
+          "lines": 33,
+          "package": "app/services",
+          "path": "app/services/ratio_management.py"
+        },
+        {
+          "lines": 79,
+          "package": "app/services",
+          "path": "app/services/redis_notification.py"
+        },
+        {
+          "lines": 92,
+          "package": "app/services",
+          "path": "app/services/reference_checker.py"
+        },
+        {
+          "lines": 104,
+          "package": "app/services",
+          "path": "app/services/registre_analytics.py"
+        },
+        {
+          "lines": 186,
+          "package": "app/services",
+          "path": "app/services/registre_import.py"
+        },
+        {
+          "lines": 147,
+          "package": "app/services",
+          "path": "app/services/registre_parser.py"
+        },
+        {
+          "lines": 241,
+          "package": "app/services",
+          "path": "app/services/report_delivery_outbox.py"
+        },
+        {
+          "lines": 549,
+          "package": "app/services",
+          "path": "app/services/report_signing.py"
+        },
+        {
+          "lines": 31,
+          "package": "app/services",
+          "path": "app/services/sample_workflow.py"
+        },
+        {
+          "lines": 455,
+          "package": "app/services",
+          "path": "app/services/stock_predictor.py"
+        },
+        {
+          "lines": 65,
+          "package": "app/services",
+          "path": "app/services/tariff_service.py"
+        },
+        {
+          "lines": 235,
+          "package": "app/services",
+          "path": "app/services/tat_service.py"
+        },
+        {
+          "lines": 95,
+          "package": "app/services",
+          "path": "app/services/token_cleanup.py"
+        },
+        {
+          "lines": 81,
+          "package": "app/services",
+          "path": "app/services/token_revocation.py"
+        },
+        {
+          "lines": 1,
+          "package": "app/services/validation",
+          "path": "app/services/validation/__init__.py"
+        },
+        {
+          "lines": 331,
+          "package": "app/services/validation",
+          "path": "app/services/validation/med_logic.py"
+        },
+        {
+          "lines": 121,
+          "package": "app/services/validation",
+          "path": "app/services/validation/poct_reference.py"
+        },
+        {
+          "lines": 54,
+          "package": "app/services/validation",
+          "path": "app/services/validation/precis_expert.py"
+        },
+        {
+          "lines": 64,
+          "package": "app/services",
+          "path": "app/services/westgard.py"
+        },
+        {
+          "lines": 341,
+          "package": "app/services",
+          "path": "app/services/worklist.py"
+        },
+        {
+          "lines": 0,
+          "package": "app/utils",
+          "path": "app/utils/__init__.py"
+        },
+        {
+          "lines": 23,
+          "package": "app/utils",
+          "path": "app/utils/csv_safety.py"
+        },
+        {
+          "lines": 17,
+          "package": "app/utils",
+          "path": "app/utils/datetime_utils.py"
+        },
+        {
+          "lines": 76,
+          "package": "app/utils",
+          "path": "app/utils/import_errors.py"
+        },
+        {
+          "lines": 28,
+          "package": "app/utils",
+          "path": "app/utils/net_utils.py"
+        },
+        {
+          "lines": 95,
+          "package": "app/utils",
+          "path": "app/utils/redis_rate_limiter.py"
+        },
+        {
+          "lines": 216,
+          "package": "app/utils",
+          "path": "app/utils/safe_http.py"
+        },
+        {
+          "lines": 66,
+          "package": "app/utils",
+          "path": "app/utils/url_safety.py"
+        }
+      ],
+      "packages": [
+        "app",
+        "app/api",
+        "app/api/middleware",
+        "app/api/v1",
+        "app/api/v1/endpoints",
+        "app/core",
+        "app/db",
+        "app/ml",
+        "app/models",
+        "app/schemas",
+        "app/services",
+        "app/services/analyzers",
+        "app/services/csa_sync",
+        "app/services/imaging",
+        "app/services/interfacing",
+        "app/services/validation",
+        "app/utils"
+      ],
+      "process_entrypoints": [
+        {
+          "command": "uvicorn app.main:app",
+          "default_state": "enabled",
+          "module": "app/main.py",
+          "name": "web",
+          "role": "API, interface, WebSocket",
+          "type": "process"
+        },
+        {
+          "command": "python -m app.scheduler",
+          "default_state": "enabled",
+          "module": "app/scheduler.py",
+          "name": "scheduler",
+          "role": "tâches périodiques, purge des jetons",
+          "type": "process"
+        },
+        {
+          "command": "python -m app.analyzer_gateway",
+          "default_state": "enabled_but_all_interfaces_disabled",
+          "module": "app/analyzer_gateway.py",
+          "name": "analyzer-gateway",
+          "role": "hôte des interfaces d'équipement",
+          "type": "process"
+        },
+        {
+          "command": "alembic upgrade head",
+          "default_state": "manual",
+          "module": "alembic/",
+          "name": "migrate",
+          "role": "application des migrations",
+          "type": "one_shot"
+        }
+      ],
+      "total_lines": 32406
+    },
+    "compose": [
+      {
+        "file": "docker-compose.analyzers.yml",
+        "networks": [],
+        "nominal_running_services": 0,
+        "one_shot_profile_services": [],
+        "role": "Interfaces automates — désactivées",
+        "service_definitions": 1,
+        "services": [
+          {
+            "command": "",
+            "depends_on": [
+              "postgres",
+              "valkey"
+            ],
+            "digest": null,
+            "has_healthcheck": true,
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
+            "networks": [],
+            "profiles": [],
+            "published_ports": [
+              "${ANALYZER_BIND_IP}:${ANALYZER_BIOCHEMISTRY_PORT:-9001}:9001",
+              "${ANALYZER_BIND_IP}:${ANALYZER_HEMATOLOGY_PORT:-9000}:9000",
+              "${ANALYZER_BIND_IP}:${ANALYZER_IMMUNO_PORT:-9002}:9002",
+              "${ANALYZER_BIND_IP}:${DH36_LISTENER_PORT:-5001}:5001"
+            ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
+            "required_variables": [
+              "ANALYZER_BIND_IP"
+            ],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
+            "service": "analyzer-gateway",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": []
+          }
+        ],
+        "status": "optional_overlay",
+        "volumes": []
+      },
+      {
+        "file": "docker-compose.dev.yml",
+        "networks": [],
+        "nominal_running_services": 0,
+        "one_shot_profile_services": [
+          "analyzer-gateway",
+          "scheduler"
+        ],
+        "role": "Surcharge de développement",
+        "service_definitions": 7,
+        "services": [
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
+            "networks": [],
+            "profiles": [
+              "workers"
+            ],
+            "published_ports": [],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot_profile_task",
+            "service": "analyzer-gateway",
+            "started_by_default": false,
+            "tag": "dev",
+            "volumes": []
+          },
+          {
+            "command": [
+              "uvicorn",
+              "app.main:app",
+              "--host",
+              "0.0.0.0",
+              "--port",
+              "8000",
+              "--reload"
+            ],
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
+            "networks": [],
+            "profiles": [],
+            "published_ports": [
+              "127.0.0.1:8000:8000"
+            ],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
+            "service": "app",
+            "started_by_default": true,
+            "tag": "dev",
+            "volumes": [
+              "./alembic.ini:/app/alembic.ini:ro",
+              "./alembic:/app/alembic:ro",
+              "./app:/app/app:ro",
+              "./data:/app/data",
+              "./models:/app/models"
+            ]
+          },
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
+            "networks": [],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
+            "service": "migrate",
+            "started_by_default": true,
+            "tag": "dev",
+            "volumes": []
+          },
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
+            "networks": [],
+            "profiles": [],
+            "published_ports": [
+              "127.0.0.1:5432:5432"
+            ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
+            "service": "postgres",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": []
+          },
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
+            "networks": [],
+            "profiles": [],
+            "published_ports": [
+              "127.0.0.1:9090:9090"
+            ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
+            "service": "prometheus",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": []
+          },
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "static",
+            "image_template": "ruggylab-os:dev",
+            "networks": [],
+            "profiles": [
+              "workers"
+            ],
+            "published_ports": [],
+            "registry": null,
+            "repository": "ruggylab-os",
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": "ruggylab-os:dev",
+            "restart_policy": "",
+            "runtime_kind": "one_shot_profile_task",
+            "service": "scheduler",
+            "started_by_default": false,
+            "tag": "dev",
+            "volumes": []
+          },
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
+            "networks": [],
+            "profiles": [],
+            "published_ports": [
+              "127.0.0.1:6379:6379"
+            ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
+            "service": "valkey",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": []
+          }
+        ],
+        "status": "dev_override",
+        "volumes": []
+      },
+      {
+        "file": "docker-compose.monitoring.dev.yml",
+        "networks": [],
+        "nominal_running_services": 0,
+        "one_shot_profile_services": [],
+        "role": "Port loopback pour l'overlay",
+        "service_definitions": 1,
+        "services": [
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "built_from_dockerfile",
+            "image_template": "",
+            "networks": [],
+            "profiles": [],
+            "published_ports": [
+              "127.0.0.1:3000:3000"
+            ],
+            "registry": null,
+            "repository": null,
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot",
+            "service": "grafana",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": []
+          }
+        ],
+        "status": "dev_override",
+        "volumes": []
+      },
+      {
+        "file": "docker-compose.monitoring.yml",
+        "networks": [],
+        "nominal_running_services": 1,
+        "one_shot_profile_services": [],
+        "role": "Supervision Grafana, hors du cœur",
+        "service_definitions": 1,
+        "services": [
+          {
+            "command": "",
+            "depends_on": [
+              "prometheus"
+            ],
+            "digest": "sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54",
+            "has_healthcheck": true,
+            "image_reference_kind": "static",
+            "image_template": "grafana/grafana:11.0.0@sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54",
+            "networks": [
+              "management_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": "grafana/grafana",
+            "required_variable": null,
+            "required_variables": [
+              "GRAFANA_PASSWORD"
+            ],
+            "resolved_image": "grafana/grafana:11.0.0@sha256:0dc5a246ab16bb2c38a349fb588174e832b4c6c2db0981d0c3e6cd774ba66a54",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "grafana",
+            "started_by_default": true,
+            "tag": "11.0.0",
+            "volumes": [
+              "./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro",
+              "./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro",
+              "grafana_data:/var/lib/grafana"
+            ]
+          }
+        ],
+        "status": "optional_overlay",
+        "volumes": [
+          "grafana_data"
+        ]
+      },
+      {
+        "file": "docker-compose.yml",
+        "networks": [
+          "analyzer_net",
+          "backend_net",
+          "frontend_net",
+          "management_net"
+        ],
+        "nominal_running_services": 8,
+        "one_shot_profile_services": [
+          "migrate"
+        ],
+        "role": "Stack de production — mode nominal supporté",
+        "service_definitions": 9,
+        "services": [
+          {
+            "command": [
+              "python",
+              "-m",
+              "app.analyzer_gateway"
+            ],
+            "depends_on": [
+              "postgres"
+            ],
+            "digest": null,
+            "has_healthcheck": true,
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
+            "networks": [
+              "analyzer_net",
+              "backend_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
+            "required_variables": [
+              "RUGGYLAB_IMAGE",
+              "SECRET_KEY"
+            ],
+            "resolved_image": null,
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "analyzer-gateway",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": []
+          },
+          {
+            "command": "",
+            "depends_on": [
+              "postgres",
+              "valkey"
+            ],
+            "digest": null,
+            "has_healthcheck": true,
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set (immutable tag, e.g. ghcr.io/rommellnelson-ux/ruggylab-os:<git-sha>)}",
+            "networks": [
+              "backend_net",
+              "frontend_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
+            "required_variables": [
+              "FIRST_SUPERUSER_PASSWORD",
+              "RUGGYLAB_IMAGE",
+              "SECRET_KEY"
+            ],
+            "resolved_image": null,
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "app",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": [
+              "app_data:/app/data",
+              "app_models:/app/models"
+            ]
+          },
+          {
+            "command": [
+              "while true; do\n  ts=$$(date +%Y%m%d-%H%M%S)\n  f=/backups/ruggylab_pg-$$ts.dump\n  if pg_dump -Fc -f \"$$f\"; then\n    sha256sum \"$$f\" > \"$$f.sha256\"\n    date -u +%Y-%m-%dT%H:%M:%SZ > /backups/last_success.txt\n    echo \"backup OK: $$f\"\n    find /backups -name 'ruggylab_pg-*' -mtime +\"$$BACKUP_RETENTION_DAYS\" -delete\n  else\n    echo \"backup FAILED at $$ts\" >&2\n  fi\n  sleep \"$$BACKUP_INTERVAL_SECONDS\"\ndone\n"
+            ],
+            "depends_on": [
+              "postgres"
+            ],
+            "digest": null,
+            "has_healthcheck": true,
+            "image_reference_kind": "static",
+            "image_template": "postgres:16.6-alpine",
+            "networks": [
+              "backend_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": "postgres",
+            "required_variable": null,
+            "required_variables": [
+              "POSTGRES_PASSWORD"
+            ],
+            "resolved_image": "postgres:16.6-alpine",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "db-backup",
+            "started_by_default": true,
+            "tag": "16.6-alpine",
+            "volumes": [
+              "${BACKUP_HOST_DIR:-./backups}:/backups"
+            ]
+          },
+          {
+            "command": [
+              "alembic",
+              "upgrade",
+              "head"
+            ],
+            "depends_on": [
+              "postgres"
+            ],
+            "digest": null,
+            "has_healthcheck": true,
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
+            "networks": [
+              "backend_net"
+            ],
+            "profiles": [
+              "migrate"
+            ],
+            "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
+            "required_variables": [
+              "RUGGYLAB_IMAGE"
+            ],
+            "resolved_image": null,
+            "restart_policy": "",
+            "runtime_kind": "one_shot_profile_task",
+            "service": "migrate",
+            "started_by_default": false,
+            "tag": null,
+            "volumes": []
+          },
+          {
+            "command": "",
+            "depends_on": [],
+            "digest": null,
+            "has_healthcheck": true,
+            "image_reference_kind": "static",
+            "image_template": "postgres:16.6-alpine",
+            "networks": [
+              "backend_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": "postgres",
+            "required_variable": null,
+            "required_variables": [
+              "POSTGRES_PASSWORD"
+            ],
+            "resolved_image": "postgres:16.6-alpine",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "postgres",
+            "started_by_default": true,
+            "tag": "16.6-alpine",
+            "volumes": [
+              "postgres_data:/var/lib/postgresql/data"
+            ]
+          },
+          {
+            "command": [
+              "--config.file=/etc/prometheus/prometheus.yml",
+              "--storage.tsdb.path=/prometheus",
+              "--storage.tsdb.retention.time=15d",
+              "--web.enable-lifecycle"
+            ],
+            "depends_on": [
+              "app"
+            ],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "static",
+            "image_template": "prom/prometheus:v3.1.0",
+            "networks": [
+              "backend_net",
+              "management_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": "prom/prometheus",
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": "prom/prometheus:v3.1.0",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "prometheus",
+            "started_by_default": true,
+            "tag": "v3.1.0",
+            "volumes": [
+              "./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro",
+              "prometheus_data:/prometheus"
+            ]
+          },
+          {
+            "command": "",
+            "depends_on": [
+              "app"
+            ],
+            "digest": null,
+            "has_healthcheck": false,
+            "image_reference_kind": "static",
+            "image_template": "caddy:2.8-alpine",
+            "networks": [
+              "frontend_net"
+            ],
+            "profiles": [],
+            "published_ports": [
+              "443:443",
+              "80:80"
+            ],
+            "registry": null,
+            "repository": "caddy",
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": "caddy:2.8-alpine",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "proxy",
+            "started_by_default": true,
+            "tag": "2.8-alpine",
+            "volumes": [
+              "./deploy/Caddyfile:/etc/caddy/Caddyfile:ro",
+              "caddy_config:/config",
+              "caddy_data:/data"
+            ]
+          },
+          {
+            "command": [
+              "python",
+              "-m",
+              "app.scheduler"
+            ],
+            "depends_on": [
+              "postgres"
+            ],
+            "digest": null,
+            "has_healthcheck": true,
+            "image_reference_kind": "dynamic_environment_expression",
+            "image_template": "${RUGGYLAB_IMAGE:?RUGGYLAB_IMAGE must be set}",
+            "networks": [
+              "backend_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": null,
+            "required_variable": "RUGGYLAB_IMAGE",
+            "required_variables": [
+              "RUGGYLAB_IMAGE",
+              "SECRET_KEY"
+            ],
+            "resolved_image": null,
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "scheduler",
+            "started_by_default": true,
+            "tag": null,
+            "volumes": []
+          },
+          {
+            "command": "valkey-server --appendonly yes",
+            "depends_on": [],
+            "digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+            "has_healthcheck": true,
+            "image_reference_kind": "static",
+            "image_template": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+            "networks": [
+              "backend_net"
+            ],
+            "profiles": [],
+            "published_ports": [],
+            "registry": null,
+            "repository": "valkey/valkey",
+            "required_variable": null,
+            "required_variables": [],
+            "resolved_image": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+            "restart_policy": "unless-stopped",
+            "runtime_kind": "continuous",
+            "service": "valkey",
+            "started_by_default": true,
+            "tag": "8.1.9-alpine",
+            "volumes": [
+              "valkey_data:/data"
+            ]
+          }
+        ],
+        "status": "core",
+        "volumes": [
+          "app_data",
+          "app_models",
+          "caddy_config",
+          "caddy_data",
+          "postgres_data",
+          "prometheus_data",
+          "valkey_data"
+        ]
+      }
+    ],
+    "core_services": {
+      "nominal_running_services": [
+        "analyzer-gateway",
+        "app",
+        "db-backup",
+        "postgres",
+        "prometheus",
+        "proxy",
+        "scheduler",
+        "valkey"
+      ],
+      "one_shot_profile_services": [
+        "migrate"
+      ],
+      "service_definitions": [
+        "analyzer-gateway",
+        "app",
+        "db-backup",
+        "migrate",
+        "postgres",
+        "prometheus",
+        "proxy",
+        "scheduler",
+        "valkey"
+      ]
+    }
+  },
+  "schema_version": "2.0.0"
+}

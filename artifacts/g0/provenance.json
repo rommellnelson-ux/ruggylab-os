@@ -1,0 +1,28 @@
+{
+  "_comment": "deterministic est compare par --check ; volatile ne l'est pas. baseline_input_commit est DECLARE (reference permanente), jamais derive de la branche de travail. relevant_input_tree_sha256 est la preuve verifiable : l'empreinte des octets reellement lus.",
+  "deterministic": {
+    "baseline_input_commit": "f7abd7e10eb8acc22e3e13775a43172e7a90261e",
+    "baseline_input_ref": "main",
+    "generation_command": "python scripts/g0_inventory.py --generate",
+    "generator_version": "2.0.0",
+    "relevant_input_file_count": 304,
+    "relevant_input_patterns": [
+      "app/**/*",
+      "alembic/**/*",
+      "deploy/**/*",
+      "monitoring/**/*",
+      "docker-compose*.yml",
+      "Dockerfile",
+      "requirements.txt",
+      ".github/workflows/ci.yml"
+    ],
+    "relevant_input_set": "inventory",
+    "relevant_input_tree_sha256": "efa599ba1d597d6dd3513625193f06426abe041acb0d6ed571bd83ef4e46163d",
+    "schema_version": "2.0.0"
+  },
+  "volatile": {
+    "generated_at": "2026-09-07T18:15:33Z",
+    "platform": "windows/amd64",
+    "python_version": "3.13.13"
+  }
+}
