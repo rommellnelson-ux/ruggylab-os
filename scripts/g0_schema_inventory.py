@@ -29,16 +29,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
-import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "1.0.0"
-GENERATOR_VERSION = "1.0.0"
+SCHEMA_VERSION = "2.0.0"
+GENERATOR_VERSION = "2.0.0"
 RACINE = Path(__file__).resolve().parents[1]
+
+if str(RACINE) not in sys.path:
+    sys.path.insert(0, str(RACINE))
 
 #: Tête attendue. Une divergence est un fait à expliquer, jamais à corriger en
 #: modifiant une migration pour retomber sur le nombre voulu.
@@ -156,13 +156,6 @@ _REQUETES: dict[str, str] = {
         GROUP BY table_name, grantee ORDER BY table_name, grantee
     """,
 }
-
-
-def _git(*args: str) -> str:
-    resultat = subprocess.run(
-        ["git", *args], cwd=RACINE, capture_output=True, text=True, encoding="utf-8"
-    )
-    return resultat.stdout.strip() if resultat.returncode == 0 else "inconnu"
 
 
 def introspecter(url: str) -> dict[str, Any]:
@@ -293,29 +286,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.generate:
         _ecrire(args.output_dir / "schema.json", schema)
         _ecrire(args.output_dir / "alembic-graph.json", alembic)
+        from scripts.g0_provenance import provenance
+
+        entete = provenance(
+            "schema",
+            "python scripts/g0_schema_inventory.py --database-url <postgres> --generate",
+            schema_version=SCHEMA_VERSION,
+            generator_version=GENERATOR_VERSION,
+        )
+        # La version du serveur et le nom de la base dépendent de la machine de
+        # mesure : ils situent la mesure sans jamais entrer dans la comparaison.
+        entete["volatile"]["postgres_server_version"] = infos_base["server_version"]
+        entete["volatile"]["database_name"] = infos_base["database_name"]
         (args.output_dir / "schema-provenance.json").write_text(
-            json.dumps(
-                {
-                    "schema_version": SCHEMA_VERSION,
-                    "generator_version": GENERATOR_VERSION,
-                    "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "source_git_sha": _git("rev-parse", "HEAD"),
-                    "generation_command": (
-                        "python scripts/g0_schema_inventory.py --database-url <postgres> --generate"
-                    ),
-                    "platform": f"{platform.system().lower()}/{platform.machine().lower()}",
-                    "postgres_server_version": infos_base["server_version"],
-                    "database_name": infos_base["database_name"],
-                    "_comment": (
-                        "La version du serveur et le nom de la base dependent de "
-                        "l'environnement de mesure : ils sont exclus du payload compare."
-                    ),
-                },
-                indent=2,
-                ensure_ascii=False,
-                sort_keys=True,
-            )
-            + "\n",
+            json.dumps(entete, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         print(f"\nArtefacts écrits dans {args.output_dir}")
@@ -330,12 +314,27 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if args.check:
+        from scripts.g0_provenance import controler, provenance
+
         for nom, payload in (("schema", schema), ("alembic-graph", alembic)):
             versionne = _lire_payload(args.output_dir / f"{nom}.json")
             if versionne is None:
                 echecs.append(f"{nom}.json absent")
             elif versionne != payload:
                 echecs.append(f"{nom}.json diverge de la base introspectée")
+        # Une migration ajoutée sans régénérer laisserait l'empreinte
+        # versionnée décrire un état révolu, en silence.
+        echecs.extend(
+            controler(
+                args.output_dir / "schema-provenance.json",
+                provenance(
+                    "schema",
+                    "python scripts/g0_schema_inventory.py --database-url <postgres> --generate",
+                    schema_version=SCHEMA_VERSION,
+                    generator_version=GENERATOR_VERSION,
+                ),
+            )
+        )
 
     if echecs:
         print("\nECHEC :", file=sys.stderr)

@@ -216,7 +216,31 @@ dont l'auteur répond. Une régénération automatique et silencieuse rendrait l
 contrôle décoratif — le fichier suivrait toujours le code, et ne dirait plus
 jamais rien.
 
-Les champs volatils — heure de génération, SHA de la source, plateforme —
-vivent à part, dans `provenance.json` et `schema-provenance.json`. Les laisser
-dans le corps comparé produirait un diff à chaque exécution : le contrôle
-échouerait toujours, on finirait par l'ignorer.
+### Ce que dit la provenance
+
+`provenance.json` et `schema-provenance.json` séparent deux natures de champs.
+
+| Bloc | Contenu | Comparé par `--check` |
+| --- | --- | --- |
+| `deterministic` | versions, commande, baseline déclarée, **empreinte des entrées** | **oui** |
+| `volatile` | heure, plateforme, version de Python, version du serveur PostgreSQL | non |
+
+- **`baseline_input_commit` / `baseline_input_ref`** — le point d'entrée
+  *déclaré* de la campagne, sur une référence **permanente** (`f7abd7e…`,
+  `main`). Déclaré et non dérivé : la première version enregistrait
+  `git rev-parse HEAD` et le nom de la branche courante, ce qui inscrivait
+  `tmp/g0-architecture-work` comme source permanente d'une preuve. Enregistrer
+  la future tête de la pull request serait pire encore — l'artefact citerait le
+  commit qui le contient.
+- **`relevant_input_tree_sha256`** — l'empreinte SHA-256 des **octets réellement
+  lus** : 304 fichiers pour l'inventaire, 48 pour le schéma. C'est la preuve
+  véritable, indépendante de toute branche et de tout outil de gestion de
+  version. Les fins de ligne sont normalisées, sans quoi un dépôt cloné sous
+  Windows et le même dépôt sous Linux donneraient deux empreintes pour le même
+  contenu.
+
+L'empreinte **entre dans la comparaison**. Sans cela, modifier un fichier
+d'entrée aurait laissé la provenance versionnée intacte : elle aurait continué
+à désigner un état révolu, en silence. L'heure, elle, en reste exclue — la
+comparer produirait un diff à chaque exécution, le contrôle échouerait
+toujours, et on finirait par l'ignorer.

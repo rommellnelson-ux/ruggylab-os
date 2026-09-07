@@ -39,21 +39,24 @@ import argparse
 import ast
 import json
 import os
-import platform
-import subprocess
+import re
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 #: Structure des artefacts. À incrémenter dès que la forme change, sans quoi
 #: deux inventaires de structures différentes seraient indiscernables.
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "2.0.0"
 
 #: Version du générateur. Un changement de résultat s'explique d'abord par là.
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "2.0.0"
 
 RACINE = Path(__file__).resolve().parents[1]
+
+# Le dépôt doit être importable avant tout : `provenance()` et
+# `_charger_application()` importent depuis `scripts.` et `app.`.
+if str(RACINE) not in sys.path:
+    sys.path.insert(0, str(RACINE))
 
 #: Fichiers Compose et ce qu'ils représentent. Le classement n'est pas
 #: cosmétique : il dit ce qui est distribué et ce qui ne l'est pas.
@@ -79,33 +82,20 @@ _REGLAGES_SURVEILLES = (
 # ── provenance ──────────────────────────────────────────────────────────────
 
 
-def _git(*args: str) -> str:
-    resultat = subprocess.run(
-        ["git", *args], cwd=RACINE, capture_output=True, text=True, encoding="utf-8"
-    )
-    return resultat.stdout.strip() if resultat.returncode == 0 else "inconnu"
-
-
 def provenance(commande: str) -> dict[str, Any]:
-    """Ce qui situe l'inventaire, et que `--check` ne compare pas.
+    """Ce qui situe l'inventaire — voir `scripts/g0_provenance.py`.
 
-    Sans ces champs, un artefact ne dit pas de quel code il parle. Avec eux
-    dans le corps, `--check` échouerait à chaque exécution.
+    La partie `deterministic` est comparée par `--check` ; la partie `volatile`
+    ne l'est pas.
     """
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "generator_version": GENERATOR_VERSION,
-        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "source_git_sha": _git("rev-parse", "HEAD"),
-        "source_git_ref": _git("rev-parse", "--abbrev-ref", "HEAD"),
-        "generation_command": commande,
-        "platform": f"{platform.system().lower()}/{platform.machine().lower()}",
-        "python_version": platform.python_version(),
-        "_comment": (
-            "Champs volatils, deliberement separes du payload : les inclure dans "
-            "la comparaison de --check produirait un diff permanent."
-        ),
-    }
+    from scripts.g0_provenance import provenance as construire_provenance
+
+    return construire_provenance(
+        "inventory",
+        commande,
+        schema_version=SCHEMA_VERSION,
+        generator_version=GENERATOR_VERSION,
+    )
 
 
 # ── inventaire du code ──────────────────────────────────────────────────────
@@ -588,6 +578,12 @@ def _ecrire(chemin: Path, payload: Any) -> None:
     )
 
 
+def _controler_provenance(chemin: Path, attendue: dict[str, Any]) -> list[str]:
+    from scripts.g0_provenance import controler
+
+    return controler(chemin, attendue)
+
+
 def _lire_payload(chemin: Path) -> Any:
     if not chemin.is_file():
         return None
@@ -654,6 +650,15 @@ def main(argv: list[str] | None = None) -> int:
                 divergences.append(f"{nom}.json absent")
             elif versionne != payload:
                 divergences.append(f"{nom}.json diverge du code")
+        # La provenance déterministe entre dans la comparaison : sans cela,
+        # modifier un fichier d'entrée laisserait l'empreinte versionnée
+        # intacte, à désigner un état révolu sans que rien ne le signale.
+        divergences.extend(
+            _controler_provenance(
+                args.output_dir / "provenance.json",
+                provenance("python scripts/g0_inventory.py --generate"),
+            )
+        )
         if divergences:
             print("\nECHEC : les artefacts versionnés ne décrivent plus le code.", file=sys.stderr)
             for message in divergences:

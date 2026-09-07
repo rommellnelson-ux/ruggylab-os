@@ -1209,6 +1209,23 @@ jobs:
                   divergents.append(f"{nom} : le corps versionne differe de la regeneration")
                   print(f"::error file={attendu}::corps divergent")
 
+          # La provenance deterministe porte l'empreinte des entrees : la
+          # laisser hors comparaison ferait qu'un fichier d'entree modifie
+          # n'obligerait jamais a regenerer, et l'empreinte versionnee
+          # designerait un etat revolu sans que rien ne le signale.
+          for nom in ("provenance", "schema-provenance"):
+              attendu, obtenu = versionne / f"{nom}.json", regenere / f"{nom}.json"
+              if not obtenu.is_file():
+                  divergents.append(f"{nom} : non regenere")
+                  continue
+              a = json.loads(attendu.read_text(encoding="utf-8")).get("deterministic")
+              b = json.loads(obtenu.read_text(encoding="utf-8")).get("deterministic")
+              if a != b:
+                  divergents.append(f"{nom} : provenance deterministe divergente")
+                  print(f"::error file={attendu}::provenance divergente")
+              if a and str(a.get("baseline_input_ref", "")).startswith(("tmp/", "wip/")):
+                  divergents.append(f"{nom} : reference temporaire inscrite comme source")
+
           if divergents:
               print("::error::Les artefacts G0 versionnes ne decrivent plus le code.")
               for ligne in divergents:
@@ -1218,8 +1235,22 @@ jobs:
               print("  python scripts/g0_schema_inventory.py --database-url <url> --generate")
               sys.exit(1)
 
-          print("Les cinq artefacts G0 correspondent au code et a la base migree.")
+          print("Artefacts et provenance G0 : conformes au code et a la base migree.")
           PY
+
+      # Bandit ciblé sur les trois générateurs G0, et sur eux seuls : le job
+      # `test` couvre déjà `app/`, et élargir l'analyse à tous les anciens
+      # scripts ferait remonter des alertes préexistantes sans rapport avec
+      # cette baseline. Zéro alerte aujourd'hui, sans aucun `# nosec` : la
+      # provenance ne lance plus de sous-processus.
+      - name: Scan the G0 generators with bandit
+        run: |
+          pip install bandit
+          bandit -q scripts/g0_inventory.py scripts/g0_schema_inventory.py                     scripts/g0_provenance.py
+          if grep -rn "nosec" scripts/g0_inventory.py scripts/g0_schema_inventory.py                               scripts/g0_provenance.py; then
+            echo "::error::un # nosec a ete ajoute : justifier l'alerte, pas la masquer"
+            exit 1
+          fi
 
       - name: Run the G0 baseline tests
         run: python -m pytest -q tests/test_g0_inventory.py
