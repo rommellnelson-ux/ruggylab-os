@@ -51,10 +51,35 @@ Ce sont des **gabarits HTML statiques** : les données affichées proviennent
 d'appels API authentifiés faits par le navigateur. Sans jeton, l'interface
 reste vide.
 
-**Un point classé P1** : `/app/map` sert la cartographie d'établissements
-militaires. Le gabarit ne contient aucune coordonnée — elles viennent de
-`/api/v1/military-facilities`, qui exige un jeton — mais l'existence de la page
-révèle la fonctionnalité. À examiner avant tout déploiement exposé.
+**Un point classé P1 — `/app/map`.** La première rédaction de cette preuve
+disait que la page « ne révèle que l'existence de la fonctionnalité ». C'était
+faux, et une inspection de la réponse réellement servie l'a montré.
+
+`GET /app/map` sans en-tête `Authorization` renvoie **HTTP 200** et un corps de
+15 837 octets qui contient déjà, en dur :
+
+| Élément public | Valeur |
+| --- | --- |
+| Titre du document | « Cartographie des EHM et Gendarmerie » |
+| Intitulé affiché | « Établissements Hospitaliers Militaires » |
+| Rattachement | « DIVISION SANTÉ — 2026 » |
+| Catégories institutionnelles | HMA, CMA, CSA, Armées, Gendarmerie |
+| Effectifs agrégés statiques | **60** total, **1** HMA, **8** CMA, **51** CSA, **37** Armées, **22** Gendarmerie |
+
+> **Le gabarit ne contient pas les coordonnées ni la liste détaillée des
+> établissements.** Il expose néanmoins publiquement la nature militaire de la
+> cartographie, ses catégories institutionnelles et des effectifs agrégés
+> statiques. Un ordre de grandeur du dispositif de santé militaire est donc
+> lisible sans authentification.
+
+**Classement : P1** — information institutionnelle et opérationnelle à faire
+qualifier par l'autorité compétente. Ce document **ne prononce pas P0** : aucune
+règle de classification institutionnelle n'a été appliquée à ces éléments, et
+inventer un niveau de classification serait aussi faux que de minimiser le
+constat.
+
+La route n'est ni protégée ni supprimée ici : le lot A photographie l'existant.
+La remédiation est une action séparée, portée par le lot D.
 
 ### Les six routes `A_QUALIFIER`
 
