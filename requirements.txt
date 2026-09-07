@@ -6,7 +6,7 @@ sqlalchemy==2.0.50
 psycopg[binary]==3.3.4
 hl7==0.4.5
 PyJWT[crypto]==2.13.0
-redis[hiredis]==5.2.1
+redis[hiredis]==8.0.1
 passlib==1.7.4
 python-multipart==0.0.32
 alembic==1.18.4
