@@ -85,14 +85,35 @@ jobs:
       - name: Test suite
         run: pytest
 
-      # ── Advisory gates (depend on external state — run and report, never block) ──
+      # ── Advisory gate (depends on external state — runs and reports, never blocks) ──
+      # `pip-audit` interroge une base d'avis qui change sans que le dépôt
+      # change : un job rouge du jour au lendemain, sur un commit qui n'a pas
+      # bougé, finirait par être ignoré. Il informe.
       - name: Dependency audit (advisory)
         continue-on-error: true
         run: pip-audit -r requirements.txt
 
-      - name: Secret scan (advisory)
-        continue-on-error: true
-        run: python -m detect_secrets.pre_commit_hook --baseline .secrets.baseline $(git ls-files)
+      # ── Barrière de secrets — BLOQUANTE (lot B du gate G0) ─────────────────
+      # Elle était `continue-on-error: true`, donc décorative : le scan
+      # échouait déjà sur l'arbre courant, et personne n'en était averti.
+      #
+      # Deux raisons pour lesquelles la commande `detect-secrets` seule ne
+      # pouvait pas être rendue bloquante telle quelle :
+      #   1. `.secrets.baseline` ne couvre que 14 fichiers, alors que 88
+      #      déclenchent une règle aujourd'hui ;
+      #   2. treize de ses quatorze clés portent des séparateurs Windows, donc
+      #      ne s'appliquent JAMAIS sur ce runner Linux.
+      # `scripts/g0_secret_gate.py` normalise les chemins à la lecture — sans
+      # réécrire le fichier, dont le défaut est un constat du lot B — et
+      # confronte chaque détection au registre d'exceptions relu et versionné.
+      #
+      # La sonde de non-vacuité tourne dans le même appel : un scanner muet est
+      # indiscernable d'un dépôt propre.
+      - name: Secret scan (arbre courant, bloquant)
+        run: |
+          git ls-files > "$RUNNER_TEMP/fichiers-suivis.txt"
+          python scripts/g0_secret_gate.py \
+            --tree --files-from "$RUNNER_TEMP/fichiers-suivis.txt" --probes
 
   # ── Image candidate : construite UNE SEULE FOIS ────────────────────────────
   # Une image auditée par un job et reconstruite par un autre ne sont pas la
@@ -1277,6 +1298,297 @@ jobs:
           path: |
             artifacts/g0/*.json
             ${{ runner.temp }}/g0/*.json
+          if-no-files-found: error
+
+  # ── Baseline de sécurité et scan de secrets (G0, lot B) ────────────────────
+  # Ce job répond à quatre questions, et refuse de passer si l'une d'elles perd
+  # sa réponse.
+  #
+  #   1. La matrice RBAC, la classification des données, les flux et les
+  #      observations de sentinelles décrivent-ils encore le code ? Les
+  #      artefacts sont régénérés puis comparés octet par octet aux fichiers
+  #      versionnés. Ils ne sont JAMAIS mis à jour ici : régénérer en silence
+  #      rendrait le contrôle décoratif.
+  #   2. Les sondes d'autorisation, les routes particulières et les sentinelles
+  #      de journalisation sont-elles réellement exercées ? Le générateur les
+  #      exécute contre l'application, sur une base SQLite jetable semée de
+  #      données strictement synthétiques.
+  #   3. L'arbre courant ET l'historique Git complet sont-ils exempts de secret
+  #      non qualifié ? `fetch-depth: 0` est indispensable : un scan sur un
+  #      clone superficiel ne voit qu'un commit, et un secret retiré de l'arbre
+  #      reste lisible dans l'objet Git qui le portait.
+  #   4. Les scanners détectent-ils encore quelque chose ? Deux sondes de
+  #      non-vacuité le vérifient. Sans elles, un outil cassé et un dépôt propre
+  #      produisent le même vert.
+  #
+  # Aucune valeur détectée n'est affichée, et les rapports bruts de Gitleaks —
+  # qui portent auteur, adresse de courriel et message de commit — ne sont pas
+  # publiés : seul le rapport expurgé de la barrière l'est.
+  #
+  # Ce job ne publie aucune image, ne touche à aucune barrière de publication et
+  # ne prononce aucun statut de gouvernance.
+  g0-security:
+    name: G0 — Security baseline and secret scan
+    runs-on: ubuntu-latest
+
+    env:
+      # Gitleaks 8.30.1, épinglé par version EXACTE. Jamais `latest` : une
+      # version flottante changerait le jeu de règles sans qu'aucun commit ne
+      # l'indique, et le résultat d'hier ne serait plus reproductible.
+      #
+      # SHA-256 de gitleaks_8.30.1_linux_x64.tar.gz, INSCRIT EN DUR ICI.
+      # Un tag de release GitHub est mutable : se contenter du fichier de
+      # checksums publié dans la même release ne prouverait rien, puisqu'un
+      # attaquant capable de remplacer l'archive remplacerait aussi ce fichier.
+      # Cette valeur est ancrée par trois canaux concordants, relevés le
+      # 2026-09-09 : calcul local `sha256sum` sur les 8 230 402 octets
+      # réellement téléchargés, champ `digest` de l'API des releases GitHub, et
+      # `gitleaks_8.30.1_checksums.txt` publié. Toute montée de version doit
+      # refaire les trois.
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+    steps:
+      # `fetch-depth: 0` : sans l'historique complet, le scan d'historique
+      # n'aurait qu'un commit à lire et rendrait un vert sans signification.
+      - name: Checkout repository (historique complet)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Confirm the full history was fetched
+        run: |
+          if [ "$(git rev-parse --is-shallow-repository)" != "false" ]; then
+            echo "::error::clone superficiel : le scan d'historique serait vide de sens"
+            exit 1
+          fi
+          echo "Commits accessibles : $(git rev-list --count --all)"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit detect-secrets
+
+      # ── 1. Les artefacts décrivent-ils encore le code ? ────────────────────
+      - name: Regenerate the security artifacts into a temporary directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/g0b"
+          python scripts/g0_security_baseline.py \
+            --generate --print-summary --output-dir "$RUNNER_TEMP/g0b"
+          ls -l "$RUNNER_TEMP/g0b"
+
+      - name: Fail if the versioned security baseline diverges from the code
+        run: python scripts/g0_security_baseline.py --check
+
+      # Seconde comparaison, sur les fichiers eux-mêmes : `--check` pourrait
+      # comparer autre chose que ce qui a été écrit.
+      - name: Compare the regenerated payloads byte for byte
+        run: |
+          python - "$RUNNER_TEMP/g0b" <<'PY'
+          import json, pathlib, sys
+
+          regenere = pathlib.Path(sys.argv[1])
+          versionne = pathlib.Path("artifacts/g0")
+          divergents = []
+          artefacts = (
+              "rbac-matrix",
+              "data-classification",
+              "external-flows",
+              "log-sentinel-observations",
+              "secret-scan-summary",
+          )
+          for nom in artefacts:
+              attendu, obtenu = versionne / f"{nom}.json", regenere / f"{nom}.json"
+              if not obtenu.is_file():
+                  divergents.append(f"{nom} : non regenere")
+                  continue
+              a = json.loads(attendu.read_text(encoding="utf-8"))["payload"]
+              b = json.loads(obtenu.read_text(encoding="utf-8"))["payload"]
+              if a != b:
+                  divergents.append(f"{nom} : le corps versionne differe de la regeneration")
+                  print(f"::error file={attendu}::corps divergent")
+
+          attendu = versionne / "security-provenance.json"
+          obtenu = regenere / "security-provenance.json"
+          a = json.loads(attendu.read_text(encoding="utf-8")).get("deterministic")
+          b = json.loads(obtenu.read_text(encoding="utf-8")).get("deterministic")
+          if a != b:
+              divergents.append("security-provenance : provenance deterministe divergente")
+          if a and str(a.get("baseline_input_ref", "")).startswith(("tmp/", "wip/")):
+              divergents.append("security-provenance : reference temporaire inscrite")
+
+          if divergents:
+              print("::error::Les artefacts de securite versionnes ne decrivent plus le code.")
+              for ligne in divergents:
+                  print(f"  - {ligne}")
+              print("Regenerez-les et relisez le diff :")
+              print("  python scripts/g0_security_baseline.py --generate")
+              sys.exit(1)
+
+          print("Artefacts de securite : conformes au code.")
+          PY
+
+      # ── 2. Les sondes sont-elles réellement exercées ? ─────────────────────
+      # `--skip B105` — « possible hardcoded password » — et RIEN d'autre.
+      # Quatre constats LOW, tous mesures, tous inherents a ce que ces scripts
+      # sont :
+      #   - g0_security_baseline.py : la cle de signature synthetique de la base
+      #     jetable, et deux occurrences d'un jeton de rafraichissement
+      #     volontairement inexistant, employe pour sonder le refus ;
+      #   - g0_security_rules.py : la categorie `AUTHENTIFICATION_SECRET`, dont
+      #     la valeur est un niveau de risque, pas un secret.
+      # Un `# nosec` masquerait l'alerte sans la nommer ; l'ecart est donc porte
+      # ici, a la vue de tous, et l'etape echoue toujours sur toute autre regle.
+      - name: Scan the G0 security scripts with bandit
+        run: |
+          bandit -q --skip B105 scripts/g0_security_baseline.py scripts/g0_security_rules.py \
+            scripts/g0_secret_gate.py scripts/g0_provenance.py
+          if grep -rn "nosec" scripts/g0_security_baseline.py scripts/g0_security_rules.py \
+              scripts/g0_secret_gate.py; then
+            echo "::error::un # nosec a ete ajoute : justifier l'alerte, pas la masquer"
+            exit 1
+          fi
+
+      - name: Run the G0 security baseline tests
+        run: python -m pytest -q tests/test_g0_security_baseline.py
+
+      # ── 3. Arbre courant, puis historique Git complet ──────────────────────
+      - name: Install Gitleaks (version et empreinte épinglées)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf gitleaks.tar.gz -C "$RUNNER_TEMP/bin" gitleaks
+          rm -f gitleaks.tar.gz
+          "$RUNNER_TEMP/bin/gitleaks" version
+
+      # Les sondes de non-vacuité tournent AVANT le scan réel, dans un dépôt
+      # jetable créé HORS du dépôt principal. La sentinelle est assemblée à
+      # l'exécution par `scripts/g0_secret_gate.py` : l'écrire en clair dans un
+      # fichier versionné ferait entrer dans le dépôt une valeur ayant la forme
+      # d'un secret actif, ce que la campagne s'interdit.
+      - name: Non-emptiness probes on a throwaway git repository
+        run: |
+          sonde="$RUNNER_TEMP/sonde-gitleaks"
+          rm -rf "$sonde" && mkdir -p "$sonde"
+          git -C "$sonde" init -q
+          git -C "$sonde" config user.email "g0-probe@example.invalid"
+          git -C "$sonde" config user.name "G0 probe"
+          python - "$sonde" <<'PY'
+          import pathlib, sys
+          sys.path.insert(0, ".")
+          from scripts.g0_secret_gate import TEXTE_PROPRE, contenu_porteur
+
+          base = pathlib.Path(sys.argv[1])
+          (base / "porteur.txt").write_text(contenu_porteur(), encoding="utf-8")
+          (base / "propre.txt").write_text(TEXTE_PROPRE, encoding="utf-8")
+          PY
+          git -C "$sonde" add porteur.txt
+          git -C "$sonde" commit -q -m "sonde positive"
+          git -C "$sonde" rm -q porteur.txt
+          git -C "$sonde" add propre.txt
+          git -C "$sonde" commit -q -m "sonde negative"
+          # L'arbre ne contient plus que le fichier propre : la sonde positive
+          # ne peut donc réussir que si l'HISTORIQUE est réellement parcouru.
+          "$RUNNER_TEMP/bin/gitleaks" git "$sonde" --no-banner --redact=100 \
+            --exit-code 0 --report-format json \
+            --report-path "$RUNNER_TEMP/sonde-positive.json"
+          "$RUNNER_TEMP/bin/gitleaks" dir "$sonde" --no-banner --redact=100 \
+            --exit-code 0 --report-format json \
+            --report-path "$RUNNER_TEMP/sonde-negative.json"
+          # Diagnostic : les rapports sont expurges (--redact=100) et le depot
+          # jetable ne porte que des valeurs synthetiques. Les afficher rend un
+          # echec de sonde diagnosticable en UNE execution au lieu de trois.
+          echo "--- rapport sonde positive ---"; cat "$RUNNER_TEMP/sonde-positive.json"
+          echo "--- rapport sonde negative ---"; cat "$RUNNER_TEMP/sonde-negative.json"
+          rm -rf "$sonde"
+
+      - name: Scan the working tree, then the full Git history
+        run: |
+          "$RUNNER_TEMP/bin/gitleaks" dir . --no-banner --redact=100 \
+            --exit-code 0 --report-format json \
+            --report-path "$RUNNER_TEMP/gitleaks-arbre.json"
+          "$RUNNER_TEMP/bin/gitleaks" git . --no-banner --redact=100 \
+            --exit-code 0 --report-format json --log-opts="--all" \
+            --report-path "$RUNNER_TEMP/gitleaks-historique.json"
+
+          # Comptage des commits, mesure ICI et non dans la barriere : celle-ci
+          # s'interdit tout sous-processus, parce qu'une barriere de securite qui
+          # lance des processus elargit sa propre surface. Sans ces nombres, la
+          # couverture de l'historique resterait une affirmation, et la barriere
+          # emet alors HISTORY_SCAN_COUNT_UNRECONCILED.
+          accessibles=$(git rev-list --all --count)
+          fusions=$(git rev-list --all --merges --count)
+          hors_fusion=$(git rev-list --all --no-merges --count)
+          superficiel=$(git rev-parse --is-shallow-repository)
+          echo "commits : $accessibles accessibles = $fusions fusions + $hors_fusion hors fusion"
+          python - "$accessibles" "$fusions" "$hors_fusion" "$superficiel" > "$RUNNER_TEMP/history-counts.json" <<'PY'
+          import json, sys
+
+          accessibles, fusions, hors_fusion, superficiel = sys.argv[1:5]
+          json.dump(
+              {
+                  "reachable_commits": int(accessibles),
+                  "merge_commits": int(fusions),
+                  "non_merge_commits": int(hors_fusion),
+                  "empty_or_non_diff_commits": 0,
+                  "is_shallow_repository": superficiel == "true",
+                  "scan_command": "gitleaks git . --log-opts=--all",
+                  "log_opts": "rev-list --all ; --merges ; --no-merges",
+              },
+              sys.stdout,
+          )
+          PY
+          cat "$RUNNER_TEMP/history-counts.json"
+
+      # ── 4. Le verdict, sondes comprises ────────────────────────────────────
+      - name: Secret gate (arbre, historique et sondes)
+        run: |
+          git ls-files > "$RUNNER_TEMP/fichiers-suivis.txt"
+          python scripts/g0_secret_gate.py \
+            --tree --files-from "$RUNNER_TEMP/fichiers-suivis.txt" \
+            --gitleaks-dir-report "$RUNNER_TEMP/gitleaks-arbre.json" \
+            --gitleaks-git-report "$RUNNER_TEMP/gitleaks-historique.json" \
+            --history-counts "$RUNNER_TEMP/history-counts.json" \
+            --probes \
+            --gitleaks-probe-positive "$RUNNER_TEMP/sonde-positive.json" \
+            --gitleaks-probe-negative "$RUNNER_TEMP/sonde-negative.json" \
+            --report "$RUNNER_TEMP/g0b/secret-gate-report.json"
+
+      - name: Confirm the governance statuses are unchanged
+        run: |
+          clinique=$(tr -d '[:space:]' < docs/governance/CLINICAL_STATUS)
+          distribution=$(tr -d '[:space:]' < docs/governance/DISTRIBUTION_STATUS)
+          echo "CLINICAL_STATUS=$clinique"
+          echo "DISTRIBUTION_STATUS=$distribution"
+          test "$clinique" = "REAL_DATA_NO_GO" || { echo "::error::CLINICAL_STATUS modifié"; exit 1; }
+          test "$distribution" = "DISTRIBUTION_NO_GO" || { echo "::error::DISTRIBUTION_STATUS modifié"; exit 1; }
+
+      # Publication des seuls documents expurgés. Les rapports bruts de Gitleaks
+      # restent dans le runner : ils portent auteur, adresse de courriel et
+      # message de commit, qui n'ont rien à faire dans un artefact téléchargeable.
+      - name: Publish the redacted security artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: g0-security-baseline
+          path: |
+            artifacts/g0/rbac-matrix.json
+            artifacts/g0/data-classification.json
+            artifacts/g0/external-flows.json
+            artifacts/g0/log-sentinel-observations.json
+            artifacts/g0/secret-scan-summary.json
+            artifacts/g0/security-provenance.json
+            ${{ runner.temp }}/g0b/secret-gate-report.json
           if-no-files-found: error
 
   # ── Garde de tag (avant toute publication) ─────────────────────────────────
