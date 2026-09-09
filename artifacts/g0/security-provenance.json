@@ -1,0 +1,30 @@
+{
+  "_comment": "deterministic est compare par --check ; volatile ne l'est pas. baseline_input_commit est DECLARE (reference permanente), jamais derive de la branche de travail. relevant_input_tree_sha256 est la preuve verifiable : l'empreinte des octets reellement lus.",
+  "deterministic": {
+    "baseline_input_commit": "f7abd7e10eb8acc22e3e13775a43172e7a90261e",
+    "baseline_input_ref": "main",
+    "generation_command": "python scripts/g0_security_baseline.py --generate",
+    "generator_version": "1.0.0",
+    "relevant_input_file_count": 261,
+    "relevant_input_patterns": [
+      "app/**/*",
+      "artifacts/g0/routes.json",
+      "artifacts/g0/entrypoints.json",
+      "artifacts/g0/schema.json",
+      "docs/g0/ROUTE_EXPOSURE_QUALIFICATION.json",
+      ".secrets.baseline",
+      "deploy/**/*",
+      "monitoring/**/*",
+      "docker-compose*.yml",
+      "requirements.txt"
+    ],
+    "relevant_input_set": "security",
+    "relevant_input_tree_sha256": "222d15092929722464c753b8d9ab0866cb956c95ff843069e20b46d8fe67adae",
+    "schema_version": "1.0.0"
+  },
+  "volatile": {
+    "generated_at": "2026-09-09T13:12:09Z",
+    "platform": "windows/amd64",
+    "python_version": "3.13.13"
+  }
+}

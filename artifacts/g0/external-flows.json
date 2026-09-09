@@ -1,0 +1,340 @@
+{
+  "payload": {
+    "_comment": "Les frontieres recensees par le lot A (docs/g0/INVENTORY.md §6), completees par les donnees qui y circulent.",
+    "flows": [
+      {
+        "activation_requise": "non",
+        "authentification": "JWT porteur, sauf sur les routes publiques recensées par le lot A.",
+        "categories_donnees": [
+          "IDENTITE",
+          "DONNEE_DE_SANTE",
+          "RESULTAT_BIOLOGIQUE",
+          "FINANCIER",
+          "AUTHENTIFICATION_SECRET"
+        ],
+        "chiffrement": "TLS ; certificat d'une autorité interne Caddy par défaut (`tls internal`).",
+        "declencheur": "usage interactif",
+        "destination": "proxy Caddy (443/TCP)",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Navigateur → proxy",
+        "id": "navigateur_vers_proxy",
+        "journalisation": "AUCUN journal d'accès : le Caddyfile ne contient pas de directive `log`. Aucune trace des accès externes n'est donc conservée au niveau du proxy.",
+        "origine": "navigateur du poste client (LAN de l'établissement)",
+        "persistance": "aucune côté proxy.",
+        "protocole": "HTTPS",
+        "risque_residuel": "Certificat d'autorité interne : un poste sans la racine Caddy installée verra un avertissement, ce qui entraîne l'habitude de l'ignorer. Absence de journal d'accès : aucune investigation possible après incident au niveau du proxy."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "aucune entre les deux conteneurs ; l'application se fie à `X-Forwarded-For`.",
+        "categories_donnees": [
+          "IDENTITE",
+          "DONNEE_DE_SANTE",
+          "RESULTAT_BIOLOGIQUE",
+          "FINANCIER",
+          "AUTHENTIFICATION_SECRET"
+        ],
+        "chiffrement": "aucun — HTTP en clair sur le réseau Docker.",
+        "declencheur": "chaque requête relayée",
+        "destination": "conteneur `app` (8000/TCP, réseau Docker interne)",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Proxy → application",
+        "id": "proxy_vers_application",
+        "journalisation": "journal applicatif structuré (chemin, méthode, code, durée, IP cliente).",
+        "origine": "proxy Caddy",
+        "persistance": "aucune.",
+        "protocole": "HTTP en clair",
+        "risque_residuel": "Un conteneur compromis sur le même réseau Docker lit le trafic en clair, jetons compris, et peut se présenter directement à `app:8000` en contournant le proxy — donc les blocages §14 (/metrics, /docs)."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "mot de passe applicatif issu de l'environnement.",
+        "categories_donnees": [
+          "TOUTES"
+        ],
+        "chiffrement": "aucun TLS observé sur la connexion base.",
+        "declencheur": "chaque requête applicative",
+        "destination": "conteneur `db` (5432/TCP, réseau interne)",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Application → PostgreSQL",
+        "id": "application_vers_postgresql",
+        "journalisation": "journaux PostgreSQL par défaut de l'image ; aucune journalisation d'audit SQL activée.",
+        "origine": "conteneur `app`, `scheduler`, `analyzer-gateway`, `migrate`",
+        "persistance": "volume Docker, non chiffré.",
+        "protocole": "protocole PostgreSQL",
+        "risque_residuel": "Un compte unique porte tous les droits applicatifs : aucune politique RLS n'existe (zéro relevée par le lot A), donc le cloisonnement par unité vit entièrement dans le code applicatif. Un accès direct à la base l'ignore intégralement."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "selon la configuration du déploiement.",
+        "categories_donnees": [
+          "TECHNIQUE",
+          "A_QUALIFIER"
+        ],
+        "chiffrement": "aucun.",
+        "declencheur": "cache, limitation de débit, quotas, file de trames brutes.",
+        "destination": "conteneur Valkey (6379/TCP, réseau interne)",
+        "etat_par_defaut": "actif quand CACHE_BACKEND=redis ; mémoire locale sinon.",
+        "frontiere_lot_a": "Application → Valkey (cache)",
+        "id": "application_vers_valkey",
+        "journalisation": "aucune journalisation applicative du contenu mis en cache.",
+        "origine": "conteneur `app`",
+        "persistance": "selon l'image ; la file de trames brutes est bornée par LTRIM.",
+        "protocole": "RESP",
+        "risque_residuel": "Le contenu réellement mis en cache n'a pas été inventorié champ par champ : classé A_QUALIFIER, non NON_SENSIBLE."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "compte PostgreSQL applicatif.",
+        "categories_donnees": [
+          "TOUTES"
+        ],
+        "chiffrement": "aucun — le dump n'est pas chiffré.",
+        "declencheur": "planification du service",
+        "destination": "volume de sauvegarde local",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Sauvegardes",
+        "id": "sauvegardes",
+        "journalisation": "somme SHA-256 du dump vérifiée en CI.",
+        "origine": "service `db-backup`",
+        "persistance": "volume local ; aucune copie hors site prévue par la stack.",
+        "protocole": "pg_dump, format custom",
+        "risque_residuel": "Une copie complète et non chiffrée de toute la base — identités, résultats, sérologies — repose sur le même hôte. Quiconque accède au volume dispose de l'intégralité des données, sans passer par aucune garde applicative."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "garde de la route d'export.",
+        "categories_donnees": [
+          "IDENTITE",
+          "DONNEE_DE_SANTE",
+          "RESULTAT_BIOLOGIQUE",
+          "FINANCIER",
+          "AUDIT"
+        ],
+        "chiffrement": "TLS en transit ; le fichier déposé sur le poste n'est pas chiffré.",
+        "declencheur": "action explicite d'un utilisateur authentifié",
+        "destination": "poste de l'utilisateur (téléchargement)",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Exports CSV / PDF",
+        "id": "exports_csv_pdf",
+        "journalisation": "requête tracée dans le journal applicatif ; aucun audit métier d'export observé sur toutes les routes d'export.",
+        "origine": "application",
+        "persistance": "hors du périmètre du système dès le téléchargement.",
+        "protocole": "HTTPS via le proxy",
+        "risque_residuel": "Le système perd la maîtrise de la donnée à l'instant du téléchargement. Aucun filigrane, aucun marquage de destinataire, et pas d'enregistrement d'audit systématique de l'export."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "aucune — l'application ne voit pas l'impression.",
+        "categories_donnees": [
+          "IDENTITE",
+          "RESULTAT_BIOLOGIQUE",
+          "FINANCIER"
+        ],
+        "chiffrement": "sans objet.",
+        "declencheur": "action de l'utilisateur",
+        "destination": "imprimante du service",
+        "etat_par_defaut": "actif, hors instrumentation",
+        "frontiere_lot_a": "Imprimante",
+        "id": "impression",
+        "journalisation": "aucune : l'application ne peut pas savoir qu'un document a été imprimé.",
+        "origine": "navigateur du poste client",
+        "persistance": "papier.",
+        "protocole": "impression navigateur — non instrumentée",
+        "risque_residuel": "Angle mort complet de la traçabilité : un compte rendu imprimé quitte le système sans laisser de trace exploitable."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "aucune — quiconque lit les journaux du conteneur lit tout.",
+        "categories_donnees": [
+          "TECHNIQUE",
+          "A_QUALIFIER"
+        ],
+        "chiffrement": "aucun.",
+        "declencheur": "chaque requête et chaque erreur",
+        "destination": "sortie standard, collectée par le pilote de journalisation Docker",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Journaux applicatifs",
+        "id": "journaux",
+        "journalisation": "sans objet.",
+        "origine": "conteneurs `app`, `scheduler`, `analyzer-gateway`",
+        "persistance": "selon le pilote Docker de l'hôte ; aucune rotation définie par la stack.",
+        "protocole": "JSON structuré sur stdout",
+        "risque_residuel": "Le chemin de requête est journalisé tel quel. Les identifiants d'objet y figurent, et le jeton de vérification d'un compte rendu en fait partie puisqu'il est porté par l'URL. Mesuré par la sonde sentinelle, voir `log-sentinel-observations.json`."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "aucune sur `/metrics`.",
+        "categories_donnees": [
+          "TECHNIQUE"
+        ],
+        "chiffrement": "aucun.",
+        "declencheur": "collecte périodique",
+        "destination": "`app:8000/metrics` par le réseau interne",
+        "etat_par_defaut": "actif ; `/metrics` renvoyé en 404 par le proxy (§14).",
+        "frontiere_lot_a": "Prometheus",
+        "id": "prometheus",
+        "journalisation": "sans objet.",
+        "origine": "Prometheus",
+        "persistance": "base de séries temporelles Prometheus.",
+        "protocole": "HTTP en clair",
+        "risque_residuel": "L'étiquette `endpoint` porte le gabarit de route, pas le chemin concret : aucun identifiant patient ne devient une étiquette. Vérifié par la sonde sentinelle. Le point reste joignable sans authentification depuis le réseau interne."
+      },
+      {
+        "activation_requise": "oui — overlay explicite.",
+        "authentification": "identifiants d'administration Grafana fournis par l'environnement.",
+        "categories_donnees": [
+          "TECHNIQUE"
+        ],
+        "chiffrement": "aucun.",
+        "declencheur": "consultation d'un tableau de bord",
+        "destination": "Prometheus",
+        "etat_par_defaut": "absent du cœur — overlay optionnel, jamais démarré par `docker-compose.yml`.",
+        "frontiere_lot_a": "Grafana (overlay optionnel)",
+        "id": "grafana",
+        "journalisation": "journaux Grafana.",
+        "origine": "Grafana",
+        "persistance": "volume Grafana.",
+        "protocole": "HTTP interne",
+        "risque_residuel": "Composant tiers hors du périmètre distribué ; non audité par cette baseline."
+      },
+      {
+        "activation_requise": "oui",
+        "authentification": "compte technique dédié côté CSA.",
+        "categories_donnees": [
+          "IDENTITE",
+          "DONNEE_DE_SANTE",
+          "RESULTAT_BIOLOGIQUE"
+        ],
+        "chiffrement": "TLS.",
+        "declencheur": "synchronisation entrante des prescriptions, sortante des résultats validés",
+        "destination": "plateforme CSA (Supabase, Internet)",
+        "etat_par_defaut": "DESACTIVEE — CSA_SYNC_ENABLED=false",
+        "frontiere_lot_a": "CSA / Supabase",
+        "id": "csa_supabase",
+        "journalisation": "csa_sync_state.last_error / last_outbound_error.",
+        "origine": "application",
+        "persistance": "csa_sync_state pour l'état ; les objets métier suivent leur table.",
+        "protocole": "HTTPS",
+        "risque_residuel": "Frontière la plus lourde du système : elle ferait sortir identités et résultats vers une plateforme tierce. Elle est coupée par configuration, et cette baseline ne l'active pas."
+      },
+      {
+        "activation_requise": "oui",
+        "authentification": "selon la configuration du client ONMCI.",
+        "categories_donnees": [
+          "IDENTITE",
+          "DONNEE_DE_SANTE"
+        ],
+        "chiffrement": "TLS.",
+        "declencheur": "transmission d'une notification épidémiologique",
+        "destination": "point de notification ONMCI",
+        "etat_par_defaut": "fail-closed — refuse de transmettre si la configuration est absente.",
+        "frontiere_lot_a": "ONMCI",
+        "id": "onmci",
+        "journalisation": "audit_events sur transmission.",
+        "origine": "application",
+        "persistance": "epi_notifications.notified_at.",
+        "protocole": "HTTPS",
+        "risque_residuel": "Sortie de données nominatives de santé vers un tiers institutionnel."
+      },
+      {
+        "activation_requise": "oui",
+        "authentification": "portée par l'URL elle-même le cas échéant.",
+        "categories_donnees": [
+          "A_QUALIFIER",
+          "RESULTAT_BIOLOGIQUE"
+        ],
+        "chiffrement": "TLS.",
+        "declencheur": "alerte déclenchée",
+        "destination": "URL configurée dans notif_configs.webhook_url",
+        "etat_par_defaut": "selon configuration ; aucune URL par défaut.",
+        "frontiere_lot_a": "Webhooks sortants",
+        "id": "webhooks_sortants",
+        "journalisation": "journal applicatif.",
+        "origine": "application (alertes critiques, péremptions, stock)",
+        "persistance": "aucune côté application.",
+        "protocole": "HTTPS",
+        "risque_residuel": "L'URL de destination est choisie par un utilisateur autorisé : c'est une sortie de données pilotée par la configuration. Un transport centralisé anti-SSRF existe ; le contenu réellement transmis par chaque notificateur n'a pas été inventorié champ par champ dans cette baseline."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "aucune.",
+        "categories_donnees": [
+          "AUCUNE donnée applicative ne part — seule la requête de ressource."
+        ],
+        "chiffrement": "TLS.",
+        "declencheur": "chargement d'une page du cockpit",
+        "destination": "CDN publics sur Internet",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Navigateur → CDN (Leaflet, JsBarcode)",
+        "id": "cdn_navigateur",
+        "journalisation": "journaux du CDN, hors du système.",
+        "origine": "navigateur du poste client",
+        "persistance": "cache du navigateur.",
+        "protocole": "HTTPS",
+        "risque_residuel": "Dépendance d'exécution à un tiers depuis le poste client : sur un LAN sans Internet, la ressource ne charge pas ; avec Internet, le CDN apprend l'existence et l'horaire d'usage de l'application. Le code exécuté dans le navigateur vient d'un tiers."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "aucune.",
+        "categories_donnees": [
+          "OPERATIONNEL_MILITAIRE (indirect : la zone consultée)"
+        ],
+        "chiffrement": "TLS.",
+        "declencheur": "affichage de la cartographie",
+        "destination": "serveurs de tuiles OpenStreetMap",
+        "etat_par_defaut": "actif",
+        "frontiere_lot_a": "Navigateur → tuiles OpenStreetMap",
+        "id": "tuiles_osm",
+        "journalisation": "journaux du fournisseur de tuiles, hors du système.",
+        "origine": "navigateur du poste client, page `/app/map`",
+        "persistance": "cache du navigateur.",
+        "protocole": "HTTPS",
+        "risque_residuel": "Les coordonnées demandées révèlent au fournisseur de tuiles les zones consultées sur une carte d'établissements militaires. À qualifier par l'autorité compétente."
+      },
+      {
+        "activation_requise": "oui",
+        "authentification": "aucune au niveau TCP ; l'écoute est bornée par ANALYZER_BIND_IP, et le démarrage est refusé sur 0.0.0.0.",
+        "categories_donnees": [
+          "RESULTAT_BIOLOGIQUE",
+          "TECHNIQUE"
+        ],
+        "chiffrement": "aucun — protocole d'automate en clair.",
+        "declencheur": "émission d'une trame par l'automate",
+        "destination": "`analyzer-gateway`",
+        "etat_par_defaut": "DESACTIVES — ENABLE_DH36_LISTENER=false, ANALYZER_RAW_LISTENER_ENABLED=false",
+        "frontiere_lot_a": "Automate DH36 et trames brutes (TCP entrant)",
+        "id": "automates_desactives",
+        "journalisation": "journal de la passerelle.",
+        "origine": "automate de laboratoire sur le réseau local",
+        "persistance": "dh36_inbound_messages (trame brute conservée).",
+        "protocole": "TCP",
+        "risque_residuel": "Si activée, une frontière TCP non authentifiée et non chiffrée reçoit des résultats et les stocke en trame brute. Coupée par défaut, et cette baseline ne l'active pas."
+      },
+      {
+        "activation_requise": "non",
+        "authentification": "jeton du runner pour GHCR.",
+        "categories_donnees": [
+          "AUCUNE donnée applicative."
+        ],
+        "chiffrement": "TLS.",
+        "declencheur": "construction de l'image",
+        "destination": "PyPI, Docker Hub, GHCR",
+        "etat_par_defaut": "actif au build uniquement ; jamais à l'exécution.",
+        "frontiere_lot_a": "Registres logiciels (build)",
+        "id": "registres_paquets",
+        "journalisation": "journaux de la CI.",
+        "origine": "runner de construction",
+        "persistance": "image candidate, artefact interne de la CI.",
+        "protocole": "HTTPS",
+        "risque_residuel": "Chaîne d'approvisionnement : le contenu de l'image dépend de tiers. Atténué par l'épinglage des actions par SHA et par les SBOM produits par le job de conformité de licences."
+      }
+    ],
+    "totals": {
+      "enabled_by_default": 12,
+      "flows": 17,
+      "requiring_activation": 4
+    }
+  },
+  "schema_version": "1.0.0"
+}

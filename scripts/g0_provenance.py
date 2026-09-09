@@ -76,6 +76,27 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
         "alembic.ini",
         "requirements.txt",
     ),
+    # La baseline de sécurité lit le code applicatif, les artefacts du lot A
+    # dont elle dérive la matrice, le registre de qualification des routes, la
+    # baseline de secrets, et les fichiers qui décrivent les frontières
+    # (Compose, proxy, supervision).
+    #
+    # Les trois artefacts du lot A sont nommés un par un, jamais par un motif
+    # `artifacts/g0/*` : ce répertoire reçoit aussi les artefacts du lot B, et
+    # un motif large rendrait l'empreinte auto-référentielle — elle changerait
+    # à chaque génération, et le contrôle échouerait toujours.
+    "security": (
+        "app/**/*",
+        "artifacts/g0/routes.json",
+        "artifacts/g0/entrypoints.json",
+        "artifacts/g0/schema.json",
+        "docs/g0/ROUTE_EXPOSURE_QUALIFICATION.json",
+        ".secrets.baseline",
+        "deploy/**/*",
+        "monitoring/**/*",
+        "docker-compose*.yml",
+        "requirements.txt",
+    ),
 }
 
 #: Répertoires et fichiers produits par l'exécution, jamais par un auteur.

@@ -1,0 +1,393 @@
+{
+  "payload": {
+    "_comment": "Les valeurs des sentinelles sont volontairement absentes de cet artefact : y écrire la chaine cherchee la rendrait indetectable par un futur controle qui scannerait le depot lui-meme.",
+    "observations": [
+      {
+        "found": false,
+        "sentinel": "analyte",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "analyte",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "analyte",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "analyte",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "analyte",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": false,
+        "sentinel": "analyte",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "analyte",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "code_barres",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "code_barres",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "code_barres",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": true,
+        "sentinel": "code_barres",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "code_barres",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": true,
+        "sentinel": "code_barres",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "code_barres",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "date_naissance",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "date_naissance",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "date_naissance",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "date_naissance",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "date_naissance",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": false,
+        "sentinel": "date_naissance",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "date_naissance",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": true,
+        "sentinel": "ipp",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "ipp",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "ipp",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "ipp",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "ipp",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": true,
+        "sentinel": "ipp",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "ipp",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "jeton_verification",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "jeton_verification",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "jeton_verification",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": true,
+        "sentinel": "jeton_verification",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "jeton_verification",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": false,
+        "sentinel": "jeton_verification",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "jeton_verification",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "nom",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "nom",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "nom",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "nom",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "nom",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": false,
+        "sentinel": "nom",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "nom",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "prenom",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "prenom",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "prenom",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "prenom",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "prenom",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": true,
+        "sentinel": "prenom",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "prenom",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "quartier",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "quartier",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "quartier",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "quartier",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "quartier",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": false,
+        "sentinel": "quartier",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "quartier",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "telephone",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "telephone",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "telephone",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "telephone",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "telephone",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": false,
+        "sentinel": "telephone",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "telephone",
+        "surface": "metriques_prometheus"
+      },
+      {
+        "found": false,
+        "sentinel": "valeur_resultat",
+        "surface": "audit_metier_en_base"
+      },
+      {
+        "found": false,
+        "sentinel": "valeur_resultat",
+        "surface": "etiquettes_de_metriques"
+      },
+      {
+        "found": false,
+        "sentinel": "valeur_resultat",
+        "surface": "journal_analyzer_gateway"
+      },
+      {
+        "found": false,
+        "sentinel": "valeur_resultat",
+        "surface": "journal_application"
+      },
+      {
+        "found": false,
+        "sentinel": "valeur_resultat",
+        "surface": "journal_scheduler"
+      },
+      {
+        "found": false,
+        "sentinel": "valeur_resultat",
+        "surface": "messages_erreur_client"
+      },
+      {
+        "found": false,
+        "sentinel": "valeur_resultat",
+        "surface": "metriques_prometheus"
+      }
+    ],
+    "sentinelles_declarees": [
+      "analyte",
+      "code_barres",
+      "date_naissance",
+      "ipp",
+      "jeton_verification",
+      "nom",
+      "prenom",
+      "quartier",
+      "telephone",
+      "valeur_resultat"
+    ],
+    "surface_journal_proxy": {
+      "directive_log_presente": false,
+      "exercee": false,
+      "mesure": "deploy/Caddyfile ne contient aucune directive `log` : le proxy n'ecrit AUCUN journal d'acces. Il ne peut donc pas divulguer de sentinelle — et il ne peut pas non plus servir a une investigation."
+    },
+    "surfaces_examinees": [
+      "audit_metier_en_base",
+      "etiquettes_de_metriques",
+      "journal_analyzer_gateway",
+      "journal_application",
+      "journal_scheduler",
+      "messages_erreur_client",
+      "metriques_prometheus"
+    ],
+    "totals": {
+      "observations": 70,
+      "surfaces_avec_sentinelle": [
+        "audit_metier_en_base",
+        "journal_application",
+        "messages_erreur_client"
+      ],
+      "trouvees": 6
+    }
+  },
+  "schema_version": "1.0.0"
+}
