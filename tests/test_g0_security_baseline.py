@@ -810,9 +810,9 @@ def test_the_exception_register_carries_no_value():
     for entree in registre["exceptions"]:
         assert "secret" not in {c.lower() for c in entree if c != "rule"}
         assert "value" not in entree
-        assert re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{7,40}|arbre-courant", entree["fingerprint"]), (
-            f"empreinte de forme inattendue : {entree['path']}"
-        )
+        assert re.fullmatch(
+            r"[0-9a-f]{40}|(?:[0-9a-f]{40}:)?[^:]+:[^:]+:[0-9]+", entree["fingerprint"]
+        ), f"empreinte de forme inattendue pour {entree['scanner']} : {entree['path']}"
 
 
 # ── la CI applique réellement la barrière ───────────────────────────────────

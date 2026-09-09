@@ -188,6 +188,24 @@
         ],
         "remediation_owner": "lot D",
         "titre": "Le modele d'environnement livre est fail-open"
+      },
+      {
+        "action_future": "Decision du proprietaire : rotation de la cle publiable et verification des policies RLS du projet de preproduction. Hors perimetre du lot B.",
+        "classement": "P2",
+        "constat": "L'historique de `.env.example` porte une cle `sb_publishable_*` et l'URL d'un projet Supabase de preproduction reel. Supabase designe ce prefixe comme PUBLIABLE : la cle est livree dans les bundles navigateur et la protection repose entierement sur les policies RLS du projet. Ce n'est donc pas un secret au sens cryptographique, et ce n'est pas un P0. L'arbre courant est deja nettoye : `.env.example` porte des marque-places, la valeur ne subsiste que dans l'historique Git. Les trois emplacements ci-dessous ne portent PAS la meme chose : la ligne 5 est un marque-place — la valeur y est le mot anglais qui invite a la remplacer —, les deux lignes 268 portent la cle publiable et l'URL du projet. Le registre leur applique a toutes le caractere le plus prudent : sur-qualifier un marque-place est sans consequence, l'inverse ne l'est pas.",
+        "id": "B-13",
+        "marqueurs": [
+          "SUPABASE_PUBLISHABLE_KEY_ROTATION_DECISION_REQUIRED"
+        ],
+        "pourquoi_pas_p0": "Ni cle privee, ni secret actif : le prefixe `sb_publishable_` est la designation par laquelle Supabase indique que la valeur est destinee au client. Un P0 ici serait une sur-classification.",
+        "pourquoi_pas_p3": "Elle identifie un projet REEL, et la seule barriere restante est la RLS de ce projet — qui n'est pas verifiable depuis ce depot. Ce constat devient P1 si une table de ce projet accorde une lecture au role `anon`.",
+        "preuve": [
+          ".env.example ligne 5 — commit 5f0d2a278ed9",
+          ".env.example ligne 268 — commit 7c53231c2ecc",
+          ".env.example ligne 268 — commit a5238c645734"
+        ],
+        "remediation_owner": "lot D",
+        "titre": "Une cle publiable et l'URL d'un projet Supabase reel subsistent dans l'historique"
       }
     ],
     "guard_semantics": {

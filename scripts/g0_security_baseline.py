@@ -1902,6 +1902,68 @@ def construire_constats(
             }
         )
 
+    # B-13 — une cle publiable d'un projet reel subsiste dans l'historique.
+    #
+    # Decouverte en qualifiant les detections Gitleaks une par une, ce que
+    # l'ancienne cle d'acceptation empechait : elle fondait les trois findings
+    # de `.env.example` en une seule entree rangee sous « exemple documentaire ».
+    # Les separer a oblige a regarder chacune, et a constater qu'il ne s'agit
+    # pas d'un marque-place.
+    from scripts.g0_secret_gate import charger_registre
+
+    registre_secrets = charger_registre()
+    cles_publiables = [
+        e
+        for e in registre_secrets.get("exceptions", [])
+        if e.get("character") == "CLE_PUBLIABLE_DE_PROJET_REEL"
+    ]
+    if cles_publiables:
+        constats.append(
+            {
+                "id": "B-13",
+                "classement": "P2",
+                "marqueurs": ["SUPABASE_PUBLISHABLE_KEY_ROTATION_DECISION_REQUIRED"],
+                "titre": (
+                    "Une cle publiable et l'URL d'un projet Supabase reel subsistent "
+                    "dans l'historique"
+                ),
+                "constat": (
+                    "L'historique de `.env.example` porte une cle `sb_publishable_*` et "
+                    "l'URL d'un projet Supabase de preproduction reel. Supabase designe ce "
+                    "prefixe comme PUBLIABLE : la cle est livree dans les bundles navigateur "
+                    "et la protection repose entierement sur les policies RLS du projet. "
+                    "Ce n'est donc pas un secret au sens cryptographique, et ce n'est pas un "
+                    "P0. L'arbre courant est deja nettoye : `.env.example` porte des "
+                    "marque-places, la valeur ne subsiste que dans l'historique Git. "
+                    "Les trois emplacements ci-dessous ne portent PAS la meme chose : la "
+                    "ligne 5 est un marque-place — la valeur y est le mot anglais qui invite a la "
+                    "remplacer —, les deux "
+                    "lignes 268 portent la cle publiable et l'URL du projet. Le registre "
+                    "leur applique a toutes le caractere le plus prudent : sur-qualifier un "
+                    "marque-place est sans consequence, l'inverse ne l'est pas."
+                ),
+                "preuve": [
+                    f"{e['path']} ligne {e.get('start_line')} — commit {e.get('commit', '')[:12]}"
+                    for e in cles_publiables
+                ],
+                "pourquoi_pas_p0": (
+                    "Ni cle privee, ni secret actif : le prefixe `sb_publishable_` est la "
+                    "designation par laquelle Supabase indique que la valeur est destinee au "
+                    "client. Un P0 ici serait une sur-classification."
+                ),
+                "pourquoi_pas_p3": (
+                    "Elle identifie un projet REEL, et la seule barriere restante est la RLS "
+                    "de ce projet — qui n'est pas verifiable depuis ce depot. Ce constat "
+                    "devient P1 si une table de ce projet accorde une lecture au role `anon`."
+                ),
+                "action_future": (
+                    "Decision du proprietaire : rotation de la cle publiable et verification "
+                    "des policies RLS du projet de preproduction. Hors perimetre du lot B."
+                ),
+                "remediation_owner": "lot D",
+            }
+        )
+
     return constats
 
 

@@ -219,6 +219,23 @@ FAMILLES_REVUES: tuple[dict[str, Any], ...] = (
         ),
     },
     {
+        # Placee AVANT `documentation` : la premiere famille qui correspond
+        # gagne, et ranger cette cle sous « exemple documentaire » serait faux.
+        "id": "cle_publiable_projet_reel",
+        "motifs": (".env.example",),
+        "caractere": "CLE_PUBLIABLE_DE_PROJET_REEL",
+        "rotation_necessaire": True,
+        "justification": (
+            "Historique de `.env.example` : cle `sb_publishable_*` d'un projet Supabase de "
+            "PREPRODUCTION reel, et son URL. Supabase designe ce prefixe comme publiable — "
+            "la cle est livree dans les bundles navigateur et la protection repose sur RLS, "
+            "ce n'est donc pas un secret au sens cryptographique. Elle identifie neanmoins "
+            "un projet reel, et l'arbre courant porte desormais des marque-places : la "
+            "valeur ne subsiste que dans l'historique. Rotation a decider par le "
+            "proprietaire — voir le constat B-13."
+        ),
+    },
+    {
         "id": "documentation",
         "motifs": (
             ".env.example",
@@ -743,7 +760,11 @@ _MOTIFS_INTERDITS: tuple[tuple[str, re.Pattern[str]], ...] = (
 #: - Gitleaks : `commit:fichier:règle:ligne`, ou `fichier:règle:ligne` sur un
 #:   scan d'arbre. Le dernier segment est toujours un numéro de ligne.
 _EMPREINTE_DETECT_SECRETS = re.compile(r"^[0-9a-f]{40}$")
-_EMPREINTE_GITLEAKS = re.compile(r"^[^:]*:[^:]+:[^:]+:\d+$")
+#: Gitleaks omet le commit sur un scan d'arbre : `fichier:regle:ligne`, trois
+#: segments. Sur un scan d'historique il le prefixe : `commit:fichier:regle:ligne`,
+#: quatre. Exiger quatre segments a fait echouer la validation des deux entrees
+#: d'arbre — le validateur a attrape une erreur de cette expression elle-meme.
+_EMPREINTE_GITLEAKS = re.compile(r"^(?:[0-9a-f]{40}:)?[^:]+:[^:]+:\d+$")
 
 
 def _valeurs_texte(noeud: Any, chemin: str = "") -> Iterator[tuple[str, str]]:

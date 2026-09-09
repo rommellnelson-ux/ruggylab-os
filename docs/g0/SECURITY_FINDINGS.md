@@ -55,8 +55,9 @@ reste `DISTRIBUTION_NO_GO`.
 | B-06 | **P2** | Aucune durée de conservation définie pour les données cliniques | classification |
 | B-07 | **P2** | Le cloisonnement par unité ne repose que sur le code applicatif | sonde + schéma |
 | B-11 | **P2** | `.secrets.baseline` est inutilisable sur un runner Linux | lecture du fichier |
+| **B-13** | **P2** | Une clé publiable et l'URL d'un projet Supabase réel subsistent dans l'historique | scan d'historique |
 
-**6 constats P1, 6 constats P2, 0 constat P0.**
+**6 constats P1, 7 constats P2, 0 constat P0.**
 
 ### Blocages de mise en service du site
 
@@ -295,6 +296,45 @@ sous Linux ou macOS remonte les mêmes détections que si le fichier était vide
 **Ce que le lot B a fait.** La barrière normalise les séparateurs **à la
 lecture** ; le fichier versionné n'est pas modifié. Cette compensation est
 elle-même la preuve du défaut. **Remédiation : lot D.**
+
+### B-13 — Une clé publiable et l'URL d'un projet Supabase réel subsistent dans l'historique
+
+`SUPABASE_PUBLISHABLE_KEY_ROTATION_DECISION_REQUIRED`
+
+**Comment ce constat est apparu.** Il n'existait pas avant l'amendement, et son
+absence était une conséquence directe du défaut d'identité corrigé ici :
+l'ancienne clé d'acceptation fondait les **trois** détections de `.env.example`
+en une seule entrée, rangée sous « exemple documentaire ». Les séparer a obligé
+à regarder chacune — et à constater que deux d'entre elles n'en sont pas.
+
+**Constat.** L'historique de `.env.example` porte une clé `sb_publishable_*` et
+l'URL d'un projet Supabase de préproduction réel, à la ligne 268 de deux
+commits. La troisième détection, ligne 5 d'un autre commit, est bien un
+marque-place.
+
+**Pourquoi ce n'est pas un P0.** Ni clé privée, ni secret actif. Le préfixe
+`sb_publishable_` est la désignation par laquelle Supabase indique que la valeur
+est destinée au client : elle est livrée dans les bundles navigateur, et la
+protection repose entièrement sur les policies RLS du projet. Prononcer P0 ici
+serait une sur-classification.
+
+**Pourquoi ce n'est pas négligeable.** Elle identifie un projet **réel**, et la
+seule barrière restante est la RLS de ce projet — qui n'est pas vérifiable
+depuis ce dépôt. Ce constat devient **P1** si une table de ce projet accorde une
+lecture au rôle `anon`.
+
+**Ce qui est déjà propre.** L'arbre courant porte des marque-places
+(`<project-ref>`, `replace-with-...`). La valeur ne subsiste que dans
+l'historique Git.
+
+**Action future.** Décision du propriétaire : rotation de la clé publiable, et
+vérification des policies RLS du projet de préproduction. Hors périmètre du
+lot B.
+
+**Note de méthode.** Le registre applique à ces trois entrées le caractère le
+plus prudent, `CLE_PUBLIABLE_DE_PROJET_REEL`, alors que l'une est un
+marque-place. Sur-qualifier un marque-place est sans conséquence ; l'inverse ne
+l'est pas.
 
 ## 5. Limites de cette revue
 
