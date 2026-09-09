@@ -722,7 +722,7 @@ def test_the_scan_reads_files_as_utf8_whatever_the_platform(tmp_path):
         'ENTETE = ""' + chr(10) + 'password = "MotDePasseLitteral123"' + chr(10),
         encoding="utf-8",
     )
-    detections = scanner_arbre(["piege.py"], racine=tmp_path)
+    detections, _ = scanner_arbre(["piege.py"], racine=tmp_path)
     assert detections, (
         "le fichier UTF-8 n'a pas ete scanne : la mesure differerait entre Windows et Linux"
     )
@@ -777,7 +777,8 @@ def test_the_gate_covers_the_whole_tracked_tree():
     )
 
     connues, _ = charger_baseline()
-    detections = scanner_arbre(fichiers_a_scanner(None))
+    detections, rapport = scanner_arbre(fichiers_a_scanner(None))
+    assert rapport["complete"], rapport["scan_errors"]
     resultat = confronter(detections, connues, charger_registre())
     assert resultat["residus"] == [], (
         f"{len(resultat['residus'])} détection(s) sans couverture écrite — "
@@ -980,12 +981,19 @@ def test_the_documents_transmit_findings_and_do_not_fix_them():
 
 
 def test_no_go_verdict_is_ever_pronounced():
-    """Prononcer un GO ici usurperait une décision qui n'appartient pas au lot B."""
-    interdits = ("G0_PASS", "REAL_DATA_GO", "SITE_PRODUCTION_GO", "DISTRIBUTION_GO")
+    """Prononcer un GO ici usurperait une décision qui n'appartient pas au lot B.
+
+    La comparaison porte sur des **jetons entiers**, jamais sur des
+    sous-chaînes. `CSA_SITE_PRODUCTION_GO_BLOCKER` contient littéralement
+    `SITE_PRODUCTION_GO` tout en disant l'inverse : c'est un marqueur de
+    blocage. Un garde-fou qui refuse le mot qui interdit, parce qu'il ressemble
+    au mot qui autorise, pousse à retirer le blocage pour faire passer le test.
+    """
+    interdits = {"G0_PASS", "REAL_DATA_GO", "SITE_PRODUCTION_GO", "DISTRIBUTION_GO"}
     for document in DOCUMENTS_LOT_B:
-        texte = _lire(DOCS / document)
-        for mot in interdits:
-            assert mot not in texte, f"{document} prononce « {mot} »"
+        jetons = set(re.findall(r"[A-Z][A-Z0-9_]{3,}", _lire(DOCS / document)))
+        prononces = jetons & interdits
+        assert not prononces, f"{document} prononce {sorted(prononces)}"
 
 
 # ── invariants de gouvernance ───────────────────────────────────────────────
@@ -1093,4 +1101,581 @@ def test_the_input_order_does_not_depend_on_the_platform():
     assert relatifs == sorted(relatifs), (
         "l'ordre des entrées n'est pas celui des chaînes POSIX : "
         "l'empreinte différerait entre Windows et Linux"
+    )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Amendement après revue indépendante — G0_LOT_B_REVIEW = CHANGES_REQUIRED
+#
+# La revue a relevé quatre défauts d'outillage, dont deux qui privaient la
+# barrière de son effet. Chaque correction est verrouillée ici, et chaque
+# verrou est vérifié par mutation : on casse volontairement l'objet contrôlé et
+# on exige que le contrôle échoue. Un test qui reste vert sur une mutation est
+# aveugle, et vaut moins que pas de test — il donne confiance sans raison.
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def _finding_gitleaks(**surcharges):
+    """Un finding Gitleaks minimal, à la forme réelle des rapports."""
+    finding = {
+        "File": "docs/exemple.md",
+        "RuleID": "generic-api-key",
+        "Commit": "a" * 40,
+        "StartLine": 12,
+        "Fingerprint": f"{'a' * 40}:docs/exemple.md:generic-api-key:12",
+    }
+    finding.update(surcharges)
+    return finding
+
+
+def _ecrire_rapport(chemin, findings):
+    chemin.write_text(json.dumps(findings), encoding="utf-8")
+    return chemin
+
+
+# ── §3 — l'identité d'une détection Gitleaks est son Fingerprint ────────────
+
+
+def test_a_gitleaks_finding_is_identified_by_its_fingerprint(tmp_path):
+    """Le champ `Fingerprint` est lu tel quel, jamais remplacé.
+
+    La version précédente inscrivait le SHA du COMMIT — ou la chaîne littérale
+    `arbre-courant` — dans le champ `fingerprint`. Ce n'est pas une identité :
+    deux valeurs différentes introduites par le même commit la partageaient.
+    """
+    from scripts.g0_secret_gate import lire_rapport_gitleaks
+
+    rapport = _ecrire_rapport(tmp_path / "gl.json", [_finding_gitleaks()])
+    detections = lire_rapport_gitleaks(rapport, "historique")
+
+    assert len(detections) == 1
+    detection = detections[0]
+    assert detection["fingerprint"] == f"{'a' * 40}:docs/exemple.md:generic-api-key:12"
+    assert detection["commit"] == "a" * 40
+    assert detection["start_line"] == 12
+    assert detection["scope"] == "history"
+    assert detection["fingerprint"] != detection["commit"], (
+        "le commit a de nouveau été inscrit à la place de l'empreinte"
+    )
+    assert "arbre-courant" not in detection["fingerprint"]
+
+
+def test_a_gitleaks_finding_without_a_fingerprint_is_refused(tmp_path):
+    """MUTATION — `Fingerprint` absent : GITLEAKS_FINDING_WITHOUT_FINGERPRINT."""
+    from scripts.g0_secret_gate import DetectionSansEmpreinte, lire_rapport_gitleaks
+
+    for absent in ({}, {"Fingerprint": ""}, {"Fingerprint": "   "}):
+        finding = _finding_gitleaks(**absent) if absent else _finding_gitleaks()
+        if not absent:
+            finding.pop("Fingerprint")
+        rapport = _ecrire_rapport(tmp_path / "gl.json", [finding])
+        with pytest.raises(DetectionSansEmpreinte, match="GITLEAKS_FINDING_WITHOUT_FINGERPRINT"):
+            lire_rapport_gitleaks(rapport, "historique")
+
+
+def test_the_acceptance_key_of_a_gitleaks_detection_carries_its_fingerprint():
+    """Aucune clé ne se réduit à `chemin + règle`."""
+    from scripts.g0_secret_gate import _cle
+
+    detection = {
+        "scanner": "gitleaks-historique",
+        "path": "docs/exemple.md",
+        "rule": "generic-api-key",
+        "fingerprint": "empreinte-exacte-1",
+    }
+    autre = {**detection, "fingerprint": "empreinte-exacte-2"}
+    assert _cle(detection) != _cle(autre), (
+        "deux identités différentes partagent la même clé d'acceptation — "
+        "c'est exactement le défaut que la revue a démontré"
+    )
+    assert "empreinte-exacte-1" in _cle(detection)
+
+
+def test_a_detection_without_fingerprint_cannot_be_keyed():
+    from scripts.g0_secret_gate import DetectionSansEmpreinte, _cle
+
+    with pytest.raises(DetectionSansEmpreinte):
+        _cle({"scanner": "gitleaks-arbre", "path": "a", "rule": "b", "fingerprint": ""})
+
+
+@pytest.mark.parametrize(
+    ("mutation", "attendu"),
+    [
+        ({}, True),
+        ({"fingerprint": "identite-differente"}, False),
+        ({"rule": "aws-access-token"}, False),
+        ({"path": "docs/autre.md"}, False),
+    ],
+    ids=[
+        "identite-exacte-acceptee",
+        "meme-chemin-meme-regle-AUTRE-empreinte-refusee",
+        "meme-chemin-NOUVELLE-regle-refusee",
+        "NOUVEAU-chemin-refuse",
+    ],
+)
+def test_only_the_exact_qualified_identity_is_accepted(mutation, attendu):
+    """MUTATION centrale de la revue.
+
+    Un chemin et une règle déjà inscrits ne doivent pas absorber une seconde
+    valeur détectable. C'est ce que faisait la version précédente, et c'est le
+    scénario par lequel un vrai secret aurait pu entrer sans être relu.
+    """
+    from scripts.g0_secret_gate import confronter
+
+    qualifiee = {
+        "scanner": "gitleaks-historique",
+        "path": "docs/exemple.md",
+        "rule": "generic-api-key",
+        "fingerprint": "empreinte-qualifiee",
+    }
+    registre = {"exceptions": [{**qualifiee, "family": "documentation", "justification": "x" * 40}]}
+    detection = {**qualifiee, **mutation}
+
+    resultat = confronter([detection], set(), registre)
+    couverte = not resultat["residus"]
+    assert couverte is attendu, (
+        f"mutation {mutation or 'aucune'} : couverte={couverte}, attendu={attendu}"
+    )
+
+
+def test_moving_a_finding_to_another_line_creates_a_new_identity(tmp_path):
+    """MUTATION — la ligne entre dans l'empreinte Gitleaks.
+
+    Déplacer une valeur détectée est un fait nouveau : la qualification
+    précédente portait sur un emplacement, pas sur un fichier entier.
+    """
+    from scripts.g0_secret_gate import _cle, lire_rapport_gitleaks
+
+    avant = _ecrire_rapport(tmp_path / "a.json", [_finding_gitleaks()])
+    apres = _ecrire_rapport(
+        tmp_path / "b.json",
+        [
+            _finding_gitleaks(
+                StartLine=99,
+                Fingerprint=f"{'a' * 40}:docs/exemple.md:generic-api-key:99",
+            )
+        ],
+    )
+    assert _cle(lire_rapport_gitleaks(avant, "historique")[0]) != _cle(
+        lire_rapport_gitleaks(apres, "historique")[0]
+    )
+
+
+def test_no_detected_value_ever_crosses_the_reader(tmp_path):
+    """`Secret` et `Match` ne franchissent jamais la lecture du rapport."""
+    from scripts.g0_secret_gate import lire_rapport_gitleaks
+
+    rapport = _ecrire_rapport(
+        tmp_path / "gl.json",
+        [_finding_gitleaks(Secret="valeur-detectee", Match="ligne=valeur-detectee")],
+    )
+    detections = lire_rapport_gitleaks(rapport, "arbre")
+    aplati = json.dumps(detections)
+    assert "valeur-detectee" not in aplati
+    assert not {"Secret", "Match", "secret", "match"} & set(detections[0])
+
+
+# ── §4 — un fichier illisible n'est pas un fichier propre ───────────────────
+
+
+def test_the_tree_scan_accounts_for_every_file(tmp_path):
+    """Chaque fichier tombe dans exactement une catégorie."""
+    from scripts.g0_secret_gate import scanner_arbre
+
+    (tmp_path / "propre.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "image.png").write_bytes(b"\x89PNG\r\n")
+    _, rapport = scanner_arbre(["propre.py", "image.png"], racine=tmp_path)
+
+    assert rapport["attempted_files"] == 2
+    assert rapport["successfully_scanned_files"] == 1
+    assert rapport["explicitly_excluded_files"] == 1
+    assert rapport["scan_errors"] == []
+    assert rapport["complete"] is True
+
+
+@pytest.mark.parametrize(
+    ("exception", "motif"),
+    [
+        (OSError("disque"), "OS_ERROR"),
+        (PermissionError("refusé"), "PERMISSION_DENIED"),
+        (UnicodeDecodeError("utf-8", b"", 0, 1, "invalide"), "DECODE_ERROR"),
+        (RuntimeError("le scanner a explosé"), "SCANNER_ERROR"),
+    ],
+    ids=["os-error", "permission-refusee", "decodage-impossible", "scanner-en-echec"],
+)
+def test_any_read_error_makes_the_scan_incomplete(tmp_path, monkeypatch, exception, motif):
+    """MUTATION — une erreur de lecture ne doit jamais ressembler à un fichier propre.
+
+    La version précédente faisait `except (OSError, UnicodeDecodeError): continue`.
+    Un fichier illisible produisait donc exactement le même résultat qu'un fichier
+    sans secret : zéro détection, barrière verte.
+    """
+    from detect_secrets.core import scan
+
+    import scripts.g0_secret_gate as gate
+
+    (tmp_path / "cible.py").write_text("x = 1\n", encoding="utf-8")
+
+    def exploser(*_args, **_kwargs):
+        raise exception
+
+    monkeypatch.setattr(scan, "scan_file", exploser)
+    _, rapport = gate.scanner_arbre(["cible.py"], racine=tmp_path)
+
+    assert rapport["complete"] is False, "l'erreur de lecture a été avalée"
+    assert rapport["successfully_scanned_files"] == 0
+    assert [e["reason"] for e in rapport["scan_errors"]][0].startswith(motif)
+
+
+def test_a_file_that_vanishes_between_inventory_and_read_is_an_error(tmp_path):
+    """MUTATION — un fichier suivi mais absent au moment de la lecture."""
+    from scripts.g0_secret_gate import scanner_arbre
+
+    _, rapport = scanner_arbre(["jamais-ecrit.py"], racine=tmp_path)
+    assert rapport["complete"] is False
+    assert rapport["scan_errors"][0]["reason"] == "FILE_MISSING_AT_READ_TIME"
+
+
+def test_binary_exclusions_are_explicit_versioned_and_counted():
+    """Une exclusion implicite est une exclusion que personne ne relit."""
+    from scripts.g0_secret_gate import SUFFIXES_EXCLUS, exclu_du_scan
+
+    assert SUFFIXES_EXCLUS, "aucune exclusion déclarée"
+    for suffixe in SUFFIXES_EXCLUS:
+        assert exclu_du_scan(f"quelque/part/fichier{suffixe}")
+    assert not exclu_du_scan("app/main.py")
+
+
+# ── §5 — les deux fichiers exclus du scan sont relus par un validateur ──────
+
+
+def test_the_governance_files_pass_their_specialised_validator():
+    from scripts.g0_secret_gate import valider_fichiers_de_gouvernance
+
+    manquements = valider_fichiers_de_gouvernance()
+    assert manquements == [], manquements
+
+
+@pytest.mark.parametrize(
+    ("mutation", "motif"),
+    [
+        ({"secret": "valeur"}, "champ porteur de valeur"),
+        ({"match": "ligne = valeur"}, "champ porteur de valeur"),
+        ({"raw": "valeur"}, "champ porteur de valeur"),
+        ({"justification": "trop court"}, "justification trop courte"),
+        ({"family": "NON_REVU"}, "NON_REVU"),
+        ({"fingerprint": "pas-une-empreinte"}, "format invalide"),
+        ({"champ_invente": "x"}, "hors schéma"),
+        ({"rotation_required": "oui"}, "n'est pas un booléen"),
+    ],
+    ids=[
+        "champ-Secret",
+        "champ-Match",
+        "champ-Raw",
+        "justification-vide-de-sens",
+        "famille-non-revue",
+        "empreinte-mal-formee",
+        "champ-hors-schema",
+        "type-invalide",
+    ],
+)
+def test_the_registry_validator_refuses_each_defect(tmp_path, monkeypatch, mutation, motif):
+    """MUTATION — le validateur spécialisé refuse ce que le scan ne voit plus."""
+    import scripts.g0_secret_gate as gate
+
+    registre = json.loads(gate.REGISTRE.read_text(encoding="utf-8"))
+    registre["exceptions"][0].update(mutation)
+    faux = tmp_path / "registre.json"
+    faux.write_text(json.dumps(registre), encoding="utf-8")
+    monkeypatch.setattr(gate, "REGISTRE", faux)
+
+    manquements = gate.valider_fichiers_de_gouvernance()
+    assert any(motif in m for m in manquements), (
+        f"mutation {mutation} non détectée — manquements : {manquements[:3]}"
+    )
+
+
+def test_the_validator_refuses_a_private_key_in_the_baseline(tmp_path, monkeypatch):
+    """MUTATION — un bloc PEM dans `.secrets.baseline`.
+
+    Le fichier est soustrait aux règles d'entropie pour éviter une récursion
+    d'empreintes, et pour cette seule raison. Sans validateur, il deviendrait
+    l'endroit du dépôt où l'on peut écrire n'importe quoi.
+    """
+    import scripts.g0_secret_gate as gate
+
+    faux = tmp_path / "baseline.json"
+    faux.write_text(
+        json.dumps({"note": gate.SENTINELLE_PEM_DEBUT + "\nAAAA\n" + gate.SENTINELLE_PEM_FIN}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(gate, "BASELINE", faux)
+    assert any("CLE_PRIVEE_PEM" in m for m in gate.valider_fichiers_de_gouvernance())
+
+
+def test_the_validator_does_not_exempt_a_file_because_it_lives_in_docs(tmp_path, monkeypatch):
+    """Un chemin ne rend pas un contenu inoffensif."""
+    import scripts.g0_secret_gate as gate
+
+    assert (
+        str(gate.REGISTRE)
+        .replace("\\", "/")
+        .endswith("docs/governance/SECRET_SCAN_EXCEPTIONS.json")
+    )
+    registre = json.loads(gate.REGISTRE.read_text(encoding="utf-8"))
+    registre["exceptions"][0]["justification"] = (
+        "Contient une adresse copiee d'un rapport : personne@exemple.test, ce qui ne "
+        "doit jamais arriver dans ce fichier."
+    )
+    faux = tmp_path / "r.json"
+    faux.write_text(json.dumps(registre), encoding="utf-8")
+    monkeypatch.setattr(gate, "REGISTRE", faux)
+    assert any("ADRESSE_ELECTRONIQUE" in m for m in gate.valider_fichiers_de_gouvernance())
+
+
+# ── §6 — la couverture de l'historique est réconciliée, pas affirmée ────────
+
+
+def test_the_history_scan_is_reconciled_against_the_repository():
+    """Un scan dont on ne sait pas sur quoi il a porté ne prouve rien."""
+    from scripts.g0_secret_gate import reconcilier_historique
+
+    comptes = {
+        "reachable_commits": 458,
+        "merge_commits": 77,
+        "non_merge_commits": 381,
+        "empty_or_non_diff_commits": 0,
+        "is_shallow_repository": False,
+        "scan_command": "gitleaks git . --log-opts=--all",
+        "log_opts": "rev-list --all ; --merges ; --no-merges",
+    }
+    bilan = reconcilier_historique([], comptes)
+    for champ in (
+        "reachable_commits",
+        "merge_commits",
+        "non_merge_commits",
+        "empty_or_non_diff_commits",
+        "gitleaks_expected_commits_scanned",
+        "distinct_commits_present_in_findings",
+        "scan_command",
+        "log_opts",
+        "is_shallow_repository",
+    ):
+        assert champ in bilan, f"compteur absent : {champ}"
+    assert bilan["reachable_commits"] == bilan["merge_commits"] + bilan["non_merge_commits"], (
+        "l'addition ne tombe pas juste : l'écart doit être expliqué, pas ignoré"
+    )
+    assert bilan["status"] == "HISTORY_SCAN_COUNT_RECONCILED"
+
+
+@pytest.mark.parametrize(
+    "comptes",
+    [
+        {
+            "reachable_commits": 458,
+            "merge_commits": 77,
+            "non_merge_commits": 381,
+            "is_shallow_repository": True,
+        },
+        {
+            "reachable_commits": 445,
+            "merge_commits": 77,
+            "non_merge_commits": 367,
+            "is_shallow_repository": False,
+        },
+        {},
+    ],
+    ids=["clone-superficiel", "addition-qui-ne-tombe-pas-juste", "comptages-absents"],
+)
+def test_an_unreconciled_history_cannot_claim_coverage(comptes):
+    """MUTATION — trois façons de ne pas savoir sur quoi le scan a porté.
+
+    Le second cas est exactement celui du rapport précédent : 445 annoncés,
+    367 parcourus, 78 d'écart, aucune explication. La barrière refuse
+    désormais de prononcer la couverture de l'historique dans ce cas.
+    """
+    from scripts.g0_secret_gate import reconcilier_historique
+
+    bilan = reconcilier_historique([], comptes)
+    assert bilan["reconciled"] is False
+    assert bilan["status"] == "HISTORY_SCAN_COUNT_UNRECONCILED"
+
+
+def test_the_history_probe_removes_its_sentinel_before_scanning():
+    """La sonde doit prouver que l'HISTORIQUE est lu, pas seulement l'arbre.
+
+    Le dépôt jetable ajoute la sentinelle, puis la retire : à HEAD, l'arbre est
+    propre. Une sonde positive qui réussit ne peut donc réussir que par
+    l'historique.
+    """
+    workflow = _lire(REPO_ROOT / ".github" / "workflows" / "ci.yml")
+    etape = workflow.split("Non-emptiness probes on a throwaway git repository", 1)[1][:2000]
+    assert 'git -C "$sonde" rm -q porteur.txt' in etape, (
+        "la sentinelle n'est pas retirée : la sonde ne distingue plus arbre et historique"
+    )
+    assert 'gitleaks" git "$sonde"' in etape or "gitleaks git" in etape
+
+
+# ── §7 — la portée de la matrice, énoncée en chiffres ───────────────────────
+
+
+def test_the_matrix_states_what_it_proves_and_on_how_many_operations():
+    matrice = _payload("rbac-matrix")
+    portee = matrice["scope"]
+    assert portee["operations_statically_classified"] == 231
+    assert portee["operations_unresolved_statically"] == 0
+    assert portee["operations_runtime_probed"] < portee["operations_statically_classified"]
+    assert (
+        portee["operations_runtime_probed"] + portee["operations_not_runtime_probed"]
+        == portee["operations_statically_classified"]
+    )
+
+
+def test_a_probe_is_not_an_operation():
+    """99 sondes portent sur 65 opérations : confondre les deux gonflerait d'un tiers."""
+    portee = _payload("rbac-matrix")["scope"]
+    assert portee["probes_executed"] > portee["operations_runtime_probed"], (
+        "sondes et opérations distinctes ne sont plus distinguées"
+    )
+    assert portee["probes_authorization_reached"] >= portee["operations_authorization_reached"]
+
+
+def test_zero_unresolved_never_reads_as_runtime_confirmed():
+    """MUTATION de rédaction — la confusion que la revue a relevée.
+
+    `UNRESOLVED = 0` porte sur la classification statique. Écrit sans cette
+    précision, il laisse croire que les 231 opérations ont été exercées.
+    """
+    aplati = _aplati(DOCS / "RBAC.md")
+    assert "classification statique" in aplati.lower()
+    for interdit in (
+        "les 231 opérations ont été exercées",
+        "231 opérations testées dynamiquement",
+        "les 231 opérations ont été sondées",
+        "toutes les opérations ont été exercées",
+    ):
+        assert interdit.lower() not in aplati.lower(), f"affirmation fausse : « {interdit} »"
+    assert "non exercée" in aplati.lower() or "non sondée" in aplati.lower(), (
+        "le document ne dit nulle part combien d'opérations n'ont PAS été exercées"
+    )
+
+
+def test_the_document_publishes_the_six_scope_counters():
+    aplati = _aplati(DOCS / "RBAC.md")
+    portee = _payload("rbac-matrix")["scope"]
+    for champ in (
+        "operations_statically_classified",
+        "operations_runtime_probed",
+        "operations_authorization_reached",
+        "operations_validation_stopped_before_authorization",
+        "operations_not_runtime_probed",
+        "operations_unresolved_statically",
+    ):
+        assert str(portee[champ]) in aplati, f"valeur de {champ} absente de RBAC.md"
+
+
+# ── §8 — les blocages de site sont formalisés, pas corrigés ─────────────────
+
+
+def _constat(identifiant):
+    for constat in _payload("rbac-matrix")["findings"]:
+        if constat["id"] == identifiant:
+            return constat
+    raise AssertionError(f"constat absent : {identifiant}")
+
+
+def test_the_environment_template_finding_is_recorded():
+    """B-12 — MUTATION : sa disparition doit faire échouer ce test."""
+    constat = _constat("B-12")
+    assert constat["classement"] == "P1"
+    assert "CSA_SITE_PRODUCTION_GO_BLOCKER" in constat["marqueurs"]
+    assert "DEPLOYMENT_TEMPLATE_FAIL_CLOSED_REQUIRED" in constat["marqueurs"]
+    cite = " ".join(constat["preuve"])
+    for reglage in (
+        "ANALYZER_RAW_LISTENER_ENABLED",
+        "ANALYZER_HEMATOLOGY_ENABLED",
+        "ANALYZER_BIOCHEMISTRY_ENABLED",
+        "ANALYZER_IMMUNO_ENABLED",
+    ):
+        assert reglage in cite, f"réglage non cité dans la preuve : {reglage}"
+
+
+def test_the_environment_template_is_not_modified_by_this_lot():
+    """Le constat B-12 vaut PARCE QUE le fichier n'a pas été touché.
+
+    Le corriger ici rendrait la preuve invérifiable : on ne saurait plus si le
+    défaut a existé.
+    """
+    modele = REPO_ROOT / ".env.example"
+    if not modele.is_file():
+        pytest.skip(".env.example absent de cette arborescence")
+    contenu = modele.read_text(encoding="utf-8")
+    assert "ANALYZER_RAW_LISTENER_ENABLED=true" in contenu, (
+        "le lot B a corrigé .env.example — hors périmètre, et cela invalide B-12"
+    )
+
+
+def test_the_report_verification_token_finding_is_fully_qualified():
+    """B-03 — MUTATION : la perte d'un attribut doit faire échouer ce test."""
+    constat = _constat("B-03")
+    assert "CSA_SITE_PRODUCTION_GO_BLOCKER" in constat["marqueurs"]
+    assert "REPORT_VERIFICATION_TOKEN_HARDENING_REQUIRED" in constat["marqueurs"]
+    attributs = constat["attributs"]
+    assert attributs["facteur_unique"] is True
+    assert attributs["expiration"] == "aucune"
+    assert attributs["rejouable"] is True
+    assert attributs["journalise_en_clair"] is True
+    assert attributs["revocable_independamment_du_compte_rendu"] is False
+
+
+def test_the_three_segregation_gaps_are_kept_and_detailed():
+    """B-08 — MUTATION : la disparition d'un écart doit faire échouer ce test."""
+    constat = _constat("B-08")
+    assert "SEGREGATION_OF_DUTIES_DECISION_REQUIRED" in constat["marqueurs"]
+    operations = {e["operation"] for e in constat["ecarts"]}
+    assert operations == {
+        "POST /api/v1/aes",
+        "POST /api/v1/quality/non-conformities",
+        "POST /api/v1/billing/calculate",
+    }, operations
+    for ecart in constat["ecarts"]:
+        for champ in ("attendu", "observe", "capacite_obtenue", "decision_metier_requise"):
+            assert ecart[champ], f"{ecart['operation']} : {champ} vide"
+        assert "distincte" in ecart["correction"]
+
+
+def test_every_site_blocker_is_listed_in_the_findings_document():
+    aplati = _aplati(DOCS / "SECURITY_FINDINGS.md")
+    for identifiant in ("B-03", "B-08", "B-12"):
+        assert identifiant in aplati, f"{identifiant} absent de SECURITY_FINDINGS.md"
+    assert "CSA_SITE_PRODUCTION_GO_BLOCKER" in aplati
+
+
+# ── §10 — la barrière ne peut pas redevenir décorative ──────────────────────
+
+
+def test_the_secret_scan_never_returns_to_advisory():
+    """MUTATION — le retour de `continue-on-error` sur le scan de secrets."""
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "ci.yml"))
+    bloc = json.dumps(workflow["jobs"]["g0-security"])
+    assert "continue-on-error" not in bloc, (
+        "un pas du job de sécurité est redevenu consultatif — c'est-à-dire décoratif"
+    )
+
+
+def test_the_security_job_checks_out_the_full_history():
+    """MUTATION — le retour de `fetch-depth: 1`.
+
+    Sans historique complet, le scan Gitleaks porte sur un seul commit et le
+    dit vert.
+    """
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "ci.yml"))
+    checkout = next(
+        e
+        for e in workflow["jobs"]["g0-security"]["steps"]
+        if str(e.get("uses", "")).startswith("actions/checkout")
+    )
+    assert checkout.get("with", {}).get("fetch-depth") == 0, (
+        "le job de sécurité ne récupère plus tout l'historique : le scan Gitleaks "
+        "porterait sur un seul commit et le dirait vert"
     )
