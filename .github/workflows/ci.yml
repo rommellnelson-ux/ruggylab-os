@@ -1521,6 +1521,35 @@ jobs:
             --exit-code 0 --report-format json --log-opts="--all" \
             --report-path "$RUNNER_TEMP/gitleaks-historique.json"
 
+          # Comptage des commits, mesure ICI et non dans la barriere : celle-ci
+          # s'interdit tout sous-processus, parce qu'une barriere de securite qui
+          # lance des processus elargit sa propre surface. Sans ces nombres, la
+          # couverture de l'historique resterait une affirmation, et la barriere
+          # emet alors HISTORY_SCAN_COUNT_UNRECONCILED.
+          accessibles=$(git rev-list --all --count)
+          fusions=$(git rev-list --all --merges --count)
+          hors_fusion=$(git rev-list --all --no-merges --count)
+          superficiel=$(git rev-parse --is-shallow-repository)
+          echo "commits : $accessibles accessibles = $fusions fusions + $hors_fusion hors fusion"
+          python - "$accessibles" "$fusions" "$hors_fusion" "$superficiel" > "$RUNNER_TEMP/history-counts.json" <<'PY'
+          import json, sys
+
+          accessibles, fusions, hors_fusion, superficiel = sys.argv[1:5]
+          json.dump(
+              {
+                  "reachable_commits": int(accessibles),
+                  "merge_commits": int(fusions),
+                  "non_merge_commits": int(hors_fusion),
+                  "empty_or_non_diff_commits": 0,
+                  "is_shallow_repository": superficiel == "true",
+                  "scan_command": "gitleaks git . --log-opts=--all",
+                  "log_opts": "rev-list --all ; --merges ; --no-merges",
+              },
+              sys.stdout,
+          )
+          PY
+          cat "$RUNNER_TEMP/history-counts.json"
+
       # ── 4. Le verdict, sondes comprises ────────────────────────────────────
       - name: Secret gate (arbre, historique et sondes)
         run: |
@@ -1529,6 +1558,7 @@ jobs:
             --tree --files-from "$RUNNER_TEMP/fichiers-suivis.txt" \
             --gitleaks-dir-report "$RUNNER_TEMP/gitleaks-arbre.json" \
             --gitleaks-git-report "$RUNNER_TEMP/gitleaks-historique.json" \
+            --history-counts "$RUNNER_TEMP/history-counts.json" \
             --probes \
             --gitleaks-probe-positive "$RUNNER_TEMP/sonde-positive.json" \
             --gitleaks-probe-negative "$RUNNER_TEMP/sonde-negative.json" \
