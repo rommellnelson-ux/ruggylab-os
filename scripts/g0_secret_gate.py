@@ -622,6 +622,15 @@ def verifier_sondes_gitleaks(rapport_porteur: Path, rapport_propre: Path) -> dic
     }
 
 
+#: Les seuls noms d'outil qu'une sonde peut porter.
+OUTILS = ("detect-secrets", "gitleaks")
+
+
+def _outil(valeur: Any) -> str:
+    """Le nom de l'outil sondé, ou une constante d'erreur — jamais autre chose."""
+    return str(valeur) if valeur in OUTILS else "OUTIL_INCONNU"
+
+
 #: Les seuls verdicts qu'une sonde peut rendre. Rien d'autre n'est affichable.
 VERDICTS = (
     "POSITIVE_PROBE_DETECTED",
@@ -732,7 +741,7 @@ def main(argv: list[str] | None = None) -> int:
         # une journalisation de donnee sensible, parce que la structure vient
         # d'un scan de secrets. Le controle d'appartenance garantit que rien
         # d'autre qu'une des six constantes ne peut sortir.
-        outil = str(sonde["scanner"])
+        outil = _outil(sonde["scanner"])
         positif = _verdict(sonde["positive"])
         negatif = _verdict(sonde["negative"])
         print(f"Sonde {outil} : {positif} / {negatif}")
