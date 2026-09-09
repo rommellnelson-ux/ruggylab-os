@@ -5,7 +5,7 @@
     "baseline_input_ref": "main",
     "generation_command": "python scripts/g0_security_baseline.py --generate",
     "generator_version": "1.0.0",
-    "relevant_input_file_count": 261,
+    "relevant_input_file_count": 264,
     "relevant_input_patterns": [
       "app/**/*",
       "artifacts/g0/routes.json",
@@ -13,17 +13,20 @@
       "artifacts/g0/schema.json",
       "docs/g0/ROUTE_EXPOSURE_QUALIFICATION.json",
       ".secrets.baseline",
+      "scripts/g0_security_baseline.py",
+      "scripts/g0_security_rules.py",
+      "scripts/g0_secret_gate.py",
       "deploy/**/*",
       "monitoring/**/*",
       "docker-compose*.yml",
       "requirements.txt"
     ],
     "relevant_input_set": "security",
-    "relevant_input_tree_sha256": "222d15092929722464c753b8d9ab0866cb956c95ff843069e20b46d8fe67adae",
+    "relevant_input_tree_sha256": "eb7d1e29431d8094adb6d7ede69049267cd3853231f3c67f1d39b09adefbf4e3",
     "schema_version": "1.0.0"
   },
   "volatile": {
-    "generated_at": "2026-09-09T13:12:09Z",
+    "generated_at": "2026-09-09T21:56:03Z",
     "platform": "windows/amd64",
     "python_version": "3.13.13"
   }

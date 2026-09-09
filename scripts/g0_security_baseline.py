@@ -1586,6 +1586,49 @@ def construire_resume_secrets() -> dict[str, Any]:
 # ── Constats ────────────────────────────────────────────────────────────────
 
 
+#: Réglages dont le modèle d'environnement doit être fermé par défaut.
+#: Ils sont relus dans `.env.example`, jamais supposés.
+REGLAGES_FAIL_CLOSED = (
+    "ANALYZER_RAW_LISTENER_ENABLED",
+    "ANALYZER_HEMATOLOGY_ENABLED",
+    "ANALYZER_BIOCHEMISTRY_ENABLED",
+    "ANALYZER_IMMUNO_ENABLED",
+    "ENABLE_DH36_LISTENER",
+    "CSA_SYNC_ENABLED",
+)
+
+
+def _modele_environnement() -> list[dict[str, Any]]:
+    """Les valeurs que `.env.example` propose pour les réglages sensibles.
+
+    Le fichier n'est pas lu pour être corrigé — il ne l'est pas dans ce lot — mais
+    parce qu'il est le point de départ de tout `.env` réel. Un défaut du code par
+    défaut se voit en relisant `config.py` ; un défaut du MODÈLE ne se voit qu'ici,
+    et se propage à chaque installation qui part de lui.
+    """
+    modele = RACINE / ".env.example"
+    if not modele.is_file():
+        return []
+    releves: list[dict[str, Any]] = []
+    for numero, ligne in enumerate(modele.read_text(encoding="utf-8").splitlines(), start=1):
+        depouille = ligne.strip()
+        if depouille.startswith("#") or "=" not in depouille:
+            continue
+        nom, _, valeur = depouille.partition("=")
+        nom = nom.strip()
+        if nom not in REGLAGES_FAIL_CLOSED:
+            continue
+        releves.append(
+            {
+                "setting": nom,
+                "template_value": valeur.strip(),
+                "line": numero,
+                "fail_closed": valeur.strip().lower() in ("false", "0", "no", ""),
+            }
+        )
+    return sorted(releves, key=lambda r: r["setting"])
+
+
 def construire_constats(
     matrice: list[dict[str, Any]],
     sondes: list[dict[str, Any]],
@@ -1667,6 +1710,19 @@ def construire_constats(
                 "et à la sortie. Le jeton n'expire jamais et n'est pas révocable "
                 "indépendamment du compte rendu."
             ),
+            "marqueurs": [
+                "CSA_SITE_PRODUCTION_GO_BLOCKER",
+                "REPORT_VERIFICATION_TOKEN_HARDENING_REQUIRED",
+            ],
+            "attributs": {
+                "facteur_unique": True,
+                "expiration": "aucune",
+                "revocable_independamment_du_compte_rendu": False,
+                "rejouable": True,
+                "porte_dans": "chemin de l'URL",
+                "journalise_en_clair": True,
+                "donnees_retournees": "vérification non nominative du compte rendu",
+            },
             "preuve": (
                 "Sonde sentinelle : la valeur placée dans le chemin est retrouvée "
                 "dans le journal applicatif — voir log-sentinel-observations.json, "
@@ -1756,10 +1812,27 @@ def construire_constats(
                     "le code fait : un écart décrit donc l'application telle qu'elle "
                     "est, et non une sonde défaillante."
                 ),
+                "marqueurs": ["SEGREGATION_OF_DUTIES_DECISION_REQUIRED"],
                 "preuve": [
                     f"{s['account']} ({s['role']}) {s['method']} {s['path']} -> HTTP "
                     f"{s['observed_status']} ({s['outcome']}), attendu {s['expected']} "
                     f"— {s['intent']}"
+                    for s in ecarts
+                ],
+                "ecarts": [
+                    {
+                        "role": s["role"],
+                        "operation": f"{s['method']} {s['path']}",
+                        "attendu": s["expected"],
+                        "observe": f"HTTP {s['observed_status']} ({s['outcome']})",
+                        "capacite_obtenue": s["intent"],
+                        "decision_metier_requise": (
+                            "Trancher si ce rôle doit disposer de cette capacité. "
+                            "Tant que la règle n'est pas écrite, l'écart n'est ni un "
+                            "défaut ni une permission : c'est une question ouverte."
+                        ),
+                        "correction": "PR distincte, hors du lot B",
+                    }
                     for s in ecarts
                 ],
                 "remediation_owner": "lot D",
@@ -1786,10 +1859,105 @@ def construire_constats(
             }
         )
 
+    # B-12 — le modele d'environnement ouvre ce que le code ferme.
+    #
+    # Le defaut du code, le Compose coeur et la CI valent tous `false`. Le
+    # MODELE que l'on copie pour fabriquer un `.env` reel, lui, propose `true`
+    # pour quatre ecoutes d'automates. Un site qui part de ce fichier — c'est
+    # sa raison d'etre — demarre donc en ecoute, sans que personne ait decide
+    # de l'activer. C'est l'inverse d'un defaut fail-closed.
+    #
+    # Rien n'est modifie ici : `.env.example` est explicitement hors perimetre
+    # de cette PR. Le constat est mesure, classe, et transmis.
+    modele = _modele_environnement()
+    ouverts = [r for r in modele if not r["fail_closed"]]
+    if ouverts:
+        constats.append(
+            {
+                "id": "B-12",
+                "classement": "P1",
+                "marqueurs": [
+                    "CSA_SITE_PRODUCTION_GO_BLOCKER",
+                    "DEPLOYMENT_TEMPLATE_FAIL_CLOSED_REQUIRED",
+                ],
+                "titre": "Le modele d'environnement livre est fail-open",
+                "constat": (
+                    f"{len(ouverts)} des {len(modele)} reglages sensibles relus dans "
+                    ".env.example y valent une valeur ACTIVE, alors que app/core/config.py, "
+                    "docker-compose.yml et la CI les tiennent tous a false. Le modele est "
+                    "le point de depart de tout .env reel : une installation qui le copie "
+                    "active des ecoutes que la gouvernance interdit."
+                ),
+                "preuve": [
+                    f".env.example:{r['line']} {r['setting']}={r['template_value']} "
+                    f"(attendu : false)"
+                    for r in ouverts
+                ],
+                "modele_environnement": modele,
+                "action_future": (
+                    "PR corrective distincte mettant les quatre valeurs a false, avec un "
+                    "test empechant toute regression. Hors perimetre du lot B."
+                ),
+                "remediation_owner": "lot D",
+            }
+        )
+
     return constats
 
 
 # ── Assemblage ──────────────────────────────────────────────────────────────
+
+
+def _portee_de_la_preuve(
+    matrice: list[dict[str, Any]],
+    sondes: list[dict[str, Any]],
+    non_resolues: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Ce que la matrice prouve, et sur combien d'opérations.
+
+    Une matrice de 231 lignes dont 99 seulement ont été exercées ne dit pas la
+    même chose selon qu'on l'énonce ou non. La première rédaction affichait
+    `UNRESOLVED = 0` sans préciser que ce zéro porte sur la classification
+    **statique** : lu vite, il laissait croire que le comportement des 231
+    opérations avait été confirmé à l'exécution. Ces nombres rendent la
+    confusion impossible.
+    """
+    exercees = {(s["method"], s["path"]) for s in sondes}
+    atteintes = {
+        (s["method"], s["path"]) for s in sondes if s["probe_class"] == "AUTHORIZATION_REACHED"
+    }
+    arretees = {
+        (s["method"], s["path"])
+        for s in sondes
+        if s["probe_class"] == "VALIDATION_FAILED_BEFORE_AUTHORIZATION"
+    }
+    return {
+        "operations_statically_classified": len(matrice),
+        "operations_runtime_probed": len(exercees),
+        "operations_authorization_reached": len(atteintes),
+        "operations_validation_stopped_before_authorization": len(arretees - atteintes),
+        "operations_not_runtime_probed": len(matrice) - len(exercees),
+        "operations_unresolved_statically": len(non_resolues),
+        # Une SONDE n'est pas une OPERATION. 99 sondes portent sur 65 operations
+        # distinctes, parce que la meme operation est exercee avec plusieurs
+        # roles — c'est justement l'objet d'une matrice RBAC. Annoncer « 99
+        # operations exercees » gonflerait la couverture d'un tiers. Les deux
+        # grandeurs sont donc nommees separement, et aucune ne sert pour l'autre.
+        "probes_executed": len(sondes),
+        "probes_authorization_reached": sum(
+            1 for s in sondes if s["probe_class"] == "AUTHORIZATION_REACHED"
+        ),
+        "probes_validation_stopped_before_authorization": sum(
+            1 for s in sondes if s["probe_class"] == "VALIDATION_FAILED_BEFORE_AUTHORIZATION"
+        ),
+        "_comment": (
+            "operations_unresolved_statically = 0 signifie : classification statique "
+            "terminee. Il ne signifie PAS que le comportement runtime des operations a "
+            "ete confirme. operations_not_runtime_probed dit combien ne l'ont pas ete. "
+            "operations_* compte des OPERATIONS DISTINCTES ; probes_* compte des SONDES, "
+            "plus nombreuses parce qu'une meme operation est exercee avec plusieurs roles."
+        ),
+    }
 
 
 def construire(avec_runtime: bool = True) -> dict[str, Any]:
@@ -1874,6 +2042,12 @@ def construire(avec_runtime: bool = True) -> dict[str, Any]:
             }
             for nom, valeur in sorted(SEMANTIQUE_GARDES.items())
         },
+        # Portée de la preuve, énoncée en chiffres pour qu'on ne puisse pas la
+        # lire à l'envers. `UNRESOLVED = 0` signifie « classification statique
+        # terminée » et rien d'autre : il ne dit pas que les 231 opérations ont
+        # été exercées. Confondre les deux transformerait un inventaire en
+        # attestation de bon fonctionnement.
+        "scope": _portee_de_la_preuve(matrice, sondes, non_resolues),
         "totals": {
             "operations": len(matrice),
             "by_confidence": par_confiance,

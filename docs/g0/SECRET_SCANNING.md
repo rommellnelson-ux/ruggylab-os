@@ -260,9 +260,27 @@ Le scan d'historique est exécuté par le job
 (`gitleaks git . --log-opts="--all"`), après vérification que le clone n'est pas
 superficiel.
 
-Mesure sur la tête de la PR (2026-09-09) : le dépôt compte **445 commits
-accessibles**, dont **367 réellement parcourus** par `gitleaks git .
---log-opts="--all"`.
+**Réconciliation du nombre de commits.** Le rapport précédent avançait deux
+nombres — 445 accessibles, 367 parcourus — sans relier l'un à l'autre. Un écart
+de 78 commits inexpliqué n'est pas une preuve de couverture : c'est une question
+ouverte. La barrière mesure désormais la partition et échoue si l'addition ne
+tombe pas juste.
+
+| Compteur | Source |
+| --- | --- |
+| `reachable_commits` | `git rev-list --all` |
+| `merge_commits` | `git rev-list --all --merges` |
+| `non_merge_commits` | `git rev-list --all --no-merges` |
+| `gitleaks_expected_commits_scanned` | = `non_merge_commits` — Gitleaks ne parcourt pas les commits de fusion, qui n'introduisent aucun contenu propre |
+| `distinct_commits_present_in_findings` | commits distincts cités par le rapport |
+| `is_shallow_repository` | `git rev-parse --is-shallow-repository` |
+
+L'écart s'explique donc par les **commits de fusion**. Si
+`reachable = merges + non_merges` ne se vérifie pas, ou si le clone est
+superficiel, la barrière émet `HISTORY_SCAN_COUNT_UNRECONCILED` et passe au
+rouge — et le statut `G0_SECRET_HISTORY_SCAN_VERIFIED` n'est pas prononcé.
+Les valeurs de l'exécution sont dans `secret-gate-report.json`, champ
+`history_reconciliation`.
 
 | Portée | Détections brutes | Après application du périmètre commun | Sans couverture écrite |
 | --- | ---: | ---: | ---: |
@@ -292,13 +310,42 @@ déjà une liste filtrée, Gitleaks parcourait tout ; les deux outils ne parlaie
 donc pas du même périmètre. Les trois derniers sont **inscrits au registre**.
 Il ne reste ensuite aucune détection non couverte.
 
-**Clé d'acceptation pour Gitleaks.** L'empreinte disponible est le SHA du
-commit. L'inclure dans la clé rendrait le registre faux à chaque nouveau commit
-touchant un chemin déjà qualifié, et le corriger deviendrait un geste machinal
-— c'est-à-dire un registre qu'on ne relit plus. La clé est donc
-**(scanner, chemin, règle)**, le commit restant inscrit à titre documentaire.
-Conséquence assumée : un chemin **nouveau** ou une règle **nouvelle** font
-échouer la barrière ; un commit de plus sur un chemin déjà qualifié, non.
+**Clé d'acceptation pour Gitleaks — corrigée après revue indépendante.**
+
+La première version de cette barrière utilisait **(scanner, chemin, règle)**,
+en écartant délibérément l'identité de la détection. L'argument écrit ici était
+qu'inclure le SHA du commit rendrait le registre faux à chaque nouveau commit.
+L'argument partait d'une prémisse fausse — **le commit n'est pas l'identité
+d'une détection** — et sa conséquence était grave.
+
+La revue l'a démontrée par mutation : dans un fichier déjà qualifié, sous une
+règle déjà qualifiée, **une seconde valeur détectable passait sans être relue**.
+C'est exactement le chemin par lequel un vrai secret serait entré.
+
+La clé est désormais le champ **`Fingerprint`** que Gitleaks compose lui-même :
+
+```
+<commit>:<fichier>:<règle>:<ligne>      pour un scan d'historique
+<fichier>:<règle>:<ligne>               pour un scan d'arbre
+```
+
+Le chemin, la règle, le commit et la ligne restent inscrits comme métadonnées
+de lecture. **Aucun ne remplace l'empreinte.** Un finding sans `Fingerprint`
+n'est pas accepté par défaut : il produit `GITLEAKS_FINDING_WITHOUT_FINGERPRINT`
+et la barrière passe au rouge — on ne laisse pas entrer une détection qu'on ne
+sait pas nommer.
+
+Conséquence assumée, et cette fois dans le bon sens : le registre s'allonge. Une
+valeur déplacée d'une ligne, une valeur ajoutée dans un fichier déjà revu, une
+nouvelle règle sur un chemin connu — **chacune redemande une décision humaine**.
+C'est le prix d'un registre qui dit la vérité, et il est plus faible que celui
+d'un registre qui rassure.
+
+Les cinq entrées Gitleaks du registre précédent portaient l'ancienne forme
+d'empreinte — trois un SHA de commit, deux la chaîne littérale `arbre-courant`.
+Elles ont été **retirées** : leur identité n'était pas vérifiable. Elles sont
+re-dérivées d'une mesure réelle en CI, puis relues et réinscrites avec leur
+`Fingerprint` exact.
 
 ### 6.3 Verdict des sondes
 
@@ -361,3 +408,37 @@ python -m pytest -q tests/test_g0_security_baseline.py
 
 Le scan d'historique demande Gitleaks ; il est exécuté par la CI, qui l'installe
 en vérifiant l'empreinte de l'archive.
+
+## 9. Ce que la revue indépendante a corrigé
+
+Quatre défauts d'outillage, dont deux privaient la barrière de son effet.
+
+| # | Défaut | Ce qu'il permettait | Correction |
+| --- | --- | --- | --- |
+| 1 | Clé d'acceptation Gitleaks réduite à `chemin + règle` | **Une nouvelle valeur détectable, dans un fichier déjà qualifié sous la même règle, passait sans être relue** | Clé = `Fingerprint` exact ; un finding sans empreinte fait échouer la barrière |
+| 2 | `except (OSError, UnicodeDecodeError): continue` dans le scan de l'arbre | **Un fichier illisible produisait le même résultat qu'un fichier propre** : zéro détection, barrière verte | Chaque fichier est `SCANNED` ou `EXPLICITLY_EXCLUDED` ; tout autre cas donne `SECRET_SCAN_INCOMPLETE` |
+| 3 | Les deux fichiers exclus des règles d'entropie n'étaient relus par personne | Une zone franche du dépôt, versionnée, où écrire n'importe quoi | Validateur spécialisé : schéma exact, champs autorisés, types, empreintes, décisions, et refus de toute valeur détectable |
+| 4 | 445 et 367 commits annoncés sans lien entre eux | Une couverture d'historique affirmée, non démontrée | Partition mesurée ; `HISTORY_SCAN_COUNT_UNRECONCILED` si l'addition ne tombe pas juste |
+
+### Ce que les exclusions ne sont pas
+
+`.secrets.baseline` et `docs/governance/SECRET_SCAN_EXCEPTIONS.json` restent
+soustraits aux règles générales d'entropie, **pour une raison unique** : ils
+contiennent des empreintes, et un scanner qui les relit signale les siennes à
+l'infini.
+
+Cette exclusion ne dit rien de leur contenu, et **aucune exemption ne s'appuie
+sur leur emplacement** — un chemin dans `docs/` ne rend pas un contenu
+inoffensif. Le validateur spécialisé refuse dans ces deux fichiers : tout champ
+`Secret`, `Match`, `Value`, `Raw` ou `Plaintext` ; toute clé privée PEM ; tout
+JWT ; toute clé d'accès cloud reconnaissable ; toute URL portant des
+identifiants ; toute adresse électronique recopiée d'un rapport ; toute entrée
+sans justification ; toute empreinte au format invalide ; tout champ hors
+schéma.
+
+### Non-vacuité de l'historique
+
+La sonde positive ajoute la sentinelle dans un premier commit, **la retire dans
+un second**, puis scanne. À `HEAD`, l'arbre du dépôt jetable est propre : une
+sonde positive qui réussit ne peut réussir que parce que l'**historique** a
+réellement été parcouru. Un scan limité à l'arbre échouerait ici.

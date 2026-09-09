@@ -32,13 +32,41 @@ Corriger un défaut dans la même passe que sa mesure rendrait la mesure
 invérifiable : on ne saurait plus si le système était ainsi ou s'il a été rendu
 ainsi pour la photographie.
 
+### Portée de la preuve, en chiffres
+
+Une matrice de 231 lignes ne prouve pas la même chose sur toutes ses lignes.
+Ces six nombres disent lesquelles, et évitent la lecture inverse que la revue
+indépendante a relevée.
+
+| Grandeur | Valeur |
+| --- | ---: |
+| `operations_statically_classified` | **231** |
+| `operations_runtime_probed` | **65** |
+| `operations_authorization_reached` | **64** |
+| `operations_validation_stopped_before_authorization` | **1** |
+| `operations_not_runtime_probed` | **166** |
+| `operations_unresolved_statically` | **0** |
+
+> **`UNRESOLVED = 0` signifie « classification statique terminée », et rien de
+> plus.** Il ne dit pas que le comportement des 231 opérations a été confirmé à
+> l'exécution. **166 opérations n'ont pas été exercées** : elles sont décrites
+> par lecture des dépendances FastAPI, pas par expérience.
+
+> **Une sonde n'est pas une opération.** 99 sondes ont été exécutées, mais elles
+> portent sur **65 opérations distinctes** : la même opération est exercée avec
+> plusieurs rôles, ce qui est précisément l'objet d'une matrice RBAC. Compter
+> 99 opérations exercées gonflerait la couverture d'un tiers. Les deux grandeurs
+> vivent donc dans des champs séparés de `rbac-matrix.json` — `operations_*` et
+> `probes_*` — et aucune ne sert pour l'autre.
+
 | | |
 | --- | --- |
-| Opérations couvertes | **231** — les 231 opérations OpenAPI du lot A, sans exception |
+| Opérations classifiées | **231** — les 231 opérations OpenAPI du lot A, sans exception |
 | Rôles | `accountant`, `admin`, `officer`, `technician` |
 | Sondes exécutées | **99**, contre l'application, sur une base SQLite jetable |
+| Opérations réellement exercées | **65** ; **166 non exercées** |
 | Données des sondes | **strictement synthétiques** — aucune donnée patient réelle |
-| Non résolues | **0** |
+| Non résolues *statiquement* | **0** |
 
 ## 2. Niveaux de confiance
 
@@ -50,7 +78,7 @@ Chaque opération porte donc le niveau de preuve de ce qui est écrit à son suj
 | `STATIC_EXPLICIT` | **168** | La garde est lue dans les dépendances FastAPI réellement appliquées à la route. Aucune sonde ne l'a exercée. |
 | `RUNTIME_CONFIRMED` | **62** | Une sonde a atteint l'autorisation et le code HTTP observé confirme la lecture statique. |
 | `CUSTOM_AUTH_CONFIRMED` | **1** | La garde n'est pas une dépendance : elle est écrite dans le corps de la fonction (`_verify_analyzer_security`), et une sonde l'a exercée. |
-| `UNRESOLVED` | **0** | Aucune opération ne reste sans qualification. |
+| `UNRESOLVED` | **0** | Aucune opération ne reste sans qualification **statique**. Ce zéro ne porte pas sur le comportement runtime. |
 
 `STATIC_EXPLICIT` n'est pas une faiblesse de méthode : c'est l'aveu que 168
 opérations sont décrites par lecture et non par expérience. Sonder les 231

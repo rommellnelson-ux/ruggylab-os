@@ -29,9 +29,22 @@
         "titre": "Le modèle military_facilities n'a aucune table dans la base migrée"
       },
       {
+        "attributs": {
+          "donnees_retournees": "vérification non nominative du compte rendu",
+          "expiration": "aucune",
+          "facteur_unique": true,
+          "journalise_en_clair": true,
+          "porte_dans": "chemin de l'URL",
+          "rejouable": true,
+          "revocable_independamment_du_compte_rendu": false
+        },
         "classement": "P1",
         "constat": "GET /api/v1/reports/verify/{token} porte le jeton dans le chemin. ObservabilityMiddleware journalise `request.url.path` à l'entrée et à la sortie. Le jeton n'expire jamais et n'est pas révocable indépendamment du compte rendu.",
         "id": "B-03",
+        "marqueurs": [
+          "CSA_SITE_PRODUCTION_GO_BLOCKER",
+          "REPORT_VERIFICATION_TOKEN_HARDENING_REQUIRED"
+        ],
         "preuve": "Sonde sentinelle : la valeur placée dans le chemin est retrouvée dans le journal applicatif — voir log-sentinel-observations.json, sentinelle `jeton_verification`.",
         "remediation_owner": "lot D",
         "titre": "Le jeton de vérification d'un compte rendu est journalisé en clair"
@@ -71,7 +84,39 @@
       {
         "classement": "P1",
         "constat": "3 sondes sur 99 montrent un comportement différent de ce que la séparation des tâches laisserait attendre. `expected` exprime la RÈGLE MÉTIER attendue, pas ce que le code fait : un écart décrit donc l'application telle qu'elle est, et non une sonde défaillante.",
+        "ecarts": [
+          {
+            "attendu": "DENY",
+            "capacite_obtenue": "déclaration AES (statut sérologique) par le comptable",
+            "correction": "PR distincte, hors du lot B",
+            "decision_metier_requise": "Trancher si ce rôle doit disposer de cette capacité. Tant que la règle n'est pas écrite, l'écart n'est ni un défaut ni une permission : c'est une question ouverte.",
+            "observe": "HTTP 201 (REACHED_HANDLER)",
+            "operation": "POST /api/v1/aes",
+            "role": "accountant"
+          },
+          {
+            "attendu": "DENY",
+            "capacite_obtenue": "calcul de facturation par un technicien",
+            "correction": "PR distincte, hors du lot B",
+            "decision_metier_requise": "Trancher si ce rôle doit disposer de cette capacité. Tant que la règle n'est pas écrite, l'écart n'est ni un défaut ni une permission : c'est une question ouverte.",
+            "observe": "HTTP 200 (REACHED_HANDLER)",
+            "operation": "POST /api/v1/billing/calculate",
+            "role": "technician"
+          },
+          {
+            "attendu": "DENY",
+            "capacite_obtenue": "création de non-conformité par le comptable",
+            "correction": "PR distincte, hors du lot B",
+            "decision_metier_requise": "Trancher si ce rôle doit disposer de cette capacité. Tant que la règle n'est pas écrite, l'écart n'est ni un défaut ni une permission : c'est une question ouverte.",
+            "observe": "HTTP 201 (REACHED_HANDLER)",
+            "operation": "POST /api/v1/quality/non-conformities",
+            "role": "accountant"
+          }
+        ],
         "id": "B-08",
+        "marqueurs": [
+          "SEGREGATION_OF_DUTIES_DECISION_REQUIRED"
+        ],
         "preuve": [
           "accountant (accountant) POST /api/v1/aes -> HTTP 201 (REACHED_HANDLER), attendu DENY — déclaration AES (statut sérologique) par le comptable",
           "technician (technician) POST /api/v1/billing/calculate -> HTTP 200 (REACHED_HANDLER), attendu DENY — calcul de facturation par un technicien",
@@ -87,6 +132,62 @@
         "preuve": "log-sentinel-observations.json",
         "remediation_owner": "lot D",
         "titre": "Des données patient synthétiques apparaissent hors de l'audit métier"
+      },
+      {
+        "action_future": "PR corrective distincte mettant les quatre valeurs a false, avec un test empechant toute regression. Hors perimetre du lot B.",
+        "classement": "P1",
+        "constat": "4 des 6 reglages sensibles relus dans .env.example y valent une valeur ACTIVE, alors que app/core/config.py, docker-compose.yml et la CI les tiennent tous a false. Le modele est le point de depart de tout .env reel : une installation qui le copie active des ecoutes que la gouvernance interdit.",
+        "id": "B-12",
+        "marqueurs": [
+          "CSA_SITE_PRODUCTION_GO_BLOCKER",
+          "DEPLOYMENT_TEMPLATE_FAIL_CLOSED_REQUIRED"
+        ],
+        "modele_environnement": [
+          {
+            "fail_closed": false,
+            "line": 98,
+            "setting": "ANALYZER_BIOCHEMISTRY_ENABLED",
+            "template_value": "true"
+          },
+          {
+            "fail_closed": false,
+            "line": 96,
+            "setting": "ANALYZER_HEMATOLOGY_ENABLED",
+            "template_value": "true"
+          },
+          {
+            "fail_closed": false,
+            "line": 100,
+            "setting": "ANALYZER_IMMUNO_ENABLED",
+            "template_value": "true"
+          },
+          {
+            "fail_closed": false,
+            "line": 87,
+            "setting": "ANALYZER_RAW_LISTENER_ENABLED",
+            "template_value": "true"
+          },
+          {
+            "fail_closed": true,
+            "line": 286,
+            "setting": "CSA_SYNC_ENABLED",
+            "template_value": "false"
+          },
+          {
+            "fail_closed": true,
+            "line": 61,
+            "setting": "ENABLE_DH36_LISTENER",
+            "template_value": "false"
+          }
+        ],
+        "preuve": [
+          ".env.example:98 ANALYZER_BIOCHEMISTRY_ENABLED=true (attendu : false)",
+          ".env.example:96 ANALYZER_HEMATOLOGY_ENABLED=true (attendu : false)",
+          ".env.example:100 ANALYZER_IMMUNO_ENABLED=true (attendu : false)",
+          ".env.example:87 ANALYZER_RAW_LISTENER_ENABLED=true (attendu : false)"
+        ],
+        "remediation_owner": "lot D",
+        "titre": "Le modele d'environnement livre est fail-open"
       }
     ],
     "guard_semantics": {
@@ -8004,6 +8105,18 @@
         "matching_expectation": 96,
         "probes": 99
       }
+    },
+    "scope": {
+      "_comment": "operations_unresolved_statically = 0 signifie : classification statique terminee. Il ne signifie PAS que le comportement runtime des operations a ete confirme. operations_not_runtime_probed dit combien ne l'ont pas ete. operations_* compte des OPERATIONS DISTINCTES ; probes_* compte des SONDES, plus nombreuses parce qu'une meme operation est exercee avec plusieurs roles.",
+      "operations_authorization_reached": 64,
+      "operations_not_runtime_probed": 166,
+      "operations_runtime_probed": 65,
+      "operations_statically_classified": 231,
+      "operations_unresolved_statically": 0,
+      "operations_validation_stopped_before_authorization": 1,
+      "probes_authorization_reached": 98,
+      "probes_executed": 99,
+      "probes_validation_stopped_before_authorization": 1
     },
     "special_routes": [
       {

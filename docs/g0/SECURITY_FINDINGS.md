@@ -44,6 +44,7 @@ reste `DISTRIBUTION_NO_GO`.
 | ID | Classement | Titre | Preuve |
 | --- | :-: | --- | --- |
 | B-01 | **P1** | Des opérations touchant à la santé n'ont aucune garde de rôle | matrice + sonde |
+| **B-12** | **P1** | Le modèle d'environnement livré est fail-open | `.env.example` relu |
 | B-03 | **P1** | Le jeton de vérification d'un compte rendu est journalisé en clair | sonde sentinelle |
 | B-08 | **P1** | L'application s'écarte de la séparation des tâches attendue | 3 sondes sur 99 |
 | B-09 | **P1** | Des données patient synthétiques apparaissent hors de l'audit métier | sonde sentinelle |
@@ -55,9 +56,64 @@ reste `DISTRIBUTION_NO_GO`.
 | B-07 | **P2** | Le cloisonnement par unité ne repose que sur le code applicatif | sonde + schéma |
 | B-11 | **P2** | `.secrets.baseline` est inutilisable sur un runner Linux | lecture du fichier |
 
-**5 constats P1, 6 constats P2, 0 constat P0.**
+**6 constats P1, 6 constats P2, 0 constat P0.**
+
+### Blocages de mise en service du site
+
+Trois constats portent un marqueur qui les distingue des autres : ils ne
+bloquent pas la baseline G0, mais ils bloquent la **mise en service réelle** au
+CSA GR Plateau.
+
+| Constat | Marqueur |
+| --- | --- |
+| B-03 | `CSA_SITE_PRODUCTION_GO_BLOCKER` · `REPORT_VERIFICATION_TOKEN_HARDENING_REQUIRED` |
+| B-08 | `SEGREGATION_OF_DUTIES_DECISION_REQUIRED` |
+| B-12 | `CSA_SITE_PRODUCTION_GO_BLOCKER` · `DEPLOYMENT_TEMPLATE_FAIL_CLOSED_REQUIRED` |
+
+Aucun n'est corrigé ici. Chacun appelle une décision, puis une PR distincte.
 
 ## 3. Constats P1
+
+### B-12 — Le modèle d'environnement livré est fail-open
+
+`CSA_SITE_PRODUCTION_GO_BLOCKER` · `DEPLOYMENT_TEMPLATE_FAIL_CLOSED_REQUIRED`
+
+**Constat.** `.env.example` est le fichier que l'on copie pour fabriquer un
+`.env` réel — c'est sa seule raison d'être. Il propose une valeur **active**
+pour quatre écoutes d'automates, alors que le code, le Compose cœur et la
+gouvernance les tiennent toutes à `false`.
+
+```
+.env.example:87   ANALYZER_RAW_LISTENER_ENABLED=true      (attendu : false)
+.env.example:96   ANALYZER_HEMATOLOGY_ENABLED=true        (attendu : false)
+.env.example:98   ANALYZER_BIOCHEMISTRY_ENABLED=true      (attendu : false)
+.env.example:100  ANALYZER_IMMUNO_ENABLED=true            (attendu : false)
+```
+
+**Ce que le défaut n'est pas.** L'invariant de gouvernance tient :
+`app/core/config.py` porte `ANALYZER_RAW_LISTENER_ENABLED: bool = False`,
+`docker-compose.yml` écrit `"false"`, la CI écrit `"false"`. Une pile démarrée
+depuis le dépôt reste fermée.
+
+**Ce que le défaut est.** Un site qui suit la procédure normale — copier le
+modèle, renseigner ses propres valeurs — démarre en écoute sur quatre
+interfaces d'automates **sans que personne ait décidé de les activer**. La
+sécurité ne doit pas dépendre de ce qu'un exploitant pense à désactiver ; c'est
+l'inverse exact d'un défaut fail-closed.
+
+**Pourquoi ce n'est pas corrigé ici.** `.env.example` est explicitement hors du
+périmètre de cette PR. Le corriger dans la passe qui le mesure rendrait la
+mesure invérifiable : on ne saurait plus si le défaut a existé.
+
+**Action future.** PR corrective distincte mettant les quatre valeurs à `false`,
+avec un test interdisant la régression. Un test du lot B vérifie d'ailleurs que
+`.env.example` **n'a pas** été modifié : sans cela, ce constat se contredirait
+lui-même.
+
+**Preuve.** `artifacts/g0/rbac-matrix.json`, constat `B-12`, champ
+`modele_environnement` — les six réglages relus dans le fichier, avec leur ligne
+et leur valeur.
+
 
 ### B-01 — Des opérations touchant à la santé n'ont aucune garde de rôle
 
