@@ -12,6 +12,11 @@ python-multipart==0.0.32
 alembic==1.18.4
 pytest==9.0.3
 httpx==0.28.1
+# Mesure de couverture (baseline G0, lot C). Versions EXACTES : un chiffre de
+# couverture n'est comparable que si l'outil qui le produit est le meme. Une
+# plage de versions ferait varier la baseline sans qu'aucun code ne change.
+coverage[toml]==7.16.0
+pytest-cov==7.1.0
 
 # Image processing & ML inference
 onnxruntime==1.26.0

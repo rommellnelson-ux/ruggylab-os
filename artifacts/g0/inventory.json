@@ -69,9 +69,21 @@
           "type": "cli_script"
         },
         {
+          "docstring_first_line": "Résumé structuré de la couverture G0 (preuve 7) — et contrôle de sa validité.",
+          "has_main_guard": true,
+          "path": "scripts/g0_coverage_summary.py",
+          "type": "cli_script"
+        },
+        {
           "docstring_first_line": "Inventaire G0 — architecture, surfaces d'entrée et données.",
           "has_main_guard": true,
           "path": "scripts/g0_inventory.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Baseline de performance G0 (preuve 8) — mesurer, pas juger.",
+          "has_main_guard": true,
+          "path": "scripts/g0_perf_baseline.py",
           "type": "cli_script"
         },
         {
