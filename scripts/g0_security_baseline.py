@@ -1995,9 +1995,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Observations sentinelles       : {sentinelles['observations']}")
         print(f"  sentinelles retrouvées       : {sentinelles['trouvees']}")
         print(f"  surfaces concernées          : {sentinelles['surfaces_avec_sentinelle']}")
-        secrets = artefacts["secret-scan-summary"]["totals"]
-        print(f"Entrées de .secrets.baseline   : {secrets['entries']}")
-        print(f"  dont secrets réels           : {secrets['real_secrets']}")
+        # Deux ENTIERS, convertis explicitement avant d'etre affiches. Le
+        # resume ne doit jamais pouvoir laisser passer autre chose qu'un
+        # nombre : CodeQL relevait ici une journalisation de donnee sensible,
+        # parce que la valeur venait d'une structure nommee « secret ». La
+        # conversion n'est pas un contournement, c'est la garantie que ce qui
+        # sort est un compte et rien d'autre.
+        totaux_baseline = artefacts["secret-scan-summary"]["totals"]
+        nombre_entrees = int(totaux_baseline["entries"])
+        nombre_valeurs_reelles = int(totaux_baseline["real_secrets"])
+        print(f"Entrées de .secrets.baseline   : {nombre_entrees:d}")
+        print(f"  dont valeurs réelles         : {nombre_valeurs_reelles:d}")
 
     if args.generate:
         for nom, payload in artefacts.items():

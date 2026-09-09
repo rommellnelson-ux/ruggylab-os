@@ -622,6 +622,20 @@ def verifier_sondes_gitleaks(rapport_porteur: Path, rapport_propre: Path) -> dic
     }
 
 
+#: Les seuls verdicts qu'une sonde peut rendre. Rien d'autre n'est affichable.
+VERDICTS = (
+    "POSITIVE_PROBE_DETECTED",
+    "POSITIVE_PROBE_MISSED",
+    "NEGATIVE_PROBE_ACCEPTED",
+    "NEGATIVE_PROBE_FALSE_POSITIVE",
+)
+
+
+def _verdict(valeur: Any) -> str:
+    """Le verdict d'une sonde, ou une constante d'erreur — jamais autre chose."""
+    return str(valeur) if valeur in VERDICTS else "VERDICT_INCONNU"
+
+
 def sondes_concluantes(sondes: list[dict[str, Any]]) -> bool:
     return all(
         s["positive"] == "POSITIVE_PROBE_DETECTED" and s["negative"] == "NEGATIVE_PROBE_ACCEPTED"
@@ -713,7 +727,15 @@ def main(argv: list[str] | None = None) -> int:
             verifier_sondes_gitleaks(args.gitleaks_probe_positive, args.gitleaks_probe_negative)
         )
     for sonde in sondes:
-        print(f"Sonde {sonde['scanner']} : {sonde['positive']} / {sonde['negative']}")
+        # Seuls des verdicts appartenant a l'ensemble ferme ci-dessus sont
+        # affiches. Ce n'est pas une precaution de style : CodeQL relevait ici
+        # une journalisation de donnee sensible, parce que la structure vient
+        # d'un scan de secrets. Le controle d'appartenance garantit que rien
+        # d'autre qu'une des six constantes ne peut sortir.
+        outil = str(sonde["scanner"])
+        positif = _verdict(sonde["positive"])
+        negatif = _verdict(sonde["negative"])
+        print(f"Sonde {outil} : {positif} / {negatif}")
 
     confrontation = confronter(detections, connues, charger_registre())
     residus = confrontation["residus"]
