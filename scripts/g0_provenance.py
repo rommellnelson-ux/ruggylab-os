@@ -76,6 +76,35 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
         "alembic.ini",
         "requirements.txt",
     ),
+    # La couverture depend du code mesure, des tests qui l'executent, de la
+    # configuration de pytest et des versions epinglees de l'outil. Le
+    # generateur du resume en fait partie : c'est lui qui decide des
+    # regroupements. `.github/**` est volontairement absent — la CI orchestre
+    # la mesure, elle ne la determine pas, et l'y inclure rendrait l'empreinte
+    # instable a chaque retouche d'un job sans rapport.
+    "coverage": (
+        "app/**/*",
+        "tests/**/*",
+        "pyproject.toml",
+        "requirements.txt",
+        "scripts/g0_coverage_summary.py",
+    ),
+    # La performance depend du scenario, de l'application mesuree, du schema
+    # qu'elle interroge, de l'image construite et de la stack qui l'heberge.
+    # `scripts/g0_perf_baseline.py` EN FAIT PARTIE : modifier le scenario doit
+    # changer l'empreinte, sans quoi une baseline pourrait decrire un parcours
+    # qui n'est plus celui qu'on execute. La surcharge de mesure y figure pour
+    # la meme raison : elle desactive les limiteurs de debit, et une baseline
+    # qui la modifierait sans changer d'empreinte decrirait un autre systeme.
+    "performance": (
+        "scripts/g0_perf_baseline.py",
+        "scripts/g0_perf_overlay.yml",
+        "app/**/*",
+        "alembic/**/*",
+        "docker-compose.yml",
+        "Dockerfile",
+        "requirements.txt",
+    ),
 }
 
 #: Répertoires et fichiers produits par l'exécution, jamais par un auteur.
