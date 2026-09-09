@@ -420,6 +420,36 @@ Quatre défauts d'outillage, dont deux privaient la barrière de son effet.
 | 3 | Les deux fichiers exclus des règles d'entropie n'étaient relus par personne | Une zone franche du dépôt, versionnée, où écrire n'importe quoi | Validateur spécialisé : schéma exact, champs autorisés, types, empreintes, décisions, et refus de toute valeur détectable |
 | 4 | 445 et 367 commits annoncés sans lien entre eux | Une couverture d'historique affirmée, non démontrée | Partition mesurée ; `HISTORY_SCAN_COUNT_UNRECONCILED` si l'addition ne tombe pas juste |
 
+### Une cinquième correction, trouvée par la CI
+
+Le premier passage de l'amendement a échoué, et sur un défaut que la relecture
+n'avait pas vu : **six entrées du registre visaient des empreintes qui changent
+à chaque régénération**.
+
+`artifacts/g0/*provenance*.json` porte `relevant_input_tree_sha256`, l'empreinte
+SHA-256 des fichiers d'entrée. `detect-secrets` la relève comme une chaîne
+hexadécimale à forte entropie — ce qu'elle est, sans être un secret. Or la clé
+d'acceptation est le hachage de la **valeur** : dès qu'un fichier d'entrée
+change, l'empreinte change, l'identité change, et l'entrée du registre devient
+caduque.
+
+Il aurait donc fallu réécrire six entrées à chaque régénération. Un registre
+qu'on réécrit machinalement est un registre qu'on ne relit plus — précisément
+le défaut que cette barrière combat par ailleurs. C'était un piège de
+maintenance latent, hérité de la première version.
+
+Ces trois fichiers rejoignent donc l'exclusion structurelle, **pour la même
+raison que la baseline et le registre**, et avec la même compensation : ils
+passent par le validateur spécialisé. L'exclusion reste étroite —
+`rbac-matrix.json`, `data-classification.json`, `external-flows.json`,
+`log-sentinel-observations.json` et `secret-scan-summary.json` restent scannés.
+
+Au passage, la politique d'exclusion était **dupliquée** : `fichiers_a_scanner()`
+appliquait sa propre condition, `exclu_du_scan()` une autre. Les motifs de
+fichiers ne s'appliquaient donc qu'au rapport Gitleaks, pas à la liste donnée à
+`detect-secrets`, et les deux outils auraient cessé de parler du même périmètre.
+Une seule fonction fait désormais foi, et un test l'exige.
+
 ### Ce que les exclusions ne sont pas
 
 `.secrets.baseline` et `docs/governance/SECRET_SCAN_EXCEPTIONS.json` restent

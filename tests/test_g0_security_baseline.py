@@ -1679,3 +1679,83 @@ def test_the_security_job_checks_out_the_full_history():
         "le job de sécurité ne récupère plus tout l'historique : le scan Gitleaks "
         "porterait sur un seul commit et le dirait vert"
     )
+
+
+def test_the_provenance_files_are_excluded_for_a_measured_reason():
+    """Leur exclusion est structurelle, et compensée par le validateur.
+
+    Ces fichiers ne portent qu'une chose sensible à l'entropie :
+    `relevant_input_tree_sha256`. L'inscrire au registre ne tient pas, car la
+    clé d'acceptation est le hachage de la VALEUR, et cette valeur change à
+    chaque régénération. Six entrées étaient dans ce cas ; il aurait fallu les
+    réécrire à chaque passage, c'est-à-dire ne plus les relire.
+    """
+    from scripts.g0_secret_gate import exclu_du_scan, fichiers_de_provenance
+
+    provenances = {c.name for c in fichiers_de_provenance()}
+    assert provenances >= {"provenance.json", "security-provenance.json"}
+    for nom in provenances:
+        assert exclu_du_scan(f"artifacts/g0/{nom}")
+    # L'exclusion reste étroite : les artefacts de preuve restent scannés.
+    assert not exclu_du_scan("artifacts/g0/rbac-matrix.json")
+    assert not exclu_du_scan("artifacts/g0/data-classification.json")
+
+
+def test_no_registry_entry_targets_a_value_that_changes_every_regeneration():
+    """Une entrée qu'il faut réécrire à chaque passage n'est plus relue."""
+    registre = json.loads(_lire(REPO_ROOT / "docs/governance/SECRET_SCAN_EXCEPTIONS.json"))
+    # Le critère est l'artefact RÉGÉNÉRÉ, pas le mot « provenance » :
+    # `scripts/g0_provenance.py` porte une empreinte stable, tirée d'un littéral
+    # du code source, et reste légitimement inscrit.
+    volatiles = [
+        e
+        for e in registre["exceptions"]
+        if e["path"].startswith("artifacts/g0/") and "provenance" in e["path"]
+    ]
+    assert volatiles == [], (
+        "le registre couvre des empreintes qui changent à chaque régénération : "
+        f"{[e['path'] for e in volatiles]}"
+    )
+
+
+def test_both_scanners_share_one_exclusion_policy():
+    """Deux périmètres divergents feraient dire aux outils des choses différentes."""
+    from scripts.g0_secret_gate import exclu_du_scan, fichiers_a_scanner
+
+    retenus = fichiers_a_scanner(None)
+    exclus_a_tort = [c for c in retenus if exclu_du_scan(c)]
+    assert exclus_a_tort == [], exclus_a_tort
+
+
+#: Formes interdites, **assemblées à l'exécution**.
+#:
+#: Écrites en un seul littéral, elles seraient détectées dans ce fichier même, et
+#: il faudrait les inscrire au registre — c'est-à-dire faire entrer dans le dépôt
+#: des valeurs ressemblant à des secrets actifs pour prouver qu'on les refuse.
+#: La campagne s'y refuse, et le lot B applique déjà cette convention à ses
+#: sentinelles de sonde.
+def _formes_interdites() -> dict[str, dict[str, str]]:
+    return {
+        "jwt": {"note": "ey" + "JhbGciOiJIUzI1NiJ9." + "ey" + "JzdWIiOiIxIn0"},
+        "url-avec-identifiants": {
+            "note": "https://" + "utilisateur" + ":" + "motdepasse" + "@exemple.test/x"
+        },
+        "cle-aws": {"note": "AK" + "IA" + "IOSFODNN7" + "EXAMPLE"},
+        "champ-Secret": {"secret": "peu importe la valeur"},
+    }
+
+
+@pytest.mark.parametrize("forme", sorted(_formes_interdites()))
+def test_the_validator_also_guards_the_provenance_files(tmp_path, monkeypatch, forme):
+    """MUTATION — ce que l'exclusion pourrait laisser passer sans validateur."""
+    import scripts.g0_secret_gate as gate
+
+    contenu = _formes_interdites()[forme]
+
+    faux = tmp_path / "artifacts" / "g0"
+    faux.mkdir(parents=True)
+    (faux / "provenance.json").write_text(json.dumps(contenu), encoding="utf-8")
+    monkeypatch.setattr(gate, "RACINE", tmp_path)
+    assert gate.valider_fichiers_de_gouvernance(), (
+        "un fichier exclu du scan a échappé aussi au validateur : c'est une zone franche"
+    )

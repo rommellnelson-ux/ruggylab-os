@@ -138,6 +138,22 @@ SUFFIXES_EXCLUS = frozenset({".ico", ".jpeg", ".jpg", ".pdf", ".png", ".pyc", ".
 #: `is_baseline_file`.
 FICHIERS_EXCLUS = frozenset({".secrets.baseline", "docs/governance/SECRET_SCAN_EXCEPTIONS.json"})
 
+#: Les fichiers de provenance G0, exclus pour la MEME raison, et vérifiée.
+#:
+#: Ils ne contiennent qu'une chose sensible à l'entropie : `relevant_input_tree_sha256`,
+#: l'empreinte SHA-256 des fichiers d'entrée. `detect-secrets` la relève comme une
+#: chaîne hexadécimale à forte entropie — ce qu'elle est, sans être un secret.
+#:
+#: Les inscrire au registre ne tient pas : la clé d'acceptation est le hachage de la
+#: VALEUR, et cette valeur change à chaque régénération, c'est-à-dire dès qu'un fichier
+#: d'entrée change. Six entrées du registre étaient dans ce cas, et il aurait fallu les
+#: réécrire à chaque passage. Un registre qu'on réécrit machinalement est un registre
+#: qu'on ne relit plus — le défaut que cette barrière combat par ailleurs.
+#:
+#: L'exclusion est donc structurelle, et compensée : ces fichiers passent par le
+#: validateur spécialisé, au même titre que la baseline et le registre.
+MOTIFS_FICHIERS_EXCLUS = ("artifacts/g0/*provenance*.json",)
+
 
 # ── Familles revues ─────────────────────────────────────────────────────────
 #
@@ -289,6 +305,8 @@ def exclu_du_scan(chemin: str) -> bool:
     """
     if chemin in FICHIERS_EXCLUS:
         return True
+    if any(fnmatch.fnmatch(chemin, motif) for motif in MOTIFS_FICHIERS_EXCLUS):
+        return True
     if Path(chemin).suffix.lower() in SUFFIXES_EXCLUS:
         return True
     return any(partie in REPERTOIRES_EXCLUS for partie in Path(chemin).parts)
@@ -315,11 +333,11 @@ def fichiers_a_scanner(liste: Path | None) -> list[str]:
             if any(partie in REPERTOIRES_EXCLUS for partie in parties):
                 continue
             chemins.append(chemin.relative_to(RACINE).as_posix())
-    retenus = [
-        c
-        for c in chemins
-        if Path(c).suffix.lower() not in SUFFIXES_EXCLUS and c not in FICHIERS_EXCLUS
-    ]
+    # `exclu_du_scan` est la SEULE politique d'exclusion. La dupliquer ici a
+    # failli laisser passer un ecart : les motifs de fichiers exclus ne
+    # s'appliquaient qu'au rapport Gitleaks, pas a la liste donnee a
+    # detect-secrets, et les deux outils n'auraient plus parle du meme perimetre.
+    retenus = [c for c in chemins if not exclu_du_scan(c)]
     return sorted(set(retenus))
 
 
@@ -759,6 +777,14 @@ def _empreinte_valide(scanner: str, empreinte: str) -> bool:
     return bool(_EMPREINTE_GITLEAKS.match(empreinte))
 
 
+def fichiers_de_provenance() -> list[Path]:
+    """Les fichiers de provenance G0 soustraits aux règles d'entropie."""
+    trouves: set[Path] = set()
+    for motif in MOTIFS_FICHIERS_EXCLUS:
+        trouves.update(c for c in RACINE.glob(motif) if c.is_file())
+    return sorted(trouves, key=lambda c: c.relative_to(RACINE).as_posix())
+
+
 def valider_fichiers_de_gouvernance() -> list[str]:
     """Les manquements des deux fichiers soustraits au scan ordinaire.
 
@@ -766,7 +792,7 @@ def valider_fichiers_de_gouvernance() -> list[str]:
     """
     manquements: list[str] = []
 
-    for fichier in (BASELINE, REGISTRE):
+    for fichier in [BASELINE, REGISTRE, *fichiers_de_provenance()]:
         if not fichier.is_file():
             manquements.append(f"{fichier.name} : absent")
             continue
