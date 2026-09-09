@@ -92,6 +92,14 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
         "artifacts/g0/schema.json",
         "docs/g0/ROUTE_EXPOSURE_QUALIFICATION.json",
         ".secrets.baseline",
+        # Les generateurs eux-memes entrent dans l'empreinte. Le lot C a releve
+        # sur le lot A le defaut inverse : un inventaire qui recense les scripts
+        # sans les couvrir, donc un corps qui change sans que l'empreinte bouge.
+        # Ici, modifier une regle de classification ou la barriere de secrets
+        # DOIT obliger a regenerer.
+        "scripts/g0_security_baseline.py",
+        "scripts/g0_security_rules.py",
+        "scripts/g0_secret_gate.py",
         "deploy/**/*",
         "monitoring/**/*",
         "docker-compose*.yml",
