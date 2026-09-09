@@ -87,6 +87,24 @@
           "type": "cli_script"
         },
         {
+          "docstring_first_line": "Barrière de secrets G0 — bloquante, sur l'arbre courant et sur l'historique.",
+          "has_main_guard": true,
+          "path": "scripts/g0_secret_gate.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Baseline de sécurité G0 — RBAC, données sensibles, flux, journaux, secrets.",
+          "has_main_guard": true,
+          "path": "scripts/g0_security_baseline.py",
+          "type": "cli_script"
+        },
+        {
+          "docstring_first_line": "Règles curées de la baseline de sécurité G0 — la partie qui se relit.",
+          "has_main_guard": false,
+          "path": "scripts/g0_security_rules.py",
+          "type": "cli_script"
+        },
+        {
           "docstring_first_line": "Inventaire reproductible des licences des dépendances Python installées.",
           "has_main_guard": true,
           "path": "scripts/inventory_python_licenses.py",
