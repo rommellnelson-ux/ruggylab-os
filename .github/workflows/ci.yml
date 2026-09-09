@@ -99,7 +99,7 @@ jobs:
       #
       # Deux raisons pour lesquelles la commande `detect-secrets` seule ne
       # pouvait pas être rendue bloquante telle quelle :
-      #   1. `.secrets.baseline` ne couvre que 14 fichiers, alors que 77
+      #   1. `.secrets.baseline` ne couvre que 14 fichiers, alors que 88
       #      déclenchent une règle aujourd'hui ;
       #   2. treize de ses quatorze clés portent des séparateurs Windows, donc
       #      ne s'appliquent JAMAIS sur ce runner Linux.

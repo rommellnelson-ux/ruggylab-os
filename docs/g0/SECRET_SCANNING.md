@@ -36,7 +36,7 @@ Trois défauts, tous mesurés, aucun corrigé par ce lot :
 
 1. **`continue-on-error: true`.** Le scan ne bloquait rien.
 2. **Il échouait déjà.** Exécuté tel quel sur l'arbre courant, il sort en code 1
-   et relève des détections dans **77 fichiers**, alors que `.secrets.baseline`
+   et relève des détections dans **88 fichiers**, alors que `.secrets.baseline`
    n'en couvre que **14**. Personne n'en était averti, puisque l'échec était
    avalé.
 3. **Les chemins de `.secrets.baseline` sont écrits à la mode Windows.** Treize
@@ -205,21 +205,45 @@ Mesure du 2026-09-09, sur l'arbre de travail complet du lot B.
 | | |
 | --- | --- |
 | Fichiers scannés | **613** |
-| Détections | **170** |
-| — couvertes par `.secrets.baseline` | **40** |
-| — couvertes par le registre d'exceptions | **130** |
+| Détections | **229** |
+| — couvertes par `.secrets.baseline` | **68** |
+| — couvertes par le registre d'exceptions | **161** |
 | — **sans couverture écrite** | **0** |
 
-Par règle : `Secret Keyword` 157, `Hex High Entropy String` 7,
-`Basic Auth Credentials` 6.
+Par règle : `Secret Keyword` 197, `Basic Auth Credentials` 22,
+`Hex High Entropy String` 10.
 
-Par famille, pour les 130 entrées du registre : `tests` 119,
-`empreintes_publiques` 7, `scripts_utilitaires` 2, `documentation` 1,
+Par famille, pour les 161 entrées du registre : `tests` 130, `ci_jetable` 14,
+`empreintes_publiques` 7, `documentation` 7, `scripts_utilitaires` 2,
 `generateurs_g0` 1.
 
 **Aucun secret réel n'a été trouvé dans l'arbre courant.** Ce jugement est celui
 porté famille par famille ci-dessus ; il n'est pas une propriété démontrée du
 dépôt, mais la conclusion d'une revue dont chaque entrée est traçable.
+
+### 6.1.1 Une première mesure était fausse — et c'est la CI qui l'a montré
+
+La première version de ce document annonçait **170 détections dans 77
+fichiers**. Ces chiffres étaient **faux**, et ils l'étaient d'une manière qui ne
+se voyait pas depuis le poste où ils avaient été produits.
+
+`detect-secrets` ouvre les fichiers avec `open(chemin)`, donc avec l'encodage de
+la locale. Sous Linux, c'est UTF-8. Sous Windows, c'est `cp1252` — et un fichier
+UTF-8 contenant un octet invalide dans cette table y provoque une
+`UnicodeDecodeError` que l'outil **avale silencieusement** : le fichier n'est pas
+scanné, et rien ne le signale. La mesure locale sous-comptait donc, sans
+avertissement.
+
+Le symptôme est mesurable : `tests/test_qc.py` porte une affectation de mot de
+passe littérale que la CI Linux relève et que la même commande, sur le même
+fichier, ne relevait pas sous Windows. Le premier passage de CI a échoué sur
+exactement ce point, en listant 30 détections que le registre ne couvrait pas.
+
+La barrière force désormais la lecture en UTF-8 pendant le scan. Après
+correction : **229 détections dans 88 fichiers**, chiffres identiques sous
+Windows et sous Linux. C'est la même famille de défaut que l'ordre de tri des
+chemins qui avait fait échouer le lot A : *une mesure qui dépend de la machine
+qui la produit n'est pas une mesure*.
 
 ### 6.2 Historique Git complet — Gitleaks
 

@@ -3,7 +3,7 @@
 Pourquoi ce script existe alors que `detect-secrets` a déjà une commande.
 
 1. **La commande seule ne peut pas bloquer aujourd'hui.** `.secrets.baseline`
-   couvre 14 fichiers ; l'arbre en compte 77 qui déclenchent une règle. Le
+   couvre 14 fichiers ; l'arbre en compte 88 qui déclenchent une règle. Le
    contrôle était donc `continue-on-error: true` — c'est-à-dire décoratif.
    Le rendre bloquant sans registre d'exceptions aurait rendu la CI rouge en
    permanence, ce qui revient au même : un contrôle qu'on ignore.
@@ -38,10 +38,13 @@ lus ici. Aucun appel réseau. Aucune donnée patient.
 from __future__ import annotations
 
 import argparse
+import builtins
+import contextlib
 import fnmatch
 import json
 import sys
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -263,6 +266,38 @@ def fichiers_a_scanner(liste: Path | None) -> list[str]:
 # ── Scan de l'arbre courant ─────────────────────────────────────────────────
 
 
+@contextlib.contextmanager
+def lecture_en_utf8() -> Iterator[None]:
+    """Force `open()` à lire en UTF-8 le temps du scan.
+
+    `detect-secrets` ouvre les fichiers avec `open(chemin)`, donc avec l'encodage
+    de la locale. Sous Linux c'est UTF-8 ; sous Windows c'est `cp1252`, et un
+    fichier UTF-8 contenant un octet invalide dans cette table y provoque une
+    `UnicodeDecodeError` que l'outil **avale silencieusement** : le fichier n'est
+    pas scanné, et rien ne le signale.
+
+    Le symptôme a été mesuré : `tests/test_qc.py` porte une affectation de mot de
+    passe littérale que la CI Linux relève et que la même commande, sur le même
+    fichier, ne relevait pas sous Windows. Un registre d'exceptions construit
+    sous Windows sous-comptait donc, et la CI le refusait — à juste titre.
+
+    Sans ce forçage, la mesure dépendrait de la machine qui la produit, ce qui la
+    priverait de toute valeur de preuve.
+    """
+    original = builtins.open
+
+    def ouvrir(fichier: Any, mode: str = "r", *args: Any, **kwargs: Any) -> Any:
+        if "b" not in mode and not args and kwargs.get("encoding") is None:
+            kwargs["encoding"] = "utf-8"
+        return original(fichier, mode, *args, **kwargs)
+
+    builtins.open = ouvrir  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        builtins.open = original  # type: ignore[assignment]
+
+
 def scanner_arbre(chemins: list[str], racine: Path | None = None) -> list[dict[str, Any]]:
     """Les détections `detect-secrets` de l'arbre, sans aucune valeur.
 
@@ -275,7 +310,7 @@ def scanner_arbre(chemins: list[str], racine: Path | None = None) -> list[dict[s
 
     base = racine or RACINE
     trouvees: list[dict[str, Any]] = []
-    with transient_settings(configuration_scan()):
+    with transient_settings(configuration_scan()), lecture_en_utf8():
         for chemin in chemins:
             absolu = base / chemin
             if not absolu.is_file():

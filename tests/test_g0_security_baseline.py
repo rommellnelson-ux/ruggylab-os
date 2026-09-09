@@ -702,6 +702,32 @@ def test_the_probe_sentinel_is_never_written_in_the_repository():
     assert SENTINELLE_SONDE not in _lire(Path(__file__))
 
 
+def test_the_scan_reads_files_as_utf8_whatever_the_platform(tmp_path):
+    """Une mesure qui depend de la machine qui la produit n'est pas une mesure.
+
+    `detect-secrets` ouvre les fichiers avec l'encodage de la locale. Sous
+    Windows c'est `cp1252`, et un fichier UTF-8 portant un octet invalide dans
+    cette table y provoque une `UnicodeDecodeError` que l'outil AVALE : le
+    fichier n'est pas scanne, et rien ne le signale. La premiere mesure du lot B
+    sous-comptait ainsi 59 detections sur 229, et c'est la CI Linux qui l'a
+    montre.
+
+    Le fichier ci-dessous porte U+0081, dont l'encodage UTF-8 (C2 81) est
+    indecodable en cp1252, et une affectation de mot de passe litterale. Sans
+    forcage de l'UTF-8, il ressort a zero detection sous Windows.
+    """
+    from scripts.g0_secret_gate import scanner_arbre
+
+    (tmp_path / "piege.py").write_text(
+        'ENTETE = ""' + chr(10) + 'password = "MotDePasseLitteral123"' + chr(10),
+        encoding="utf-8",
+    )
+    detections = scanner_arbre(["piege.py"], racine=tmp_path)
+    assert detections, (
+        "le fichier UTF-8 n'a pas ete scanne : la mesure differerait entre Windows et Linux"
+    )
+
+
 def test_the_gate_refuses_a_detection_without_written_coverage():
     """Une barrière qui accepte l'inconnu n'est pas une barrière."""
     from scripts.g0_secret_gate import confronter
