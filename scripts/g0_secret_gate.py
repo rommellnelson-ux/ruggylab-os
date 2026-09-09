@@ -627,8 +627,17 @@ OUTILS = ("detect-secrets", "gitleaks")
 
 
 def _outil(valeur: Any) -> str:
-    """Le nom de l'outil sondé, ou une constante d'erreur — jamais autre chose."""
-    return str(valeur) if valeur in OUTILS else "OUTIL_INCONNU"
+    """Le nom de l'outil sondé, ou une constante d'erreur — jamais autre chose.
+
+    La constante RENVOYÉE est celle du tuple, pas la valeur reçue. La différence
+    n'est pas cosmétique : `str(valeur) if valeur in OUTILS` restitue l'objet
+    d'entrée, donc la donnée continue de circuler. Renvoyer l'élément du tuple
+    coupe le flux — ce que CodeQL a signalé deux fois avant que ce soit corrigé.
+    """
+    for connu in OUTILS:
+        if valeur == connu:
+            return connu
+    return "OUTIL_INCONNU"
 
 
 #: Les seuls verdicts qu'une sonde peut rendre. Rien d'autre n'est affichable.
@@ -641,8 +650,15 @@ VERDICTS = (
 
 
 def _verdict(valeur: Any) -> str:
-    """Le verdict d'une sonde, ou une constante d'erreur — jamais autre chose."""
-    return str(valeur) if valeur in VERDICTS else "VERDICT_INCONNU"
+    """Le verdict d'une sonde, ou une constante d'erreur — jamais autre chose.
+
+    Comme `_outil`, cette fonction renvoie la constante du tuple et non la
+    valeur reçue : c'est ce qui coupe réellement le flux de données.
+    """
+    for connu in VERDICTS:
+        if valeur == connu:
+            return connu
+    return "VERDICT_INCONNU"
 
 
 def sondes_concluantes(sondes: list[dict[str, Any]]) -> bool:
