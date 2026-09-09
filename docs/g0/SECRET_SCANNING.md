@@ -300,11 +300,18 @@ mais aucune fuite n'a été relevée. La sentinelle valait alors
 écarter par la liste de mots vides de Gitleaks. Le scanner fonctionnait, la
 sonde était mal choisie.
 
-Deux corrections, toutes deux mesurables : la valeur ne contient plus aucun mot
-du dictionnaire, et le fichier porteur embarque une **seconde forme** — un
-en-tête de clé privée PEM — qu'aucune liste de mots ne peut écarter. Une sonde à
-forme unique ne teste que la règle qui la reconnaît, et sa disparition se lit
-alors comme un dépôt propre.
+Deux passages de CI ont été nécessaires pour la corriger, et chacun a mesuré,
+pas supposé. D'abord la valeur, débarrassée de tout mot du dictionnaire. Puis le
+**bloc PEM complet** : la deuxième rédaction ne portait que la ligne `BEGIN`,
+alors que la règle `private-key` de Gitleaks exige le bloc entier, ligne `END`
+comprise — la sonde est ressortie en `POSITIVE_PROBE_MISSED` une seconde fois.
+Le corps du bloc n'est pas une clé : c'est l'encodage base64 d'une phrase
+française qui le dit.
+
+Une sonde à forme unique ne teste que la règle qui la reconnaît, et sa
+disparition se lit alors comme un dépôt propre. Le job affiche désormais les
+deux rapports de sonde — ils sont expurgés et le dépôt jetable ne porte que des
+valeurs synthétiques — pour qu'un échec soit diagnosticable en une exécution.
 
 ## 7. Ce que cette barrière ne prouve pas
 

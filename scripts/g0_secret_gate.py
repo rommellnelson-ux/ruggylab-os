@@ -38,6 +38,7 @@ lus ici. Aucun appel réseau. Aucune donnée patient.
 from __future__ import annotations
 
 import argparse
+import base64
 import builtins
 import contextlib
 import fnmatch
@@ -70,13 +71,36 @@ SENTINELLE_SONDE = "AK" + "IA" + "Q7XKJ92MW" + "VD3B5N4"
 #: POSITIVE_PROBE_MISSED alors que le scanner fonctionnait. Mesuré en CI, pas
 #: supposé — et corrigé en retirant tout mot du dictionnaire de la valeur, et
 #: en ajoutant une seconde forme qu'aucune liste de mots ne peut écarter.
-SENTINELLE_PEM = "-----BEGIN " + "RSA PRIVATE KEY" + "-----"
+SENTINELLE_PEM_DEBUT = "-----BEGIN " + "RSA PRIVATE KEY" + "-----"
+SENTINELLE_PEM_FIN = "-----END " + "RSA PRIVATE KEY" + "-----"
 
 
 def contenu_porteur() -> str:
-    """Le fichier que les deux scanners DOIVENT relever."""
+    """Le fichier que les deux scanners DOIVENT relever.
+
+    Deux formes, et un bloc PEM **complet**. La première rédaction ne portait
+    que la ligne `BEGIN` : la règle `private-key` de Gitleaks exige le bloc
+    entier, ligne `END` comprise, et la sonde sortait donc en
+    POSITIVE_PROBE_MISSED — mesuré en CI, deux fois.
+
+    Le corps du bloc n'est pas une clé : c'est l'encodage base64 d'une phrase
+    française qui le dit. Aucune valeur ressemblant à un secret actif n'entre
+    dans le dépôt : tout est assemblé à l'exécution.
+    """
+    corps = base64.b64encode(
+        ("Ceci n'est pas une cle. Sentinelle de non-vacuite du lot B du gate G0. " * 2).encode()
+    ).decode()
     saut = chr(10)
-    return f"aws_access_key_id = {SENTINELLE_SONDE}{saut}{SENTINELLE_PEM}{saut}"
+    return saut.join(
+        (
+            f"aws_access_key_id = {SENTINELLE_SONDE}",
+            SENTINELLE_PEM_DEBUT,
+            corps[:64],
+            corps[64:128],
+            SENTINELLE_PEM_FIN,
+            "",
+        )
+    )
 
 
 #: Contenu du fichier propre de la sonde négative. Aucune règle ne s'y applique.

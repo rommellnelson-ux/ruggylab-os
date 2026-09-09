@@ -1486,12 +1486,10 @@ jobs:
           python - "$sonde" <<'PY'
           import pathlib, sys
           sys.path.insert(0, ".")
-          from scripts.g0_secret_gate import SENTINELLE_SONDE, TEXTE_PROPRE
+          from scripts.g0_secret_gate import TEXTE_PROPRE, contenu_porteur
 
           base = pathlib.Path(sys.argv[1])
-          (base / "porteur.txt").write_text(
-              f"aws_access_key_id = {SENTINELLE_SONDE}\n", encoding="utf-8"
-          )
+          (base / "porteur.txt").write_text(contenu_porteur(), encoding="utf-8")
           (base / "propre.txt").write_text(TEXTE_PROPRE, encoding="utf-8")
           PY
           git -C "$sonde" add porteur.txt
@@ -1507,6 +1505,11 @@ jobs:
           "$RUNNER_TEMP/bin/gitleaks" dir "$sonde" --no-banner --redact=100 \
             --exit-code 0 --report-format json \
             --report-path "$RUNNER_TEMP/sonde-negative.json"
+          # Diagnostic : les rapports sont expurges (--redact=100) et le depot
+          # jetable ne porte que des valeurs synthetiques. Les afficher rend un
+          # echec de sonde diagnosticable en UNE execution au lieu de trois.
+          echo "--- rapport sonde positive ---"; cat "$RUNNER_TEMP/sonde-positive.json"
+          echo "--- rapport sonde negative ---"; cat "$RUNNER_TEMP/sonde-negative.json"
           rm -rf "$sonde"
 
       - name: Scan the working tree, then the full Git history
