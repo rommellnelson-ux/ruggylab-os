@@ -153,8 +153,9 @@ Git : une empreinte est publiée pour être comparée, elle n'ouvre aucun accès
 `AUTHENTIFICATION_SECRET`, dont la valeur est un niveau de risque : le détecteur
 de mots-clés relève l'affectation, pas une valeur.
 
-Deux fichiers sont exclus du scan : `.secrets.baseline` et le registre
-lui-même. Ils ne contiennent que des empreintes ; les scanner ferait relever ces
+Sont exclus du scan, pour les **deux** scanners : `.secrets.baseline`, le
+registre lui-même, les produits d'exécution (`__pycache__`, caches d'outils) et
+les fichiers binaires. Ils ne contiennent que des empreintes ; les scanner ferait relever ces
 empreintes comme chaînes hexadécimales à forte entropie, qu'il faudrait inscrire
 à leur tour dans le registre, dont les nouvelles empreintes seraient relevées à
 la génération suivante. `detect-secrets` applique la même exclusion à sa propre
@@ -189,6 +190,10 @@ ajoutée dans un premier commit, **puis retirée** dans un second. L'arbre final
 ne la contient plus. La sonde positive ne peut donc réussir que si l'historique
 est réellement parcouru — c'est aussi le contrôle du `fetch-depth: 0`.
 
+**Deux formes plutôt qu'une.** Une clé d'accès et un en-tête de clé privée PEM.
+Une sonde à forme unique ne teste que la règle qui la reconnaît ; la première
+version l'a montré à ses dépens (§6.3).
+
 **La sentinelle n'est écrite en clair nulle part dans le dépôt.** Elle est
 assemblée à l'exécution, morceau par morceau, par `scripts/g0_secret_gate.py`.
 L'écrire en un seul littéral ferait entrer dans le dépôt principal une valeur
@@ -207,15 +212,18 @@ Mesure du 2026-09-09, sur l'arbre de travail complet du lot B.
 | Fichiers scannés | **613** |
 | Détections | **229** |
 | — couvertes par `.secrets.baseline` | **68** |
-| — couvertes par le registre d'exceptions | **161** |
+| — couvertes par le registre d'exceptions | **161** (127 entrées après déduplication) |
 | — **sans couverture écrite** | **0** |
 
 Par règle : `Secret Keyword` 197, `Basic Auth Credentials` 22,
 `Hex High Entropy String` 10.
 
-Par famille, pour les 161 entrées du registre : `tests` 130, `ci_jetable` 14,
-`empreintes_publiques` 7, `documentation` 7, `scripts_utilitaires` 2,
-`generateurs_g0` 1.
+Le registre compte **127 entrées** — une par décision à prendre, et non une
+par occurrence : dix lignes portant la même valeur dans le même fichier ne
+posent qu'une question. Par famille : `tests` 100, `ci_jetable` 11,
+`empreintes_publiques` 7, `documentation` 7, `generateurs_g0` 1,
+`scripts_utilitaires` 1. Par scanner : `detect-secrets` 122,
+`gitleaks-historique` 3, `gitleaks-arbre` 2.
 
 **Aucun secret réel n'a été trouvé dans l'arbre courant.** Ce jugement est celui
 porté famille par famille ci-dessus ; il n'est pas une propriété démontrée du
@@ -252,13 +260,51 @@ Le scan d'historique est exécuté par le job
 (`gitleaks git . --log-opts="--all"`), après vérification que le clone n'est pas
 superficiel.
 
-<!-- MESURE_HISTORIQUE_GITLEAKS -->
-Résultat mesuré sur la CI : voir §6.3.
+Mesure du premier passage complet (2026-09-09, exécution CI sur la tête de la
+PR) : **416 détections** au total pour les trois scanners, dont **187 sans
+couverture écrite** — toutes de la règle `generic-api-key`, sur **quatre chemins
+distincts** :
+
+| Chemin | Portée | Occurrences | Jugement |
+| --- | --- | ---: | --- |
+| `.secrets.baseline` | arbre + historique | 179 | **Exclu du scan** : le fichier ne contient que des empreintes SHA-1, que Gitleaks relève comme clés génériques. Même raison que pour le registre. |
+| `tests/__pycache__/*.pyc` | arbre | 1 | **Exclu du scan** : produit d'exécution, jamais un fichier d'auteur. |
+| `.env.example` | historique | 3 | Marque-place documentaires (famille `documentation`). |
+| `docs/g0/INVENTORY.md` | arbre + historique | 2 | Identifiants d'un conteneur jetable cités dans une procédure reproductible du lot A. |
+| `tests/test_g0_security_baseline.py` | arbre + historique | 2 | Mot de passe littéral du fichier piège de la sonde UTF-8 (famille `tests`). |
+
+Les deux premiers ont été **exclus du périmètre** — `detect-secrets` recevait
+déjà une liste filtrée, Gitleaks parcourait tout ; les deux outils ne parlaient
+donc pas du même périmètre. Les trois derniers sont **inscrits au registre**.
+
+**Clé d'acceptation pour Gitleaks.** L'empreinte disponible est le SHA du
+commit. L'inclure dans la clé rendrait le registre faux à chaque nouveau commit
+touchant un chemin déjà qualifié, et le corriger deviendrait un geste machinal
+— c'est-à-dire un registre qu'on ne relit plus. La clé est donc
+**(scanner, chemin, règle)**, le commit restant inscrit à titre documentaire.
+Conséquence assumée : un chemin **nouveau** ou une règle **nouvelle** font
+échouer la barrière ; un commit de plus sur un chemin déjà qualifié, non.
 
 ### 6.3 Verdict des sondes
 
-<!-- MESURE_SONDES -->
-Verdicts mesurés sur la CI : voir le journal du job.
+| Scanner | Sonde positive | Sonde négative |
+| --- | --- | --- |
+| `detect-secrets` | `POSITIVE_PROBE_DETECTED` (règles `AWS Access Key`, `Private Key`) | `NEGATIVE_PROBE_ACCEPTED` |
+| Gitleaks | `POSITIVE_PROBE_DETECTED` | `NEGATIVE_PROBE_ACCEPTED` |
+
+**La sonde Gitleaks a d'abord échoué — et c'est précisément à cela qu'elle
+sert.** Au premier passage, elle est sortie en `POSITIVE_PROBE_MISSED` : les
+deux commits du dépôt jetable ont bien été parcourus (« 2 commits scanned »),
+mais aucune fuite n'a été relevée. La sentinelle valait alors
+`AKIA` + `G0PROBE` + `SENTINEL7` ; les mots `PROBE` et `SENTINEL` la faisaient
+écarter par la liste de mots vides de Gitleaks. Le scanner fonctionnait, la
+sonde était mal choisie.
+
+Deux corrections, toutes deux mesurables : la valeur ne contient plus aucun mot
+du dictionnaire, et le fichier porteur embarque une **seconde forme** — un
+en-tête de clé privée PEM — qu'aucune liste de mots ne peut écarter. Une sonde à
+forme unique ne teste que la règle qui la reconnaît, et sa disparition se lit
+alors comme un dépôt propre.
 
 ## 7. Ce que cette barrière ne prouve pas
 

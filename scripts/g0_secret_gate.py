@@ -59,7 +59,25 @@ REGISTRE = RACINE / "docs" / "governance" / "SECRET_SCAN_EXCEPTIONS.json"
 #: une valeur ressemblant à un secret actif, ce que la campagne s'interdit.
 #: Assemblée, elle n'existe qu'en mémoire, et les deux scanners la voient
 #: apparaître dans le dépôt jetable de la sonde.
-SENTINELLE_SONDE = "AK" + "IA" + "G0PROBE" + "SENTINEL7"
+SENTINELLE_SONDE = "AK" + "IA" + "Q7XKJ92MW" + "VD3B5N4"
+
+#: Seconde forme de sentinelle : en-tête de clé privée PEM, elle aussi
+#: assemblée à l'exécution.
+#:
+#: Une sonde à UNE seule forme ne teste que la règle qui la reconnaît. La
+#: première version portait les mots PROBE et SENTINEL : la liste de mots
+#: vides de Gitleaks les écarte, et la sonde positive est sortie en
+#: POSITIVE_PROBE_MISSED alors que le scanner fonctionnait. Mesuré en CI, pas
+#: supposé — et corrigé en retirant tout mot du dictionnaire de la valeur, et
+#: en ajoutant une seconde forme qu'aucune liste de mots ne peut écarter.
+SENTINELLE_PEM = "-----BEGIN " + "RSA PRIVATE KEY" + "-----"
+
+
+def contenu_porteur() -> str:
+    """Le fichier que les deux scanners DOIVENT relever."""
+    saut = chr(10)
+    return f"aws_access_key_id = {SENTINELLE_SONDE}{saut}{SENTINELLE_PEM}{saut}"
+
 
 #: Contenu du fichier propre de la sonde négative. Aucune règle ne s'y applique.
 TEXTE_PROPRE = "Ce fichier ne contient aucune valeur sensible.\nligne de texte ordinaire\n"
@@ -234,6 +252,21 @@ def configuration_scan() -> dict[str, Any]:
 # ── Inventaire des fichiers ─────────────────────────────────────────────────
 
 
+def exclu_du_scan(chemin: str) -> bool:
+    """La meme politique d'exclusion pour les deux scanners.
+
+    `detect-secrets` recoit une liste de chemins deja filtree ; Gitleaks, lui,
+    parcourt le repertoire et l'historique tout seul. Sans ce filtre applique a
+    son rapport, les deux outils ne parleraient pas du meme perimetre, et le
+    registre devrait couvrir des fichiers que l'autre n'a jamais lus.
+    """
+    if chemin in FICHIERS_EXCLUS:
+        return True
+    if Path(chemin).suffix.lower() in SUFFIXES_EXCLUS:
+        return True
+    return any(partie in REPERTOIRES_EXCLUS for partie in Path(chemin).parts)
+
+
 def fichiers_a_scanner(liste: Path | None) -> list[str]:
     """Les chemins à scanner, triés sur la **chaîne POSIX**.
 
@@ -347,10 +380,13 @@ def lire_rapport_gitleaks(chemin: Path, portee: str) -> list[dict[str, Any]]:
     brut = json.loads(texte) if texte else []
     detections: list[dict[str, Any]] = []
     for element in brut:
+        fichier = str(element.get("File", "")).replace("\\", "/")
+        if exclu_du_scan(fichier):
+            continue
         detections.append(
             {
                 "scanner": f"gitleaks-{portee}",
-                "path": str(element.get("File", "")).replace("\\", "/"),
+                "path": fichier,
                 "rule": str(element.get("RuleID", "")),
                 "fingerprint": str(element.get("Commit", "")) or "arbre-courant",
             }
@@ -371,12 +407,27 @@ def charger_registre() -> dict[str, Any]:
 
 
 def _cle(detection: dict[str, Any]) -> tuple[str, str, str, str]:
-    return (
-        detection["scanner"],
-        detection["path"],
-        detection["rule"],
-        detection["fingerprint"],
-    )
+    """La cle d'acceptation d'une detection.
+
+    Pour `detect-secrets`, l'empreinte SHA-1 de la valeur entre dans la cle :
+    elle est stable et identifie l'occurrence exacte.
+
+    Pour Gitleaks, l'empreinte disponible est le SHA du COMMIT. L'y inclure
+    rendrait le registre faux a chaque nouveau commit touchant un chemin deja
+    revu, et le corriger deviendrait un geste machinal — c'est-a-dire un
+    registre qu'on ne relit plus. La cle est donc (scanner, chemin, regle), et
+    le commit reste inscrit comme documentation. Consequence assumee et ecrite
+    dans SECRET_SCANNING.md : un chemin NOUVEAU ou une regle NOUVELLE font
+    echouer la barriere ; un commit de plus sur un chemin deja qualifie, non.
+    """
+    if detection["scanner"] == "detect-secrets":
+        return (
+            detection["scanner"],
+            detection["path"],
+            detection["rule"],
+            detection["fingerprint"],
+        )
+    return (detection["scanner"], detection["path"], detection["rule"], "")
 
 
 def confronter(
@@ -405,6 +456,26 @@ def confronter(
         else:
             residus.append(detection)
     return {"couvertes": couvertes, "residus": residus}
+
+
+def _commit_documentaire(
+    detection: dict[str, Any],
+    precedente: dict[str, Any] | None,
+    registre_courant: dict[str, Any],
+) -> str:
+    """Le commit inscrit a titre documentaire, jamais devine.
+
+    Pour une detection d'historique, Gitleaks nomme le commit ou la valeur
+    apparait : c'est lui qu'on inscrit. Pour l'arbre courant, il n'y en a pas —
+    le commit d'introduction du fichier est renseigne separement, et a defaut
+    l'entree porte le commit de revue.
+    """
+    if precedente and precedente.get("commit"):
+        return str(precedente["commit"])
+    empreinte = detection.get("fingerprint", "")
+    if detection["scanner"].startswith("gitleaks") and empreinte != "arbre-courant":
+        return str(empreinte)
+    return str(registre_courant.get("review_commit", ""))
 
 
 def proposer(
@@ -439,7 +510,7 @@ def proposer(
                 "path": detection["path"],
                 "rule": detection["rule"],
                 "fingerprint": detection["fingerprint"],
-                "commit": (precedente or {}).get("commit", registre_courant.get("review_commit")),
+                "commit": _commit_documentaire(detection, precedente, registre_courant),
                 "family": famille["id"] if famille else "NON_REVU",
                 "character": famille["caractere"] if famille else "A_QUALIFIER",
                 "rotation_required": (not famille) or bool(famille["rotation_necessaire"]),
@@ -450,7 +521,20 @@ def proposer(
                 ),
             }
         )
-    exceptions.sort(key=lambda e: (e["scanner"], e["path"], e["rule"], e["fingerprint"]))
+    # Deduplication sur la CLE D'ACCEPTATION, pas sur l'entree entiere : pour
+    # Gitleaks, dix commits touchant le meme chemin avec la meme regle donnent
+    # dix detections et une seule decision a prendre. Les inscrire dix fois
+    # gonflerait le registre sans rien ajouter a la revue.
+    uniques: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for exception in exceptions:
+        cle = _cle(exception)
+        if cle in uniques:
+            uniques[cle]["occurrences"] = uniques[cle].get("occurrences", 1) + 1
+            continue
+        uniques[cle] = exception
+    exceptions = sorted(
+        uniques.values(), key=lambda e: (e["scanner"], e["path"], e["rule"], e["fingerprint"])
+    )
     return {
         "_comment": registre_courant.get("_comment", ""),
         "review_commit": registre_courant.get("review_commit", ""),
@@ -484,9 +568,7 @@ def sonde_detect_secrets() -> dict[str, Any]:
     """
     with tempfile.TemporaryDirectory(prefix="g0-sonde-secrets-") as repertoire:
         base = Path(repertoire)
-        (base / "porteur.txt").write_text(
-            f"aws_access_key_id = {SENTINELLE_SONDE}\n", encoding="utf-8"
-        )
+        (base / "porteur.txt").write_text(contenu_porteur(), encoding="utf-8")
         (base / "propre.txt").write_text(TEXTE_PROPRE, encoding="utf-8")
         detections = scanner_arbre(["porteur.txt", "propre.txt"], racine=base)
     porteur = [d for d in detections if d["path"] == "porteur.txt"]
@@ -546,6 +628,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gitleaks-probe-negative", type=Path)
     parser.add_argument("--report", type=Path, help="écrit un rapport expurgé")
     parser.add_argument("--propose", type=Path, help="écrit une proposition de registre")
+    parser.add_argument(
+        "--uncovered-from",
+        type=Path,
+        help=(
+            "rapport expurgé d'une exécution précédente : ses détections non "
+            "couvertes sont réinjectées dans --propose. Les scans Gitleaks ne "
+            "tournent qu'en CI ; sans cela, le registre serait complété de "
+            "mémoire au lieu d'être dérivé d'une mesure."
+        ),
+    )
     args = parser.parse_args(argv)
 
     connues, chemins_non_posix = charger_baseline()
@@ -571,6 +663,12 @@ def main(argv: list[str] | None = None) -> int:
         gl_git = lire_rapport_gitleaks(args.gitleaks_git_report, "historique")
         _resume("Gitleaks — historique complet", gl_git)
         detections.extend(gl_git)
+
+    if args.uncovered_from:
+        rapport = json.loads(args.uncovered_from.read_text(encoding="utf-8"))
+        reinjectees = [d for d in rapport.get("uncovered", []) if not exclu_du_scan(d["path"])]
+        print(f"Détections réinjectées depuis un rapport mesuré : {len(reinjectees)}")
+        detections.extend(reinjectees)
 
     if args.propose:
         proposition = proposer(
