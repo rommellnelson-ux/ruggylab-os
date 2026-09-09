@@ -178,9 +178,163 @@ prendrait un conflit de clé pour une régression de performance.
 
 <!-- RESULTATS_PERFORMANCE_DEBUT -->
 
-*Section renseignée depuis l'exécution de CI identifiée ci-dessous. Tant
-qu'aucune exécution n'a produit les artefacts, aucun chiffre ne figure ici :
-une estimation vaudrait moins qu'une absence.*
+> Exécution de CI : [34363173460 / job 102505089035](https://github.com/rommellnelson-ux/ruggylab-os/actions/runs/34363173460/job/102505089035), commit `fa45c84`
+> · commit mesuré `c5a788e36283` · image `sha256:45eb5f3c627b…` · archive `21a68afbf9acd8a5…`
+
+### 4.1 Environnement de mesure
+
+| | |
+| --- | --- |
+| Runner | github-actions/ubuntu-latest |
+| OS / architecture | Linux 6.17.0-1022-azure — x86_64 |
+| CPU | 4 cœurs logiques |
+| Mémoire | 16.8 Go totale, 15.1 Go disponible au démarrage |
+| Docker | 28.0.4 |
+| Python (banc) | 3.13.15 |
+| PostgreSQL | PostgreSQL 16.6 |
+| Valkey (version annoncée par `INFO`) | 7.2.4 |
+| Graine | `20260909` |
+| Durée totale | 134.758 s |
+| Empreinte du scénario | `84e8e408aff36448…` |
+| Empreinte des entrées | `77f0c21e7b3e1f7d…` sur 295 fichiers |
+| Appels réseau externes | aucun |
+
+Commande exacte :
+
+```bash
+python scripts/g0_perf_baseline.py --run --base-url https://localhost --concurrency 1,3,5,10 --repetitions 3 --iterations 5 --warmup 2 --seed 20260909
+```
+
+Interrupteurs externes effectifs, lus dans le processus applicatif :
+
+- `ANALYZER_RAW_LISTENER_ENABLED` = `false`
+- `CSA_SYNC_ENABLED` = `false`
+- `ENABLE_DH36_LISTENER` = `false`
+
+Configuration applicative observée :
+
+- `ANALYZER_RAW_LISTENER_ENABLED` = *non transmise au conteneur*
+- `CACHE_BACKEND` = `redis`
+- `CSA_SYNC_ENABLED` = *non transmise au conteneur*
+- `ENABLE_DH36_LISTENER` = *non transmise au conteneur*
+- `LOGIN_RATE_LIMIT_ENABLED` = `false`
+- `PROCESS_ROLE` = `web`
+- `RATE_LIMIT_ENABLED` = `false`
+- `REQUIRE_VALIDATION_FOR_RELEASE` = `false`
+- `TRUSTED_PROXY_IPS` = `["172.28.117.10"]`
+
+### 4.2 Agrégat par niveau de concurrence
+
+> Les latences n'agrègent que les réponses en succès. Mêler la latence d'un 500 immédiat à celle d'une réponse utile ferait baisser les centiles à mesure que le système se dégrade — l'inverse de ce qu'on veut lire. Le taux d'erreur est publié à côté, jamais fondu dedans.
+
+| Concurrence | Échantillons | p50 ms | p95 ms | p99 ms | moyenne ms | max ms | débit req/s | erreurs | taux |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **1** | 210 | **11.7** | **18.8** | **24.2** | 12.0 | 141.6 | **55.35** | 0 | 0.00 % |
+| **10** | 2054 | **120.0** | **1603.3** | **2180.0** | 242.3 | 2522.2 | **29.359** | 52 | 2.53 % |
+| **3** | 625 | **30.3** | **97.1** | **142.2** | 35.5 | 163.6 | **58.208** | 5 | 0.80 % |
+| **5** | 1037 | **55.0** | **363.3** | **515.3** | 80.9 | 543.6 | **43.679** | 13 | 1.25 % |
+
+### 4.3 Par scénario et par niveau
+
+#### Concurrence 1
+
+| Scénario | Genre | Échantillons | p50 ms | p95 ms | p99 ms | max ms | erreurs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `auth` | read | 15 | 12.4 | 12.9 | 12.9 | 12.9 | 0 |
+| `patient_create` | write | 15 | 8.8 | 9.1 | 9.1 | 9.1 | 0 |
+| `patient_search` | read | 15 | 6.7 | 7.0 | 7.0 | 7.0 | 0 |
+| `order_create` | write | 15 | 10.8 | 12.5 | 12.5 | 12.5 | 0 |
+| `sample_create` | write | 15 | 10.2 | 11.0 | 11.0 | 11.0 | 0 |
+| `sample_attach` | write | 15 | 14.2 | 16.3 | 16.3 | 16.3 | 0 |
+| `worklist` | read | 15 | 13.5 | 23.0 | 23.0 | 23.0 | 0 |
+| `order_read` | read | 15 | 6.8 | 7.4 | 7.4 | 7.4 | 0 |
+| `result_create` | write | 15 | 13.5 | 14.4 | 14.4 | 14.4 | 0 |
+| `result_read` | read | 15 | 6.0 | 6.1 | 6.1 | 6.1 | 0 |
+| `result_release` | write | 15 | 13.4 | 15.3 | 15.3 | 15.3 | 0 |
+| `dashboard` | read | 15 | 19.9 | 141.6 | 141.6 | 141.6 | 0 |
+| `invoice_create` | write | 15 | 10.6 | 11.7 | 11.7 | 11.7 | 0 |
+| `payment_create` | write | 15 | 12.9 | 13.4 | 13.4 | 13.4 | 0 |
+
+#### Concurrence 10
+
+| Scénario | Genre | Échantillons | p50 ms | p95 ms | p99 ms | max ms | erreurs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `auth` | read | 150 | 81.8 | 190.4 | 308.9 | 329.8 | **6** (http_502×6) |
+| `patient_create` | write | 150 | 99.8 | 175.0 | 301.8 | 350.0 | 0 |
+| `patient_search` | read | 150 | 67.6 | 103.5 | 216.5 | 220.1 | 0 |
+| `order_create` | write | 150 | 116.3 | 160.9 | 242.2 | 249.0 | 0 |
+| `sample_create` | write | 150 | 127.4 | 189.2 | 303.8 | 327.1 | 0 |
+| `sample_attach` | write | 150 | 154.6 | 302.1 | 364.1 | 381.0 | 0 |
+| `worklist` | read | 150 | 127.2 | 281.4 | 298.4 | 338.7 | 0 |
+| `order_read` | read | 150 | 70.0 | 106.8 | 257.0 | 289.8 | 0 |
+| `result_create` | write | 150 | 158.8 | 329.8 | 365.4 | 366.0 | 0 |
+| `result_read` | read | 150 | 60.2 | 91.7 | 209.1 | 247.3 | 0 |
+| `result_release` | write | 150 | 152.8 | 206.5 | 331.2 | 333.9 | 0 |
+| `dashboard` | read | 150 | 1723.2 | 2326.8 | 2474.2 | 2522.2 | 0 |
+| `invoice_create` | write | 150 | 114.5 | 176.5 | 234.7 | 264.3 | **46** (http_500×46) |
+| `payment_create` | write | 104 | 130.1 | 185.6 | 201.9 | 247.1 | 0 |
+
+#### Concurrence 3
+
+| Scénario | Genre | Échantillons | p50 ms | p95 ms | p99 ms | max ms | erreurs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `auth` | read | 45 | 23.6 | 40.9 | 50.4 | 50.4 | 0 |
+| `patient_create` | write | 45 | 24.7 | 38.3 | 39.6 | 39.6 | 0 |
+| `patient_search` | read | 45 | 17.6 | 21.2 | 24.2 | 24.2 | 0 |
+| `order_create` | write | 45 | 29.3 | 36.4 | 39.3 | 39.3 | 0 |
+| `sample_create` | write | 45 | 30.3 | 39.2 | 40.0 | 40.0 | 0 |
+| `sample_attach` | write | 45 | 41.2 | 50.0 | 59.0 | 59.0 | 0 |
+| `worklist` | read | 45 | 35.8 | 43.9 | 48.8 | 48.8 | 0 |
+| `order_read` | read | 45 | 17.9 | 24.2 | 26.4 | 26.4 | 0 |
+| `result_create` | write | 45 | 40.6 | 48.0 | 52.4 | 52.4 | 0 |
+| `result_read` | read | 45 | 14.5 | 22.0 | 24.1 | 24.1 | 0 |
+| `result_release` | write | 45 | 37.4 | 45.3 | 50.9 | 50.9 | 0 |
+| `dashboard` | read | 45 | 118.9 | 150.2 | 163.6 | 163.6 | 0 |
+| `invoice_create` | write | 45 | 27.3 | 42.6 | 56.3 | 56.3 | **5** (http_500×5) |
+| `payment_create` | write | 40 | 33.1 | 47.6 | 53.1 | 53.1 | 0 |
+
+#### Concurrence 5
+
+| Scénario | Genre | Échantillons | p50 ms | p95 ms | p99 ms | max ms | erreurs |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `auth` | read | 75 | 41.3 | 56.4 | 76.6 | 76.6 | 0 |
+| `patient_create` | write | 75 | 45.8 | 64.3 | 193.8 | 193.8 | 0 |
+| `patient_search` | read | 75 | 29.1 | 44.8 | 166.2 | 166.2 | 0 |
+| `order_create` | write | 75 | 54.5 | 67.2 | 199.4 | 199.4 | 0 |
+| `sample_create` | write | 75 | 57.3 | 81.8 | 224.1 | 224.1 | 0 |
+| `sample_attach` | write | 75 | 73.1 | 94.5 | 243.2 | 243.2 | 0 |
+| `worklist` | read | 75 | 64.6 | 86.0 | 224.4 | 224.4 | 0 |
+| `order_read` | read | 75 | 32.6 | 51.3 | 196.2 | 196.2 | 0 |
+| `result_create` | write | 75 | 72.7 | 99.4 | 109.5 | 109.5 | 0 |
+| `result_read` | read | 75 | 28.0 | 42.3 | 60.0 | 60.0 | 0 |
+| `result_release` | write | 75 | 69.6 | 87.1 | 102.8 | 102.8 | 0 |
+| `dashboard` | read | 75 | 419.1 | 537.3 | 543.6 | 543.6 | 0 |
+| `invoice_create` | write | 75 | 47.1 | 86.2 | 97.8 | 97.8 | **13** (http_500×13) |
+| `payment_create` | write | 62 | 60.7 | 83.2 | 92.8 | 92.8 | 0 |
+
+### 4.4 Ressources observées
+
+| Concurrence | CPU app | Mémoire app | CPU PostgreSQL | Mémoire PostgreSQL | Connexions PG | Transactions validées | Transactions annulées |
+| ---: | --- | --- | --- | --- | ---: | ---: | ---: |
+| **1** | 0.12% | 138.3MiB / 1GiB | 2.84% | 36.43MiB / 1GiB | 2 | 183 | 219 |
+| **10** | 0.12% | 172.3MiB / 1GiB | 0.01% | 54.35MiB / 1GiB | 6 | 2326 | 2652 |
+| **3** | 0.12% | 145.7MiB / 1GiB | 0.03% | 47.35MiB / 1GiB | 5 | 736 | 833 |
+| **5** | 0.12% | 151.6MiB / 1GiB | 0.03% | 53.66MiB / 1GiB | 6 | 1123 | 1369 |
+
+Valkey en fin de mesure : 1002.52K utilisés, 2 clients connectés, 0 bloqués, 0 clés, 20 commandes traitées.
+
+Requêtes lentes journalisées au-delà de 200 ms : **7**.
+
+### 4.5 Erreurs applicatives observées
+
+| Type | Occurrences |
+| --- | ---: |
+| `http_500` | **64** |
+| `http_502` | **6** |
+
+Ces erreurs ne sont ni réessayées, ni exclues de l'agrégat, ni corrigées ici : le lot C mesure. Elles relèvent du **lot D**.
+
+Validité de la mesure : **valide** (scripts/g0_perf_baseline.py valider()).
 
 <!-- RESULTATS_PERFORMANCE_FIN -->
 
@@ -195,6 +349,25 @@ entre la mesure et le fichier fait échouer le job.
 Les erreurs observées relèvent du **lot D**. Elles ne sont pas corrigées ici :
 le lot C mesure, et corriger un défaut découvert en le mesurant reviendrait à
 publier la mesure d'un système qu'on vient de changer.
+
+### Ce que l'exécution de référence a observé
+
+Deux défauts distincts, et ils ne se répartissent pas au hasard :
+
+1. **`invoice_create` répond `500` sous concurrence, et de plus en plus
+   souvent.** Aucune erreur à un utilisateur ; 5 sur 45 (11 %) à trois ;
+   13 sur 75 (17 %) à cinq ; 46 sur 150 (31 %) à dix. Le taux croît avec la
+   concurrence sur ce seul pas d'écriture, ce qui oriente vers un conflit
+   d'accès concurrent à l'émission d'une facture — numérotation, verrou ou
+   transaction. **Trois utilisateurs simultanés est le premier usage envisagé
+   au CSA GR Plateau** : ce n'est pas un défaut de charge extrême. À instruire
+   en priorité au lot D.
+2. **`auth` répond `502` six fois sur 150 au seul niveau 10.** Un `502` vient
+   du proxy, pas de l'application : la requête n'a pas abouti jusqu'à elle.
+   C'est un symptôme de saturation, pas nécessairement un défaut applicatif.
+
+Aucune de ces erreurs n'a été réessayée, exclue, ni corrigée. Elles sont dans
+l'agrégat, dans le détail par scénario, et dans `errors_by_type_total`.
 
 ## 6. Provenance
 
