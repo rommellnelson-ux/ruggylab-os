@@ -76,6 +76,36 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v --tb=short"
 
+# ── Mesure de couverture (G0, preuve 7) ───────────────────────────────────────
+# Cette section décide de ce qui est MESURÉ. Elle ne contient et ne doit jamais
+# contenir de seuil : une option d'echec sous un pourcentage transformerait une
+# baseline en verdict, et un verdict se contourne en choisissant les tests.
+[tool.coverage.run]
+branch = true
+source = ["app"]
+# Chemins relatifs : la mesure combine des données produites par plusieurs
+# processus (suite pytest, tests PostgreSQL, application instrumentée pendant le
+# flux clinique). Des chemins absolus ne se recouperaient pas.
+relative_files = true
+
+[tool.coverage.report]
+# `app/api/middleware/` et `app/ml/` n'ont pas de `__init__.py`. Sans ce
+# réglage, coverage cesse de descendre dans un répertoire qui n'est pas un
+# paquet, et ces deux modules — dont le limiteur de débit — disparaissent
+# purement et simplement du rapport : ni couverts, ni signalés non couverts,
+# juste absents. Le contrôle de périmètre de `scripts/g0_coverage_summary.py`
+# l'a détecté en comparant le rapport à l'arborescence réelle.
+# (Option de la section `[report]`, et non `[run]` : coverage l'ignore
+# silencieusement ailleurs, avec un simple avertissement.)
+include_namespace_packages = true
+# Aucune exclusion ajoutée. Le seul motif actif est le `# pragma: no cover` par
+# défaut de coverage, présent 10 fois dans `app/` — chaque occurrence est
+# recensée dans docs/g0/COVERAGE.md. Ajouter des motifs ici (`if TYPE_CHECKING`,
+# `raise NotImplementedError`, `__repr__`…) ferait monter le pourcentage sans
+# qu'une seule ligne de plus soit exécutée.
+show_missing = true
+skip_empty = false
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100

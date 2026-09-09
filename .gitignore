@@ -29,3 +29,18 @@ artifacts/*
 # `artifacts/*` et non `artifacts/` : git n'applique pas une négation si le
 # RÉPERTOIRE parent est exclu — il ne descend même pas dedans.
 !artifacts/g0/
+
+# … sauf les MESURES du lot C. Couverture et performance ne se dérivent pas du
+# code : elles s'observent. Deux exécutions de la même suite sur la même
+# révision ne donnent pas les mêmes latences, et re-mesurer ne peut donc pas
+# détecter qu'un fichier versionné est périmé. Versionner ces cinq fichiers
+# produirait une preuve que rien ne contredit — exactement ce que le lot A
+# refuse pour l'inventaire, pour la raison inverse. Ils sont générés à chaque
+# exécution du workflow `g0-quality`, publiés comme artefacts de CI, et leurs
+# valeurs sont reprises dans docs/g0/COVERAGE.md et docs/g0/PERFORMANCE.md avec
+# l'identifiant de l'exécution qui les a produites.
+artifacts/g0/coverage.xml
+artifacts/g0/coverage.json
+artifacts/g0/coverage-summary.json
+artifacts/g0/perf-baseline.json
+artifacts/g0/perf-provenance.json
