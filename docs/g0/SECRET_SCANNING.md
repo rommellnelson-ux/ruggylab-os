@@ -260,10 +260,24 @@ Le scan d'historique est exécuté par le job
 (`gitleaks git . --log-opts="--all"`), après vérification que le clone n'est pas
 superficiel.
 
-Mesure du premier passage complet (2026-09-09, exécution CI sur la tête de la
-PR) : **416 détections** au total pour les trois scanners, dont **187 sans
-couverture écrite** — toutes de la règle `generic-api-key`, sur **quatre chemins
-distincts** :
+Mesure sur la tête de la PR (2026-09-09) : le dépôt compte **445 commits
+accessibles**, dont **367 réellement parcourus** par `gitleaks git .
+--log-opts="--all"`.
+
+| Portée | Détections brutes | Après application du périmètre commun | Sans couverture écrite |
+| --- | ---: | ---: | ---: |
+| `detect-secrets`, arbre courant (613 fichiers) | 229 | 229 | **0** |
+| Gitleaks, arbre courant | 30 | **2** | **0** |
+| Gitleaks, historique complet (367 commits) | 157 | **5** | **0** |
+| **Total confronté au registre** | | **236** | **0** |
+
+Les 30 et 157 détections brutes de Gitleaks portaient presque toutes sur
+`.secrets.baseline` — Gitleaks relève ses empreintes SHA-1 comme des clés
+génériques — et sur un fichier `.pyc` de `__pycache__`. Ces deux-là sont
+**hors périmètre** pour les deux scanners.
+
+Le premier passage complet mesurait **416 détections dont 187 sans couverture
+écrite**, sur **quatre chemins distincts** :
 
 | Chemin | Portée | Occurrences | Jugement |
 | --- | --- | ---: | --- |
@@ -276,6 +290,7 @@ distincts** :
 Les deux premiers ont été **exclus du périmètre** — `detect-secrets` recevait
 déjà une liste filtrée, Gitleaks parcourait tout ; les deux outils ne parlaient
 donc pas du même périmètre. Les trois derniers sont **inscrits au registre**.
+Il ne reste ensuite aucune détection non couverte.
 
 **Clé d'acceptation pour Gitleaks.** L'empreinte disponible est le SHA du
 commit. L'inclure dans la clé rendrait le registre faux à chaque nouveau commit
@@ -287,10 +302,15 @@ Conséquence assumée : un chemin **nouveau** ou une règle **nouvelle** font
 
 ### 6.3 Verdict des sondes
 
+Verdicts relevés dans le job, sur la tête de la PR :
+
 | Scanner | Sonde positive | Sonde négative |
 | --- | --- | --- |
-| `detect-secrets` | `POSITIVE_PROBE_DETECTED` (règles `AWS Access Key`, `Private Key`) | `NEGATIVE_PROBE_ACCEPTED` |
-| Gitleaks | `POSITIVE_PROBE_DETECTED` | `NEGATIVE_PROBE_ACCEPTED` |
+| `detect-secrets` | `POSITIVE_PROBE_DETECTED` — règles `AWS Access Key` et `Private Key` | `NEGATIVE_PROBE_ACCEPTED` |
+| Gitleaks | `POSITIVE_PROBE_DETECTED` — « 2 commits scanned », « leaks found: 2 » | `NEGATIVE_PROBE_ACCEPTED` — « no leaks found » |
+
+Les deux formes de la sentinelle sont donc relevées par les deux outils, et le
+fichier propre par aucun.
 
 **La sonde Gitleaks a d'abord échoué — et c'est précisément à cela qu'elle
 sert.** Au premier passage, elle est sortie en `POSITIVE_PROBE_MISSED` : les
