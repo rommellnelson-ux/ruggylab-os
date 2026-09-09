@@ -422,9 +422,27 @@ artefact produit avant la mutation.
    observés après des mois d'exploitation.
 3. **Un seul poste de charge.** Le client et la stack partagent la même machine ;
    une part du CPU mesurée côté conteneurs est disputée par le banc lui-même.
-4. **Limiteurs désactivés** (§2) : le débit publié n'est pas atteignable en
+4. **Les chiffres de CPU et de mémoire sont des instantanés, pas des pointes.**
+   `docker stats --no-stream` est appelé **avant** et **après** chaque niveau,
+   jamais pendant. Les valeurs publiées décrivent donc l'état de la stack au
+   repos, immédiatement après la charge — la consommation de CPU **au pic** n'a
+   pas été mesurée, et les 0,12 % relevés côté application ne doivent surtout
+   pas être lus comme « l'application a consommé 0,12 % de CPU pendant la
+   mesure ». Ce qui reste exploitable dans ces relevés est ce qui ne redescend
+   pas : la mémoire résidente (138 → 172 Mio de la concurrence 1 à 10), le
+   nombre de connexions PostgreSQL, et les compteurs de transactions, qui sont
+   cumulés et donc pris en différence. Mesurer les pointes demanderait un
+   échantillonnage périodique pendant la charge ; c'est une amélioration à
+   instruire, pas un résultat de cette campagne.
+5. **Plus de transactions annulées que validées.** À la concurrence 10, 2 652
+   `xact_rollback` pour 2 326 `xact_commit`. Une partie s'explique par les
+   erreurs applicatives observées, une autre par le comportement ordinaire d'une
+   session qui se termine sans écriture. Ce banc ne permet pas de trancher entre
+   les deux ; le ratio est publié parce qu'il est mesuré, pas parce qu'il est
+   interprété.
+6. **Limiteurs désactivés** (§2) : le débit publié n'est pas atteignable en
    exploitation depuis une seule adresse IP.
-5. **Cinq itérations mesurées par utilisateur** (§3) : les centiles élevés des
+7. **Cinq itérations mesurées par utilisateur** (§3) : les centiles élevés des
    niveaux de faible concurrence reposent sur des effectifs modestes.
-6. **Aucune mesure de la restitution navigateur.** Ce banc mesure l'API. Le temps
+8. **Aucune mesure de la restitution navigateur.** Ce banc mesure l'API. Le temps
    perçu par un utilisateur devant l'interface n'est pas ce qui est publié ici.
