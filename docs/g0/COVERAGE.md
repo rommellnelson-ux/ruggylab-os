@@ -266,6 +266,18 @@ Croisement XML/JSON : `lines-valid=12712`, `lines-covered=6606`, `branches-valid
 
 <!-- RESULTATS_COUVERTURE_FIN -->
 
+> **Sur quelle révision ces chiffres portent-ils ?** Ils viennent de
+> l'exécution citée ci-dessus, prise sur le commit `fa45c84`. Les commits
+> suivants de cette branche ne touchent que `docs/g0/*.md` — aucun fichier des
+> ensembles d'entrée `coverage` (`app/**`, `tests/**`, `pyproject.toml`,
+> `requirements.txt`, le générateur du résumé) ni `performance` (le script de
+> mesure, la surcharge, `app/**`, `alembic/**`, `docker-compose.yml`,
+> `Dockerfile`, `requirements.txt`). La mesure décrit donc bien le code de la
+> tête de branche. Chaque nouvelle exécution du workflow en produit une autre,
+> nécessairement différente sur les latences : c'est la raison pour laquelle ces
+> artefacts ne sont pas versionnés, et pourquoi la version publiée ici porte
+> l'identifiant de l'exécution qui l'a produite.
+
 ## 5. Limites de cette campagne
 
 1. **La couverture ne mesure pas la qualité des assertions.** Une ligne exécutée

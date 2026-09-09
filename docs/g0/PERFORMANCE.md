@@ -338,6 +338,18 @@ Validité de la mesure : **valide** (scripts/g0_perf_baseline.py valider()).
 
 <!-- RESULTATS_PERFORMANCE_FIN -->
 
+> **Sur quelle révision ces chiffres portent-ils ?** Ils viennent de
+> l'exécution citée ci-dessus, prise sur le commit `fa45c84`. Les commits
+> suivants de cette branche ne touchent que `docs/g0/*.md` — aucun fichier des
+> ensembles d'entrée `coverage` (`app/**`, `tests/**`, `pyproject.toml`,
+> `requirements.txt`, le générateur du résumé) ni `performance` (le script de
+> mesure, la surcharge, `app/**`, `alembic/**`, `docker-compose.yml`,
+> `Dockerfile`, `requirements.txt`). La mesure décrit donc bien le code de la
+> tête de branche. Chaque nouvelle exécution du workflow en produit une autre,
+> nécessairement différente sur les latences : c'est la raison pour laquelle ces
+> artefacts ne sont pas versionnés, et pourquoi la version publiée ici porte
+> l'identifiant de l'exécution qui l'a produite.
+
 ## 5. Erreurs applicatives
 
 Une requête qui échoue est **comptée, classée par type, et publiée**. Elle n'est
