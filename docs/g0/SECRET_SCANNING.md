@@ -512,6 +512,29 @@ lit les fusions, mais parce qu'il lit une suppression. La sonde passait au vert
 sans rien prouver. L'isolation correcte exige qu'**aucun commit ordinaire ne
 touche la valeur**, ni pour l'ajouter, ni pour la supprimer.
 
+### Ce que le scan des fusions coûte, et pourquoi c'est accepté
+
+Avec `-m`, la fusion est diffée contre **chaque parent**. Un contenu venu d'un
+parent apparaît donc comme *ajouté* par rapport à l'autre. Conséquence
+mesurée : un fichier déjà qualifié dans l'arbre **réapparaît** sous une
+empreinte nouvelle — préfixée par le SHA du commit de fusion — dès qu'une
+fusion le traverse.
+
+Les deux premières sont `docs/g0/INVENTORY.md:215` vue à travers la fusion du
+lot A, et `tests/test_g0_security_baseline.py:722` vue à travers celle du lot B.
+Même contenu, déjà revu, mais **identité nouvelle** — donc décision nouvelle.
+
+Le registre grandira donc au rythme des fusions qui traversent un fichier
+porteur. C'est un coût réel, et il est **assumé** : l'alternative serait de
+dédupliquer les findings de fusion sur `chemin + règle`, c'est-à-dire de
+rétablir exactement le défaut que la revue précédente a fait corriger. Un
+registre plus long reste préférable à un registre qui absorbe silencieusement
+une valeur nouvelle.
+
+Ce coût est **borné** — une entrée par fusion traversant un emplacement déjà
+détecté — à la différence des empreintes de provenance, qui changeaient à
+chaque régénération et ont dû être sorties du scan pour cette raison.
+
 ### Les quatre sondes
 
 | Sonde | Ce qu'elle exerce | Verdict attendu |

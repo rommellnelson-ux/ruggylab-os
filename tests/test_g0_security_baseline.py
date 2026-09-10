@@ -2085,3 +2085,27 @@ def test_the_merge_probe_uses_the_command_it_certifies():
     assert sondes["run"].count("$MERGE_LOG_OPTS") >= 2, (
         "M2 et M3 doivent tous deux employer la variante certifiée"
     )
+
+
+def test_every_registry_entry_declares_the_scan_that_found_it():
+    """La portée doit nommer le scan d'origine, pas retomber sur « tree ».
+
+    Deux entrées de fusion ont été inscrites avec `scope: tree`, héritées d'un
+    rapport produit avant que la table des portées existe. Le champ servait
+    précisément à distinguer les catégories : mal renseigné, il rend la revue
+    trompeuse là où elle doit être la plus précise.
+    """
+    registre = json.loads(_lire(REPO_ROOT / "docs/governance/SECRET_SCAN_EXCEPTIONS.json"))
+    attendu = {
+        "gitleaks-arbre": "tree",
+        "gitleaks-historique": "history",
+        "gitleaks-merge-history": "merge_history",
+    }
+    for entree in registre["exceptions"]:
+        cible = attendu.get(entree["scanner"])
+        if cible is None:
+            continue
+        assert entree.get("scope") == cible, (
+            f"{entree['path']} ({entree['scanner']}) declare scope={entree.get('scope')}, "
+            f"attendu {cible}"
+        )

@@ -473,6 +473,20 @@ def scanner_arbre(
 # ── Lecture des rapports Gitleaks ───────────────────────────────────────────
 
 
+#: Portee inscrite dans chaque detection, selon le scan qui l'a produite.
+#:
+#: Sans cette table, `merge-history` retombait sur « tree » : une detection
+#: issue d'une resolution de fusion se declarait comme venant de l'arbre
+#: courant, ce qui rendait le champ trompeur la ou il sert precisement a
+#: distinguer les categories.
+_PORTEES = {
+    "arbre": "tree",
+    "historique": "history",
+    "merge-history": "merge_history",
+    "sonde": "probe",
+}
+
+
 class DetectionSansEmpreinte(RuntimeError):
     """Un finding Gitleaks sans `Fingerprint` — la barrière ne peut pas l'identifier.
 
@@ -522,7 +536,7 @@ def lire_rapport_gitleaks(chemin: Path, portee: str) -> list[dict[str, Any]]:
                 "fingerprint": empreinte,
                 "commit": str(element.get("Commit", "") or ""),
                 "start_line": int(element.get("StartLine", 0) or 0),
-                "scope": "history" if portee == "historique" else "tree",
+                "scope": _PORTEES.get(portee, "tree"),
             }
         )
     if sans_empreinte:
