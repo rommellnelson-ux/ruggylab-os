@@ -938,6 +938,77 @@ def reconcilier_historique(
     }
 
 
+# ── Couverture des deux catégories de commits ───────────────────────────────
+#
+# `reachable = merges + non_merges` est une identité arithmétique. Elle dit que
+# la partition est cohérente ; elle ne dit RIEN sur ce qui a été lu.
+#
+# Gitleaks s'appuie sur `git log -p`. Or `git log -p` n'émet **aucun patch**
+# pour un commit de fusion, sauf à lui passer `-m` ou `--cc`. Un contenu
+# introduit pendant une résolution de conflit — donc absent des deux parents —
+# n'apparaît alors dans aucun patch : ni dans celui de la fusion, qui n'existe
+# pas, ni dans ceux des parents, qui ne le contiennent pas.
+#
+# Mesuré sur un dépôt jetable, une valeur présente uniquement dans l'arbre d'un
+# commit de fusion :
+#
+#     --all                    ABSENT      <- la commande d'origine
+#     --all --no-merges        ABSENT
+#     --all --merges           ABSENT      <- les fusions sans patch
+#     --all --merges -m        DETECTE
+#     --all --merges --cc      DETECTE
+#
+# Il faut donc DEUX preuves distinctes, et non une addition qui tombe juste.
+
+#: Verdicts possibles de la couverture d'historique.
+COUVERTURE_ORDINAIRE_VERIFIEE = "NON_MERGE_HISTORY_SCAN_VERIFIED"
+COUVERTURE_FUSION_VERIFIEE = "MERGE_HISTORY_SCAN_VERIFIED"
+COUVERTURE_FUSION_INCOMPLETE = "MERGE_HISTORY_SCAN_INCOMPLETE"
+
+
+def couverture_historique(comptes: dict[str, Any], sondes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Ce qui a réellement été lu, catégorie par catégorie.
+
+    Deux scans, deux sondes, deux verdicts. Une sonde qui n'a pas détecté sa
+    sentinelle rend la catégorie correspondante incomplète, quel que soit le
+    nombre de commits annoncé : un scan qui ne trouve pas ce qu'on y a mis ne
+    prouve pas ce qu'il n'a pas trouvé.
+    """
+    par_portee = {s.get("scope"): s for s in sondes if s.get("scope")}
+    ordinaire = par_portee.get("non_merge_history", {})
+    fusion = par_portee.get("merge_history", {})
+
+    ordinaire_ok = (
+        bool(comptes.get("ordinary_history_scan_executed"))
+        and ordinaire.get("positive") == "POSITIVE_PROBE_DETECTED"
+    )
+    fusion_ok = (
+        bool(comptes.get("merge_history_scan_executed"))
+        and fusion.get("positive") == "POSITIVE_PROBE_DETECTED"
+    )
+    erreurs = list(comptes.get("history_scan_errors") or [])
+
+    statuts = []
+    if ordinaire_ok:
+        statuts.append(COUVERTURE_ORDINAIRE_VERIFIEE)
+    if fusion_ok:
+        statuts.append(COUVERTURE_FUSION_VERIFIEE)
+    elif comptes.get("merge_commits", 0):
+        statuts.append(COUVERTURE_FUSION_INCOMPLETE)
+
+    return {
+        "ordinary_history_scan_executed": bool(comptes.get("ordinary_history_scan_executed")),
+        "merge_history_scan_executed": bool(comptes.get("merge_history_scan_executed")),
+        "ordinary_history_probe_detected": ordinaire.get("positive") == "POSITIVE_PROBE_DETECTED",
+        "merge_resolution_probe_detected": fusion.get("positive") == "POSITIVE_PROBE_DETECTED",
+        "merge_scan_log_opts": str(comptes.get("merge_scan_log_opts", "")),
+        "ordinary_scan_log_opts": str(comptes.get("ordinary_scan_log_opts", "")),
+        "history_scan_errors": erreurs,
+        "statuses": statuts,
+        "complete": ordinaire_ok and fusion_ok and not erreurs,
+    }
+
+
 # ── Sondes de non-vacuité ───────────────────────────────────────────────────
 
 
@@ -963,17 +1034,24 @@ def sonde_detect_secrets() -> dict[str, Any]:
     }
 
 
-def verifier_sondes_gitleaks(rapport_porteur: Path, rapport_propre: Path) -> dict[str, Any]:
+def verifier_sondes_gitleaks(
+    rapport_porteur: Path, rapport_propre: Path, portee: str = "tree"
+) -> dict[str, Any]:
     """Le même contrôle pour Gitleaks, sur les rapports produits par le workflow.
 
-    Le dépôt jetable est créé par le job, hors du dépôt principal, avec un
-    commit portant la sentinelle et un commit propre. Ce sont les deux rapports
-    qui sont jugés ici — jamais les valeurs.
+    Le dépôt jetable est créé par le job, hors du dépôt principal. Ce sont les
+    deux rapports qui sont jugés ici — jamais les valeurs.
+
+    `portee` distingue les sondes : `non_merge_history` pour un secret ajouté
+    puis supprimé hors de toute fusion, `merge_history` pour un secret présent
+    uniquement dans l'arbre d'un commit de fusion. Sans cette distinction, une
+    sonde réussie couvrirait l'autre catégorie sans l'avoir exercée.
     """
     porteur = lire_rapport_gitleaks(rapport_porteur, "sonde")
     propre = lire_rapport_gitleaks(rapport_propre, "sonde")
     return {
         "scanner": "gitleaks",
+        "scope": portee,
         "positive": "POSITIVE_PROBE_DETECTED" if porteur else "POSITIVE_PROBE_MISSED",
         "negative": "NEGATIVE_PROBE_ACCEPTED" if not propre else "NEGATIVE_PROBE_FALSE_POSITIVE",
         "positive_rules": sorted({d["rule"] for d in porteur}),
@@ -1043,7 +1121,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--files-from", type=Path, help="liste de chemins (sortie de git ls-files)")
     parser.add_argument("--tree", action="store_true", help="scanne l'arbre courant")
     parser.add_argument("--gitleaks-dir-report", type=Path, help="rapport Gitleaks de l'arbre")
-    parser.add_argument("--gitleaks-git-report", type=Path, help="rapport Gitleaks de l'historique")
+    parser.add_argument(
+        "--gitleaks-git-report",
+        type=Path,
+        help="rapport Gitleaks de l'historique ORDINAIRE (--all --no-merges)",
+    )
+    parser.add_argument(
+        "--gitleaks-merge-history-report",
+        type=Path,
+        help=(
+            "rapport Gitleaks des RESOLUTIONS DE FUSION. `git log -p` n'emet aucun "
+            "patch pour un commit de fusion sans `-m` ni `--cc` : un contenu propre a "
+            "la resolution echappe sinon aux deux scans."
+        ),
+    )
+    parser.add_argument("--gitleaks-merge-probe-positive", type=Path)
+    parser.add_argument("--gitleaks-merge-probe-negative", type=Path)
     parser.add_argument("--probes", action="store_true", help="exécute la sonde detect-secrets")
     parser.add_argument("--gitleaks-probe-positive", type=Path)
     parser.add_argument("--gitleaks-probe-negative", type=Path)
@@ -1081,6 +1174,7 @@ def main(argv: list[str] | None = None) -> int:
     detections: list[dict[str, Any]] = []
     rapport_scan: dict[str, Any] = {}
     reconciliation: dict[str, Any] = {}
+    comptes_historique: dict[str, Any] = {}
     if args.tree:
         chemins = fichiers_a_scanner(args.files_from)
         print(f"Fichiers scannés (arbre courant) : {len(chemins)}")
@@ -1102,12 +1196,16 @@ def main(argv: list[str] | None = None) -> int:
             gl_git = lire_rapport_gitleaks(args.gitleaks_git_report, "historique")
             _resume("Gitleaks — historique complet", gl_git)
             detections.extend(gl_git)
-            comptes = (
+            comptes_historique = (
                 json.loads(args.history_counts.read_text(encoding="utf-8"))
                 if args.history_counts and args.history_counts.is_file()
                 else {}
             )
-            reconciliation = reconcilier_historique(gl_git, comptes)
+            reconciliation = reconcilier_historique(gl_git, comptes_historique)
+        if args.gitleaks_merge_history_report:
+            gl_fusion = lire_rapport_gitleaks(args.gitleaks_merge_history_report, "merge-history")
+            _resume("Gitleaks — resolutions de fusion", gl_fusion)
+            detections.extend(gl_fusion)
             print(
                 f"Historique : {reconciliation['reachable_commits']} accessibles = "
                 f"{reconciliation['merge_commits']} fusions + "
@@ -1140,7 +1238,19 @@ def main(argv: list[str] | None = None) -> int:
         sondes.append(sonde_detect_secrets())
     if args.gitleaks_probe_positive and args.gitleaks_probe_negative:
         sondes.append(
-            verifier_sondes_gitleaks(args.gitleaks_probe_positive, args.gitleaks_probe_negative)
+            verifier_sondes_gitleaks(
+                args.gitleaks_probe_positive,
+                args.gitleaks_probe_negative,
+                portee="non_merge_history",
+            )
+        )
+    if args.gitleaks_merge_probe_positive and args.gitleaks_merge_probe_negative:
+        sondes.append(
+            verifier_sondes_gitleaks(
+                args.gitleaks_merge_probe_positive,
+                args.gitleaks_merge_probe_negative,
+                portee="merge_history",
+            )
         )
     for sonde in sondes:
         # Seuls des verdicts appartenant a l'ensemble ferme ci-dessus sont
@@ -1157,6 +1267,12 @@ def main(argv: list[str] | None = None) -> int:
     # validateur qui connaît leur schéma. Sans lui, l'exclusion technique
     # deviendrait une zone franche.
     manquements_gouvernance = valider_fichiers_de_gouvernance()
+    couverture = couverture_historique(comptes_historique, sondes) if comptes_historique else {}
+    if couverture:
+        print(
+            "Couverture d'historique : "
+            + (" · ".join(couverture["statuses"]) or "aucune categorie verifiee")
+        )
 
     try:
         confrontation = confronter(detections, connues, charger_registre())
@@ -1179,6 +1295,7 @@ def main(argv: list[str] | None = None) -> int:
                     "baseline_paths_normalised": chemins_non_posix,
                     "tree_scan": rapport_scan,
                     "history_reconciliation": reconciliation,
+                    "history_coverage": couverture,
                     "governance_files_validation": manquements_gouvernance,
                 },
                 indent=2,
@@ -1232,6 +1349,31 @@ def main(argv: list[str] | None = None) -> int:
         )
         for manquement in manquements_gouvernance[:50]:
             print(f"  ! {manquement}", file=sys.stderr)
+    if couverture and not couverture["complete"]:
+        echec = True
+        manquantes = []
+        if not couverture["ordinary_history_scan_executed"]:
+            manquantes.append("le scan de l'historique ordinaire n'a pas ete execute")
+        elif not couverture["ordinary_history_probe_detected"]:
+            manquantes.append("la sonde de l'historique ordinaire n'a rien detecte")
+        if not couverture["merge_history_scan_executed"]:
+            manquantes.append("le scan des resolutions de fusion n'a pas ete execute")
+        elif not couverture["merge_resolution_probe_detected"]:
+            manquantes.append(
+                "la sonde de resolution de fusion n'a rien detecte — "
+                "`git log -p` n'emet aucun patch pour une fusion sans `-m` ni `--cc`"
+            )
+        for erreur in couverture["history_scan_errors"]:
+            manquantes.append(f"erreur Git pendant le scan : {erreur}")
+        print(
+            "\nECHEC — "
+            + (" · ".join(couverture["statuses"]) or "MERGE_HISTORY_SCAN_INCOMPLETE")
+            + " : "
+            "une categorie de commits n'est pas demontree lue.",
+            file=sys.stderr,
+        )
+        for manque in manquantes:
+            print(f"  ! {manque}", file=sys.stderr)
     if reconciliation and not reconciliation["reconciled"]:
         echec = True
         print(

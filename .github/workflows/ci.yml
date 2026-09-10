@@ -467,7 +467,7 @@ jobs:
 
           # Les identités restaurées sont bien celles qui avaient été semées.
           python - <<'PY'
-          import json, sys
+          import json, os, sys
           items = json.load(open("patients.json"))["items"]
           ipps = {p["ipp_unique_id"] for p in items}
           attendus = {"TEST-IPP-0001", "TEST-IPP-0002", "TEST-IPP-0003"}
@@ -1345,6 +1345,26 @@ jobs:
       # réellement téléchargés, champ `digest` de l'API des releases GitHub, et
       # `gitleaks_8.30.1_checksums.txt` publié. Toute montée de version doit
       # refaire les trois.
+      # Variante retenue pour le scan des resolutions de fusion.
+      #
+      # `git log -p` n'emet AUCUN patch pour un commit de fusion sans `-m` ni
+      # `--cc` : un contenu introduit pendant une resolution de conflit, donc
+      # absent des deux parents, echappe alors a tout scan. Mesure sur un depot
+      # jetable, une valeur presente uniquement dans l'arbre d'une fusion :
+      #
+      #     --all                 ABSENT   <- la commande d'origine
+      #     --all --no-merges     ABSENT
+      #     --all --merges        ABSENT   <- fusions sans patch
+      #     --all --merges -m     DETECTE
+      #     --all --merges --cc   DETECTE
+      #
+      # `-m` est prefere a `--cc` : il produit des diffs ORDINAIRES, un par
+      # parent, la que `--cc` produit un diff combine dont l'analyse par le
+      # lecteur de Gitleaks n'est pas garantie. La sonde M2 verifie de toute
+      # facon la variante REELLEMENT utilisee : si elle ne detecte rien, le job
+      # passe au rouge sous MERGE_HISTORY_SCAN_INCOMPLETE.
+      MERGE_LOG_OPTS: "--all --merges -m"
+      ORDINARY_LOG_OPTS: "--all --no-merges"
       GITLEAKS_VERSION: "8.30.1"
       GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
 
@@ -1476,50 +1496,180 @@ jobs:
       # l'exécution par `scripts/g0_secret_gate.py` : l'écrire en clair dans un
       # fichier versionné ferait entrer dans le dépôt une valeur ayant la forme
       # d'un secret actif, ce que la campagne s'interdit.
-      - name: Non-emptiness probes on a throwaway git repository
+      # Quatre sondes, et non deux : une sonde qui n'exerce qu'une categorie
+      # de commits ne dit rien de l'autre.
+      - name: Non-emptiness probes (M1 ordinary, M2 merge, M3 clean merge, M4 tree)
         run: |
-          sonde="$RUNNER_TEMP/sonde-gitleaks"
-          rm -rf "$sonde" && mkdir -p "$sonde"
-          git -C "$sonde" init -q
-          git -C "$sonde" config user.email "g0-probe@example.invalid"
-          git -C "$sonde" config user.name "G0 probe"
-          python - "$sonde" <<'PY'
-          import pathlib, sys
+          sonde_racine="$RUNNER_TEMP/sondes"
+          rm -rf "$sonde_racine" && mkdir -p "$sonde_racine"
+
+          # Les quatre sondes vivent dans des depots jetables HORS du depot principal.
+          # Leurs sentinelles sont assemblees par Python a l'execution : ecrites en
+          # litteral, elles entreraient dans ce depot sous la forme d'une valeur
+          # ressemblant a un secret actif.
+          python - "$sonde_racine" <<'PY'
+          import pathlib
+          import subprocess
+          import sys
+
+          racine = pathlib.Path(sys.argv[1])
           sys.path.insert(0, ".")
           from scripts.g0_secret_gate import TEXTE_PROPRE, contenu_porteur
 
-          base = pathlib.Path(sys.argv[1])
-          (base / "porteur.txt").write_text(contenu_porteur(), encoding="utf-8")
-          (base / "propre.txt").write_text(TEXTE_PROPRE, encoding="utf-8")
+          # Deux sentinelles distinctes : une meme valeur dans les deux sondes ne
+          # permettrait pas de dire laquelle des deux categories l'a fait apparaitre.
+          PORTEUR_ORDINAIRE = contenu_porteur()
+          PORTEUR_FUSION = contenu_porteur().replace("Q7XKJ92MW", "4KMZ8PLT2")
+
+
+          def git(depot, *args):
+              resultat = subprocess.run(
+                  ["git", "-C", str(depot), *args], capture_output=True, text=True
+              )
+              if resultat.returncode != 0 and args[0] not in ("merge",):
+                  raise SystemExit(f"git {' '.join(args)} : {resultat.stderr.strip()[:200]}")
+              return resultat.stdout.strip()
+
+
+          def init(nom):
+              depot = racine / nom
+              depot.mkdir(parents=True)
+              git(depot, "init", "-q", "-b", "principal", ".")
+              git(depot, "config", "user.email", "g0-probe@example.invalid")
+              git(depot, "config", "user.name", "G0 probe")
+              git(depot, "config", "commit.gpgsign", "false")
+              (depot / "fichier.txt").write_text("ligne commune\n", encoding="utf-8")
+              git(depot, "add", "fichier.txt")
+              git(depot, "commit", "-q", "-m", "base")
+              return depot
+
+
+          # ── M1 : secret ordinaire, ajoute puis supprime, hors de toute fusion ───────
+          m1 = init("m1-ordinaire")
+          (m1 / "porteur.txt").write_text(PORTEUR_ORDINAIRE, encoding="utf-8")
+          git(m1, "add", "porteur.txt")
+          git(m1, "commit", "-q", "-m", "ordinaire : porteur")
+          git(m1, "rm", "-q", "porteur.txt")
+          git(m1, "commit", "-q", "-m", "ordinaire : nettoyage")
+
+          # ── M2 : secret present UNIQUEMENT dans l'arbre d'un commit de fusion ───────
+          #
+          # Aucun commit ordinaire ne le touche : ni ajout, ni suppression. Il n'apparait
+          # donc dans AUCUN patch ordinaire. La branche principale ne l'a jamais porte,
+          # donc HEAD reste propre. C'est la seule construction qui isole la lacune : une
+          # suppression par un commit ordinaire reexposerait la valeur dans son diff, et
+          # la sonde passerait au vert sans rien prouver.
+          m2 = init("m2-fusion")
+          base = git(m2, "rev-parse", "HEAD")
+          git(m2, "switch", "-q", "-c", "gauche", base)
+          (m2 / "fichier.txt").write_text("ligne commune\nvariante gauche\n", encoding="utf-8")
+          git(m2, "commit", "-qam", "gauche")
+          git(m2, "switch", "-q", "-c", "droite", base)
+          (m2 / "fichier.txt").write_text("ligne commune\nvariante droite\n", encoding="utf-8")
+          git(m2, "commit", "-qam", "droite")
+          git(m2, "switch", "-q", "gauche")
+          git(m2, "merge", "droite", "-q")  # conflit attendu
+          (m2 / "fichier.txt").write_text(
+              "ligne commune\nresolution\n" + PORTEUR_FUSION, encoding="utf-8"
+          )
+          git(m2, "add", "fichier.txt")
+          git(m2, "commit", "-q", "--no-edit", "-m", "fusion : resolution porteuse")
+          fusion = git(m2, "rev-parse", "HEAD")
+          git(m2, "switch", "-q", "principal")
+
+          # La sonde ne vaut que si sa premisse est vraie : verifions-la ici, pas plus tard.
+          arbre = git(m2, "show", f"{fusion}:fichier.txt")
+          if "4KMZ8PLT2" not in arbre:
+              raise SystemExit("SONDE M2 INVALIDE : la sentinelle n'est pas dans l'arbre de la fusion")
+          parents = git(m2, "rev-list", "--parents", "-n1", fusion).split()[1:]
+          for parent in parents:
+              if "4KMZ8PLT2" in git(m2, "show", f"{parent}:fichier.txt"):
+                  raise SystemExit("SONDE M2 INVALIDE : la sentinelle existe deja dans un parent")
+
+          # ── M3 : une fusion PROPRE ne doit produire aucun faux positif ──────────────
+          m3 = init("m3-fusion-propre")
+          base = git(m3, "rev-parse", "HEAD")
+          git(m3, "switch", "-q", "-c", "a", base)
+          (m3 / "a.txt").write_text("alpha\n", encoding="utf-8")
+          git(m3, "add", "a.txt")
+          git(m3, "commit", "-q", "-m", "a")
+          git(m3, "switch", "-q", "-c", "b", base)
+          (m3 / "b.txt").write_text("beta\n", encoding="utf-8")
+          git(m3, "add", "b.txt")
+          git(m3, "commit", "-q", "-m", "b")
+          git(m3, "switch", "-q", "a")
+          git(m3, "merge", "b", "-q", "--no-edit")
+
+          # ── M4 : l'arbre courant des deux depots porteurs est propre ────────────────
+          for depot, nom in ((m1, "m1"), (m2, "m2")):
+              (depot / "propre.txt").write_text(TEXTE_PROPRE, encoding="utf-8")
+              git(depot, "add", "propre.txt")
+              git(depot, "commit", "-q", "-m", "temoin propre")
+
+          print(f"sondes preparees dans {racine}")
           PY
-          git -C "$sonde" add porteur.txt
-          git -C "$sonde" commit -q -m "sonde positive"
-          git -C "$sonde" rm -q porteur.txt
-          git -C "$sonde" add propre.txt
-          git -C "$sonde" commit -q -m "sonde negative"
-          # L'arbre ne contient plus que le fichier propre : la sonde positive
-          # ne peut donc réussir que si l'HISTORIQUE est réellement parcouru.
-          "$RUNNER_TEMP/bin/gitleaks" git "$sonde" --no-banner --redact=100 \
-            --exit-code 0 --report-format json \
-            --report-path "$RUNNER_TEMP/sonde-positive.json"
-          "$RUNNER_TEMP/bin/gitleaks" dir "$sonde" --no-banner --redact=100 \
-            --exit-code 0 --report-format json \
-            --report-path "$RUNNER_TEMP/sonde-negative.json"
-          # Diagnostic : les rapports sont expurges (--redact=100) et le depot
-          # jetable ne porte que des valeurs synthetiques. Les afficher rend un
-          # echec de sonde diagnosticable en UNE execution au lieu de trois.
-          echo "--- rapport sonde positive ---"; cat "$RUNNER_TEMP/sonde-positive.json"
-          echo "--- rapport sonde negative ---"; cat "$RUNNER_TEMP/sonde-negative.json"
-          rm -rf "$sonde"
+
+          gl="$RUNNER_TEMP/bin/gitleaks"
+
+          # M1 — historique ORDINAIRE : le secret a ete ajoute puis supprime hors fusion.
+          "$gl" git "$sonde_racine/m1-ordinaire" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --log-opts="--all --no-merges" \
+            --report-path "$RUNNER_TEMP/sonde-m1-positive.json"
+          "$gl" dir "$sonde_racine/m1-ordinaire" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --report-path "$RUNNER_TEMP/sonde-m1-negative.json"
+
+          # M2 — RESOLUTION DE FUSION. La variante est celle du scan reel, pas une autre :
+          # une sonde qui exercerait une commande differente de la mesure ne prouverait
+          # rien sur la mesure.
+          "$gl" git "$sonde_racine/m2-fusion" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --log-opts="$MERGE_LOG_OPTS" \
+            --report-path "$RUNNER_TEMP/sonde-m2-positive.json"
+
+          # M3 — fusion propre : aucun faux positif attendu, avec la MEME commande.
+          "$gl" git "$sonde_racine/m3-fusion-propre" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --log-opts="$MERGE_LOG_OPTS" \
+            --report-path "$RUNNER_TEMP/sonde-m2-negative.json"
+
+          # M4 — l'arbre courant des depots porteurs est propre.
+          "$gl" dir "$sonde_racine/m2-fusion" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --report-path "$RUNNER_TEMP/sonde-m4-arbre.json"
+
+          echo "--- verdicts des sondes (rapports expurges, --redact=100) ---"
+          python - <<'PY'
+          import json
+          import pathlib
+          import os
+
+          base = pathlib.Path(os.environ["RUNNER_TEMP"])
+          for nom, chemin, attendu in (
+              ("M1 historique ordinaire — positive", "sonde-m1-positive.json", "detecte"),
+              ("M1 arbre — negative", "sonde-m1-negative.json", "vide"),
+              ("M2 resolution de fusion — positive", "sonde-m2-positive.json", "detecte"),
+              ("M3 fusion propre — negative", "sonde-m2-negative.json", "vide"),
+              ("M4 arbre du depot de fusion", "sonde-m4-arbre.json", "vide"),
+          ):
+              texte = (base / chemin).read_text(encoding="utf-8").strip()
+              findings = json.loads(texte) if texte else []
+              regles = sorted({f.get("RuleID", "") for f in findings})
+              verdict = "detecte" if findings else "vide"
+              marque = "OK  " if verdict == attendu else "ECHEC"
+              print(f"  {marque} {nom:44} {verdict:8} {regles}")
+          PY
 
       - name: Scan the working tree, then the full Git history
         run: |
           "$RUNNER_TEMP/bin/gitleaks" dir . --no-banner --redact=100 \
             --exit-code 0 --report-format json \
             --report-path "$RUNNER_TEMP/gitleaks-arbre.json"
+          # Historique ORDINAIRE et RESOLUTIONS DE FUSION : deux commandes,
+          # deux rapports, deux preuves. Une seule addition de commits ne
+          # demontre pas que les deux categories ont ete lues.
           "$RUNNER_TEMP/bin/gitleaks" git . --no-banner --redact=100 \
-            --exit-code 0 --report-format json --log-opts="--all" \
+            --exit-code 0 --report-format json --log-opts="$ORDINARY_LOG_OPTS" \
             --report-path "$RUNNER_TEMP/gitleaks-historique.json"
+          "$RUNNER_TEMP/bin/gitleaks" git . --no-banner --redact=100 \
+            --exit-code 0 --report-format json --log-opts="$MERGE_LOG_OPTS" \
+            --report-path "$RUNNER_TEMP/gitleaks-fusions.json"
 
           # Comptage des commits, mesure ICI et non dans la barriere : celle-ci
           # s'interdit tout sous-processus, parce qu'une barriere de securite qui
@@ -1544,6 +1694,11 @@ jobs:
                   "is_shallow_repository": superficiel == "true",
                   "scan_command": "gitleaks git . --log-opts=--all",
                   "log_opts": "rev-list --all ; --merges ; --no-merges",
+                  "ordinary_history_scan_executed": True,
+                  "merge_history_scan_executed": True,
+                  "ordinary_scan_log_opts": os.environ["ORDINARY_LOG_OPTS"],
+                  "merge_scan_log_opts": os.environ["MERGE_LOG_OPTS"],
+                  "history_scan_errors": [],
               },
               sys.stdout,
           )
@@ -1558,10 +1713,13 @@ jobs:
             --tree --files-from "$RUNNER_TEMP/fichiers-suivis.txt" \
             --gitleaks-dir-report "$RUNNER_TEMP/gitleaks-arbre.json" \
             --gitleaks-git-report "$RUNNER_TEMP/gitleaks-historique.json" \
+            --gitleaks-merge-history-report "$RUNNER_TEMP/gitleaks-fusions.json" \
             --history-counts "$RUNNER_TEMP/history-counts.json" \
+            --gitleaks-merge-probe-positive "$RUNNER_TEMP/sonde-m2-positive.json" \
+            --gitleaks-merge-probe-negative "$RUNNER_TEMP/sonde-m2-negative.json" \
             --probes \
-            --gitleaks-probe-positive "$RUNNER_TEMP/sonde-positive.json" \
-            --gitleaks-probe-negative "$RUNNER_TEMP/sonde-negative.json" \
+            --gitleaks-probe-positive "$RUNNER_TEMP/sonde-m1-positive.json" \
+            --gitleaks-probe-negative "$RUNNER_TEMP/sonde-m1-negative.json" \
             --report "$RUNNER_TEMP/g0b/secret-gate-report.json"
 
       - name: Confirm the governance statuses are unchanged
