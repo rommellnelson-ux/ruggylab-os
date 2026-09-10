@@ -206,6 +206,25 @@
         ],
         "remediation_owner": "lot D",
         "titre": "Une cle publiable et l'URL d'un projet Supabase reel subsistent dans l'historique"
+      },
+      {
+        "action_future": "Aucune : la lacune est refermee par deux scans distincts, chacun verifie par sa propre sonde. Le constat est conserve pour memoire.",
+        "aucun_secret_reel_decouvert": true,
+        "classement": "P1",
+        "constat": "`git log -p` n'emet aucun patch pour un commit de fusion sans `-m` ni `--cc`. La commande d'origine `--log-opts=\"--all\"` laissait donc hors de portee tout contenu introduit par une resolution de conflit. Reproduit sur un depot jetable : une valeur presente uniquement dans l'arbre d'un commit de fusion est ABSENTE de `--all`, de `--all --no-merges` et de `--all --merges`, et DETECTEE par `--all --merges -m` comme par `--all --merges --cc`.",
+        "id": "B-14",
+        "marqueurs": [
+          "HISTORY_PROOF_GAP"
+        ],
+        "preuve": [
+          "tests/test_g0_security_baseline.py::test_the_original_command_misses_merge_resolutions",
+          "tests/test_g0_security_baseline.py::test_a_merge_aware_command_sees_the_resolution",
+          "scan des fusions configure : --all --merges -m",
+          "scan ordinaire configure   : --all --no-merges"
+        ],
+        "remediation_owner": "lot B (referme)",
+        "statut": "CLOSED_BY_MERGE_HISTORY_SCAN",
+        "titre": "Les contenus propres aux commits de fusion n'etaient pas analyses par la commande historique initiale"
       }
     ],
     "guard_semantics": {
