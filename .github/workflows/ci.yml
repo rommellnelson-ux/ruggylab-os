@@ -1682,7 +1682,7 @@ jobs:
           superficiel=$(git rev-parse --is-shallow-repository)
           echo "commits : $accessibles accessibles = $fusions fusions + $hors_fusion hors fusion"
           python - "$accessibles" "$fusions" "$hors_fusion" "$superficiel" > "$RUNNER_TEMP/history-counts.json" <<'PY'
-          import json, sys
+          import json, os, sys
 
           accessibles, fusions, hors_fusion, superficiel = sys.argv[1:5]
           json.dump(
@@ -1692,7 +1692,10 @@ jobs:
                   "non_merge_commits": int(hors_fusion),
                   "empty_or_non_diff_commits": 0,
                   "is_shallow_repository": superficiel == "true",
-                  "scan_command": "gitleaks git . --log-opts=--all",
+                  "scan_command": (
+                      "gitleaks git . --log-opts=$ORDINARY_LOG_OPTS ; "
+                      "gitleaks git . --log-opts=$MERGE_LOG_OPTS"
+                  ),
                   "log_opts": "rev-list --all ; --merges ; --no-merges",
                   "ordinary_history_scan_executed": True,
                   "merge_history_scan_executed": True,
