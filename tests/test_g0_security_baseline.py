@@ -846,11 +846,20 @@ def test_the_history_scanner_is_pinned_by_version_and_checksum(workflow):
     assert "latest" not in etapes.replace("--latest", "")
 
 
-def test_the_security_job_scans_the_tree_then_the_history(workflow):
+def test_the_security_job_scans_the_tree_then_both_histories(workflow):
+    """Trois rapports, et non deux : arbre, historique ordinaire, fusions.
+
+    `--log-opts="--all"` seul est proscrit : il n'emet aucun patch pour un
+    commit de fusion, et laissait donc les resolutions hors de portee. C'est le
+    constat B-14.
+    """
     etapes = " ".join(str(e.get("run", "")) for e in workflow["jobs"]["g0-security"]["steps"])
     assert "gitleaks-arbre.json" in etapes
     assert "gitleaks-historique.json" in etapes
-    assert '--log-opts="--all"' in etapes
+    assert "gitleaks-fusions.json" in etapes
+    assert '--log-opts="--all"' not in etapes, (
+        "la commande d'origine est revenue : elle manque les resolutions de fusion"
+    )
 
 
 def test_the_security_job_runs_both_probes(workflow):
@@ -909,6 +918,25 @@ def test_no_secret_or_real_data_in_the_artifacts(artefact):
         for motif in _MOTIFS_INTERDITS:
             trouve = motif.search(texte)
             assert not trouve, f"{artefact}.json : {trouve.group(0)[:60]}"
+
+
+@pytest.mark.parametrize("artefact", ARTEFACTS_LOT_B)
+def test_no_artifact_field_is_named_like_a_detected_value(artefact):
+    """Un champ NOMME `secret` passait, quelle que soit sa valeur.
+
+    Le balayage precedent cherchait des motifs dans les VALEURS. Une mutation a
+    montre qu'un champ `secret` ajoute a un artefact publie n'etait attrape par
+    rien : les valeurs benignes ne declenchent aucun motif, et le nom du champ
+    n'etait examine nulle part. Le validateur des fichiers de gouvernance faisait
+    deja ce controle ; les artefacts publies ne l'avaient pas.
+    """
+    from scripts.g0_secret_gate import _champs_porteurs
+
+    document = json.loads(_lire(ARTEFACTS / f"{artefact}.json"))
+    porteurs = list(_champs_porteurs(document))
+    assert porteurs == [], (
+        f"{artefact}.json porte un champ dont le nom annonce une valeur detectee : {porteurs}"
+    )
 
 
 @pytest.mark.parametrize("artefact", ARTEFACTS_LOT_B)
@@ -1502,18 +1530,19 @@ def test_an_unreconciled_history_cannot_claim_coverage(comptes):
 
 
 def test_the_history_probe_removes_its_sentinel_before_scanning():
-    """La sonde doit prouver que l'HISTORIQUE est lu, pas seulement l'arbre.
+    """M1 — la sonde ordinaire doit prouver que l'HISTORIQUE est lu.
 
-    Le dépôt jetable ajoute la sentinelle, puis la retire : à HEAD, l'arbre est
-    propre. Une sonde positive qui réussit ne peut donc réussir que par
-    l'historique.
+    Le dépôt jetable ajoute la sentinelle puis la retire : à `HEAD`, l'arbre est
+    propre. Une sonde positive ne peut donc réussir que par l'historique.
     """
     workflow = _lire(REPO_ROOT / ".github" / "workflows" / "ci.yml")
-    etape = workflow.split("Non-emptiness probes on a throwaway git repository", 1)[1][:2000]
-    assert 'git -C "$sonde" rm -q porteur.txt' in etape, (
+    # Le pas entier, jusqu'au pas suivant : une troncature arbitraire ferait
+    # dependre le test de la longueur du script plutot que de son contenu.
+    etape = workflow.split("Non-emptiness probes (M1 ordinary", 1)[1].split("      - name:", 1)[0]
+    assert 'git(m1, "rm", "-q", "porteur.txt")' in etape, (
         "la sentinelle n'est pas retirée : la sonde ne distingue plus arbre et historique"
     )
-    assert 'gitleaks" git "$sonde"' in etape or "gitleaks git" in etape
+    assert "sonde-m1-positive.json" in etape and "sonde-m2-positive.json" in etape
 
 
 # ── §7 — la portée de la matrice, énoncée en chiffres ───────────────────────
@@ -1758,4 +1787,301 @@ def test_the_validator_also_guards_the_provenance_files(tmp_path, monkeypatch, f
     monkeypatch.setattr(gate, "RACINE", tmp_path)
     assert gate.valider_fichiers_de_gouvernance(), (
         "un fichier exclu du scan a échappé aussi au validateur : c'est une zone franche"
+    )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Couverture des résolutions de fusion — B-14
+#
+# `reachable = merges + non_merges` est une identité arithmétique : elle dit que
+# la partition est cohérente, jamais que les deux catégories ont été LUES.
+#
+# Gitleaks s'appuie sur `git log -p`, qui n'émet aucun patch pour un commit de
+# fusion sans `-m` ni `--cc`. Un contenu introduit pendant une résolution de
+# conflit — donc absent des deux parents — n'apparaît alors dans aucun patch.
+# Mesuré, pas supposé : voir `test_the_original_command_misses_merge_resolutions`.
+# ════════════════════════════════════════════════════════════════════════════
+
+_SENTINELLE_ORDINAIRE = "Q7XKJ92MW"
+_SENTINELLE_FUSION = "4KMZ8PLT2"
+
+
+def _git(depot, *args):
+    import subprocess
+
+    resultat = subprocess.run(
+        ["git", "-C", str(depot), *args], capture_output=True, text=True, encoding="utf-8"
+    )
+    return resultat.stdout or ""
+
+
+def _depot_avec_secret_de_fusion(racine):
+    """Un secret présent UNIQUEMENT dans l'arbre d'un commit de fusion.
+
+    Aucun commit ordinaire ne le touche — ni ajout, ni suppression. Une
+    suppression ordinaire le réexposerait dans son propre diff, et la sonde
+    passerait au vert sans rien prouver : c'est l'erreur qu'a faite ma première
+    reproduction du défaut.
+    """
+    from scripts.g0_secret_gate import contenu_porteur
+
+    depot = racine / "fusion"
+    depot.mkdir(parents=True)
+    _git(depot, "init", "-q", "-b", "principal", ".")
+    _git(depot, "config", "user.email", "g0@example.invalid")
+    _git(depot, "config", "user.name", "G0")
+    _git(depot, "config", "commit.gpgsign", "false")
+    (depot / "f.txt").write_text("commune\n", encoding="utf-8")
+    _git(depot, "add", "f.txt")
+    _git(depot, "commit", "-q", "-m", "base")
+    base = _git(depot, "rev-parse", "HEAD").strip()
+
+    _git(depot, "switch", "-q", "-c", "gauche", base)
+    (depot / "f.txt").write_text("commune\ngauche\n", encoding="utf-8")
+    _git(depot, "commit", "-qam", "gauche")
+    _git(depot, "switch", "-q", "-c", "droite", base)
+    (depot / "f.txt").write_text("commune\ndroite\n", encoding="utf-8")
+    _git(depot, "commit", "-qam", "droite")
+    _git(depot, "switch", "-q", "gauche")
+    _git(depot, "merge", "droite", "-q")
+    porteur = contenu_porteur().replace(_SENTINELLE_ORDINAIRE, _SENTINELLE_FUSION)
+    (depot / "f.txt").write_text("commune\nresolution\n" + porteur, encoding="utf-8")
+    _git(depot, "add", "f.txt")
+    _git(depot, "commit", "-q", "--no-edit", "-m", "fusion porteuse")
+    _git(depot, "switch", "-q", "principal")
+    return depot
+
+
+def test_the_merge_probe_premise_holds(tmp_path):
+    """Une sonde dont la prémisse est fausse ne prouve rien.
+
+    Le contenu doit être dans l'arbre de la fusion, absent des DEUX parents, et
+    `HEAD` doit rester propre.
+    """
+    depot = _depot_avec_secret_de_fusion(tmp_path)
+    fusion = _git(depot, "rev-list", "--merges", "-n1", "--all").strip()
+    assert fusion, "aucun commit de fusion"
+
+    assert _SENTINELLE_FUSION in _git(depot, "show", f"{fusion}:f.txt")
+    for parent in _git(depot, "rev-list", "--parents", "-n1", fusion).split()[1:]:
+        assert _SENTINELLE_FUSION not in _git(depot, "show", f"{parent}:f.txt"), (
+            "la sentinelle existe déjà dans un parent : la fusion ne l'introduit pas"
+        )
+    assert _SENTINELLE_FUSION not in (depot / "f.txt").read_text(encoding="utf-8"), (
+        "HEAD porte la sentinelle : le scan de l'arbre suffirait, et la sonde "
+        "ne dirait rien de l'historique"
+    )
+
+
+def test_the_original_command_misses_merge_resolutions(tmp_path):
+    """MUTATION — reproduction du défaut, mesurée sur Git lui-même.
+
+    `--all` est la commande d'origine. Elle n'émet aucun patch pour un commit de
+    fusion, et manque donc ce que la résolution a introduit.
+    """
+    depot = _depot_avec_secret_de_fusion(tmp_path)
+    for options in (["--all"], ["--all", "--no-merges"], ["--all", "--merges"]):
+        emis = _git(depot, "log", "-p", *options)
+        assert _SENTINELLE_FUSION not in emis, (
+            f"git log -p {' '.join(options)} émet la résolution — la prémisse du "
+            "correctif serait fausse, et le correctif inutile"
+        )
+
+
+@pytest.mark.parametrize("options", [["--all", "--merges", "-m"], ["--all", "--merges", "--cc"]])
+def test_a_merge_aware_command_sees_the_resolution(tmp_path, options):
+    """Les deux variantes qualifiées voient ce que `--all` manque."""
+    depot = _depot_avec_secret_de_fusion(tmp_path)
+    assert _SENTINELLE_FUSION in _git(depot, "log", "-p", *options)
+
+
+def test_a_clean_merge_produces_no_false_positive(tmp_path):
+    """M3 — une fusion sans conflit ne doit rien faire apparaître."""
+    depot = tmp_path / "propre"
+    depot.mkdir()
+    _git(depot, "init", "-q", "-b", "principal", ".")
+    _git(depot, "config", "user.email", "g0@example.invalid")
+    _git(depot, "config", "user.name", "G0")
+    (depot / "f.txt").write_text("commune\n", encoding="utf-8")
+    _git(depot, "add", "f.txt")
+    _git(depot, "commit", "-q", "-m", "base")
+    base = _git(depot, "rev-parse", "HEAD").strip()
+    for nom, fichier in (("a", "a.txt"), ("b", "b.txt")):
+        _git(depot, "switch", "-q", "-c", nom, base)
+        (depot / fichier).write_text(nom + "\n", encoding="utf-8")
+        _git(depot, "add", fichier)
+        _git(depot, "commit", "-q", "-m", nom)
+    _git(depot, "switch", "-q", "a")
+    _git(depot, "merge", "b", "-q", "--no-edit")
+    emis = _git(depot, "log", "-p", "--all", "--merges", "-m")
+    assert "AKIA" not in emis and "PRIVATE KEY" not in emis
+
+
+# ── deux preuves distinctes, jamais une addition ────────────────────────────
+
+_COMPTES_COMPLETS = {
+    "reachable_commits": 452,
+    "merge_commits": 77,
+    "non_merge_commits": 375,
+    "ordinary_history_scan_executed": True,
+    "merge_history_scan_executed": True,
+    "ordinary_scan_log_opts": "--all --no-merges",
+    "merge_scan_log_opts": "--all --merges -m",
+    "history_scan_errors": [],
+}
+_SONDES_COMPLETES = [
+    {"scope": "non_merge_history", "positive": "POSITIVE_PROBE_DETECTED"},
+    {"scope": "merge_history", "positive": "POSITIVE_PROBE_DETECTED"},
+]
+
+
+def test_both_categories_are_proven_separately():
+    from scripts.g0_secret_gate import couverture_historique
+
+    bilan = couverture_historique(_COMPTES_COMPLETS, _SONDES_COMPLETES)
+    assert bilan["complete"] is True
+    assert set(bilan["statuses"]) == {
+        "NON_MERGE_HISTORY_SCAN_VERIFIED",
+        "MERGE_HISTORY_SCAN_VERIFIED",
+    }
+    assert bilan["merge_scan_log_opts"] == "--all --merges -m"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "sondes"),
+    [
+        ({"merge_history_scan_executed": False}, _SONDES_COMPLETES),
+        ({"merge_scan_log_opts": "--all --no-merges"}, [_SONDES_COMPLETES[0]]),
+        ({}, [_SONDES_COMPLETES[0]]),
+        ({"history_scan_errors": ["fatal: bad revision"]}, _SONDES_COMPLETES),
+    ],
+    ids=[
+        "scan-de-fusion-supprime",
+        "merges-remplace-par-no-merges",
+        "sonde-de-fusion-absente",
+        "erreur-git-ignoree",
+    ],
+)
+def test_an_unproven_merge_category_fails_the_gate(mutation, sondes):
+    """MUTATION — quatre façons de ne pas démontrer la lecture des fusions."""
+    from scripts.g0_secret_gate import couverture_historique
+
+    comptes = {**_COMPTES_COMPLETS, **mutation}
+    bilan = couverture_historique(comptes, sondes)
+    assert bilan["complete"] is False, f"mutation {mutation} non détectée"
+
+
+def test_a_missed_merge_probe_is_named_incomplete():
+    """Le verdict doit nommer la catégorie manquante, pas rester muet."""
+    from scripts.g0_secret_gate import couverture_historique
+
+    bilan = couverture_historique(
+        _COMPTES_COMPLETS,
+        [
+            _SONDES_COMPLETES[0],
+            {"scope": "merge_history", "positive": "POSITIVE_PROBE_MISSED"},
+        ],
+    )
+    assert "MERGE_HISTORY_SCAN_INCOMPLETE" in bilan["statuses"]
+    assert "MERGE_HISTORY_SCAN_VERIFIED" not in bilan["statuses"]
+
+
+# ── les findings de fusion gardent leur identité propre ─────────────────────
+
+
+def test_merge_findings_carry_their_own_scope(tmp_path):
+    from scripts.g0_secret_gate import lire_rapport_gitleaks
+
+    rapport = tmp_path / "gl.json"
+    rapport.write_text(
+        json.dumps(
+            [
+                {
+                    "File": "f.txt",
+                    "RuleID": "aws-access-token",
+                    "Commit": "b" * 40,
+                    "StartLine": 3,
+                    "Fingerprint": f"{'b' * 40}:f.txt:aws-access-token:3",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    detection = lire_rapport_gitleaks(rapport, "merge-history")[0]
+    assert detection["scanner"] == "gitleaks-merge-history"
+    assert detection["fingerprint"] == f"{'b' * 40}:f.txt:aws-access-token:3"
+
+
+def test_a_merge_finding_without_a_fingerprint_is_refused(tmp_path):
+    """MUTATION — la règle d'identité vaut aussi pour le scan des fusions."""
+    from scripts.g0_secret_gate import DetectionSansEmpreinte, lire_rapport_gitleaks
+
+    rapport = tmp_path / "gl.json"
+    rapport.write_text(
+        json.dumps([{"File": "f.txt", "RuleID": "r", "Commit": "c" * 40, "StartLine": 1}]),
+        encoding="utf-8",
+    )
+    with pytest.raises(DetectionSansEmpreinte):
+        lire_rapport_gitleaks(rapport, "merge-history")
+
+
+def test_a_new_fingerprint_on_an_accepted_path_is_still_refused():
+    """MUTATION — la déduplication ne se fait jamais sur `chemin + règle`."""
+    from scripts.g0_secret_gate import confronter
+
+    acceptee = {
+        "scanner": "gitleaks-merge-history",
+        "path": "f.txt",
+        "rule": "aws-access-token",
+        "fingerprint": "empreinte-acceptee",
+    }
+    registre = {"exceptions": [{**acceptee, "family": "tests", "justification": "x" * 40}]}
+    nouvelle = {**acceptee, "fingerprint": "empreinte-NOUVELLE"}
+    assert confronter([nouvelle], set(), registre)["residus"], (
+        "un nouveau finding de fusion a été absorbé par une entrée existante"
+    )
+
+
+# ── le workflow exerce réellement les deux catégories ───────────────────────
+
+
+def _job_securite():
+    return yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "ci.yml"))["jobs"][
+        "g0-security"
+    ]
+
+
+def test_the_workflow_runs_two_distinct_history_scans():
+    job = _job_securite()
+    assert job["env"]["ORDINARY_LOG_OPTS"] == "--all --no-merges"
+    merge_opts = job["env"]["MERGE_LOG_OPTS"]
+    assert "--merges" in merge_opts
+    assert "-m" in merge_opts.split() or "--cc" in merge_opts.split(), merge_opts
+
+    scan = next(e for e in job["steps"] if "Scan the working tree" in e["name"])
+    assert "$ORDINARY_LOG_OPTS" in scan["run"]
+    assert "$MERGE_LOG_OPTS" in scan["run"]
+    assert "gitleaks-fusions.json" in scan["run"]
+
+
+def test_the_workflow_feeds_the_merge_report_and_probe_to_the_gate():
+    job = _job_securite()
+    gate = next(e for e in job["steps"] if e["name"].startswith("Secret gate"))
+    for option in (
+        "--gitleaks-merge-history-report",
+        "--gitleaks-merge-probe-positive",
+        "--gitleaks-merge-probe-negative",
+    ):
+        assert option in gate["run"], f"option absente du gate : {option}"
+
+
+def test_the_merge_probe_uses_the_command_it_certifies():
+    """Une sonde qui exercerait une autre commande ne prouverait rien sur la mesure."""
+    job = _job_securite()
+    sondes = next(e for e in job["steps"] if "Non-emptiness probes" in e["name"])
+    assert "$MERGE_LOG_OPTS" in sondes["run"], (
+        "la sonde de fusion n'utilise pas la variante réellement employée par le scan"
+    )
+    assert sondes["run"].count("$MERGE_LOG_OPTS") >= 2, (
+        "M2 et M3 doivent tous deux employer la variante certifiée"
     )

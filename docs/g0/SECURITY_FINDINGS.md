@@ -55,9 +55,10 @@ reste `DISTRIBUTION_NO_GO`.
 | B-06 | **P2** | Aucune durée de conservation définie pour les données cliniques | classification |
 | B-07 | **P2** | Le cloisonnement par unité ne repose que sur le code applicatif | sonde + schéma |
 | B-11 | **P2** | `.secrets.baseline` est inutilisable sur un runner Linux | lecture du fichier |
+| **B-14** | **P1** | Les contenus propres aux commits de fusion n'étaient pas analysés — **`CLOSED_BY_MERGE_HISTORY_SCAN`** | reproduction sur dépôt jetable |
 | **B-13** | **P2** | Une clé publiable et l'URL d'un projet Supabase réel subsistent dans l'historique | scan d'historique |
 
-**6 constats P1, 7 constats P2, 0 constat P0.**
+**7 constats P1 — dont un refermé —, 7 constats P2, 0 constat P0.**
 
 ### Blocages de mise en service du site
 
@@ -335,6 +336,33 @@ lot B.
 plus prudent, `CLE_PUBLIABLE_DE_PROJET_REEL`, alors que l'une est un
 marque-place. Sur-qualifier un marque-place est sans conséquence ; l'inverse ne
 l'est pas.
+
+### B-14 — Les contenus propres aux commits de fusion n'étaient pas analysés
+
+`HISTORY_PROOF_GAP` · statut **`CLOSED_BY_MERGE_HISTORY_SCAN`**
+
+**Constat.** La commande d'origine, `gitleaks git . --log-opts="--all"`, ne
+demandait aucun patch pour les commits de fusion. Un contenu introduit pendant
+une résolution de conflit échappait donc au scan. La réconciliation
+arithmétique `accessibles = fusions + hors fusion` ne pouvait pas le révéler :
+elle vérifie une partition, pas une lecture.
+
+**Ce que ce constat n'est pas.** **Aucun secret réel nouveau n'a été découvert**
+par le scan des fusions sur ce dépôt. Le constat porte sur la **preuve**, pas
+sur une fuite. Le dire autrement serait s'attribuer une découverte qui n'a pas
+eu lieu.
+
+**Pourquoi P1 malgré cela.** Une barrière qui affirme couvrir l'historique sans
+le couvrir est plus dangereuse qu'une barrière absente : on cesse de chercher
+ailleurs.
+
+**Refermé par.** Deux scans distincts — `--all --no-merges` et
+`--all --merges -m` — chacun vérifié par sa propre sonde de non-vacuité. Si la
+sonde de fusion ne détecte pas sa sentinelle, le job passe au rouge sous
+`MERGE_HISTORY_SCAN_INCOMPLETE`.
+
+**Preuve.** `tests/test_g0_security_baseline.py::test_the_original_command_misses_merge_resolutions`
+et `::test_a_merge_aware_command_sees_the_resolution`.
 
 ## 5. Limites de cette revue
 

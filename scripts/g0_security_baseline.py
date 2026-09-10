@@ -1629,6 +1629,32 @@ def _modele_environnement() -> list[dict[str, Any]]:
     return sorted(releves, key=lambda r: r["setting"])
 
 
+def etat_couverture_fusion() -> dict[str, Any]:
+    """Ce que le workflow configure reellement pour les deux scans d'historique.
+
+    Lu dans `ci.yml`, jamais suppose : un constat qui se declare referme sur la
+    foi d'une intention plutot que d'une configuration se reouvrirait en silence.
+    """
+    workflow = RACINE / ".github" / "workflows" / "ci.yml"
+    if not workflow.is_file():
+        return {
+            "merge_scan_configure": False,
+            "merge_scan_log_opts": "",
+            "ordinary_scan_log_opts": "",
+        }
+    import yaml
+
+    job = yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"].get("g0-security", {})
+    environnement = job.get("env", {})
+    fusion = str(environnement.get("MERGE_LOG_OPTS", ""))
+    return {
+        "merge_scan_configure": "--merges" in fusion
+        and ("-m" in fusion.split() or "--cc" in fusion.split()),
+        "merge_scan_log_opts": fusion,
+        "ordinary_scan_log_opts": str(environnement.get("ORDINARY_LOG_OPTS", "")),
+    }
+
+
 def construire_constats(
     matrice: list[dict[str, Any]],
     sondes: list[dict[str, Any]],
@@ -1963,6 +1989,57 @@ def construire_constats(
                 "remediation_owner": "lot D",
             }
         )
+
+    # B-14 — lacune de PREUVE, refermee par le correctif qui l'a mise au jour.
+    #
+    # La commande d'origine, `gitleaks git . --log-opts="--all"`, ne demandait
+    # aucun patch pour les commits de fusion. Un contenu introduit pendant une
+    # resolution de conflit — donc absent des deux parents — n'apparaissait dans
+    # AUCUN patch, et echappait au scan sans que rien ne le signale.
+    #
+    # La reconciliation arithmetique `accessibles = fusions + hors fusion` ne
+    # pouvait pas le detecter : elle verifie une partition, pas une lecture.
+    #
+    # Aucun secret reel nouveau n'a ete decouvert par le scan de fusion sur ce
+    # depot. Le constat porte sur la PREUVE, pas sur une fuite.
+    couverture = etat_couverture_fusion()
+    constats.append(
+        {
+            "id": "B-14",
+            "classement": "P1",
+            "marqueurs": ["HISTORY_PROOF_GAP"],
+            "statut": (
+                "CLOSED_BY_MERGE_HISTORY_SCAN" if couverture["merge_scan_configure"] else "OPEN"
+            ),
+            "titre": (
+                "Les contenus propres aux commits de fusion n'etaient pas analyses "
+                "par la commande historique initiale"
+            ),
+            "constat": (
+                "`git log -p` n'emet aucun patch pour un commit de fusion sans `-m` ni "
+                '`--cc`. La commande d\'origine `--log-opts="--all"` laissait donc hors '
+                "de portee tout contenu introduit par une resolution de conflit. "
+                "Reproduit sur un depot jetable : une valeur presente uniquement dans "
+                "l'arbre d'un commit de fusion est ABSENTE de `--all`, de "
+                "`--all --no-merges` et de `--all --merges`, et DETECTEE par "
+                "`--all --merges -m` comme par `--all --merges --cc`."
+            ),
+            "preuve": [
+                "tests/test_g0_security_baseline.py::"
+                "test_the_original_command_misses_merge_resolutions",
+                "tests/test_g0_security_baseline.py::"
+                "test_a_merge_aware_command_sees_the_resolution",
+                f"scan des fusions configure : {couverture['merge_scan_log_opts'] or 'aucun'}",
+                f"scan ordinaire configure   : {couverture['ordinary_scan_log_opts'] or 'aucun'}",
+            ],
+            "aucun_secret_reel_decouvert": True,
+            "action_future": (
+                "Aucune : la lacune est refermee par deux scans distincts, chacun "
+                "verifie par sa propre sonde. Le constat est conserve pour memoire."
+            ),
+            "remediation_owner": "lot B (referme)",
+        }
+    )
 
     return constats
 

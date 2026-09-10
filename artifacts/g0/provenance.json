@@ -17,11 +17,11 @@
       ".github/workflows/ci.yml"
     ],
     "relevant_input_set": "inventory",
-    "relevant_input_tree_sha256": "6e003d36b3459bd39d2308b7671b124f11537c4713abf21e77feb5d5b18429e6",
+    "relevant_input_tree_sha256": "c4c156de539ef1387282299251db8fba99bdc5a2a59511bb34ca1f30d20296af",
     "schema_version": "2.0.0"
   },
   "volatile": {
-    "generated_at": "2026-09-09T23:25:51Z",
+    "generated_at": "2026-09-10T02:28:36Z",
     "platform": "windows/amd64",
     "python_version": "3.13.13"
   }

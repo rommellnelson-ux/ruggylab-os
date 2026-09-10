@@ -466,6 +466,65 @@ identifiants ; toute adresse électronique recopiée d'un rapport ; toute entré
 sans justification ; toute empreinte au format invalide ; tout champ hors
 schéma.
 
+### Une sixième correction — les résolutions de fusion
+
+**`reachable = merges + non_merges` est une identité arithmétique.** Elle dit
+que la partition est cohérente ; elle ne dit rien sur ce qui a été **lu**.
+Le §D du rapport précédent la présentait comme une preuve de couverture. C'en
+était une de comptage.
+
+Gitleaks s'appuie sur `git log -p`, qui **n'émet aucun patch pour un commit de
+fusion** sans `-m` ni `--cc`. Un contenu introduit pendant une résolution de
+conflit — donc absent des deux parents — n'apparaît alors dans aucun patch : ni
+dans celui de la fusion, qui n'existe pas, ni dans ceux des parents, qui ne le
+contiennent pas.
+
+**Mesuré sur un dépôt jetable**, une valeur présente uniquement dans l'arbre
+d'un commit de fusion :
+
+| `git log -p …` | Résolution de fusion | Commit ordinaire |
+| --- | :-: | :-: |
+| `--all` — *la commande d'origine* | **ABSENT** | DÉTECTÉ |
+| `--all --no-merges` | **ABSENT** | DÉTECTÉ |
+| `--all --merges` | **ABSENT** | — |
+| `--all --merges -m` | **DÉTECTÉ** | — |
+| `--all --merges --cc` | **DÉTECTÉ** | — |
+
+Deux scans distincts sont donc exécutés, chacun avec sa propre sonde :
+
+```
+ORDINARY_LOG_OPTS = "--all --no-merges"
+MERGE_LOG_OPTS    = "--all --merges -m"
+```
+
+`-m` est préféré à `--cc` bien que les deux détectent : `-m` produit des diffs
+**ordinaires**, un par parent, là où `--cc` produit un diff *combiné* dont
+l'analyse par le lecteur de Gitleaks n'est pas garantie. La sonde M2 exerce de
+toute façon la variante **réellement utilisée** : si elle ne détecte rien, le
+job passe au rouge sous `MERGE_HISTORY_SCAN_INCOMPLETE`. Le choix ne repose
+donc pas sur la documentation, mais sur une mesure qui se refait à chaque
+exécution.
+
+**Une erreur de méthode, dans ma première reproduction.** J'avais fait
+supprimer la sentinelle par un commit **ordinaire**. La suppression la réexpose
+dans le diff de ce commit, et `--no-merges` la « détectait » — non parce qu'il
+lit les fusions, mais parce qu'il lit une suppression. La sonde passait au vert
+sans rien prouver. L'isolation correcte exige qu'**aucun commit ordinaire ne
+touche la valeur**, ni pour l'ajouter, ni pour la supprimer.
+
+### Les quatre sondes
+
+| Sonde | Ce qu'elle exerce | Verdict attendu |
+| --- | --- | --- |
+| **M1** | secret ajouté puis supprimé, hors de toute fusion | détecté par le scan ordinaire |
+| **M2** | secret présent uniquement dans l'arbre d'un commit de fusion | détecté par le scan des fusions |
+| **M3** | fusion propre, sans sentinelle | aucun faux positif |
+| **M4** | arbre courant des dépôts porteurs | propre |
+
+M2 vérifie sa propre prémisse avant de conclure : la valeur doit être dans
+l'arbre de la fusion, **absente des deux parents**, et `HEAD` doit rester
+propre. Une sonde dont la prémisse est fausse ne prouve rien.
+
 ### Non-vacuité de l'historique
 
 La sonde positive ajoute la sentinelle dans un premier commit, **la retire dans
