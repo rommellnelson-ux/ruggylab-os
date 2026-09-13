@@ -372,7 +372,8 @@ def construire(rapport_json: dict[str, Any], rapport_xml: dict[str, Any]) -> dic
 
     jamais_importes = [m["module"] for m in modules if not m["executed"] and m["statements"] > 0]
 
-    from scripts.g0_provenance import identite_de_mesure, provenance
+    from scripts.g0_measurement_identity import identite_de_mesure
+    from scripts.g0_provenance import provenance
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -524,7 +525,7 @@ def controler(resume: dict[str, Any]) -> list[str]:
     #              l'une en Python, l'autre en shell. Si elles divergent, l'une
     #              des deux ment, et rien dans un artefact isole ne permettrait
     #              de savoir laquelle.
-    from scripts.g0_provenance import ecarts_identite
+    from scripts.g0_measurement_identity import ecarts_identite
 
     voisin = RACINE / "artifacts" / "g0" / "coverage-identities.json"
     sidecar = None

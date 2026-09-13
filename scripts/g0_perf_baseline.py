@@ -1850,7 +1850,7 @@ def valider_provenance(entete: Any, corps: Any) -> list[str]:
     # L'identite embarquee, confrontee au fichier ecrit independamment par la
     # CI. `baseline_input_commit` n'est PAS le commit mesure : c'est l'ancrage
     # historique declare du programme G0. Lu seul, il induisait en erreur.
-    from scripts.g0_provenance import ecarts_identite
+    from scripts.g0_measurement_identity import ecarts_identite
 
     voisin = RACINE / "artifacts" / "g0" / "perf-identities.json"
     sidecar = None
@@ -1910,7 +1910,8 @@ def _ecrire(chemin: Path, contenu: dict[str, Any]) -> None:
 
 def construire_provenance(corps: dict[str, Any], commande: str) -> dict[str, Any]:
     """La provenance de la mesure (§20), empreinte du scenario comprise."""
-    from scripts.g0_provenance import identite_de_mesure, provenance
+    from scripts.g0_measurement_identity import identite_de_mesure
+    from scripts.g0_provenance import provenance
 
     entete = provenance(
         "performance",

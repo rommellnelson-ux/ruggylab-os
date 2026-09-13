@@ -87,6 +87,12 @@
           "type": "cli_script"
         },
         {
+          "docstring_first_line": "L'identité de mesure d'une campagne G0 — sur quoi elle a réellement porté.",
+          "has_main_guard": false,
+          "path": "scripts/g0_measurement_identity.py",
+          "type": "cli_script"
+        },
+        {
           "docstring_first_line": "Baseline de performance G0 (preuve 8) — mesurer, pas juger.",
           "has_main_guard": true,
           "path": "scripts/g0_perf_baseline.py",

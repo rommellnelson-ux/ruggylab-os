@@ -444,6 +444,13 @@ def test_aucun_seuil_de_couverture_nulle_part():
 # ── Performance : construction d'une mesure de référence ────────────────────
 
 
+def _image_valkey() -> dict[str, Any]:
+    """La référence d'image Valkey réellement déclarée, lue à l'exécution."""
+    from scripts.g0_perf_baseline import _image_valkey_declaree
+
+    return _image_valkey_declaree()
+
+
 def _releve_pendant_la_charge() -> dict[str, Any]:
     """Un relevé de ressources valide, tel que l'échantillonneur en produit.
 
@@ -597,14 +604,15 @@ def _mesure_valide() -> dict[str, Any]:
             # `valkey/valkey:8.1.9-alpine` : le serveur annonce bien les deux.
             "valkey_version": "8.1.9",
             "redis_protocol_compatibility_version": "7.2.4",
-            "valkey_image_reference": (
-                "valkey/valkey:8.1.9-alpine@sha256:"
-                "e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84"
-            ),
-            "valkey_image_digest": (
-                "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84"
-            ),
-            "valkey_expected_version_from_image_tag": "8.1.9",
+            # La reference est LUE dans docker-compose.yml, jamais recopiee :
+            # deux exemplaires du meme digest finiraient par diverger, et la
+            # fixture decrirait alors une image que la stack n'emploie plus.
+            # Accessoirement, un digest recopie est une chaine hexadecimale de
+            # forte entropie que le scan de secrets releve — a juste titre,
+            # puisqu'il ne peut pas savoir qu'elle est publique.
+            "valkey_image_reference": _image_valkey()["image_reference"],
+            "valkey_image_digest": _image_valkey()["image_digest"],
+            "valkey_expected_version_from_image_tag": _image_valkey()["version_from_tag"],
             "application_configuration": {"RATE_LIMIT_ENABLED": "false"},
             "effective_external_switches": {
                 "available": True,
@@ -2099,21 +2107,21 @@ def _identite_valide() -> dict[str, Any]:
 
 
 def test_temoin_une_identite_complete_est_acceptee():
-    from scripts.g0_provenance import ecarts_identite
+    from scripts.g0_measurement_identity import ecarts_identite
 
     identite = _identite_valide()
     assert ecarts_identite(identite, identite) == []
 
 
 def test_mutation_identite_de_mesure_absente_est_refusee():
-    from scripts.g0_provenance import ecarts_identite
+    from scripts.g0_measurement_identity import ecarts_identite
 
     assert ecarts_identite(None, None) == ["identite de mesure absente de l'artefact"]
 
 
 @pytest.mark.parametrize("champ", ["measurement_source_sha", "workflow_run_id", "workflow_job"])
 def test_mutation_champ_d_identite_manquant_est_refusee(champ):
-    from scripts.g0_provenance import ecarts_identite
+    from scripts.g0_measurement_identity import ecarts_identite
 
     identite = _identite_valide()
     identite[champ] = None
@@ -2122,7 +2130,7 @@ def test_mutation_champ_d_identite_manquant_est_refusee(champ):
 
 def test_mutation_tete_confondue_avec_le_merge_synthetique_est_refusee():
     """Sur un `pull_request`, `GITHUB_SHA` est la fusion, pas la tête."""
-    from scripts.g0_provenance import ecarts_identite
+    from scripts.g0_measurement_identity import ecarts_identite
 
     identite = _identite_valide()
     identite["tested_merge_sha"] = identite["measurement_source_sha"]
@@ -2132,7 +2140,7 @@ def test_mutation_tete_confondue_avec_le_merge_synthetique_est_refusee():
 
 def test_mutation_identite_incoherente_avec_le_fichier_de_la_ci_est_refusee():
     """Deux écritures de la même vérité : si elles divergent, l'une ment."""
-    from scripts.g0_provenance import ecarts_identite
+    from scripts.g0_measurement_identity import ecarts_identite
 
     identite = _identite_valide()
     sidecar = dict(identite, measurement_source_sha="e" * 40)
@@ -2144,7 +2152,7 @@ def test_l_identite_est_lue_depuis_l_evenement_et_non_devinee(monkeypatch, tmp_p
     """Sur un `pull_request`, la tête vient de l'événement, pas de `GITHUB_SHA`."""
     import json as _json
 
-    from scripts import g0_provenance as prov
+    from scripts import g0_measurement_identity as prov
 
     evenement = tmp_path / "event.json"
     evenement.write_text(
@@ -2185,6 +2193,46 @@ def test_les_deux_artefacts_embarquent_leur_identite():
             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
         }
         assert "identite_de_mesure" in appels, f"{fichier}:{fonction} n'embarque pas l'identite"
+
+
+def test_le_module_de_provenance_ne_lance_aucun_sous_processus():
+    """`g0_provenance.py` promet « aucun sous-processus, aucun appel réseau ».
+
+    Ce contrat n'est pas décoratif : le job du lot A exige **zéro** alerte
+    Bandit sur ce module, et trois lots l'importent. Lui donner le droit de
+    lancer des sous-processus l'ouvrirait à tous pour le besoin d'un seul.
+
+    L'identité de mesure y avait été écrite par commodité, avec son appel à
+    `git`. La CI du lot A l'a refusé — et elle avait raison. Ce test rend le
+    refus immédiat au lieu d'attendre un aller-retour de CI.
+    """
+    import ast
+
+    arbre = ast.parse(_lire(REPO_ROOT / "scripts" / "g0_provenance.py"))
+    importes: set[str] = set()
+    for noeud in ast.walk(arbre):
+        if isinstance(noeud, ast.Import):
+            importes |= {a.name.split(".")[0] for a in noeud.names}
+        elif isinstance(noeud, ast.ImportFrom) and noeud.module:
+            importes.add(noeud.module.split(".")[0])
+    for interdit in ("subprocess", "shutil", "socket", "urllib", "requests", "httpx"):
+        assert interdit not in importes, (
+            f"g0_provenance.py importe `{interdit}` : son contrat « aucun "
+            "sous-processus, aucun appel reseau » n'est plus tenu, et le job du "
+            "lot A exigera zero alerte Bandit qu'il ne pourra plus rendre"
+        )
+
+
+def test_l_identite_de_mesure_vit_dans_son_propre_module():
+    """Un besoin du lot C n'a pas à élargir les droits d'un module partagé."""
+    from scripts import g0_measurement_identity
+
+    assert hasattr(g0_measurement_identity, "identite_de_mesure")
+    assert hasattr(g0_measurement_identity, "ecarts_identite")
+    partage = _lire(REPO_ROOT / "scripts" / "g0_provenance.py")
+    assert "def identite_de_mesure" not in partage, (
+        "l'identite de mesure est revenue dans le module partage du lot A"
+    )
 
 
 def test_le_champ_historique_du_lot_a_est_documente_comme_tel():
