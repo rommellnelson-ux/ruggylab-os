@@ -20,3 +20,18 @@
 -r requirements.txt
 coverage[toml]==7.16.0
 pytest-cov==7.1.0
+
+# `detect-secrets` n'est pas un outil de MESURE : c'est une dependance de la
+# suite de tests du lot B, que le job de couverture instrumente integralement.
+# Sans lui, neuf tests de `test_g0_security_baseline.py` echouent sur
+# `ModuleNotFoundError` et la campagne s'arrete avant d'avoir rien mesure.
+#
+# La version est celle qui a produit `.secrets.baseline` (champ `version`) :
+# les noms de greffons changent d'une version a l'autre, et une baseline lue
+# par une autre version se refuse a l'initialisation.
+#
+# RESERVE CONSIGNEE : `ci.yml` installe `detect-secrets` SANS version dans deux
+# de ses jobs. Le job de couverture est donc plus strict que le job qui fait
+# autorite sur les secrets. Uniformiser releve de `ci.yml`, hors du mandat de
+# ce lot ; le constat est inscrit plutot que corrige en passant.
+detect-secrets==1.5.0

@@ -401,6 +401,7 @@ def _releve_pendant_la_charge() -> dict[str, Any]:
         "interval_seconds_observed_mean": 1.2,
         "samples_total": 50,
         "samples_within_load_window": 48,
+        "min_samples_per_container_within_window": 8,
         "samples_before_load_window": 1,
         "samples_after_load_window": 1,
         "sampler_alive_at_stop": True,
@@ -1478,9 +1479,9 @@ def test_mutation_trop_peu_dechantillons_pendant_la_charge_est_refusee(mesure):
     from scripts.g0_perf_baseline import valider
 
     for niveau in mesure["levels"].values():
-        niveau["resources"]["during_load"]["samples_within_load_window"] = 1
+        niveau["resources"]["during_load"]["min_samples_per_container_within_window"] = 1
     motifs = valider(mesure)
-    assert any("pendant la charge" in m and "signifient rien" in m for m in motifs), motifs
+    assert any("le moins observe" in m for m in motifs), motifs
 
 
 def test_mutation_fenetre_de_charge_vide_est_refusee(mesure):
@@ -1582,58 +1583,97 @@ def test_les_parseurs_de_docker_stats_lisent_ce_que_docker_ecrit():
     assert _octets_memoire(None) is None
 
 
-def test_lechantillonneur_ne_retient_que_les_echantillons_de_la_fenetre(monkeypatch):
-    """Le comptage doit refléter la fenêtre, pas la durée totale du fil.
+def _flux_factice(lignes, retard=0.02):
+    """Un faux `docker stats` en flux : un objet pretend etre le processus."""
+    import io as _io
 
-    L'échantillonneur est exercé pour de bon — `_docker` est remplacé, le fil
-    tourne, et le rapport est confronté à une fenêtre choisie. Un test qui
-    n'inspecterait que le dictionnaire produit ne dirait rien du fil.
+    class FauxProcessus:
+        def __init__(self):
+            self.stdout = _io.StringIO("".join(lignes))
+            self.termine = False
+
+        def terminate(self):
+            self.termine = True
+
+    return FauxProcessus()
+
+
+def test_lechantillonneur_decode_le_flux_reel_de_docker(monkeypatch):
+    """Le flux de `docker stats` porte des sequences ANSI, et il faut les retirer.
+
+    Trouve en CI, puis reproduit sur docker 29.6.1 : en flux, docker redessine
+    son tableau et prefixe CHAQUE ligne de `ESC[H`. Les sept premieres lignes
+    recues etaient toutes rejetees, l'echantillonneur rendait zero observation,
+    et la campagne echouait sans dire pourquoi.
     """
-    import json as _json
-    import time as _time
-
     from scripts import g0_perf_baseline as banc
 
-    compteur = {"n": 0}
-
-    def faux_docker(*arguments, timeout=60):
-        compteur["n"] += 1
-        return _json.dumps(
-            {"ID": "abcdef123456", "CPUPerc": "50.00%", "MemUsage": "100MiB / 1GiB", "PIDs": "7"}
+    identifiant = "abc" + "def" + "123" + "456"
+    echappement = chr(27) + "[H"
+    lignes = [
+        echappement
+        + json.dumps(
+            {
+                "ID": identifiant,
+                "CPUPerc": "50.00%",
+                "MemUsage": "100MiB / 1GiB",
+                "PIDs": "7",
+            }
         )
+        + chr(10)
+        for _ in range(6)
+    ]
+    monkeypatch.setattr(banc, "_flux_stats", lambda ids: _flux_factice(lignes))
 
-    monkeypatch.setattr(banc, "_docker", faux_docker)
-    echantillonneur = banc.EchantillonneurRessources({"app": "abcdef123456"}, 0.05)
+    echantillonneur = banc.EchantillonneurRessources({"app": identifiant}, 0.05)
     echantillonneur.demarrer()
-    debut = _time.perf_counter()
-    while compteur["n"] < 4:
-        _time.sleep(0.02)
-    fin = _time.perf_counter()
+    import time as _time
+
+    _time.sleep(0.3)
     echantillonneur.arreter()
 
-    rapport = echantillonneur.rapport(charge_debut=debut, charge_fin=fin)
+    rapport = echantillonneur.rapport(charge_debut=0.0, charge_fin=1e12)
     assert rapport["sampler_alive_at_stop"] is True
-    assert rapport["samples_total"] >= 3
-    assert rapport["samples_within_load_window"] >= 1
+    assert rapport["samples_total"] == 6, rapport["sampling_errors"]
     assert rapport["containers"]["app"]["cpu_percent"]["mean"] == 50.0
     assert rapport["containers"]["app"]["memory_bytes"]["max"] == 100 * 2**20
+    assert rapport["min_samples_per_container_within_window"] == 6
 
-    # Une fenêtre qui ne recouvre rien doit se voir dans le comptage, et non
+    # Une fenetre qui ne recouvre rien doit se voir dans le comptage, et non
     # produire des chiffres d'allure normale.
-    hors = echantillonneur.rapport(charge_debut=fin + 100, charge_fin=fin + 200)
+    hors = echantillonneur.rapport(charge_debut=1e12, charge_fin=2e12)
     assert hors["samples_within_load_window"] == 0
     assert hors["containers"]["app"]["cpu_percent"]["mean"] is None
+    assert hors["min_samples_per_container_within_window"] == 0
+
+
+def test_une_ligne_de_flux_illisible_est_comptee_et_non_avalee(monkeypatch):
+    """Une ligne qu'on ne sait pas lire doit laisser une trace."""
+    from scripts import g0_perf_baseline as banc
+
+    monkeypatch.setattr(
+        banc, "_flux_stats", lambda ids: _flux_factice(["{ceci n'est pas du json" + chr(10)])
+    )
+    echantillonneur = banc.EchantillonneurRessources({"app": "abc123def456"}, 0.05)
+    echantillonneur.demarrer()
+    import time as _time
+
+    _time.sleep(0.2)
+    echantillonneur.arreter()
+    rapport = echantillonneur.rapport(charge_debut=0.0, charge_fin=1e12)
+    assert rapport["samples_total"] == 0
+    assert rapport["sampling_errors"], "la ligne illisible n'a laisse aucune trace"
 
 
 def test_lechantillonneur_signale_sa_propre_mort(monkeypatch):
     """Un fil mort en cours de route ne doit pas passer pour un fil silencieux."""
     from scripts import g0_perf_baseline as banc
 
-    def docker_qui_explose(*arguments, timeout=60):
+    def flux_qui_explose(identifiants):
         raise RuntimeError("docker a disparu")
 
-    monkeypatch.setattr(banc, "_docker", docker_qui_explose)
-    echantillonneur = banc.EchantillonneurRessources({"app": "abcdef123456"}, 0.05)
+    monkeypatch.setattr(banc, "_flux_stats", flux_qui_explose)
+    echantillonneur = banc.EchantillonneurRessources({"app": "abc123def456"}, 0.05)
     echantillonneur.demarrer()
     import time as _time
 
@@ -1642,6 +1682,40 @@ def test_lechantillonneur_signale_sa_propre_mort(monkeypatch):
     rapport = echantillonneur.rapport(charge_debut=0.0, charge_fin=1e12)
     assert rapport["sampler_alive_at_stop"] is False
     assert "docker a disparu" in str(rapport["sampler_exception"])
+
+
+def test_le_flux_est_prefere_au_scrutin_pour_les_fenetres_courtes():
+    """`--no-stream` relance un processus docker a chaque releve.
+
+    Mesure faite en CI : au niveau de concurrence 1, dont la fenetre de charge
+    dure quelques secondes, le scrutin ne tenait que DEUX releves — et le
+    validateur refusait a juste titre une moyenne calculee sur deux points.
+    Baisser le minimum aurait revenu a deplacer la cible pour faire passer sa
+    propre barriere ; le flux est la correction, pas le seuil.
+    """
+    import ast
+
+    # Le controle porte sur le CODE, jamais sur le texte : la docstring de
+    # `_flux_stats` explique precisement pourquoi `--no-stream` a ete
+    # abandonne, et un grep sur le bloc se declencherait sur sa propre
+    # explication. C'est la troisieme fois que ce piege se presente dans cette
+    # campagne ; l'arbre syntaxique y met fin.
+    arbre = ast.parse(_lire(REPO_ROOT / "scripts" / "g0_perf_baseline.py"))
+    flux = next(
+        n for n in ast.walk(arbre) if isinstance(n, ast.FunctionDef) and n.name == "_flux_stats"
+    )
+    corps = [n for n in flux.body if not isinstance(n, ast.Expr)]
+    litteraux = {
+        n.value
+        for n in ast.walk(ast.Module(body=corps, type_ignores=[]))
+        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+    }
+    assert "stats" in litteraux, "l'echantillonneur n'appelle plus `docker stats`"
+    assert "--format" in litteraux
+    assert "--no-stream" not in litteraux, (
+        "l'echantillonneur est revenu au scrutin : les fenetres courtes "
+        "redeviendraient sous-echantillonnees"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════

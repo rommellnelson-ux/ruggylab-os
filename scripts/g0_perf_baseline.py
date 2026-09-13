@@ -59,6 +59,7 @@ import json
 import os
 import platform
 import random
+import re
 import shutil
 import statistics
 import subprocess
@@ -765,8 +766,44 @@ def _octets_memoire(texte: Any) -> int | None:
         return None
 
 
+#: Sequences de controle de terminal que `docker stats` insere en flux.
+_ANSI = re.compile(chr(27) + r"\[[0-9;?]*[A-Za-z]")
+
+
+def _flux_stats(identifiants: list[str]):
+    """Ouvre `docker stats` en FLUX et rend le processus et ses lignes.
+
+    `--no-stream` lance un processus docker complet a chaque releve : sur six
+    conteneurs, l'aller-retour coute une a deux secondes. Le niveau de
+    concurrence 1 dure quelques secondes a peine — il n'y tenait que deux
+    releves, et le validateur refusait a juste titre une moyenne calculee sur
+    deux points.
+
+    En flux, docker emet une ligne par conteneur a chaque rafraichissement,
+    environ une fois par seconde, sans repayer le demarrage d'un processus. La
+    fenetre la plus courte recoit alors assez d'echantillons pour qu'une
+    moyenne veuille dire quelque chose.
+    """
+    binaire = shutil.which("docker")
+    if binaire is None:
+        return None
+    return subprocess.Popen(  # noqa: S603 - arguments litteraux, jamais de shell
+        [binaire, "stats", "--format", "{{json .}}", *identifiants],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        bufsize=1,
+    )
+
+
 class EchantillonneurRessources:
-    """Relève CPU et mémoire par conteneur, à intervalle fixe, pendant la charge.
+    """Relève CPU et mémoire par conteneur, en continu, pendant la charge.
+
+    Chaque ligne de `docker stats` est UNE observation d'UN conteneur, datée
+    pour elle-même. Il n'y a donc pas de « tour de scrutation » : deux
+    conteneurs peuvent avoir des comptes légèrement différents, et c'est le
+    compte le plus faible parmi les conteneurs exigés qui décide de la validité
+    — la moyenne la moins bien fondée est celle qui compte.
 
     Le fil est `daemon` : si la campagne échoue brutalement, il ne retient pas
     le processus. Mais son état de vie est ENREGISTRÉ et contrôlé — un
@@ -776,10 +813,12 @@ class EchantillonneurRessources:
 
     def __init__(self, services: dict[str, str], intervalle: float) -> None:
         self._services = {nom: cid for nom, cid in services.items() if cid}
+        self._par_id = {cid[:12]: nom for nom, cid in self._services.items()}
         self._intervalle = max(0.05, float(intervalle))
         self._arret = threading.Event()
         self._fil: threading.Thread | None = None
-        self._echantillons: list[dict[str, Any]] = []
+        self._processus: Any = None
+        self._observations: list[dict[str, Any]] = []
         self._erreurs: list[str] = []
         self._exception: str | None = None
         self._debut_horloge: str | None = None
@@ -792,96 +831,106 @@ class EchantillonneurRessources:
 
     def arreter(self) -> None:
         self._arret.set()
+        processus = self._processus
+        if processus is not None:
+            try:
+                processus.terminate()
+            except OSError as erreur:
+                self._erreurs.append(f"arret de docker stats : {erreur}")
         if self._fil is not None:
-            self._fil.join(timeout=self._intervalle * 10 + 30)
+            self._fil.join(timeout=30)
         self._fin_horloge = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
     @property
     def vivant_a_l_arret(self) -> bool:
-        """Le fil tournait-il encore quand on lui a demandé de s'arrêter ?
+        """Le fil a-t-il tenu jusqu'à l'arrêt demandé ?
 
-        Faux signifie qu'il est mort prématurément : la série est tronquée et
-        la campagne doit être refusée.
+        Faux signifie qu'il est mort prématurément : la série est tronquée, et
+        la campagne doit être refusée plutôt que publiée avec un trou.
         """
         return self._exception is None
 
     def _boucle(self) -> None:
         try:
-            identifiants = list(self._services.values())
-            while not self._arret.is_set():
-                debut_tour = time.perf_counter()
-                brut = _docker(
-                    "stats", "--no-stream", "--format", "{{json .}}", *identifiants, timeout=30
-                )
-                if not brut:
-                    self._erreurs.append("docker stats sans sortie")
-                else:
-                    self._enregistrer(brut, debut_tour)
-                reste = self._intervalle - (time.perf_counter() - debut_tour)
-                if reste > 0:
-                    self._arret.wait(reste)
+            self._processus = _flux_stats(list(self._services.values()))
+            if self._processus is None:
+                self._erreurs.append("docker introuvable")
+                return
+            for ligne in self._processus.stdout:
+                if self._arret.is_set():
+                    break
+                self._enregistrer(ligne)
         except Exception as erreur:  # noqa: BLE001 - l'etat de vie est une PREUVE
             self._exception = f"{type(erreur).__name__}: {erreur}"
 
-    def _enregistrer(self, brut: str, instant: float) -> None:
-        par_id: dict[str, dict[str, Any]] = {}
-        for ligne in brut.splitlines():
+    def _enregistrer(self, ligne: str) -> None:
+        """Extrait les enregistrements JSON d'une ligne du flux `docker stats`.
+
+        En flux, docker REDESSINE son tableau : il prefixe chaque ligne de
+        sequences ANSI de positionnement du curseur (`ESC[H`, `ESC[2J`), y
+        compris quand la sortie est un tube et non un terminal. Une lecture
+        naive de la ligne echoue donc a la deserialiser — mesure faite sur
+        docker 29.6.1, ou les sept premieres lignes recues etaient toutes
+        rejetees pour cette seule raison.
+
+        Les sequences sont donc retirees, puis les objets sont decodes un par
+        un : un meme rafraichissement peut en concatener plusieurs.
+        """
+        nue = _ANSI.sub("", ligne).strip()
+        if not nue:
+            return
+        decodeur = json.JSONDecoder()
+        position = 0
+        trouve = False
+        while position < len(nue):
+            debut = nue.find("{", position)
+            if debut == -1:
+                break
             try:
-                enregistrement = json.loads(ligne)
+                enregistrement, fin = decodeur.raw_decode(nue, debut)
             except json.JSONDecodeError:
                 self._erreurs.append("ligne docker stats illisible")
+                return
+            position = fin
+            trouve = True
+            service = self._par_id.get(str(enregistrement.get("ID", ""))[:12])
+            if service is None:
                 continue
-            par_id[str(enregistrement.get("ID", ""))[:12]] = enregistrement
-        mesures: dict[str, Any] = {}
-        for service, cid in self._services.items():
-            enregistrement = par_id.get(cid[:12])
-            if enregistrement is None:
-                continue
-            mesures[service] = {
-                "cpu_percent": _pourcentage_cpu(enregistrement.get("CPUPerc")),
-                "memory_bytes": _octets_memoire(enregistrement.get("MemUsage")),
-                "pids": enregistrement.get("PIDs"),
-            }
-        self._echantillons.append(
-            {
-                "monotonic": round(instant, 4),
-                "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                "containers": mesures,
-            }
-        )
+            self._observations.append(
+                {
+                    "monotonic": round(time.perf_counter(), 4),
+                    "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                    "service": service,
+                    "cpu_percent": _pourcentage_cpu(enregistrement.get("CPUPerc")),
+                    "memory_bytes": _octets_memoire(enregistrement.get("MemUsage")),
+                }
+            )
+        if not trouve:
+            self._erreurs.append("ligne docker stats sans enregistrement")
 
     def rapport(self, *, charge_debut: float, charge_fin: float) -> dict[str, Any]:
         """Les statistiques par conteneur, et de quoi contester la mesure.
 
         `charge_debut` et `charge_fin` sont les bornes MONOTONES de la fenêtre
-        de charge du niveau. Elles servent à compter les échantillons qui
-        tombent réellement dedans : sans ce comptage, un échantillonneur démarré
-        trop tôt et arrêté trop tôt produirait des chiffres d'allure normale sur
-        une stack au repos.
+        de charge du niveau. Sans ce découpage, un échantillonneur démarré trop
+        tôt et arrêté trop tôt produirait des chiffres d'allure normale sur une
+        stack au repos, et rien ne le signalerait.
         """
         dans_fenetre = [
-            e for e in self._echantillons if charge_debut <= e["monotonic"] <= charge_fin
-        ]
-        deltas = [
-            round(b["monotonic"] - a["monotonic"], 4)
-            for a, b in zip(self._echantillons, self._echantillons[1:], strict=False)
+            o for o in self._observations if charge_debut <= o["monotonic"] <= charge_fin
         ]
         par_conteneur: dict[str, Any] = {}
+        intervalles: list[float] = []
         for service in self._services:
-            cpu = [
-                e["containers"][service]["cpu_percent"]
-                for e in dans_fenetre
-                if service in e["containers"]
-                and e["containers"][service]["cpu_percent"] is not None
-            ]
-            memoire = [
-                e["containers"][service]["memory_bytes"]
-                for e in dans_fenetre
-                if service in e["containers"]
-                and e["containers"][service]["memory_bytes"] is not None
-            ]
+            propres = [o for o in dans_fenetre if o["service"] == service]
+            instants = [o["monotonic"] for o in propres]
+            intervalles.extend(
+                round(b - a, 4) for a, b in zip(instants, instants[1:], strict=False)
+            )
+            cpu = [o["cpu_percent"] for o in propres if o["cpu_percent"] is not None]
+            memoire = [o["memory_bytes"] for o in propres if o["memory_bytes"] is not None]
             par_conteneur[service] = {
-                "samples": len([e for e in dans_fenetre if service in e["containers"]]),
+                "samples": len(propres),
                 "cpu_percent": {
                     "mean": round(statistics.fmean(cpu), 3) if cpu else None,
                     "p95": _centile([float(v) for v in cpu], 95) if cpu else None,
@@ -889,10 +938,11 @@ class EchantillonneurRessources:
                 },
                 "memory_bytes": {
                     "mean": int(statistics.fmean(memoire)) if memoire else None,
-                    "p95": (int(_centile([float(v) for v in memoire], 95)) if memoire else None),
+                    "p95": int(_centile([float(v) for v in memoire], 95)) if memoire else None,
                     "max": max(memoire) if memoire else None,
                 },
             }
+        mesures = [v["samples"] for v in par_conteneur.values()]
         return {
             "enabled": True,
             "sampler_started_at": self._debut_horloge,
@@ -900,16 +950,19 @@ class EchantillonneurRessources:
             "load_window_seconds": round(charge_fin - charge_debut, 3),
             "interval_seconds_configured": self._intervalle,
             "interval_seconds_observed_mean": (
-                round(statistics.fmean(deltas), 3) if deltas else None
+                round(statistics.fmean(intervalles), 3) if intervalles else None
             ),
-            "samples_total": len(self._echantillons),
+            "samples_total": len(self._observations),
             "samples_within_load_window": len(dans_fenetre),
             "samples_before_load_window": len(
-                [e for e in self._echantillons if e["monotonic"] < charge_debut]
+                [o for o in self._observations if o["monotonic"] < charge_debut]
             ),
             "samples_after_load_window": len(
-                [e for e in self._echantillons if e["monotonic"] > charge_fin]
+                [o for o in self._observations if o["monotonic"] > charge_fin]
             ),
+            # Le compte le plus FAIBLE decide : publier le plus eleve
+            # masquerait le conteneur dont la moyenne ne repose sur rien.
+            "min_samples_per_container_within_window": min(mesures) if mesures else 0,
             "sampler_alive_at_stop": self.vivant_a_l_arret,
             "sampler_exception": self._exception,
             "sampling_errors": self._erreurs[:20],
@@ -1542,11 +1595,18 @@ def valider(corps: Any) -> list[str]:
                 f"({avant_charge} avant, {apres_charge} apres) — le releve ne "
                 "decrit pas l'effort"
             )
-        elif dedans < minimum_echantillons:
-            motifs.append(
-                f"niveau {nom_niveau} : {dedans} echantillon(s) pendant la charge "
-                f"(< {minimum_echantillons}) — moyenne et p95 ne signifient rien"
-            )
+        else:
+            # C'est le conteneur le MOINS observe qui decide. Compter toutes
+            # les observations confondues laisserait passer un conteneur vu
+            # deux fois pendant que les autres le sont vingt : sa moyenne ne
+            # reposerait sur rien, et le chiffre publie aurait l'air complet.
+            par_conteneur = int(pendant.get("min_samples_per_container_within_window") or 0)
+            if par_conteneur < minimum_echantillons:
+                motifs.append(
+                    f"niveau {nom_niveau} : {par_conteneur} echantillon(s) pendant la "
+                    f"charge pour le conteneur le moins observe (< {minimum_echantillons}) "
+                    "— moyenne et p95 ne signifient rien"
+                )
         if not float(pendant.get("load_window_seconds") or 0.0) > 0.0:
             motifs.append(f"niveau {nom_niveau} : fenetre de charge vide")
         conteneurs = pendant.get("containers") or {}
