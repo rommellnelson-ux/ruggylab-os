@@ -913,9 +913,20 @@ def test_le_bandeau_de_classification_est_repris_a_lidentique(document: str):
 
 @pytest.mark.parametrize("document", ["COVERAGE.md", "PERFORMANCE.md"])
 def test_aucun_verdict_de_gouvernance_dans_les_documents(document: str):
-    texte = _lire(DOCS / document)
-    for verdict in VERDICTS_INTERDITS:
-        assert verdict not in texte, f"{document} prononce {verdict}"
+    """La comparaison porte sur des JETONS ENTIERS, jamais sur des sous-chaînes.
+
+    `CSA_SITE_PRODUCTION_GO_BLOCKER` contient littéralement
+    `SITE_PRODUCTION_GO` tout en disant l'inverse : c'est un BLOCAGE de mise en
+    production sur site. Un `in` sur le texte brut refusait donc précisément le
+    constat le plus défavorable du lot C, et poussait à le renommer ou à le
+    taire pour faire passer la barrière.
+
+    Le lot B avait déjà rencontré et corrigé ce piège dans son propre garde-fou ;
+    la copie du lot C ne l'avait jamais été, faute d'avoir écrit ce jeton.
+    """
+    jetons = set(re.findall(r"[A-Z][A-Z0-9_]{3,}", _lire(DOCS / document)))
+    interdits = jetons & set(VERDICTS_INTERDITS)
+    assert not interdits, f"{document} prononce {sorted(interdits)}"
 
 
 def test_la_couverture_nest_jamais_declaree_suffisante():
