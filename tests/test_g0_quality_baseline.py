@@ -69,21 +69,44 @@ def test_les_deux_ensembles_dentree_du_lot_c_existent():
     assert "performance" in ENSEMBLES_ENTREE
 
 
-def test_la_surcharge_de_mesure_reste_hors_de_lensemble_inventory():
-    """L'appareil de mesure ne doit pas déplacer l'empreinte du lot A.
+def test_la_surcharge_de_mesure_nest_jamais_prise_pour_un_deploiement():
+    """L'appareil de mesure ne doit jamais passer pour une configuration livrée.
 
-    `deploy/**` appartient à l'ensemble `inventory` d'une baseline déjà
-    fusionnée. Y déposer cette surcharge aurait obligé à régénérer l'inventaire
-    d'architecture pour un réglage qui ne décrit aucun déploiement — et un
-    inventaire régénéré pour une raison étrangère est un inventaire qu'on relit
-    moins.
+    Version précédente de ce test : la surcharge devait rester HORS de
+    l'ensemble `inventory`. Elle y entre désormais, parce que l'ensemble
+    couvre `scripts/**/*.yml` depuis que les scripts d'exploitation sont sous
+    empreinte. L'assertion a donc été revue plutôt que contournée.
+
+    Ce que cela change, exactement : modifier la surcharge oblige maintenant à
+    régénérer `inventory.json`, dont la charge utile ne bougera pourtant pas.
+    C'est une régénération de plus, et elle va dans le sens prudent — vers
+    « regarde », jamais vers « laisse passer ».
+
+    Ce que cela ne change pas, et qui est la vraie protection : la surcharge
+    n'est pas un fichier de déploiement. Elle n'est ni dans `deploy/**`, ni
+    recensée parmi les fichiers Compose du système livré. Un lecteur de
+    l'inventaire ne doit pas pouvoir croire que le laboratoire tourne avec ses
+    limiteurs de débit désactivés.
     """
+    import json
+
     from scripts.g0_provenance import fichiers_entree
 
     assert SURCHARGE.is_file(), "la surcharge de mesure a disparu"
     assert not (REPO_ROOT / "deploy" / "g0-perf-overlay.yml").exists()
-    assert SURCHARGE not in fichiers_entree("inventory")
     assert SURCHARGE in fichiers_entree("performance")
+
+    inventaire = json.loads(
+        (REPO_ROOT / "artifacts" / "g0" / "inventory.json").read_text(encoding="utf-8")
+    )["payload"]
+    recenses = {entree["file"] for entree in inventaire["compose"]}
+    assert SURCHARGE.name not in recenses, (
+        "la surcharge de mesure est recensee parmi les fichiers Compose du "
+        "systeme livre : l'inventaire decrirait une stack sans limiteurs"
+    )
+    assert "docker-compose.yml" in recenses, (
+        "aucun fichier Compose recense : l'assertion precedente ne prouverait rien"
+    )
 
 
 def test_modifier_la_surcharge_change_lempreinte_de_performance():
@@ -359,6 +382,45 @@ def test_aucun_seuil_de_couverture_nulle_part():
 # ── Performance : construction d'une mesure de référence ────────────────────
 
 
+def _releve_pendant_la_charge() -> dict[str, Any]:
+    """Un relevé de ressources valide, tel que l'échantillonneur en produit.
+
+    Les valeurs de CPU et de mémoire sont quelconques : aucun contrôle ne porte
+    sur elles, et il ne faut jamais en introduire. Ce qui est vérifié, c'est
+    que la mesure a EU LIEU, pendant la charge, sur les conteneurs attendus.
+    """
+    from scripts.g0_perf_baseline import charger_plan
+
+    reglage = charger_plan()["performance"]["resource_sampling"]
+    return {
+        "enabled": True,
+        "sampler_started_at": "2026-09-09T00:00:00.000000Z",
+        "sampler_stopped_at": "2026-09-09T00:01:00.000000Z",
+        "load_window_seconds": 58.0,
+        "interval_seconds_configured": reglage["interval_seconds"],
+        "interval_seconds_observed_mean": 1.2,
+        "samples_total": 50,
+        "samples_within_load_window": 48,
+        "samples_before_load_window": 1,
+        "samples_after_load_window": 1,
+        "sampler_alive_at_stop": True,
+        "sampler_exception": None,
+        "sampling_errors": [],
+        "containers": {
+            service: {
+                "samples": 48,
+                "cpu_percent": {"mean": 42.0, "p95": 81.5, "max": 96.0},
+                "memory_bytes": {
+                    "mean": 200_000_000,
+                    "p95": 260_000_000,
+                    "max": 280_000_000,
+                },
+            }
+            for service in reglage["observed_containers"]
+        },
+    }
+
+
 def _mesure_valide() -> dict[str, Any]:
     """Une mesure complète et cohérente, la plus petite possible.
 
@@ -371,6 +433,8 @@ def _mesure_valide() -> dict[str, Any]:
         NOMS_SYNTHETIQUES,
         PRENOMS_SYNTHETIQUES,
         SCENARIOS,
+        charger_plan,
+        empreinte_plan,
         empreinte_scenario,
     )
 
@@ -399,22 +463,30 @@ def _mesure_valide() -> dict[str, Any]:
         "throughput_rps": 40.0,
         "completed": True,
     }
+    # La fixture DERIVE du plan au lieu de recopier ses valeurs. Recopiees,
+    # elles auraient continue de decrire `[1, 3]` pendant que le plan serait
+    # passe a autre chose, et le temoin aurait valide une campagne que le
+    # validateur refuse en CI.
+    plan = charger_plan()["performance"]
     return {
         "run": {
             "run_id": "abcdef0123",
-            "seed": 20260909,
+            "seed": plan["seed"],
             "started_at": "2026-09-09T00:00:00Z",
             "duration_seconds": 120.0,
-            "concurrency_levels": [1, 3],
-            "repetitions": 3,
-            "iterations_per_worker": 5,
-            "warmup_iterations_per_worker": 2,
+            "concurrency_levels": list(plan["concurrency"]),
+            "repetitions": plan["repetitions"],
+            "iterations_per_worker": plan["iterations"],
+            "warmup_iterations_per_worker": plan["warmup"],
             "scenario_order": [s.nom for s in noms],
             "scenario_sha256": empreinte_scenario(),
             "percentile_method": "nearest-rank (ceil(p/100*n)) sans interpolation",
             "clock_source": "time.perf_counter (monotone)",
             "clock_monotonic": True,
             "retries": 0,
+            "measurement_plan": "scripts/g0_quality_plan.json",
+            "measurement_plan_sha256": empreinte_plan(),
+            "performance_profile": plan["profile"],
             "command": "python scripts/g0_perf_baseline.py --run",
             "base_url_scheme": "https",
         },
@@ -430,22 +502,20 @@ def _mesure_valide() -> dict[str, Any]:
         },
         "application_health": {"before": True, "after": True},
         "levels": {
-            "1": {
-                "concurrency": 1,
-                "repetitions": [{"index": i} for i in range(3)],
+            str(niveau): {
+                "concurrency": niveau,
+                "repetitions": [{"index": i} for i in range(plan["repetitions"])],
                 "wall_clock_seconds": 60.0,
                 "scenarios": copy.deepcopy(scenarios),
                 "aggregate": copy.deepcopy(agregat),
-                "resources": {},
-            },
-            "3": {
-                "concurrency": 3,
-                "repetitions": [{"index": i} for i in range(3)],
-                "wall_clock_seconds": 60.0,
-                "scenarios": copy.deepcopy(scenarios),
-                "aggregate": copy.deepcopy(agregat),
-                "resources": {},
-            },
+                "resources": {
+                    "before": {},
+                    "after": {},
+                    "during_load": _releve_pendant_la_charge(),
+                    "postgres_delta": {"available": False},
+                },
+            }
+            for niveau in plan["concurrency"]
         },
         "errors_by_type_total": {},
         "environment": {
@@ -471,7 +541,9 @@ def _mesure_valide() -> dict[str, Any]:
             },
             "external_network_calls": False,
         },
-        "validity_policy": {"min_samples_per_scenario_per_level": 10},
+        "validity_policy": {
+            "min_samples_per_scenario_per_level": plan["minimum_samples"],
+        },
     }
 
 
@@ -737,10 +809,16 @@ def test_les_centiles_renvoient_une_valeur_reellement_observee():
 
 
 def test_les_niveaux_de_concurrence_par_defaut_couvrent_le_premier_usage():
-    """1, 3, 5, 10 — 3 est le premier usage envisagé au CSA GR Plateau."""
-    from scripts.g0_perf_baseline import NIVEAUX_PAR_DEFAUT
+    """1, 3, 5, 10 — 3 est le premier usage envisagé au CSA GR Plateau.
 
-    assert NIVEAUX_PAR_DEFAUT == (1, 3, 5, 10)
+    Les niveaux viennent du PLAN, plus d'une constante du module : le contrôle
+    porte donc sur le fichier réellement sous empreinte. Une constante locale
+    aurait pu rester à `(1, 3, 5, 10)` pendant que la campagne tournait à un
+    seul niveau.
+    """
+    from scripts.g0_perf_baseline import charger_plan
+
+    assert charger_plan()["performance"]["concurrency"] == [1, 3, 5, 10]
 
 
 def test_le_banc_ne_reessaie_jamais_une_requete():
@@ -951,3 +1029,670 @@ def test_le_resume_de_couverture_est_serialisable(resume_couverture):
     """Un résumé qui ne s'écrit pas ne se relit pas dans une revue."""
     texte = json.dumps(resume_couverture, ensure_ascii=False, sort_keys=True)
     assert json.loads(texte)["payload"]["totals"]["statements"] > 0
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Dépendances de mesure contre dépendances du produit
+# ══════════════════════════════════════════════════════════════════════════
+#
+# `requirements.txt` est installé dans le virtualenv copié dans l'image
+# runtime. Y épingler `coverage[toml]` et `pytest-cov` faisait embarquer un
+# instrumenteur de code dans l'image expédiée — un outil capable de tracer
+# chaque ligne exécutée, qu'aucun flux clinique n'appelle jamais.
+#
+# Chaque mutation ci-dessous est précédée de son témoin : le contrôle doit
+# accepter l'état intact, sans quoi un contrôle qui refuse tout passerait pour
+# vigilant.
+
+
+@pytest.fixture
+def requirements_runtime() -> Path:
+    return REPO_ROOT / "requirements.txt"
+
+
+@pytest.fixture
+def requirements_qualite() -> Path:
+    return REPO_ROOT / "requirements-g0-quality.txt"
+
+
+def _avec_contenu(chemin: Path, contenu: str):
+    """Remplace temporairement un fichier, et le restaure quoi qu'il arrive."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def gestionnaire():
+        original = chemin.read_text(encoding="utf-8")
+        try:
+            chemin.write_text(contenu, encoding="utf-8")
+            yield
+        finally:
+            chemin.write_text(original, encoding="utf-8")
+
+    return gestionnaire()
+
+
+def test_temoin_les_dependances_intactes_sont_acceptees():
+    """Témoin. Sans lui, les mutations qui suivent ne prouveraient rien."""
+    from scripts.g0_coverage_summary import controler_dependances
+
+    assert controler_dependances() == []
+
+
+def test_mutation_coverage_remis_dans_le_runtime_est_refusee(requirements_runtime):
+    """L'image expédiée ne doit pas embarquer d'instrumenteur de code."""
+    from scripts.g0_coverage_summary import controler_dependances
+
+    contenu = requirements_runtime.read_text(encoding="utf-8") + "\ncoverage[toml]==7.16.0\n"
+    with _avec_contenu(requirements_runtime, contenu):
+        ecarts = controler_dependances()
+    assert any("coverage" in e and "image runtime" in e for e in ecarts), ecarts
+
+
+def test_mutation_pytest_cov_remis_dans_le_runtime_est_refusee(requirements_runtime):
+    """Même défaut, autre paquet : le contrôle ne doit pas viser un seul nom."""
+    from scripts.g0_coverage_summary import controler_dependances
+
+    contenu = requirements_runtime.read_text(encoding="utf-8") + "\npytest-cov==7.1.0\n"
+    with _avec_contenu(requirements_runtime, contenu):
+        ecarts = controler_dependances()
+    assert any("pytest-cov" in e and "image runtime" in e for e in ecarts), ecarts
+
+
+def test_mutation_coverage_sans_extra_dans_le_runtime_est_refusee(requirements_runtime):
+    """`coverage==7.16.0` et `coverage[toml]==7.16.0` sont la même distribution.
+
+    Comparer les lignes brutes aurait laissé passer la première : elle ne
+    ressemble pas à la chaîne cherchée, et elle installe pourtant le même
+    module dans la même image.
+    """
+    from scripts.g0_coverage_summary import controler_dependances
+
+    contenu = requirements_runtime.read_text(encoding="utf-8") + "\ncoverage==7.16.0\n"
+    with _avec_contenu(requirements_runtime, contenu):
+        ecarts = controler_dependances()
+    assert any("coverage" in e and "image runtime" in e for e in ecarts), ecarts
+
+
+def test_mutation_version_non_epinglee_est_refusee(requirements_qualite):
+    """Une plage de versions ferait bouger la baseline sans qu'aucun code ne change."""
+    from scripts.g0_coverage_summary import controler_dependances
+
+    contenu = requirements_qualite.read_text(encoding="utf-8").replace(
+        "coverage[toml]==7.16.0", "coverage[toml]>=7.16.0"
+    )
+    with _avec_contenu(requirements_qualite, contenu):
+        ecarts = controler_dependances()
+    assert any("non epingle" in e for e in ecarts), ecarts
+
+
+def test_mutation_fichier_qualite_sans_include_du_runtime_est_refusee(requirements_qualite):
+    """Sans `-r requirements.txt`, les deux jeux de versions divergeraient."""
+    from scripts.g0_coverage_summary import controler_dependances
+
+    contenu = requirements_qualite.read_text(encoding="utf-8").replace(
+        "-r requirements.txt", "# -r requirements.txt"
+    )
+    with _avec_contenu(requirements_qualite, contenu):
+        ecarts = controler_dependances()
+    assert any("n'inclut pas requirements.txt" in e for e in ecarts), ecarts
+
+
+def test_mutation_paquet_absent_du_fichier_qualite_est_refusee(requirements_qualite):
+    """Retirer l'outil du fichier qui doit le porter est aussi un défaut."""
+    from scripts.g0_coverage_summary import controler_dependances
+
+    contenu = requirements_qualite.read_text(encoding="utf-8").replace("pytest-cov==7.1.0", "")
+    with _avec_contenu(requirements_qualite, contenu):
+        ecarts = controler_dependances()
+    assert any("absent de" in e for e in ecarts), ecarts
+
+
+def test_le_dockerfile_n_installe_que_les_dependances_du_produit():
+    """Le fichier de qualité ne doit jamais entrer dans l'image."""
+    dockerfile = _lire(REPO_ROOT / "Dockerfile")
+    assert "requirements.txt" in dockerfile
+    assert "requirements-g0-quality.txt" not in dockerfile, (
+        "le Dockerfile installe l'outillage de mesure dans l'image expediee"
+    )
+
+
+def test_le_job_couverture_installe_le_fichier_de_qualite():
+    """Un job qui installerait `requirements.txt` seul n'aurait pas `coverage`."""
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    etapes = workflow["jobs"]["coverage-baseline"]["steps"]
+    installations = [
+        str(e.get("run", "")) for e in etapes if "pip install" in str(e.get("run", ""))
+    ]
+    assert installations, "le job couverture n'installe rien"
+    assert any("requirements-g0-quality.txt" in cmd for cmd in installations), (
+        "le job couverture n'installe pas le fichier de qualite : coverage serait absent"
+    )
+    # Le cache doit couvrir les DEUX fichiers, sans quoi il serait réutilisé
+    # après un changement de version de l'outil de mesure.
+    mise_en_place = next(e for e in etapes if "setup-python" in str(e.get("uses", "")))
+    cache = str(mise_en_place["with"]["cache-dependency-path"])
+    assert "requirements.txt" in cache and "requirements-g0-quality.txt" in cache
+
+
+def test_l_image_runtime_est_verifiee_par_la_ci_et_pas_seulement_par_un_fichier():
+    """Un paquet apporté transitivement ne se lirait dans aucun `requirements`.
+
+    Le contrôle de fichiers ne voit que ce qui est déclaré. L'image, elle, peut
+    recevoir un module par une dépendance de dépendance. La CI doit donc
+    INTERROGER l'image construite, et le job doit échouer si elle le porte.
+    """
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    etapes = workflow["jobs"]["coverage-baseline"]["steps"]
+    corps = "\n".join(str(e.get("run", "")) for e in etapes)
+    assert "docker build" in corps, "l'image runtime n'est jamais construite dans ce job"
+    assert "find_spec" in corps, "aucune interrogation de l'image construite"
+    for module in ("coverage", "pytest_cov"):
+        assert module in corps, f"{module} n'est pas cherche dans l'image"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Le plan de mesure — les paramètres sont sous empreinte
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Le workflow FIXAIT la mesure : concurrences, répétitions, graine, warm-up,
+# liste des tests PostgreSQL. La provenance déclarait pourtant `.github/**`
+# volontairement absent au motif que « la CI orchestre la mesure, elle ne la
+# détermine pas ». Remplacer `--concurrency 1,3,5,10` par `--concurrency 1`
+# changeait donc la mesure sans changer aucune empreinte.
+
+
+def test_le_plan_de_mesure_entre_dans_les_deux_empreintes():
+    """Sinon il ne serait qu'une documentation de plus."""
+    from scripts.g0_provenance import ENSEMBLES_ENTREE, fichiers_entree
+
+    plan = REPO_ROOT / "scripts" / "g0_quality_plan.json"
+    assert plan.is_file()
+    for ensemble in ("coverage", "performance"):
+        assert "scripts/g0_quality_plan.json" in ENSEMBLES_ENTREE[ensemble]
+        assert plan in fichiers_entree(ensemble), f"plan absent de l'ensemble {ensemble}"
+
+
+@pytest.mark.parametrize("ensemble", ["coverage", "performance"])
+def test_mutation_plan_modifie_sans_changement_dempreinte_est_refusee(ensemble):
+    """Preuve que le plan est LU, et pas seulement listé."""
+    from scripts.g0_provenance import empreinte_entrees
+
+    plan = REPO_ROOT / "scripts" / "g0_quality_plan.json"
+    avant, _ = empreinte_entrees(ensemble)
+    original = plan.read_bytes()
+    try:
+        plan.write_bytes(original.replace(b'"repetitions": 3', b'"repetitions": 1'))
+        apres, _ = empreinte_entrees(ensemble)
+    finally:
+        plan.write_bytes(original)
+    assert apres != avant, f"l'empreinte {ensemble} ignore le plan : elle ne le lit pas"
+    assert plan.read_bytes() == original
+
+
+def test_le_workflow_ne_fixe_plus_les_parametres_de_charge():
+    """Le job ne doit plus porter ce que le plan détermine.
+
+    Si un seul de ces drapeaux revenait dans la ligne de commande, la mesure
+    pourrait à nouveau s'écarter du fichier sous empreinte — et le commentaire
+    du workflow qui affirme le contraire deviendrait faux.
+    """
+    import yaml
+
+    # Le controle porte sur les COMMANDES, jamais sur le texte du fichier : le
+    # commentaire qui explique ce defaut cite lui-meme `--concurrency`, et un
+    # grep sur tout le fichier se declencherait sur sa propre explication.
+    # C'est exactement l'erreur qu'un `grep -r fail_under` avait deja commise
+    # ailleurs dans cette campagne.
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    commandes = chr(10).join(
+        str(etape.get("run", "")) for job in workflow["jobs"].values() for etape in job["steps"]
+    )
+    assert "g0_perf_baseline.py --run" in commandes, "le banc n'est plus lance : rien a controler"
+    for drapeau in (
+        "--concurrency",
+        "--repetitions",
+        "--iterations",
+        "--warmup",
+        "--seed",
+        "--min-samples",
+    ):
+        assert drapeau not in commandes, (
+            f"{drapeau} est encore passe par le workflow : la mesure ne suit plus le plan"
+        )
+
+
+def test_le_job_couverture_lit_la_liste_des_tests_postgres_dans_le_plan():
+    """Écrite dans le job, la restreindre n'aurait changé aucune empreinte."""
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    etape = next(
+        e
+        for e in workflow["jobs"]["coverage-baseline"]["steps"]
+        if "PostgreSQL" in str(e.get("name", ""))
+    )
+    # Les COMMENTAIRES shell sont retires avant le controle. Sans cela, une
+    # etape qui reecrirait la liste en dur tout en laissant l'ancienne ligne
+    # commentee passerait : la chaine cherchee serait encore presente, et le
+    # test se declencherait sur une ligne qui ne s'execute pas. C'est la meme
+    # erreur qu'un `grep` sur un fichier entier.
+    effectif = chr(10).join(
+        ligne for ligne in str(etape["run"]).splitlines() if not ligne.strip().startswith("#")
+    )
+    assert "g0_quality_plan.json" in effectif, "la liste est encore ecrite dans le job"
+    assert "postgres_test_files" in effectif
+    # Et aucun fichier de test ne doit etre nomme en dur dans la commande.
+    assert "_postgres.py" not in effectif, (
+        "un fichier de test PostgreSQL est nomme en dur dans le job : la liste "
+        "pourrait etre restreinte sans changer aucune empreinte"
+    )
+    # Et le plan doit réellement porter les fichiers, qui doivent exister.
+    from scripts.g0_coverage_summary import charger_plan
+
+    fichiers = charger_plan()["coverage"]["postgres_test_files"]
+    assert len(fichiers) >= 9, fichiers
+    for chemin in fichiers:
+        assert (REPO_ROOT / chemin).is_file(), f"{chemin} declare au plan mais absent"
+
+
+def test_les_commandes_instrumentees_mesurent_toutes_les_branches():
+    """`--cov-branch` doit figurer dans CHAQUE commande qui collecte.
+
+    La protection de fond existe deja en aval : `controler()` refuse un rapport
+    dont `branch_coverage` est faux. Mais elle n'intervient qu'apres toute la
+    campagne, et le message parle du rapport, pas de la commande. Ce controle
+    statique nomme la cause au lieu du symptome.
+
+    Le defaut a ete trouve par mutation : retirer `--cov-branch` du workflow ne
+    faisait echouer aucun test.
+    """
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    etapes = workflow["jobs"]["coverage-baseline"]["steps"]
+    collectes = [
+        chr(10).join(
+            ligne
+            for ligne in str(etape.get("run", "")).splitlines()
+            if not ligne.strip().startswith("#")
+        )
+        for etape in etapes
+        if "--cov=app" in str(etape.get("run", ""))
+    ]
+    assert len(collectes) >= 2, "moins de deux commandes instrumentees : la mesure a maigri"
+    for commande in collectes:
+        assert "--cov-branch" in commande, (
+            "une commande collecte sans mesurer les branches : le chiffre de "
+            "branches serait incomplet sans que rien ne le dise"
+        )
+    # Le processus applicatif du flux E2E aussi.
+    e2e = next(e for e in etapes if "E2E" in str(e.get("name", "")))
+    assert "--branch" in str(e2e["run"]), "l'application E2E tourne sans mesure de branches"
+
+
+def test_mutation_echantillonnage_desactive_dans_le_plan_est_refusee(mesure, monkeypatch):
+    """Le plan ne peut pas se dispenser lui-meme d'une preuve exigee.
+
+    Trouvee par mutation : `"enabled": false` dans le plan n'avait AUCUN effet.
+    Le validateur lisait ce champ dans le rapport, que l'echantillonneur pose
+    toujours a vrai. Un champ qui a l'apparence d'un interrupteur sans en etre
+    un est pire qu'un champ absent — on croit avoir agi.
+    """
+    from scripts import g0_perf_baseline as banc
+
+    plan_modifie = banc.charger_plan()
+    plan_modifie["performance"]["resource_sampling"]["enabled"] = False
+    monkeypatch.setattr(banc, "charger_plan", lambda: plan_modifie)
+    motifs = banc.valider(mesure)
+    assert any("echantillonnage des ressources desactive" in m for m in motifs), motifs
+
+
+def test_mutation_aucun_conteneur_requis_au_plan_est_refusee(mesure, monkeypatch):
+    """Vider la liste des conteneurs requis viderait le controle de son objet."""
+    from scripts import g0_perf_baseline as banc
+
+    plan_modifie = banc.charger_plan()
+    plan_modifie["performance"]["resource_sampling"]["required_containers"] = []
+    monkeypatch.setattr(banc, "charger_plan", lambda: plan_modifie)
+    motifs = banc.valider(mesure)
+    assert any("aucun conteneur requis" in m for m in motifs), motifs
+
+
+def test_mutation_resume_citant_un_autre_plan_est_refusee(resume_couverture):
+    """Une campagne doit citer le plan présent dans l'arbre, pas un autre."""
+    from scripts.g0_coverage_summary import controler
+
+    resume_couverture["payload"]["measurement"]["measurement_plan_sha256"] = "0" * 64
+    assert any("ne cite pas le plan" in e for e in controler(resume_couverture))
+
+
+def test_mutation_mesure_citant_un_autre_plan_est_refusee(mesure):
+    """Le même contrôle, côté performance."""
+    from scripts.g0_perf_baseline import valider
+
+    mesure["run"]["measurement_plan_sha256"] = "0" * 64
+    assert any("ne cite pas le plan" in m for m in valider(mesure))
+
+
+@pytest.mark.parametrize(
+    ("champ", "valeur", "attendu"),
+    [
+        ("concurrency_levels", [1], "concurrency"),
+        ("repetitions", 1, "repetitions"),
+        ("iterations_per_worker", 1, "iterations"),
+        ("warmup_iterations_per_worker", 0, "warmup"),
+        ("seed", 1, "seed"),
+    ],
+)
+def test_mutation_parametre_hors_plan_est_refusee(mesure, champ, valeur, attendu):
+    """Une ligne de commande ne doit plus pouvoir restreindre la mesure.
+
+    C'est la contrepartie indispensable du plan : sans ce contrôle, le plan
+    resterait une intention, et une campagne réduite continuerait de le citer.
+    """
+    from scripts.g0_perf_baseline import valider
+
+    mesure["run"][champ] = valeur
+    motifs = valider(mesure)
+    assert any("hors plan" in m and attendu in m for m in motifs), motifs
+
+
+def test_mutation_profil_de_mesure_different_du_plan_est_refusee(mesure):
+    """Le profil dit dans quel régime la mesure a eu lieu. Il ne s'invente pas."""
+    from scripts.g0_perf_baseline import valider
+
+    mesure["run"]["performance_profile"] = "PRODUCTION"
+    assert any("profil de mesure" in m for m in valider(mesure))
+
+
+def test_le_profil_declare_dit_que_les_limiteurs_sont_desactives():
+    """Une baseline mesurée limiteurs coupés ne décrit pas le futur site."""
+    from scripts.g0_perf_baseline import charger_plan
+
+    plan = charger_plan()["performance"]
+    assert plan["profile"] == "CORE_INTRINSIC_WITH_RATE_LIMITS_DISABLED"
+    assert plan["rate_limits_enabled"] is False
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Ressources PENDANT la charge
+# ══════════════════════════════════════════════════════════════════════════
+#
+# La campagne précédente encadrait chaque niveau de deux `docker stats` : elle
+# mesurait le repos, juste avant que la charge monte et juste après qu'elle
+# était retombée, et publiait le résultat comme s'il décrivait l'effort.
+#
+# Aucun seuil de CPU ni de mémoire n'est introduit ici, et il ne faut jamais en
+# ajouter : une consommation élevée est un RÉSULTAT. C'est l'ABSENCE de mesure
+# qui invalide la campagne.
+
+
+def test_temoin_un_releve_de_ressources_complet_est_accepte(mesure):
+    """Témoin de la série qui suit."""
+    from scripts.g0_perf_baseline import valider
+
+    assert valider(mesure) == []
+
+
+def test_mutation_aucun_echantillon_de_ressources_est_refusee(mesure):
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        niveau["resources"]["during_load"]["samples_total"] = 0
+        niveau["resources"]["during_load"]["samples_within_load_window"] = 0
+    motifs = valider(mesure)
+    assert any("zero echantillon" in m for m in motifs), motifs
+
+
+def test_mutation_echantillons_tous_anterieurs_a_la_charge_est_refusee(mesure):
+    """L'échantillonneur a tourné, mais pas pendant l'effort. C'est le défaut exact."""
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        pendant = niveau["resources"]["during_load"]
+        pendant["samples_within_load_window"] = 0
+        pendant["samples_before_load_window"] = 50
+        pendant["samples_after_load_window"] = 0
+    motifs = valider(mesure)
+    assert any("aucun echantillon dans la fenetre" in m for m in motifs), motifs
+
+
+def test_mutation_echantillons_tous_posterieurs_a_la_charge_est_refusee(mesure):
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        pendant = niveau["resources"]["during_load"]
+        pendant["samples_within_load_window"] = 0
+        pendant["samples_before_load_window"] = 0
+        pendant["samples_after_load_window"] = 50
+    motifs = valider(mesure)
+    assert any("aucun echantillon dans la fenetre" in m for m in motifs), motifs
+
+
+def test_mutation_trop_peu_dechantillons_pendant_la_charge_est_refusee(mesure):
+    """Une moyenne et un p95 sur un point ne signifient rien."""
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        niveau["resources"]["during_load"]["samples_within_load_window"] = 1
+    motifs = valider(mesure)
+    assert any("pendant la charge" in m and "signifient rien" in m for m in motifs), motifs
+
+
+def test_mutation_fenetre_de_charge_vide_est_refusee(mesure):
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        niveau["resources"]["during_load"]["load_window_seconds"] = 0.0
+    motifs = valider(mesure)
+    assert any("fenetre de charge vide" in m for m in motifs), motifs
+
+
+def test_mutation_cpu_absent_est_refusee(mesure):
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        niveau["resources"]["during_load"]["containers"]["app"]["cpu_percent"]["mean"] = None
+    motifs = valider(mesure)
+    assert any("sans CPU pendant la charge" in m for m in motifs), motifs
+
+
+def test_mutation_memoire_absente_est_refusee(mesure):
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        niveau["resources"]["during_load"]["containers"]["postgres"]["memory_bytes"]["mean"] = None
+    motifs = valider(mesure)
+    assert any("sans memoire pendant la charge" in m for m in motifs), motifs
+
+
+@pytest.mark.parametrize("service", ["app", "postgres", "valkey", "proxy"])
+def test_mutation_conteneur_attendu_non_mesure_est_refusee(mesure, service):
+    """Les quatre conteneurs du chemin d'une requête, un par un."""
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        niveau["resources"]["during_load"]["containers"].pop(service, None)
+    motifs = valider(mesure)
+    assert any(f"`{service}` attendu, jamais mesure" in m for m in motifs), motifs
+
+
+def test_mutation_echantillonneur_mort_prematurement_est_refusee(mesure):
+    """Une série tronquée a l'air normale. Rien ne la trahirait sans ce champ."""
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        pendant = niveau["resources"]["during_load"]
+        pendant["sampler_alive_at_stop"] = False
+        pendant["sampler_exception"] = "RuntimeError: docker indisponible"
+    motifs = valider(mesure)
+    assert any("mort avant la fin" in m for m in motifs), motifs
+
+
+def test_mutation_releve_de_ressources_absent_est_refusee(mesure):
+    """Revenir aux deux instantanés `before`/`after` doit être refusé."""
+    from scripts.g0_perf_baseline import valider
+
+    for niveau in mesure["levels"].values():
+        niveau["resources"] = {"before": {}, "after": {}}
+    motifs = valider(mesure)
+    assert any("aucune mesure de ressources pendant la charge" in m for m in motifs), motifs
+
+
+def test_aucun_seuil_de_cpu_ni_de_memoire_nulle_part():
+    """Une consommation élevée est un constat. G0 ne juge pas."""
+    for chemin in (
+        REPO_ROOT / "scripts" / "g0_perf_baseline.py",
+        REPO_ROOT / "scripts" / "g0_quality_plan.json",
+        REPO_ROOT / ".github" / "workflows" / "g0-quality.yml",
+    ):
+        source = _lire(chemin)
+        for interdit in (
+            "MAX_CPU",
+            "CPU_BUDGET",
+            "max_memory_bytes",
+            "MEMORY_LIMIT_PERCENT",
+            "cpu_threshold",
+            "memory_threshold",
+        ):
+            assert interdit not in source, f"{interdit} dans {chemin.name}"
+
+
+def test_les_parseurs_de_docker_stats_lisent_ce_que_docker_ecrit():
+    """Sur les formats réels de `docker stats`, et sur ce qu'il rend illisible.
+
+    Sans ce test, un parseur qui renverrait toujours `None` ferait échouer la
+    campagne pour la bonne raison affichée et la mauvaise raison réelle.
+    """
+    from scripts.g0_perf_baseline import _octets_memoire, _pourcentage_cpu
+
+    assert _pourcentage_cpu("12.34%") == 12.34
+    assert _pourcentage_cpu("0.00%") == 0.0
+    assert _pourcentage_cpu("--") is None
+    assert _pourcentage_cpu(None) is None
+
+    assert _octets_memoire("123.4MiB / 7.775GiB") == int(123.4 * 2**20)
+    assert _octets_memoire("1GiB / 2GiB") == 2**30
+    assert _octets_memoire("512B / 2GiB") == 512
+    assert _octets_memoire("-- / --") is None
+    assert _octets_memoire(None) is None
+
+
+def test_lechantillonneur_ne_retient_que_les_echantillons_de_la_fenetre(monkeypatch):
+    """Le comptage doit refléter la fenêtre, pas la durée totale du fil.
+
+    L'échantillonneur est exercé pour de bon — `_docker` est remplacé, le fil
+    tourne, et le rapport est confronté à une fenêtre choisie. Un test qui
+    n'inspecterait que le dictionnaire produit ne dirait rien du fil.
+    """
+    import json as _json
+    import time as _time
+
+    from scripts import g0_perf_baseline as banc
+
+    compteur = {"n": 0}
+
+    def faux_docker(*arguments, timeout=60):
+        compteur["n"] += 1
+        return _json.dumps(
+            {"ID": "abcdef123456", "CPUPerc": "50.00%", "MemUsage": "100MiB / 1GiB", "PIDs": "7"}
+        )
+
+    monkeypatch.setattr(banc, "_docker", faux_docker)
+    echantillonneur = banc.EchantillonneurRessources({"app": "abcdef123456"}, 0.05)
+    echantillonneur.demarrer()
+    debut = _time.perf_counter()
+    while compteur["n"] < 4:
+        _time.sleep(0.02)
+    fin = _time.perf_counter()
+    echantillonneur.arreter()
+
+    rapport = echantillonneur.rapport(charge_debut=debut, charge_fin=fin)
+    assert rapport["sampler_alive_at_stop"] is True
+    assert rapport["samples_total"] >= 3
+    assert rapport["samples_within_load_window"] >= 1
+    assert rapport["containers"]["app"]["cpu_percent"]["mean"] == 50.0
+    assert rapport["containers"]["app"]["memory_bytes"]["max"] == 100 * 2**20
+
+    # Une fenêtre qui ne recouvre rien doit se voir dans le comptage, et non
+    # produire des chiffres d'allure normale.
+    hors = echantillonneur.rapport(charge_debut=fin + 100, charge_fin=fin + 200)
+    assert hors["samples_within_load_window"] == 0
+    assert hors["containers"]["app"]["cpu_percent"]["mean"] is None
+
+
+def test_lechantillonneur_signale_sa_propre_mort(monkeypatch):
+    """Un fil mort en cours de route ne doit pas passer pour un fil silencieux."""
+    from scripts import g0_perf_baseline as banc
+
+    def docker_qui_explose(*arguments, timeout=60):
+        raise RuntimeError("docker a disparu")
+
+    monkeypatch.setattr(banc, "_docker", docker_qui_explose)
+    echantillonneur = banc.EchantillonneurRessources({"app": "abcdef123456"}, 0.05)
+    echantillonneur.demarrer()
+    import time as _time
+
+    _time.sleep(0.2)
+    echantillonneur.arreter()
+    rapport = echantillonneur.rapport(charge_debut=0.0, charge_fin=1e12)
+    assert rapport["sampler_alive_at_stop"] is False
+    assert "docker a disparu" in str(rapport["sampler_exception"])
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Identités mesurées — tête de PR, base, commit de fusion, arbre
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_le_workflow_distingue_la_tete_de_pr_du_commit_de_fusion():
+    """Sur un `pull_request`, `GITHUB_SHA` est le commit de fusion synthétique.
+
+    Les confondre ferait citer par la campagne un commit qui n'existe sur
+    aucune référence, et que personne ne pourrait retrouver après coup.
+    """
+    workflow = _lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml")
+    assert "github.event.pull_request.head.sha" in workflow
+    assert "github.event.pull_request.base.sha" in workflow
+    for champ in (
+        "pr_head_sha",
+        "base_sha",
+        "tested_merge_sha",
+        "tested_tree_sha",
+        "workflow_run_id",
+    ):
+        assert champ in workflow, f"{champ} n'est pas enregistre"
+
+
+def test_les_deux_jobs_enregistrent_les_identites_mesurees():
+    """Une campagne qui ne dit pas sur quoi elle a porté ne se rejoue pas."""
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    for job in ("coverage-baseline", "performance-baseline"):
+        corps = "\n".join(str(e.get("run", "")) for e in workflow["jobs"][job]["steps"])
+        assert "pr_head_sha" in corps, f"{job} n'enregistre pas la tete de la PR"
+        assert "tested_tree_sha" in corps, f"{job} n'enregistre pas l'arbre teste"
+        assert "github.run_id" in corps, f"{job} n'enregistre pas l'identifiant d'execution"
+
+
+def test_le_workflow_ne_publie_toujours_aucune_image_et_ne_cree_aucun_tag():
+    """Un job qui mesure ne doit rien pouvoir publier."""
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    assert workflow["permissions"] == {"contents": "read"}
+    texte = _lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml")
+    for interdit in (
+        "docker push",
+        "gh release",
+        "actions/create-release",
+        "git tag",
+        "packages: write",
+        "contents: write",
+    ):
+        assert interdit not in texte, f"{interdit} present dans le workflow de mesure"

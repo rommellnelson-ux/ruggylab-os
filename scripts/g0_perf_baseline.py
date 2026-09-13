@@ -63,6 +63,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from collections import Counter
@@ -79,6 +80,42 @@ GENERATOR_VERSION = "1.0.0"
 
 RACINE = Path(__file__).resolve().parents[1]
 
+#: Les services Compose dont l'etat est releve. `grafana` n'y figure pas : il
+#: n'est pas demarre, et l'y attendre ferait echouer une mesure valide.
+SERVICES_OBSERVES: tuple[str, ...] = (
+    "app",
+    "postgres",
+    "valkey",
+    "proxy",
+    "scheduler",
+    "prometheus",
+)
+
+#: Le plan de mesure. Les parametres y vivent, pas dans le workflow : le job
+#: fixait les concurrences, les repetitions et la graine, alors que la
+#: provenance declarait `.github/**` sans influence sur la mesure. Changer
+#: `--concurrency 1,3,5,10` en `--concurrency 1` ne changeait donc aucune
+#: empreinte. Le plan entre, lui, dans les ensembles `coverage` et
+#: `performance`.
+PLAN = RACINE / "scripts" / "g0_quality_plan.json"
+
+
+def charger_plan() -> dict[str, Any]:
+    """Le plan de mesure, ou une erreur. Aucun repli sur des valeurs par defaut.
+
+    Un repli silencieux rendrait la mesure possible sans le plan : elle
+    s'executerait avec d'autres parametres que ceux qui sont sous empreinte, et
+    la baseline decrirait une campagne qui n'a pas eu lieu.
+    """
+    return dict(json.loads(PLAN.read_text(encoding="utf-8")))
+
+
+def empreinte_plan() -> str:
+    """L'empreinte du plan, insensible a la fin de ligne."""
+    texte = PLAN.read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+    return hashlib.sha256(texte.encode("utf-8")).hexdigest()
+
+
 if str(RACINE) not in sys.path:
     sys.path.insert(0, str(RACINE))
 
@@ -93,9 +130,12 @@ MARQUE_SYNTHETIQUE = "G0SYNTH"
 PRENOMS_SYNTHETIQUES = ("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot")
 NOMS_SYNTHETIQUES = ("Temoin", "Fictif", "Synthetique", "Essai", "Banc", "Zero")
 
-#: Niveaux de concurrence. 3 correspond au premier usage envisagé au CSA GR
-#: Plateau (un guichet, un préleveur, un technicien).
-NIVEAUX_PAR_DEFAUT = (1, 3, 5, 10)
+#: Les niveaux de concurrence ne sont PLUS une constante de ce module : ils
+#: viennent de `scripts/g0_quality_plan.json`. Deux sources pour un même
+#: paramètre finissent par diverger, et c'est celle qui n'est pas sous
+#: empreinte qui gagne en silence. Le niveau 3 y est commenté : il correspond
+#: au premier usage envisagé au CSA GR Plateau — un guichet, un préleveur, un
+#: technicien.
 
 
 @dataclass(frozen=True)
@@ -671,12 +711,215 @@ def _etat_valkey() -> dict[str, Any]:
     }
 
 
+# ── Échantillonnage des ressources PENDANT la charge ───────────────────────
+# La première campagne relevait `docker stats` avant et après chaque niveau.
+# Deux instantanés qui ENCADRENT une fenêtre ne mesurent pas ce qui s'y passe :
+# ils mesurent le repos, juste avant que la charge monte et juste après qu'elle
+# est retombée. Le CPU publié était donc, littéralement, celui d'une stack au
+# repos — et rien dans le fichier ne le disait.
+#
+# Un fil dédié relève désormais pendant l'effort. Aucun seuil n'est introduit :
+# une consommation élevée est un RÉSULTAT que le lot D interprétera. C'est
+# l'ABSENCE de mesure qui invalide la campagne.
+
+_UNITES_MEMOIRE = {
+    "b": 1,
+    "kb": 10**3,
+    "mb": 10**6,
+    "gb": 10**9,
+    "tb": 10**12,
+    "kib": 2**10,
+    "mib": 2**20,
+    "gib": 2**30,
+    "tib": 2**40,
+}
+
+
+def _pourcentage_cpu(texte: Any) -> float | None:
+    """Convertit `"12.34%"` en `12.34`. `None` si docker n'a rien d'exploitable."""
+    if not isinstance(texte, str):
+        return None
+    try:
+        return float(texte.strip().rstrip("%"))
+    except ValueError:
+        return None
+
+
+def _octets_memoire(texte: Any) -> int | None:
+    """Convertit `"123.4MiB / 7.775GiB"` en octets. Seule la part UTILISEE compte."""
+    if not isinstance(texte, str):
+        return None
+    utilise = texte.split("/")[0].strip()
+    nombre = ""
+    for caractere in utilise:
+        if caractere.isdigit() or caractere == ".":
+            nombre += caractere
+        else:
+            break
+    unite = utilise[len(nombre) :].strip().lower()
+    if not nombre or unite not in _UNITES_MEMOIRE:
+        return None
+    try:
+        return int(float(nombre) * _UNITES_MEMOIRE[unite])
+    except ValueError:
+        return None
+
+
+class EchantillonneurRessources:
+    """Relève CPU et mémoire par conteneur, à intervalle fixe, pendant la charge.
+
+    Le fil est `daemon` : si la campagne échoue brutalement, il ne retient pas
+    le processus. Mais son état de vie est ENREGISTRÉ et contrôlé — un
+    échantillonneur mort en cours de route produirait une série tronquée dont
+    rien, dans un fichier de résultats, ne trahirait la troncature.
+    """
+
+    def __init__(self, services: dict[str, str], intervalle: float) -> None:
+        self._services = {nom: cid for nom, cid in services.items() if cid}
+        self._intervalle = max(0.05, float(intervalle))
+        self._arret = threading.Event()
+        self._fil: threading.Thread | None = None
+        self._echantillons: list[dict[str, Any]] = []
+        self._erreurs: list[str] = []
+        self._exception: str | None = None
+        self._debut_horloge: str | None = None
+        self._fin_horloge: str | None = None
+
+    def demarrer(self) -> None:
+        self._debut_horloge = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        self._fil = threading.Thread(target=self._boucle, name="g0-ressources", daemon=True)
+        self._fil.start()
+
+    def arreter(self) -> None:
+        self._arret.set()
+        if self._fil is not None:
+            self._fil.join(timeout=self._intervalle * 10 + 30)
+        self._fin_horloge = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+    @property
+    def vivant_a_l_arret(self) -> bool:
+        """Le fil tournait-il encore quand on lui a demandé de s'arrêter ?
+
+        Faux signifie qu'il est mort prématurément : la série est tronquée et
+        la campagne doit être refusée.
+        """
+        return self._exception is None
+
+    def _boucle(self) -> None:
+        try:
+            identifiants = list(self._services.values())
+            while not self._arret.is_set():
+                debut_tour = time.perf_counter()
+                brut = _docker(
+                    "stats", "--no-stream", "--format", "{{json .}}", *identifiants, timeout=30
+                )
+                if not brut:
+                    self._erreurs.append("docker stats sans sortie")
+                else:
+                    self._enregistrer(brut, debut_tour)
+                reste = self._intervalle - (time.perf_counter() - debut_tour)
+                if reste > 0:
+                    self._arret.wait(reste)
+        except Exception as erreur:  # noqa: BLE001 - l'etat de vie est une PREUVE
+            self._exception = f"{type(erreur).__name__}: {erreur}"
+
+    def _enregistrer(self, brut: str, instant: float) -> None:
+        par_id: dict[str, dict[str, Any]] = {}
+        for ligne in brut.splitlines():
+            try:
+                enregistrement = json.loads(ligne)
+            except json.JSONDecodeError:
+                self._erreurs.append("ligne docker stats illisible")
+                continue
+            par_id[str(enregistrement.get("ID", ""))[:12]] = enregistrement
+        mesures: dict[str, Any] = {}
+        for service, cid in self._services.items():
+            enregistrement = par_id.get(cid[:12])
+            if enregistrement is None:
+                continue
+            mesures[service] = {
+                "cpu_percent": _pourcentage_cpu(enregistrement.get("CPUPerc")),
+                "memory_bytes": _octets_memoire(enregistrement.get("MemUsage")),
+                "pids": enregistrement.get("PIDs"),
+            }
+        self._echantillons.append(
+            {
+                "monotonic": round(instant, 4),
+                "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                "containers": mesures,
+            }
+        )
+
+    def rapport(self, *, charge_debut: float, charge_fin: float) -> dict[str, Any]:
+        """Les statistiques par conteneur, et de quoi contester la mesure.
+
+        `charge_debut` et `charge_fin` sont les bornes MONOTONES de la fenêtre
+        de charge du niveau. Elles servent à compter les échantillons qui
+        tombent réellement dedans : sans ce comptage, un échantillonneur démarré
+        trop tôt et arrêté trop tôt produirait des chiffres d'allure normale sur
+        une stack au repos.
+        """
+        dans_fenetre = [
+            e for e in self._echantillons if charge_debut <= e["monotonic"] <= charge_fin
+        ]
+        deltas = [
+            round(b["monotonic"] - a["monotonic"], 4)
+            for a, b in zip(self._echantillons, self._echantillons[1:], strict=False)
+        ]
+        par_conteneur: dict[str, Any] = {}
+        for service in self._services:
+            cpu = [
+                e["containers"][service]["cpu_percent"]
+                for e in dans_fenetre
+                if service in e["containers"]
+                and e["containers"][service]["cpu_percent"] is not None
+            ]
+            memoire = [
+                e["containers"][service]["memory_bytes"]
+                for e in dans_fenetre
+                if service in e["containers"]
+                and e["containers"][service]["memory_bytes"] is not None
+            ]
+            par_conteneur[service] = {
+                "samples": len([e for e in dans_fenetre if service in e["containers"]]),
+                "cpu_percent": {
+                    "mean": round(statistics.fmean(cpu), 3) if cpu else None,
+                    "p95": _centile([float(v) for v in cpu], 95) if cpu else None,
+                    "max": round(max(cpu), 3) if cpu else None,
+                },
+                "memory_bytes": {
+                    "mean": int(statistics.fmean(memoire)) if memoire else None,
+                    "p95": (int(_centile([float(v) for v in memoire], 95)) if memoire else None),
+                    "max": max(memoire) if memoire else None,
+                },
+            }
+        return {
+            "enabled": True,
+            "sampler_started_at": self._debut_horloge,
+            "sampler_stopped_at": self._fin_horloge,
+            "load_window_seconds": round(charge_fin - charge_debut, 3),
+            "interval_seconds_configured": self._intervalle,
+            "interval_seconds_observed_mean": (
+                round(statistics.fmean(deltas), 3) if deltas else None
+            ),
+            "samples_total": len(self._echantillons),
+            "samples_within_load_window": len(dans_fenetre),
+            "samples_before_load_window": len(
+                [e for e in self._echantillons if e["monotonic"] < charge_debut]
+            ),
+            "samples_after_load_window": len(
+                [e for e in self._echantillons if e["monotonic"] > charge_fin]
+            ),
+            "sampler_alive_at_stop": self.vivant_a_l_arret,
+            "sampler_exception": self._exception,
+            "sampling_errors": self._erreurs[:20],
+            "containers": par_conteneur,
+        }
+
+
 def observer(base: str) -> dict[str, Any]:
     """Un instantané de la stack. Chaque source dit si elle a répondu."""
-    services = {
-        nom: _conteneur(nom)
-        for nom in ("app", "postgres", "valkey", "proxy", "scheduler", "prometheus")
-    }
+    services = {nom: _conteneur(nom) for nom in SERVICES_OBSERVES}
     return {
         "sampled_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "containers": _stats_conteneurs(services),
@@ -861,11 +1104,28 @@ def executer(args: argparse.Namespace) -> dict[str, Any]:
     niveaux: dict[str, Any] = {}
     collecte_globale = Collecte()
 
+    plan = charger_plan()
+    reglage_ressources = (plan.get("performance") or {}).get("resource_sampling") or {}
+    services_mesures = {
+        nom: _conteneur(nom)
+        for nom in (reglage_ressources.get("observed_containers") or SERVICES_OBSERVES)
+    }
+
     for niveau in args.concurrency:
         series_repetitions: list[dict[str, Any]] = []
         echantillons_niveau: list[Echantillon] = []
         avant = observer(args.database_name)
         horloge_niveau = 0.0
+
+        # L'echantillonneur demarre AVANT la premiere repetition et s'arrete
+        # APRES la derniere : la fenetre de charge lui est strictement
+        # interieure, et les bornes monotones enregistrees permettent de
+        # verifier ce chevauchement au lieu de le supposer.
+        echantillonneur = EchantillonneurRessources(
+            services_mesures, float(reglage_ressources.get("interval_seconds") or 1.0)
+        )
+        echantillonneur.demarrer()
+        charge_debut = time.perf_counter()
 
         for repetition in range(args.repetitions):
             collecte = Collecte()
@@ -923,6 +1183,10 @@ def executer(args: argparse.Namespace) -> dict[str, Any]:
                 }
             )
 
+        charge_fin = time.perf_counter()
+        echantillonneur.arreter()
+        pendant = echantillonneur.rapport(charge_debut=charge_debut, charge_fin=charge_fin)
+
         apres = observer(args.database_name)
         par_scenario = {
             scenario.nom: _statistiques(
@@ -938,8 +1202,13 @@ def executer(args: argparse.Namespace) -> dict[str, Any]:
             "scenarios": par_scenario,
             "aggregate": _statistiques(echantillons_niveau, horloge_niveau),
             "resources": {
+                # `before` et `after` restent : ils situent le point de depart
+                # et ce qui subsiste apres. Mais ils ne mesurent PAS l'effort,
+                # et `during_load` est desormais ce sur quoi le validateur
+                # porte ses refus.
                 "before": avant,
                 "after": apres,
+                "during_load": pendant,
                 "postgres_delta": _delta_postgres(avant, apres),
             },
         }
@@ -992,6 +1261,9 @@ def executer(args: argparse.Namespace) -> dict[str, Any]:
             "clock_source": "time.perf_counter (monotone)",
             "clock_monotonic": horloge_monotone,
             "retries": 0,
+            "measurement_plan": "scripts/g0_quality_plan.json",
+            "measurement_plan_sha256": empreinte_plan(),
+            "performance_profile": (plan.get("performance") or {}).get("profile"),
             "command": args.command,
             "base_url_scheme": args.base_url.split(":")[0],
         },
@@ -1226,6 +1498,103 @@ def valider(corps: Any) -> list[str]:
             f"{total_declare} dans les niveaux — la classification est incomplete"
         )
 
+    # 9. Ressources PENDANT la charge. La campagne precedente encadrait chaque
+    #    niveau de deux `docker stats` : elle mesurait le repos et publiait le
+    #    resultat comme s'il decrivait l'effort. Aucun seuil n'est introduit
+    #    ici — une consommation elevee est un RESULTAT. Ce qui est refuse,
+    #    c'est une mesure dont on ne peut rien conclure.
+    reglage = (charger_plan().get("performance") or {}).get("resource_sampling") or {}
+    requis = list(reglage.get("required_containers") or [])
+    minimum_echantillons = int(reglage.get("minimum_samples_per_level") or 0)
+    # Le plan ne peut pas se dispenser lui-meme de la preuve. `enabled: false`
+    # etait auparavant sans effet : le validateur lisait ce champ dans le
+    # RAPPORT, que l'echantillonneur pose toujours a vrai. Un champ qui a
+    # l'apparence d'un interrupteur sans en etre un est pire qu'un champ
+    # absent — on croit avoir agi.
+    if reglage.get("enabled") is not True:
+        motifs.append(
+            "plan de mesure : echantillonnage des ressources desactive — la "
+            "consommation pendant la charge est une preuve exigee, pas une option"
+        )
+    if not requis:
+        motifs.append("plan de mesure : aucun conteneur requis — le releve ne prouverait rien")
+    if minimum_echantillons <= 0:
+        motifs.append("plan de mesure : aucun effectif minimal d'echantillons declare")
+    for nom_niveau, niveau in niveaux.items():
+        pendant = ((niveau.get("resources") or {}).get("during_load")) or {}
+        if not pendant.get("enabled"):
+            motifs.append(f"niveau {nom_niveau} : aucune mesure de ressources pendant la charge")
+            continue
+        if pendant.get("sampler_alive_at_stop") is not True:
+            motifs.append(
+                f"niveau {nom_niveau} : l'echantillonneur est mort avant la fin "
+                f"({pendant.get('sampler_exception')}) — la serie est tronquee"
+            )
+        total = int(pendant.get("samples_total") or 0)
+        dedans = int(pendant.get("samples_within_load_window") or 0)
+        if total == 0:
+            motifs.append(f"niveau {nom_niveau} : zero echantillon de ressources")
+        if dedans == 0:
+            avant_charge = int(pendant.get("samples_before_load_window") or 0)
+            apres_charge = int(pendant.get("samples_after_load_window") or 0)
+            motifs.append(
+                f"niveau {nom_niveau} : aucun echantillon dans la fenetre de charge "
+                f"({avant_charge} avant, {apres_charge} apres) — le releve ne "
+                "decrit pas l'effort"
+            )
+        elif dedans < minimum_echantillons:
+            motifs.append(
+                f"niveau {nom_niveau} : {dedans} echantillon(s) pendant la charge "
+                f"(< {minimum_echantillons}) — moyenne et p95 ne signifient rien"
+            )
+        if not float(pendant.get("load_window_seconds") or 0.0) > 0.0:
+            motifs.append(f"niveau {nom_niveau} : fenetre de charge vide")
+        conteneurs = pendant.get("containers") or {}
+        for service in requis:
+            mesure = conteneurs.get(service)
+            if mesure is None:
+                motifs.append(f"niveau {nom_niveau} : conteneur `{service}` attendu, jamais mesure")
+                continue
+            if (mesure.get("cpu_percent") or {}).get("mean") is None:
+                motifs.append(f"niveau {nom_niveau} : `{service}` sans CPU pendant la charge")
+            if (mesure.get("memory_bytes") or {}).get("mean") is None:
+                motifs.append(f"niveau {nom_niveau} : `{service}` sans memoire pendant la charge")
+
+    # 10. La campagne a-t-elle tourne avec les parametres SOUS EMPREINTE ?
+    #     Le plan existe pour que modifier un parametre change l'empreinte ;
+    #     encore faut-il que la mesure l'ait suivi. Un `--concurrency 1` passe
+    #     en ligne de commande produirait sinon une baseline conforme a son
+    #     propre fichier et etrangere au plan qu'elle cite.
+    plan_performance = charger_plan().get("performance") or {}
+    if execution.get("measurement_plan_sha256") != empreinte_plan():
+        motifs.append(
+            "la mesure ne cite pas le plan present dans l'arbre : "
+            f"{execution.get('measurement_plan_sha256')} != {empreinte_plan()}"
+        )
+    ecarts_plan = {
+        "concurrency_levels": ("concurrency", list(execution.get("concurrency_levels") or [])),
+        "repetitions": ("repetitions", execution.get("repetitions")),
+        "iterations_per_worker": ("iterations", execution.get("iterations_per_worker")),
+        "warmup_iterations_per_worker": ("warmup", execution.get("warmup_iterations_per_worker")),
+        "seed": ("seed", execution.get("seed")),
+    }
+    for _, (cle_plan, mesuree) in ecarts_plan.items():
+        attendue = plan_performance.get(cle_plan)
+        if attendue is not None and mesuree != attendue:
+            motifs.append(
+                f"parametre hors plan : {cle_plan} mesure = {mesuree!r}, plan = {attendue!r}"
+            )
+    if execution.get("performance_profile") != plan_performance.get("profile"):
+        motifs.append(
+            f"profil de mesure {execution.get('performance_profile')!r} "
+            f"different du plan {plan_performance.get('profile')!r}"
+        )
+    if int(minimum) != int(plan_performance.get("minimum_samples") or 0):
+        motifs.append(
+            f"minimum d'echantillons {minimum} different du plan "
+            f"{plan_performance.get('minimum_samples')}"
+        )
+
     if execution.get("retries") != 0:
         motifs.append("des reessais ont eu lieu : le taux d'erreur publie est sous-estime")
 
@@ -1360,22 +1729,32 @@ def construire_provenance(corps: dict[str, Any], commande: str) -> dict[str, Any
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Les valeurs par defaut viennent du PLAN, pas de constantes locales et
+    # surtout pas du workflow. Le job passait `--concurrency 1,3,5,10 --seed
+    # 20260909` : ces parametres determinaient la mesure tout en restant hors de
+    # toute empreinte. Ils sont desormais lus ici, et `valider()` refuse une
+    # campagne qui s'en ecarterait.
+    reglages = charger_plan()["performance"]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="https://localhost")
     parser.add_argument("--insecure", action="store_true", help="certificat auto-signe (proxy CI)")
     parser.add_argument("--admin-user", default=os.environ.get("G0_ADMIN_USER", "admin"))
     parser.add_argument("--admin-password", default=os.environ.get("G0_ADMIN_PASSWORD", ""))
-    parser.add_argument("--seed", type=int, default=20260909)
-    parser.add_argument("--iterations", type=int, default=5)
-    parser.add_argument("--warmup", type=int, default=2)
-    parser.add_argument("--repetitions", type=int, default=3)
-    parser.add_argument("--min-samples", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=int(reglages["seed"]))
+    parser.add_argument("--iterations", type=int, default=int(reglages["iterations"]))
+    parser.add_argument("--warmup", type=int, default=int(reglages["warmup"]))
+    parser.add_argument("--repetitions", type=int, default=int(reglages["repetitions"]))
+    parser.add_argument("--min-samples", type=int, default=int(reglages["minimum_samples"]))
     parser.add_argument("--timeout", type=float, default=30.0)
-    parser.add_argument("--slow-query-threshold-ms", type=int, default=200)
+    parser.add_argument(
+        "--slow-query-threshold-ms",
+        type=int,
+        default=int(reglages["slow_query_threshold_ms"]),
+    )
     parser.add_argument(
         "--concurrency",
         type=lambda v: [int(x) for x in v.split(",")],
-        default=list(NIVEAUX_PAR_DEFAUT),
+        default=[int(n) for n in reglages["concurrency"]],
     )
     parser.add_argument("--database-name", default="ruggylab")
     parser.add_argument("--image", default=os.environ.get("RUGGYLAB_IMAGE", "ruggylab-os:g0"))

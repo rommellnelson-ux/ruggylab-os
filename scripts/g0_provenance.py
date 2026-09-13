@@ -124,17 +124,24 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
         "requirements.txt",
     ),
     # La couverture depend du code mesure, des tests qui l'executent, de la
-    # configuration de pytest et des versions epinglees de l'outil. Le
-    # generateur du resume en fait partie : c'est lui qui decide des
-    # regroupements. `.github/**` est volontairement absent — la CI orchestre
-    # la mesure, elle ne la determine pas, et l'y inclure rendrait l'empreinte
-    # instable a chaque retouche d'un job sans rapport.
+    # configuration de pytest, des versions epinglees de l'outil de mesure et
+    # du **plan de mesure** — c'est lui qui fixe les commandes, les fichiers
+    # PostgreSQL instrumentes et les paquets requis.
+    #
+    # `.github/**` etait declare volontairement absent au motif que « la CI
+    # orchestre la mesure, elle ne la determine pas ». La declaration etait
+    # fausse : le job portait les concurrences, la graine et la liste des
+    # tests PostgreSQL. Le plan ayant repris ces parametres, elle devient
+    # vraie — et les validateurs refusent une campagne qui s'ecarterait du
+    # plan, faute de quoi elle resterait une intention.
     "coverage": (
         "app/**/*",
         "tests/**/*",
         "pyproject.toml",
         "requirements.txt",
+        "requirements-g0-quality.txt",
         "scripts/g0_coverage_summary.py",
+        "scripts/g0_quality_plan.json",
     ),
     # La performance depend du scenario, de l'application mesuree, du schema
     # qu'elle interroge, de l'image construite et de la stack qui l'heberge.
@@ -143,9 +150,12 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
     # qui n'est plus celui qu'on execute. La surcharge de mesure y figure pour
     # la meme raison : elle desactive les limiteurs de debit, et une baseline
     # qui la modifierait sans changer d'empreinte decrirait un autre systeme.
+    # Le plan de mesure aussi : concurrences, repetitions, warm-up, graine,
+    # intervalle d'echantillonnage des ressources.
     "performance": (
         "scripts/g0_perf_baseline.py",
         "scripts/g0_perf_overlay.yml",
+        "scripts/g0_quality_plan.json",
         "app/**/*",
         "alembic/**/*",
         "docker-compose.yml",

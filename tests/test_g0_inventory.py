@@ -1066,8 +1066,7 @@ def test_un_produit_d_execution_depose_dans_scripts_n_a_aucun_effet(nom, emprein
     finally:
         depose.unlink(missing_ok=True)
     assert apres == avant, (
-        f"{nom} est entre dans l'empreinte : une campagne locale suffirait a "
-        "faire echouer --check"
+        f"{nom} est entre dans l'empreinte : une campagne locale suffirait a faire echouer --check"
     )
 
 

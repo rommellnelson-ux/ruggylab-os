@@ -5,7 +5,7 @@
     "baseline_input_ref": "main",
     "generation_command": "python scripts/g0_inventory.py --generate",
     "generator_version": "2.0.0",
-    "relevant_input_file_count": 344,
+    "relevant_input_file_count": 345,
     "relevant_input_patterns": [
       "app/**/*",
       "alembic/**/*",
@@ -23,11 +23,11 @@
       ".github/workflows/ci.yml"
     ],
     "relevant_input_set": "inventory",
-    "relevant_input_tree_sha256": "82b30178b61382304a9afb59b185c1cfc9d92187fec1cea934a3b44e63566dae",
+    "relevant_input_tree_sha256": "754bed172c30adb96cf03d6739bb981f58847a4b65d8d467c2c3330a0e08607c",
     "schema_version": "2.0.0"
   },
   "volatile": {
-    "generated_at": "2026-09-13T15:06:36Z",
+    "generated_at": "2026-09-13T15:45:27Z",
     "platform": "windows/amd64",
     "python_version": "3.13.13"
   }

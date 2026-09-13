@@ -43,6 +43,7 @@ Aucun appel réseau. Aucun secret. Aucune donnée patient.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import xml.etree.ElementTree as ET  # noqa: S405 - lecture d'un XML produit localement
@@ -59,6 +60,98 @@ RACINE = Path(__file__).resolve().parents[1]
 
 if str(RACINE) not in sys.path:
     sys.path.insert(0, str(RACINE))
+
+#: Le plan de mesure — mêmes paramètres pour le workflow et pour ce script.
+#: Les fichiers PostgreSQL instrumentés y vivent désormais : le job en portait
+#: la liste, et la restreindre pour embellir un chiffre n'aurait changé aucune
+#: empreinte.
+PLAN = RACINE / "scripts" / "g0_quality_plan.json"
+
+#: Le fichier de dépendances du produit. Ce qui y figure entre dans l'image
+#: expédiée : `coverage` et `pytest-cov` y instrumentaient donc un runtime
+#: clinique qui ne les appelle jamais.
+REQUIREMENTS_RUNTIME = RACINE / "requirements.txt"
+
+
+def charger_plan() -> dict[str, Any]:
+    """Le plan de mesure. Aucun repli : sans plan, la mesure n'est pas cadrée."""
+    return dict(json.loads(PLAN.read_text(encoding="utf-8")))
+
+
+def empreinte_plan() -> str:
+    """L'empreinte du plan, insensible à la convention de fin de ligne."""
+    texte = PLAN.read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+    return hashlib.sha256(texte.encode("utf-8")).hexdigest()
+
+
+def _distributions_declarees(chemin: Path) -> set[str]:
+    """Les noms de distribution d'un fichier `requirements`, sans les extras.
+
+    `coverage[toml]==7.16.0` et `coverage==7.16.0` désignent la même
+    distribution : comparer les lignes brutes laisserait passer la seconde.
+    Les lignes `-r autre.txt` ne sont PAS suivies — ce qui est demandé ici,
+    c'est ce que CE fichier déclare, pas ce que sa clôture transitive installe.
+    """
+    noms: set[str] = set()
+    if not chemin.is_file():
+        return noms
+    for ligne in chemin.read_text(encoding="utf-8").splitlines():
+        nue = ligne.split("#", 1)[0].strip()
+        if not nue or nue.startswith("-"):
+            continue
+        nom = nue
+        for separateur in ("==", ">=", "<=", "~=", "!=", ">", "<", ";", "["):
+            nom = nom.split(separateur)[0]
+        noms.add(nom.strip().lower().replace("_", "-"))
+    return noms
+
+
+def controler_dependances() -> list[str]:
+    """L'outillage de mesure est-il hors du runtime, et épinglé là où il vit ?
+
+    Deux refus distincts, parce que ce sont deux défauts différents : un outil
+    d'instrumentation embarqué dans l'image expédiée, et une version flottante
+    qui ferait bouger une baseline sans qu'aucun code ne change.
+    """
+    ecarts: list[str] = []
+    plan = charger_plan()["coverage"]
+    fichier_qualite = RACINE / str(plan["requirements_file"])
+    runtime = _distributions_declarees(REQUIREMENTS_RUNTIME)
+    qualite_brut = fichier_qualite.read_text(encoding="utf-8") if fichier_qualite.is_file() else ""
+    qualite = _distributions_declarees(fichier_qualite)
+
+    if not fichier_qualite.is_file():
+        return [f"{plan['requirements_file']} absent : l'outillage de mesure n'a pas de fichier"]
+    # L'include est cherche sur des lignes DECODEES, jamais dans le texte brut :
+    # `# -r requirements.txt` contient la chaine et n'inclut rien.
+    inclut = any(
+        ligne.split("#", 1)[0].strip() in ("-r requirements.txt", "--requirement requirements.txt")
+        for ligne in qualite_brut.splitlines()
+    )
+    if not inclut:
+        ecarts.append(
+            f"{plan['requirements_file']} n'inclut pas requirements.txt : les versions "
+            "du produit et celles de la mesure divergeraient en silence"
+        )
+
+    for paquet in plan["required_packages"]:
+        distribution = str(paquet["distribution"]).split("[")[0].lower()
+        epingle = f"{paquet['distribution']}=={paquet['version']}"
+        if distribution in runtime:
+            ecarts.append(
+                f"`{distribution}` declare dans requirements.txt : l'outillage de "
+                "mesure entrerait dans l'image runtime"
+            )
+        if distribution not in qualite:
+            ecarts.append(f"`{distribution}` absent de {plan['requirements_file']}")
+        elif epingle not in qualite_brut:
+            ecarts.append(
+                f"`{distribution}` non epingle a {paquet['version']} dans "
+                f"{plan['requirements_file']} : un chiffre de couverture n'est "
+                "comparable qu'a outil identique"
+            )
+    return ecarts
+
 
 #: Regroupements exigés par la campagne. Chacun est un préfixe de chemin POSIX.
 #: Leur absence est un échec : un résumé qui ometterait `app/services/csa_sync`
@@ -284,6 +377,10 @@ def construire(rapport_json: dict[str, Any], rapport_xml: dict[str, Any]) -> dic
                 "branch_coverage": bool(rapport_json.get("meta", {}).get("branch_coverage")),
                 "coverage_report_timestamp": rapport_json.get("meta", {}).get("timestamp"),
                 "generator_version": GENERATOR_VERSION,
+                "measurement_plan": "scripts/g0_quality_plan.json",
+                "measurement_plan_sha256": empreinte_plan(),
+                "postgres_test_files": list(charger_plan()["coverage"]["postgres_test_files"]),
+                "not_instrumented": list(charger_plan()["coverage"]["not_instrumented"]),
             },
             "totals": totaux,
             "xml_cross_check": rapport_xml,
@@ -377,6 +474,24 @@ def controler(resume: dict[str, Any]) -> list[str]:
             f"perimetre reduit : {len(manquants)} module(s) de app/ absents du "
             f"rapport (ex. {apercu})"
         )
+
+    # 4 bis. Le plan de mesure est-il celui qui a servi ?
+    plan_couverture = charger_plan()["coverage"]
+    if mesure.get("measurement_plan_sha256") != empreinte_plan():
+        ecarts.append(
+            "le resume ne cite pas le plan present dans l'arbre : "
+            f"{mesure.get('measurement_plan_sha256')} != {empreinte_plan()}"
+        )
+    if not plan_couverture.get("branch"):
+        ecarts.append("plan de mesure : branch=false — la mesure de branches serait desactivee")
+    if not plan_couverture.get("postgres_test_files"):
+        ecarts.append(
+            "plan de mesure : aucun test PostgreSQL declare — la mesure se "
+            "restreindrait a ce qui tourne sans base"
+        )
+
+    # 4 ter. L'outillage de mesure est-il hors du runtime, et epingle ?
+    ecarts.extend(controler_dependances())
 
     # 5. Tous les regroupements exigés sont-ils présents et non vides ?
     paquets = corps.get("by_package", {})
