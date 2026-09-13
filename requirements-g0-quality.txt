@@ -1,0 +1,22 @@
+# Outillage de MESURE du gate G0 — lot C (couverture et performance).
+#
+# Ces paquets ne sont pas des dependances du produit : ils instrumentent la
+# mesure, ils ne participent a aucun flux clinique. Les avoir places dans
+# `requirements.txt` les faisait entrer dans le virtualenv copie dans l'image
+# runtime : l'image expedee embarquait un instrumenteur de code qu'aucune
+# execution du produit n'appelle. Une surface d'attaque de plus, et une image
+# qui ne decrit plus ce qu'elle execute.
+#
+# Le fichier inclut `requirements.txt` : le job de mesure a besoin du produit
+# ET de l'outillage, et dupliquer les versions les ferait diverger en silence.
+#
+# Les versions sont EXACTES. Un chiffre de couverture n'est comparable qu'a
+# outil identique : une plage de versions ferait bouger la baseline sans
+# qu'aucune ligne de code n'ait change.
+#
+# `pytest` et `httpx` restent dans `requirements.txt`. Les en sortir serait un
+# refactoring plus large que ce lot, et le faire a la faveur d'une PR de mesure
+# melangerait deux decisions.
+-r requirements.txt
+coverage[toml]==7.16.0
+pytest-cov==7.1.0
