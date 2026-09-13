@@ -58,13 +58,30 @@ BASELINE_INPUT_REF = "main"
 #: rapport, on finirait par régénérer sans lire le diff, et le contrôle
 #: perdrait son sens.
 ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
-    # L'inventaire lit le code, les migrations, les fichiers d'orchestration et
-    # la définition de la CI.
+    # L'inventaire lit le code, les migrations, les fichiers d'orchestration,
+    # la définition de la CI et **les scripts d'exploitation**.
+    #
+    # Les scripts n'y figuraient pas. L'artefact recensait pourtant 30 scripts
+    # CLI un par un : il décrivait un corps qu'il ne lisait pas. Modifier
+    # `scripts/reset_admin_password.py` laissait donc l'empreinte intacte, et
+    # `--check` déclarait la baseline à jour alors qu'une surface d'entrée
+    # venait de changer. Le défaut a été relevé par le lot C sur le lot A ; il
+    # est corrigé ici.
+    #
+    # Les extensions sont énumérées plutôt qu'un `scripts/**/*` global : ce
+    # répertoire reçoit aussi, à l'exécution, des rapports bruts et des bases
+    # jetables qu'un motif large absorberait.
     "inventory": (
         "app/**/*",
         "alembic/**/*",
         "deploy/**/*",
         "monitoring/**/*",
+        "scripts/**/*.py",
+        "scripts/**/*.sh",
+        "scripts/**/*.ps1",
+        "scripts/**/*.yml",
+        "scripts/**/*.yaml",
+        "scripts/**/*.json",
         "docker-compose*.yml",
         "Dockerfile",
         "requirements.txt",

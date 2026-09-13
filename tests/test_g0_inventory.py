@@ -979,3 +979,159 @@ def test_the_fingerprint_covers_the_path_as_well_as_the_content(tmp_path, monkey
     (depot / "alembic" / "b.py").write_text("contenu A\n", encoding="utf-8")
 
     assert provenance_module.empreinte_entrees("schema")[0] != avant
+
+
+# ── Les scripts d'exploitation entrent dans l'empreinte ────────────────────
+# L'inventaire recensait 30 scripts CLI un par un tout en ne les LISANT pas :
+# `scripts/**` était absent de l'ensemble `inventory`. Un artefact peut ainsi
+# décrire un corps dont il ne dérive pas, et c'est le pire des deux mondes —
+# il a l'air exhaustif, et il ne l'est pas. Modifier
+# `scripts/reset_admin_password.py` laissait l'empreinte identique, donc
+# `--check` vert, donc aucune régénération, donc une baseline qui continuait
+# d'affirmer décrire un état révolu.
+#
+# Les quatre tests qui suivent ne vérifient pas que le motif est présent dans
+# une liste : ils MODIFIENT l'arbre et exigent que l'empreinte bouge. Un test
+# qui se contenterait de lire `ENSEMBLES_ENTREE` passerait encore si
+# `fichiers_entree` écartait silencieusement ce qu'il vient d'y trouver.
+
+
+@pytest.fixture
+def empreinte_inventaire():
+    """Recalcule l'empreinte de l'ensemble `inventory` à la demande."""
+    from scripts.g0_provenance import empreinte_entrees
+
+    def calculer() -> tuple[str, int]:
+        return empreinte_entrees("inventory")
+
+    return calculer
+
+
+def test_modifier_un_script_inventorie_change_l_empreinte(empreinte_inventaire):
+    """Le témoin est dans le test : on mesure avant, on altère, on remesure."""
+    cible = REPO_ROOT / "scripts" / "seed_demo.py"
+    origine = cible.read_bytes()
+    avant, nombre_avant = empreinte_inventaire()
+    try:
+        cible.write_bytes(origine + b"\n# marqueur de mutation G0\n")
+        apres, nombre_apres = empreinte_inventaire()
+    finally:
+        cible.write_bytes(origine)
+    assert nombre_apres == nombre_avant, "le nombre de fichiers ne devait pas bouger"
+    assert apres != avant, (
+        "modifier un script inventorie n'a pas change l'empreinte : "
+        "l'inventaire decrit un corps qu'il ne lit pas"
+    )
+    assert empreinte_inventaire()[0] == avant, "l'arbre n'a pas ete restaure"
+
+
+def test_ajouter_un_script_cli_change_l_inventaire_et_l_empreinte(empreinte_inventaire):
+    """Un script ajouté est une surface d'entrée de plus, pas un détail."""
+    nouveau = REPO_ROOT / "scripts" / "g0_mutation_script_temporaire.py"
+    avant, nombre_avant = empreinte_inventaire()
+    try:
+        nouveau.write_text('"""Script CLI factice."""\n', encoding="utf-8")
+        apres, nombre_apres = empreinte_inventaire()
+    finally:
+        nouveau.unlink(missing_ok=True)
+    assert nombre_apres == nombre_avant + 1, "le script ajoute n'est pas entre dans l'ensemble"
+    assert apres != avant
+    assert empreinte_inventaire() == (avant, nombre_avant)
+
+
+@pytest.mark.parametrize(
+    "nom",
+    [
+        "coverage.xml",
+        "coverage.json",
+        "coverage-summary.json",
+        "perf-baseline.json",
+        "g0_mesure.log",
+        "g0_jetable.db",
+    ],
+)
+def test_un_produit_d_execution_depose_dans_scripts_n_a_aucun_effet(nom, empreinte_inventaire):
+    """Sinon l'empreinte varierait selon qu'une campagne a tourné sur la machine.
+
+    C'est le revers exact du test précédent : ouvrir `scripts/**` sans écarter
+    les produits d'exécution rendrait le contrôle impossible à satisfaire — et
+    un contrôle qu'on ne peut pas satisfaire finit par être ignoré.
+    """
+    depose = REPO_ROOT / "scripts" / nom
+    assert not depose.exists(), f"{nom} existe deja : le test mentirait"
+    avant = empreinte_inventaire()
+    try:
+        depose.write_text('{"mesure": 1}\n', encoding="utf-8")
+        apres = empreinte_inventaire()
+    finally:
+        depose.unlink(missing_ok=True)
+    assert apres == avant, (
+        f"{nom} est entre dans l'empreinte : une campagne locale suffirait a "
+        "faire echouer --check"
+    )
+
+
+def test_le_tri_des_entrees_est_identique_sous_windows_et_sous_linux():
+    """L'ordre entre dans l'empreinte ; il ne doit dépendre d'aucune plateforme.
+
+    `sorted()` sur des objets `Path` compare casse repliée sous Windows et
+    casse exacte sous Linux : `Dockerfile` passe avant `alembic/env.py` sur
+    l'un et après sur l'autre. La CI Linux avait refusé une baseline générée
+    sous Windows à contenu pourtant identique. Le tri porte donc sur la chaîne
+    POSIX.
+
+    Le contrôle ne relit pas le code source — il rejouerait alors l'erreur
+    qu'il cherche. Il compare l'ordre obtenu à celui d'un tri explicitement
+    sensible à la casse, et vérifie qu'un tri insensible en donnerait un autre.
+    """
+    from scripts.g0_provenance import chemin_relatif, fichiers_entree
+
+    chemins = [chemin_relatif(p) for p in fichiers_entree("inventory")]
+    assert chemins == sorted(chemins), "l'ordre n'est pas celui du tri POSIX sensible a la casse"
+    assert any(c.startswith("scripts/") for c in chemins), "aucun script dans l'ensemble"
+    # Sans cette derniere assertion, le test passerait sur une arborescence ou
+    # les deux tris coincident, et ne prouverait rien.
+    assert chemins != sorted(chemins, key=str.lower), (
+        "les deux tris coincident sur cette arborescence : le test ne distingue "
+        "plus une plateforme de l'autre"
+    )
+
+
+def test_l_ensemble_inventory_couvre_les_extensions_de_scripts_attendues():
+    """Les six extensions du mandat, et le refus d'un `scripts/**/*` global."""
+    from scripts.g0_provenance import ENSEMBLES_ENTREE
+
+    motifs = set(ENSEMBLES_ENTREE["inventory"])
+    for extension in ("py", "sh", "ps1", "yml", "yaml", "json"):
+        assert f"scripts/**/*.{extension}" in motifs, f"extension {extension} non couverte"
+    assert "scripts/**/*" not in motifs, (
+        "un motif global absorberait les rapports bruts deposes a l'execution"
+    )
+
+
+def test_tous_les_scripts_suivis_par_git_sont_dans_l_empreinte():
+    """Aucun script versionné ne doit rester hors du périmètre mesuré.
+
+    L'énumération par extension est un choix ; ce test en est le garde-fou. Si
+    quelqu'un ajoute demain `scripts/quelque_chose.toml`, il échoue au lieu de
+    laisser un script réel hors de l'empreinte.
+    """
+    import subprocess
+
+    sortie = subprocess.run(
+        ["git", "ls-files", "scripts/"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+        check=True,
+    ).stdout
+    suivis = {ligne.strip() for ligne in sortie.splitlines() if ligne.strip()}
+
+    from scripts.g0_provenance import chemin_relatif, fichiers_entree
+
+    couverts = {chemin_relatif(p) for p in fichiers_entree("inventory")}
+    # Les fichiers JS pilotent Playwright, qui n'est pas instrumente et dont le
+    # lot C dit explicitement qu'il n'entre pas dans la mesure.
+    attendus = {c for c in suivis if not c.endswith(".js")}
+    manquants = sorted(attendus - couverts)
+    assert not manquants, f"scripts suivis mais hors empreinte : {manquants}"

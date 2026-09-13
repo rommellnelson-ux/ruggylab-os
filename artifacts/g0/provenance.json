@@ -5,23 +5,29 @@
     "baseline_input_ref": "main",
     "generation_command": "python scripts/g0_inventory.py --generate",
     "generator_version": "2.0.0",
-    "relevant_input_file_count": 304,
+    "relevant_input_file_count": 344,
     "relevant_input_patterns": [
       "app/**/*",
       "alembic/**/*",
       "deploy/**/*",
       "monitoring/**/*",
+      "scripts/**/*.py",
+      "scripts/**/*.sh",
+      "scripts/**/*.ps1",
+      "scripts/**/*.yml",
+      "scripts/**/*.yaml",
+      "scripts/**/*.json",
       "docker-compose*.yml",
       "Dockerfile",
       "requirements.txt",
       ".github/workflows/ci.yml"
     ],
     "relevant_input_set": "inventory",
-    "relevant_input_tree_sha256": "82a2abd0ebd3f139b481742d9192b6cf8b9c60c039d9a8e0adc42229cb209c4e",
+    "relevant_input_tree_sha256": "82b30178b61382304a9afb59b185c1cfc9d92187fec1cea934a3b44e63566dae",
     "schema_version": "2.0.0"
   },
   "volatile": {
-    "generated_at": "2026-09-13T15:04:32Z",
+    "generated_at": "2026-09-13T15:06:36Z",
     "platform": "windows/amd64",
     "python_version": "3.13.13"
   }
