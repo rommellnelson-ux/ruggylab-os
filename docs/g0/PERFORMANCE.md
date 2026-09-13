@@ -200,8 +200,23 @@ PERFORMANCE_PROFILE = CORE_INTRINSIC_WITH_RATE_LIMITS_DISABLED
 | Processeurs | **4** |
 | Mémoire | 16 766 414 848 o (≈ 15,6 Gio) |
 | Python | 3.13.15 · Docker 28.0.4 |
-| PostgreSQL | 16.6 · Valkey 7.2.4 |
+| PostgreSQL | 16.6 |
+| Valkey — **produit** | **8.1.9** |
+| Valkey — compatibilité de protocole | `redis_version` 7.2.4 |
+| Image Valkey épinglée | `valkey/valkey:8.1.9-alpine@sha256:e0eb7c48…` |
 | Image mesurée | `sha256:6490d477…` |
+
+> **Deux versions, et les confondre était une erreur de preuve.** `INFO server`
+> publie `redis_version:7.2.4` — une compatibilité de **protocole** — et
+> `valkey_version:8.1.9` — la version du **produit**. Les campagnes précédentes
+> lisaient la première et publiaient « Valkey 7.2.4 », un numéro qui ne désigne
+> pas le serveur mesuré. Le champ correct figurait dans la même réponse et était
+> ignoré ; le champ générique `version` de l'artefact, qui ne disait pas de quel
+> produit il parlait, est ce qui a rendu la confusion invisible.
+>
+> Relevé par une revue indépendante, pas par les contrôles de cette campagne.
+> Ceux-ci refusent désormais un `valkey_version` absent, recopié depuis la
+> compatibilité de protocole, ou contredit par le tag de l'image épinglée.
 
 Réglages effectifs lus **dans le processus applicatif**, jamais supposés depuis
 l'environnement du runner :
@@ -332,10 +347,36 @@ niveaux, et aucune erreur de lecture n'est survenue.
 
 > **Ce que cette mesure établit, et que l'ancienne cachait entièrement.**
 > L'application consomme déjà **63 % d'un cœur avec un seul utilisateur**, et
-> sature autour de **1,3 cœur** dès trois. Au-delà, le CPU ne monte presque plus
-> (114 → 124 → 130 %) alors que la latence explose : le système n'est pas en
-> attente d'entrées-sorties, il est **borné par le calcul**. C'est cohérent avec
-> un débit qui plafonne à trois utilisateurs puis décroît.
+> plafonne autour de **1,3 cœur** dès trois. Au-delà, le CPU ne monte presque
+> plus (114 → 124 → 130 %) alors que la latence explose et que le débit décroît.
+>
+> **Ce que cette mesure n'établit pas : la cause.** Une version antérieure de ce
+> document concluait « le système n'est pas en attente d'entrées-sorties, il est
+> borné par le calcul ». C'était une inférence, pas une mesure, et une revue
+> indépendante l'a relevée à juste titre. Un plateau de CPU **concomitant** à
+> une dégradation des latences est compatible avec plusieurs explications, et
+> rien dans cette campagne ne permet de trancher entre elles.
+>
+> Formulation exacte de ce qui est observé : *le profil est compatible avec une
+> limitation du chemin applicatif ou du processus web, concomitante à un plateau
+> CPU. Les mesures ne permettent pas d'exclure une contention transactionnelle,
+> un verrou, une sérialisation, le pool de connexions, le GIL, une file interne,
+> ni plusieurs de ces causes combinées.*
+>
+> L'absence de lectures physiques PostgreSQL (§4.5) écarte une attente de disque
+> **pendant la partie chaude de cette campagne** — sur une base qui tient
+> entièrement en cache. Elle n'écarte pas une attente d'entrées-sorties en
+> général, ni sur un site dont la base aura grossi.
+>
+> ```
+> PERFORMANCE_BOTTLENECK_PROFILING_REQUIRED   (P1, investigation)
+> ```
+>
+> Un profilage du processus web sous charge est **requis avant toute mise en
+> production sur site**. P1 porte sur l'investigation, pas sur une cause
+> démontrée : affirmer que le CPU est la cause unique reviendrait à refermer la
+> question sans l'avoir instruite, et à orienter le lot D vers une piste qui
+> pourrait n'être qu'un symptôme.
 >
 > La mémoire reste modeste et croît lentement (137 → 167 Mio en moyenne). Rien
 > n'indique de fuite sur la durée de la campagne — mais une campagne de quelques
@@ -362,13 +403,20 @@ niveaux, et aucune erreur de lecture n'est survenue.
 > transmis au lot D, non instruit ici.
 >
 > Les blocs lus depuis le disque tombent à **0** dès cinq utilisateurs : le jeu
-> synthétique tient intégralement en cache. Les latences publiées ne contiennent
-> donc **aucune attente de disque**, ce qui les rend plutôt optimistes par
-> rapport à un site dont la base aura grossi.
+> synthétique tient en cache pendant la partie chaude de la campagne. Les
+> latences publiées sont donc, très probablement, **exemptes d'attente de
+> lecture disque** — ce qui les rend plutôt optimistes par rapport à un site
+> dont la base aura grossi.
+>
+> Ce compteur porte sur les **lectures**. Il ne dit rien des écritures, du
+> journal WAL, ni des `fsync` : conclure de ces zéros que la campagne n'a connu
+> aucune entrée-sortie serait aller au-delà de ce qui est mesuré.
 
 Valkey en fin de campagne : 1002,02 Kio utilisés, 2 clients connectés, 0 clé,
 33 commandes traitées. **Requêtes lentes journalisées au-delà de 200 ms : 0** —
-le temps ne se perd pas dans les requêtes SQL.
+aucune requête SQL prise individuellement ne dépasse ce seuil. Cela n'exclut ni
+une accumulation de requêtes courtes, ni une attente de verrou qui ne serait pas
+comptée comme durée d'exécution.
 
 ### 4.6 Erreurs applicatives observées
 
@@ -499,7 +547,8 @@ ne suffit ni à confirmer ni à écarter.
 
 - le commit Git mesuré, le runner, l'OS, l'architecture, le nombre de CPU et la
   mémoire ;
-- les versions de Docker, Python, PostgreSQL et Valkey ;
+- les versions de Docker, Python, PostgreSQL et Valkey — cette dernière
+  distinguée de sa compatibilité de protocole Redis ;
 - l'identifiant de l'image mesurée et l'empreinte SHA-256 de son archive ;
 - la configuration applicative observée et les interrupteurs externes effectifs ;
 - le jeu de données, la graine, l'ordre des scénarios et leur empreinte, les

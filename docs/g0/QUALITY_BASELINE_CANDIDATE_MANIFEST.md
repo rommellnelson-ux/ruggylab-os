@@ -13,8 +13,18 @@
 > visibilité du dépôt.
 
 ```
-QUALITY_BASELINE_CANDIDATE = REVIEW_PENDING
+QUALITY_BASELINE_CANDIDATE = MEASUREMENT_PENDING
 ```
+
+> **Ce manifeste est dans son état d'attente.** Le commit qui le porte corrige
+> les générateurs — version Valkey, identités embarquées — et **invalide donc
+> la campagne précédente** : les artefacts qu'elle a produits ne sont plus ceux
+> que ce code produit. Nommer encore cette campagne reviendrait à désigner des
+> fichiers que plus aucune exécution ne reproduit.
+>
+> Les identités et les empreintes sont renseignées par le commit
+> **documentaire** qui suit, une fois la nouvelle campagne exécutée et ses deux
+> jobs verts.
 
 **Ce document ne prononce pas `QUALITY_BASELINE_ACCEPTED`.** Une baseline ne
 devient acceptée qu'après revue indépendante, et c'est cette revue — pas
@@ -45,13 +55,19 @@ personne ne retrouverait ensuite.
 
 | Identité | Valeur |
 | --- | --- |
-| `measurement_source_sha` (**tête Q1**) | `6afe098ab21d8cbcaea161d5ae3b7d407003ad58` |
+| `measurement_source_sha` (**tête Q1**) | *à mesurer* |
 | `base_sha` | `981ef356759bad628898fed0094c0dd40c8a7b57` |
-| `tested_merge_sha` (fusion synthétique GitHub) | `e847523087b1bbe6791170474ff6c94163ad1904` |
-| `tested_tree_sha` | `170ca31e2171ffc6eaf09666959f742fce475585` |
-| `workflow_run_id` | `34776027833` (tentative 1) |
-| Job — couverture | `103774175365` |
-| Job — performance | `103774175500` |
+| `tested_merge_sha` (fusion synthétique GitHub) | *à mesurer* |
+| `tested_tree_sha` | *à mesurer* |
+| `workflow_run_id` | *à mesurer* |
+| Job — couverture | *à mesurer* |
+| Job — performance | *à mesurer* |
+
+Ces six identités sont désormais **embarquées dans les artefacts eux-mêmes**
+(`coverage-summary.json` et `perf-provenance.json`, champ
+`measurement_identity`), et plus seulement consignées ici. Un lecteur du seul
+artefact canonique sait donc sur quelle tête la mesure a porté, sans fichier
+annexe ni acte de foi.
 
 > **`measurement_source_sha` est la tête Q1, jamais le commit qui ajoutera le
 > snapshot.** Nommer le répertoire d'après le commit qui le contient créerait
@@ -70,18 +86,18 @@ SHA-256 des fichiers tels que la CI les a publiés, sur l'exécution ci-dessus.
 
 | Artefact | Taille | SHA-256 |
 | --- | ---: | --- |
-| `coverage.xml` | 580 152 o | `e38a7c2f28d1a93b9099c60c3b94562cef03f94483235af2334153b1f2ca37c2` |
-| `coverage.json` | 1 359 014 o | `66a5c9b9515bb29d4eebc6efb893047d7ac99c29461771d150a152d9ba427c80` |
-| `coverage-summary.json` | 114 314 o | `aec65fbf05e7ff93084f40dfb8b4d3cea24e9b77c97d63decdc956092b299c34` |
-| `perf-baseline.json` | 67 932 o | `cfe967172f6708392bdfa4078edd820225ad5d3bae5c97bdfcb302a0b1b0af0d` |
-| `perf-provenance.json` | 3 737 o | `98815c6be3851b993bdfc5580697250b629069234bc96111128fbf655b6b3635` |
+| `coverage.xml` | *à mesurer* | *à mesurer* |
+| `coverage.json` | *à mesurer* | *à mesurer* |
+| `coverage-summary.json` | *à mesurer* | *à mesurer* |
+| `perf-baseline.json` | *à mesurer* | *à mesurer* |
+| `perf-provenance.json` | *à mesurer* | *à mesurer* |
 
 ## 4. Image mesurée
 
 | | |
 | --- | --- |
-| `image_id` | `sha256:6490d477e98ebbe101b98d32c0648d3baa0f77548400308b13a368aad1318890` |
-| SHA-256 de l'archive | `28bc7a84bf3ac3371031e6e7dbd7860438d68d62848c4a151dbf2c2908428411` |
+| `image_id` | *à mesurer* |
+| SHA-256 de l'archive | *à mesurer* |
 
 L'archive est produite avec `gzip -n` : sans cela, son empreinte changerait à
 chaque exécution à cause du seul horodatage, et ne dirait plus rien de l'image.
@@ -90,8 +106,8 @@ chaque exécution à cause du seul horodatage, et ne dirait plus rien de l'image
 
 | Ensemble | Fichiers | Empreinte |
 | --- | ---: | --- |
-| `coverage` | 376 | `ff1aadec587ad9259098d0b2a961ddd6d1a5e3f2a360a7831db56d900f676861` |
-| `performance` | 296 | `12f945c95bfd155f301962d02cd137b780457e204fc02887bcd2bacef4abc40a` |
+| `coverage` | *à mesurer* | *à mesurer* |
+| `performance` | *à mesurer* | *à mesurer* |
 
 Le **plan de mesure** [`scripts/g0_quality_plan.json`](../../scripts/g0_quality_plan.json)
 entre dans les deux empreintes, et son propre SHA-256 est inscrit dans les deux
@@ -99,7 +115,7 @@ artefacts (`measurement_plan_sha256`). Les validateurs **refusent** une campagne
 dont les paramètres s'écarteraient du plan : sans ce refus, le plan ne serait
 qu'une intention, et une campagne réduite continuerait de le citer.
 
-Empreinte du scénario de performance : `84e8e408aff36448…`
+Empreinte du scénario de performance : *à mesurer*
 (`perf-baseline.json`, `run.scenario_sha256`). Elle change dès qu'un pas change
 de route, d'ordre ou de nature — indépendamment de toute reformulation de commentaire.
 
@@ -131,8 +147,7 @@ rien ici ne doit être lu comme si elle l'avait été.
 ## 7. Statut
 
 ```
-QUALITY_BASELINE_CANDIDATE_READY
-QUALITY_BASELINE_CANDIDATE     = REVIEW_PENDING
+QUALITY_BASELINE_CANDIDATE     = MEASUREMENT_PENDING
 CLINICAL_STATUS                = REAL_DATA_NO_GO
 DISTRIBUTION_STATUS            = DISTRIBUTION_NO_GO
 ```

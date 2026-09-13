@@ -69,6 +69,12 @@
           "type": "cli_script"
         },
         {
+          "docstring_first_line": "Décompte des jobs de CI d'une révision — mesuré, jamais saisi à la main.",
+          "has_main_guard": true,
+          "path": "scripts/g0_ci_job_report.py",
+          "type": "cli_script"
+        },
+        {
           "docstring_first_line": "Résumé structuré de la couverture G0 (preuve 7) — et contrôle de sa validité.",
           "has_main_guard": true,
           "path": "scripts/g0_coverage_summary.py",

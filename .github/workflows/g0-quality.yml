@@ -148,6 +148,28 @@ jobs:
             echo "workflow_run_id=${{ github.run_id }}"
           } | tee -a "$GITHUB_OUTPUT"
 
+      # Ecrit AVANT la mesure, et non apres : un validateur ne peut pas
+      # confronter son identite embarquee a un fichier qui n'existerait
+      # qu'apres lui. Les noms des champs sont ceux de l'identite
+      # embarquee — comparer `pr_head_sha` a `measurement_source_sha` ne
+      # comparerait rien du tout.
+      - name: Write the measured identities before measuring
+        run: |
+          mkdir -p artifacts/g0
+          cat > artifacts/g0/coverage-identities.json <<JSON
+          {
+            "measurement_source_sha": "${{ steps.identites.outputs.pr_head_sha }}",
+            "base_sha": "${{ steps.identites.outputs.base_sha }}",
+            "tested_merge_sha": "${{ steps.identites.outputs.tested_merge_sha }}",
+            "tested_tree_sha": "${{ steps.identites.outputs.tested_tree_sha }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "workflow_run_attempt": "${{ github.run_attempt }}",
+            "workflow_job": "coverage-baseline",
+            "event_name": "${{ github.event_name }}"
+          }
+          JSON
+          cat artifacts/g0/coverage-identities.json
+
       # 1. Suite complète. Les rapports par suite sont écrits dans un
       #    répertoire temporaire : les artefacts définitifs viennent des données
       #    COMBINÉES, et écraser l'un par l'autre publierait une mesure
@@ -297,23 +319,6 @@ jobs:
       # Les identités mesurées, écrites à côté des chiffres : une campagne qui
       # ne dirait pas sur quelle tête, quelle base et quel arbre elle a porté ne
       # se rejouerait pas.
-      - name: Write the measured identities next to the artifacts
-        if: always()
-        run: |
-          mkdir -p artifacts/g0
-          cat > artifacts/g0/coverage-identities.json <<JSON
-          {
-            "pr_head_sha": "${{ steps.identites.outputs.pr_head_sha }}",
-            "base_sha": "${{ steps.identites.outputs.base_sha }}",
-            "tested_merge_sha": "${{ steps.identites.outputs.tested_merge_sha }}",
-            "tested_tree_sha": "${{ steps.identites.outputs.tested_tree_sha }}",
-            "workflow_run_id": "${{ github.run_id }}",
-            "workflow_run_attempt": "${{ github.run_attempt }}",
-            "job": "coverage-baseline"
-          }
-          JSON
-          cat artifacts/g0/coverage-identities.json
-
       # Publié même en échec : c'est précisément quand la mesure est refusée
       # qu'on a besoin de lire ce qui a été produit.
       - name: Publish the coverage baseline
@@ -398,6 +403,28 @@ jobs:
             echo "tested_merge_sha=$fusion"
             echo "tested_tree_sha=$arbre"
           } | tee -a "$GITHUB_OUTPUT"
+
+      # Ecrit AVANT la mesure, et non apres : un validateur ne peut pas
+      # confronter son identite embarquee a un fichier qui n'existerait
+      # qu'apres lui. Les noms des champs sont ceux de l'identite
+      # embarquee — comparer `pr_head_sha` a `measurement_source_sha` ne
+      # comparerait rien du tout.
+      - name: Write the measured identities before measuring
+        run: |
+          mkdir -p artifacts/g0
+          cat > artifacts/g0/perf-identities.json <<JSON
+          {
+            "measurement_source_sha": "${{ steps.identites.outputs.pr_head_sha }}",
+            "base_sha": "${{ steps.identites.outputs.base_sha }}",
+            "tested_merge_sha": "${{ steps.identites.outputs.tested_merge_sha }}",
+            "tested_tree_sha": "${{ steps.identites.outputs.tested_tree_sha }}",
+            "workflow_run_id": "${{ github.run_id }}",
+            "workflow_run_attempt": "${{ github.run_attempt }}",
+            "workflow_job": "performance-baseline",
+            "event_name": "${{ github.event_name }}"
+          }
+          JSON
+          cat artifacts/g0/perf-identities.json
 
       # L'image est construite ICI, et son identité est enregistrée : une
       # baseline qui ne dirait pas quelle image elle a mesurée ne se compare à
@@ -528,23 +555,6 @@ jobs:
           echo "DISTRIBUTION_STATUS=$distribution"
           test "$clinique" = "REAL_DATA_NO_GO" || { echo "::error::CLINICAL_STATUS modifié"; exit 1; }
           test "$distribution" = "DISTRIBUTION_NO_GO" || { echo "::error::DISTRIBUTION_STATUS modifié"; exit 1; }
-
-      - name: Write the measured identities next to the artifacts
-        if: always()
-        run: |
-          mkdir -p artifacts/g0
-          cat > artifacts/g0/perf-identities.json <<JSON
-          {
-            "pr_head_sha": "${{ steps.identites.outputs.pr_head_sha }}",
-            "base_sha": "${{ steps.identites.outputs.base_sha }}",
-            "tested_merge_sha": "${{ steps.identites.outputs.tested_merge_sha }}",
-            "tested_tree_sha": "${{ steps.identites.outputs.tested_tree_sha }}",
-            "workflow_run_id": "${{ github.run_id }}",
-            "workflow_run_attempt": "${{ github.run_attempt }}",
-            "job": "performance-baseline"
-          }
-          JSON
-          cat artifacts/g0/perf-identities.json
 
       - name: Compose logs on failure
         if: failure()

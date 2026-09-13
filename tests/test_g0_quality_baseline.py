@@ -35,6 +35,10 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"
 SURCHARGE = REPO_ROOT / "scripts" / "g0_perf_overlay.yml"
 
 #: Verdicts que le lot C ne prononce jamais. Constater n'est pas décider.
+TETE_FICTIVE = "a" * 40
+BASE_FICTIVE = "b" * 40
+FUSION_FICTIVE = "c" * 40
+
 VERDICTS_INTERDITS = (
     "G0_PASS",
     "REAL_DATA_GO",
@@ -220,7 +224,36 @@ def _rapport_xml(rapport_json: dict[str, Any], *, conditions: int = 1) -> dict[s
 
 
 @pytest.fixture
-def resume_couverture() -> dict[str, Any]:
+def environnement_ci(monkeypatch, tmp_path):
+    """Les variables qu'un runner GitHub pose, pour un témoin réaliste.
+
+    Hors CI, `identite_de_mesure` ne peut rien renseigner : il n'y a ni
+    événement, ni identifiant d'exécution. Un témoin généré dans ce vide
+    échouerait, non parce que le contrôle est trop strict, mais parce que la
+    situation qu'il décrit n'existe pas en CI. La fixture la reconstitue.
+
+    Et c'est volontairement STRICT : un artefact généré hors CI ne doit pas
+    passer `--check`. Une baseline produite sur un poste, sans traçabilité
+    d'exécution, n'est pas une preuve.
+    """
+    evenement = tmp_path / "event.json"
+    evenement.write_text(
+        json.dumps(
+            {"pull_request": {"head": {"sha": TETE_FICTIVE}, "base": {"sha": BASE_FICTIVE}}}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(evenement))
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.setenv("GITHUB_SHA", FUSION_FICTIVE)
+    monkeypatch.setenv("GITHUB_RUN_ID", "34000000000")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    monkeypatch.setenv("GITHUB_JOB", "baseline")
+    return {"measurement_source_sha": TETE_FICTIVE, "base_sha": BASE_FICTIVE}
+
+
+@pytest.fixture
+def resume_couverture(environnement_ci) -> dict[str, Any]:
     rapport = _rapport_json()
     from scripts.g0_coverage_summary import construire
 
@@ -549,7 +582,7 @@ def _mesure_valide() -> dict[str, Any]:
         },
         "errors_by_type_total": {},
         "environment": {
-            "git_commit": "0" * 40,
+            "git_commit": TETE_FICTIVE,
             "runner": "ubuntu-latest",
             "os": "Linux 6.8",
             "architecture": "x86_64",
@@ -559,7 +592,19 @@ def _mesure_valide() -> dict[str, Any]:
             "docker_version": "27.0.0",
             "image_id": "sha256:" + "a" * 64,
             "postgres_version": "PostgreSQL 16.6",
-            "valkey_version": "7.2.4",
+            # Produit et compatibilite protocolaire, SEPARES. La fixture porte
+            # les deux valeurs REELLES de l'image epinglee, mesurees sur
+            # `valkey/valkey:8.1.9-alpine` : le serveur annonce bien les deux.
+            "valkey_version": "8.1.9",
+            "redis_protocol_compatibility_version": "7.2.4",
+            "valkey_image_reference": (
+                "valkey/valkey:8.1.9-alpine@sha256:"
+                "e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84"
+            ),
+            "valkey_image_digest": (
+                "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84"
+            ),
+            "valkey_expected_version_from_image_tag": "8.1.9",
             "application_configuration": {"RATE_LIMIT_ENABLED": "false"},
             "effective_external_switches": {
                 "available": True,
@@ -747,7 +792,7 @@ def _provenance_valide(mesure: dict[str, Any]) -> dict[str, Any]:
     return construire_provenance(mesure, mesure["run"]["command"])
 
 
-def test_temoin_une_provenance_complete_est_acceptee(mesure):
+def test_temoin_une_provenance_complete_est_acceptee(mesure, environnement_ci):
     from scripts.g0_perf_baseline import valider_provenance
 
     assert valider_provenance(_provenance_valide(mesure), mesure) == []
@@ -1810,3 +1855,471 @@ def test_le_workflow_ne_publie_toujours_aucune_image_et_ne_cree_aucun_tag():
         "contents: write",
     ):
         assert interdit not in texte, f"{interdit} present dans le workflow de mesure"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Amendement après la première revue indépendante
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Trois incohérences de preuve, trouvées par une relecture extérieure et non
+# par les contrôles de cette campagne. C'est le point important : la mesure
+# était techniquement valide et se disait valide, et elle publiait pourtant une
+# version de produit fausse, une causalité non démontrée et un décompte qui ne
+# comptait pas ce qu'il annonçait.
+#
+# Les tests qui suivent existent pour que ces trois familles d'erreur ne
+# puissent plus passer en silence.
+
+
+# ── Valkey : produit et compatibilité protocolaire ────────────────────────
+#
+# `INFO server` publie DEUX versions :
+#     redis_version:7.2.4      ← compatibilité de PROTOCOLE
+#     valkey_version:8.1.9     ← version du PRODUIT
+# Le générateur lisait la première et l'étiquetait comme la seconde. Mesuré sur
+# l'image épinglée `valkey/valkey:8.1.9-alpine` : les deux champs sont présents
+# dans la même réponse, et le bon était ignoré.
+
+
+@pytest.fixture
+def environnement_valkey(mesure):
+    """Raccourci vers le bloc d'environnement de la mesure de référence."""
+    return mesure["environment"]
+
+
+def test_temoin_les_versions_valkey_intactes_sont_acceptees(mesure):
+    """Témoin. Sans lui, les mutations qui suivent ne prouveraient rien."""
+    from scripts.g0_perf_baseline import valider
+
+    assert valider(mesure) == []
+
+
+def test_la_compatibilite_redis_ne_devient_jamais_la_version_du_produit(mesure):
+    """`7.2.4` est une compatibilité de protocole, pas une version de Valkey."""
+    from scripts.g0_perf_baseline import valider
+
+    environnement = mesure["environment"]
+    environnement["valkey_version"] = environnement["redis_protocol_compatibility_version"]
+    motifs = valider(mesure)
+    assert any("recopiee comme version du produit" in m for m in motifs), motifs
+
+
+def test_la_version_du_produit_valkey_est_enregistree(mesure):
+    """Elle doit venir de `valkey_version`, et valoir celle du tag épinglé."""
+    environnement = mesure["environment"]
+    assert environnement["valkey_version"] == "8.1.9"
+    assert environnement["redis_protocol_compatibility_version"] == "7.2.4"
+    assert environnement["valkey_version"] != environnement["redis_protocol_compatibility_version"]
+
+
+def test_mutation_version_valkey_absente_est_refusee(mesure):
+    from scripts.g0_perf_baseline import valider
+
+    mesure["environment"]["valkey_version"] = None
+    motifs = valider(mesure)
+    assert any("valkey_version" in m and "absent" in m for m in motifs), motifs
+
+
+def test_mutation_version_serveur_differente_de_l_image_est_refusee(mesure):
+    """Une version annoncée que l'image épinglée contredit."""
+    from scripts.g0_perf_baseline import valider
+
+    mesure["environment"]["valkey_version"] = "9.0.0"
+    motifs = valider(mesure)
+    assert any("incoherente" in m for m in motifs), motifs
+
+
+def test_mutation_reference_d_image_valkey_absente_est_refusee(mesure):
+    """Sans image épinglée, la version annoncée n'est contredite par rien."""
+    from scripts.g0_perf_baseline import valider
+
+    mesure["environment"]["valkey_image_reference"] = None
+    mesure["environment"]["valkey_expected_version_from_image_tag"] = None
+    motifs = valider(mesure)
+    assert any("valkey_image_reference" in m for m in motifs), motifs
+
+
+def test_le_generateur_lit_bien_les_deux_champs_distincts():
+    """Le code doit lire `valkey_version`, pas seulement `redis_version`.
+
+    Contrôle sur l'arbre syntaxique et non par `grep` : la docstring de
+    `_etat_valkey` cite les deux noms pour expliquer la confusion, et un
+    `grep` se déclencherait sur sa propre explication.
+    """
+    import ast
+
+    arbre = ast.parse(_lire(REPO_ROOT / "scripts" / "g0_perf_baseline.py"))
+    fonction = next(
+        n for n in ast.walk(arbre) if isinstance(n, ast.FunctionDef) and n.name == "_etat_valkey"
+    )
+    corps = [n for n in fonction.body if not isinstance(n, ast.Expr)]
+    module = ast.Module(body=corps, type_ignores=[])
+
+    # Le controle porte sur l'ASSOCIATION cle -> source, pas sur la simple
+    # presence des deux noms. Une premiere version se contentait de verifier
+    # que « valkey_version » et « redis_version » figuraient tous deux dans la
+    # fonction : remplacer `valeurs.get("valkey_version")` par
+    # `valeurs.get("redis_version")` la laissait passer, puisque le nom
+    # « valkey_version » restait present — comme CLE du dictionnaire de sortie.
+    # C'est exactement le defaut d'origine, et le test ne le voyait pas.
+    lu_pour: dict[str, str] = {}
+    for noeud in ast.walk(module):
+        if not isinstance(noeud, ast.Dict):
+            continue
+        for cle, valeur in zip(noeud.keys, noeud.values, strict=False):
+            if not (isinstance(cle, ast.Constant) and isinstance(cle.value, str)):
+                continue
+            source = None
+            if (
+                isinstance(valeur, ast.Call)
+                and isinstance(valeur.func, ast.Attribute)
+                and valeur.func.attr == "get"
+                and valeur.args
+                and isinstance(valeur.args[0], ast.Constant)
+            ):
+                source = valeur.args[0].value
+            if source is not None:
+                lu_pour[cle.value] = source
+
+    assert lu_pour.get("valkey_version") == "valkey_version", (
+        "la version du PRODUIT n'est pas lue dans le champ `valkey_version` : "
+        f"elle vient de {lu_pour.get('valkey_version')!r}"
+    )
+    assert lu_pour.get("redis_version") == "redis_version", (
+        "la compatibilite de protocole n'est plus relevee depuis `redis_version`"
+    )
+    assert "version" not in lu_pour, (
+        "un champ generique `version` est revenu : il ne dit pas de quel produit "
+        "il parle, et c'est ce qui a rendu la confusion invisible"
+    )
+
+
+def test_l_image_valkey_est_epinglee_par_digest():
+    """Un tag seul peut être redéployé ; un digest, non."""
+    import yaml
+
+    compose = yaml.safe_load(_lire(REPO_ROOT / "docker-compose.yml"))
+    reference = str(compose["services"]["valkey"]["image"])
+    assert "@sha256:" in reference, "l'image Valkey n'est pas epinglee par digest"
+    assert reference.startswith("valkey/valkey:8.1.9"), reference
+
+
+@pytest.mark.parametrize("document", ["PERFORMANCE.md"])
+def test_les_documents_ne_presentent_plus_valkey_7_2_4(document):
+    """« Valkey 7.2.4 » ne doit plus apparaître comme version du produit.
+
+    Les CITATIONS sont retirées avant le contrôle. Le document reproduit sa
+    propre erreur pour l'expliquer — « les campagnes précédentes publiaient
+    "Valkey 7.2.4" » — et un contrôle qui se déclencherait dessus exigerait
+    qu'on efface la trace au lieu de la commenter. C'est la troisième fois que
+    ce piège se présente dans cette campagne.
+    """
+    texte = _aplati(DOCS / document)
+    texte = re.sub(r"«.*?»", "«…»", texte)
+    assert "Valkey 7.2.4" not in texte, (
+        f"{document} presente encore la compatibilite de protocole comme la version du produit"
+    )
+    assert "Valkey 8.1.9" in texte or "8.1.9" in texte, (
+        f"{document} ne publie pas la version reelle du serveur"
+    )
+
+
+# ── Interprétation causale ────────────────────────────────────────────────
+#
+# Un plateau de CPU CONCOMITANT à une dégradation des latences ne démontre pas
+# que le CPU en est la cause. Le document concluait « le système est borné par
+# le calcul » — une inférence présentée comme une mesure.
+
+
+@pytest.mark.parametrize("document", ["COVERAGE.md", "PERFORMANCE.md"])
+def test_aucune_causalite_categorique_non_demontree(document):
+    """Les formules qui referment une question que la mesure laisse ouverte.
+
+    Le contrôle ignore les lignes de CITATION (`> ... « ... »`) où le document
+    reproduit et corrige explicitement son ancienne formulation : les interdire
+    reviendrait à exiger qu'on efface l'erreur au lieu de l'expliquer.
+    """
+    # Les citations peuvent courir sur PLUSIEURS lignes : filtrer ligne par
+    # ligne laissait passer une ouverture de guillemet en fin de ligne et sa
+    # fermeture sur la suivante. Le retrait porte donc sur le texte entier.
+    texte = re.sub(r"«.*?»", "«…»", _lire(DOCS / document), flags=re.DOTALL)
+    interdites = (
+        "est borné par le calcul",
+        "est bornée par le calcul",
+        "la cause est le CPU",
+        "le CPU explique",
+        "n'est pas en attente d'entrées-sorties",
+        "aucune attente de disque",
+        "le temps ne se perd pas",
+    )
+    fautives = [formule for formule in interdites if formule in texte]
+    assert not fautives, f"{document} affirme une causalite non demontree : {fautives}"
+
+
+def test_le_constat_de_profilage_est_inscrit():
+    """La question reste ouverte, et le document doit le dire par un constat."""
+    texte = _aplati(DOCS / "PERFORMANCE.md")
+    assert "PERFORMANCE_BOTTLENECK_PROFILING_REQUIRED" in texte
+    for cause in ("contention", "verrou", "GIL", "pool de connexions"):
+        assert cause.lower() in texte.lower(), (
+            f"PERFORMANCE.md n'envisage pas la piste « {cause} » : la formulation "
+            "referme la question au lieu de l'ouvrir"
+        )
+
+
+def test_le_blocage_de_facturation_ne_depend_pas_de_l_hypothese_de_cause():
+    """Il repose sur des erreurs OBSERVÉES, pas sur une explication supposée."""
+    texte = _aplati(DOCS / "PERFORMANCE.md")
+    assert "CSA_SITE_PRODUCTION_GO_BLOCKER" in texte
+    assert "INVOICE_CONCURRENCY_REMEDIATION_REQUIRED" in texte
+    assert "http_500" in texte or "HTTP 500" in texte, (
+        "le blocage n'est plus rattache aux erreurs mesurees"
+    )
+
+
+# ── Identité de mesure embarquée ──────────────────────────────────────────
+#
+# `perf-provenance.json` portait `baseline_input_commit`, qui est l'ancrage
+# historique DÉCLARÉ du programme G0 — et non le commit mesuré. Lu seul,
+# l'artefact induisait en erreur.
+
+
+def _identite_valide() -> dict[str, Any]:
+    return {
+        "measurement_source_sha": "a" * 40,
+        "base_sha": "b" * 40,
+        "tested_merge_sha": "c" * 40,
+        "tested_tree_sha": "d" * 40,
+        "workflow_run_id": "123456",
+        "workflow_run_attempt": "1",
+        "workflow_job": "performance-baseline",
+        "workflow_job_id": None,
+        "event_name": "pull_request",
+    }
+
+
+def test_temoin_une_identite_complete_est_acceptee():
+    from scripts.g0_provenance import ecarts_identite
+
+    identite = _identite_valide()
+    assert ecarts_identite(identite, identite) == []
+
+
+def test_mutation_identite_de_mesure_absente_est_refusee():
+    from scripts.g0_provenance import ecarts_identite
+
+    assert ecarts_identite(None, None) == ["identite de mesure absente de l'artefact"]
+
+
+@pytest.mark.parametrize("champ", ["measurement_source_sha", "workflow_run_id", "workflow_job"])
+def test_mutation_champ_d_identite_manquant_est_refusee(champ):
+    from scripts.g0_provenance import ecarts_identite
+
+    identite = _identite_valide()
+    identite[champ] = None
+    assert any(champ in e for e in ecarts_identite(identite, None))
+
+
+def test_mutation_tete_confondue_avec_le_merge_synthetique_est_refusee():
+    """Sur un `pull_request`, `GITHUB_SHA` est la fusion, pas la tête."""
+    from scripts.g0_provenance import ecarts_identite
+
+    identite = _identite_valide()
+    identite["tested_merge_sha"] = identite["measurement_source_sha"]
+    ecarts = ecarts_identite(identite, None)
+    assert any("confondue avec le commit de fusion" in e for e in ecarts), ecarts
+
+
+def test_mutation_identite_incoherente_avec_le_fichier_de_la_ci_est_refusee():
+    """Deux écritures de la même vérité : si elles divergent, l'une ment."""
+    from scripts.g0_provenance import ecarts_identite
+
+    identite = _identite_valide()
+    sidecar = dict(identite, measurement_source_sha="e" * 40)
+    ecarts = ecarts_identite(identite, sidecar)
+    assert any("identite incoherente sur measurement_source_sha" in e for e in ecarts), ecarts
+
+
+def test_l_identite_est_lue_depuis_l_evenement_et_non_devinee(monkeypatch, tmp_path):
+    """Sur un `pull_request`, la tête vient de l'événement, pas de `GITHUB_SHA`."""
+    import json as _json
+
+    from scripts import g0_provenance as prov
+
+    evenement = tmp_path / "event.json"
+    evenement.write_text(
+        _json.dumps({"pull_request": {"head": {"sha": "a" * 40}, "base": {"sha": "b" * 40}}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(evenement))
+    monkeypatch.setenv("GITHUB_SHA", "c" * 40)
+    monkeypatch.setenv("GITHUB_RUN_ID", "999")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    identite = prov.identite_de_mesure("coverage-baseline")
+    assert identite["measurement_source_sha"] == "a" * 40, "la tete a ete prise dans GITHUB_SHA"
+    assert identite["tested_merge_sha"] == "c" * 40
+    assert identite["base_sha"] == "b" * 40
+
+    # Sur un `push`, il n'y a pas de fusion synthetique a enregistrer.
+    monkeypatch.delenv("GITHUB_EVENT_PATH")
+    identite = prov.identite_de_mesure("coverage-baseline")
+    assert identite["measurement_source_sha"] == "c" * 40
+    assert identite["tested_merge_sha"] is None
+
+
+def test_les_deux_artefacts_embarquent_leur_identite():
+    """`coverage-summary.json` et `perf-provenance.json`, pas seulement l'un."""
+    import ast
+
+    for fichier, fonction in (
+        ("scripts/g0_coverage_summary.py", "construire"),
+        ("scripts/g0_perf_baseline.py", "construire_provenance"),
+    ):
+        arbre = ast.parse(_lire(REPO_ROOT / fichier))
+        cible = next(
+            n for n in ast.walk(arbre) if isinstance(n, ast.FunctionDef) and n.name == fonction
+        )
+        appels = {
+            n.func.id
+            for n in ast.walk(cible)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        }
+        assert "identite_de_mesure" in appels, f"{fichier}:{fonction} n'embarque pas l'identite"
+
+
+def test_le_champ_historique_du_lot_a_est_documente_comme_tel():
+    """`baseline_input_commit` doit dire qu'il n'est PAS le commit mesuré."""
+    source = _lire(REPO_ROOT / "scripts" / "g0_provenance.py")
+    assert "ANCRAGE HISTORIQUE DECLARE" in source
+    assert "N'EST PAS le commit mesure" in source
+
+
+def test_les_fichiers_d_identite_sont_ecrits_avant_la_mesure():
+    """Un validateur ne peut pas confronter son identité à un fichier futur."""
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    for job, sidecar, mesure in (
+        ("coverage-baseline", "coverage-identities.json", "Resume structure"),
+        ("performance-baseline", "perf-identities.json", "Run the performance baseline"),
+    ):
+        etapes = workflow["jobs"][job]["steps"]
+        ecriture = next(i for i, e in enumerate(etapes) if sidecar in str(e.get("run", "")))
+        mesuree = next(i for i, e in enumerate(etapes) if mesure in str(e.get("name", "")))
+        assert ecriture < mesuree, (
+            f"{job} : {sidecar} est ecrit APRES la mesure, le validateur ne peut pas s'y confronter"
+        )
+        # Et les noms de champs doivent être ceux de l'identité embarquée.
+        corps = str(etapes[ecriture]["run"])
+        assert "measurement_source_sha" in corps
+        assert "pr_head_sha" not in corps.replace("steps.identites.outputs.pr_head_sha", ""), (
+            "le fichier voisin emploie un autre nom : la comparaison ne comparerait rien"
+        )
+
+
+# ── Décompte des jobs de CI ───────────────────────────────────────────────
+#
+# Le corps de la PR annonçait « 16 SUCCESS », chiffre issu de
+# `statusCheckRollup` qui agrège les *check runs* — CodeQL en publie un en plus
+# de son job. Le nombre était exact pour ce qu'il comptait, et faux pour ce
+# qu'il prétendait décrire.
+
+
+@pytest.mark.parametrize(
+    "document", ["COVERAGE.md", "PERFORMANCE.md", "QUALITY_BASELINE_CANDIDATE_MANIFEST.md"]
+)
+def test_aucun_decompte_de_ci_saisi_a_la_main_dans_les_documents(document):
+    """Un décompte recopié se périme à la première réexécution."""
+    texte = _lire(DOCS / document)
+    fautives = [
+        ligne.strip()[:90]
+        for ligne in texte.splitlines()
+        if re.search(r"\d+\s+SUCCESS", ligne) and "«" not in ligne
+    ]
+    assert not fautives, (
+        f"{document} porte un decompte de jobs saisi a la main : {fautives}. "
+        "Le nombre se genere avec scripts/g0_ci_job_report.py."
+    )
+
+
+def test_le_rapport_de_jobs_compte_des_jobs_et_non_des_check_runs():
+    """Le script doit interroger l'API des jobs, jamais le rollup de la PR."""
+    source = _lire(REPO_ROOT / "scripts" / "g0_ci_job_report.py")
+    assert "actions/runs" in source
+    assert "/jobs" in source
+    assert "statusCheckRollup" not in source.replace(
+        "`gh pr view --json statusCheckRollup` ", ""
+    ).replace("statusCheckRollup`", ""), (
+        "le rapport s'appuie sur le rollup, qui melange jobs et check runs"
+    )
+
+
+def test_le_rapport_de_jobs_distingue_les_workflows():
+    """Un total global masquerait qu'un workflow entier n'a pas tourné."""
+    from scripts.g0_ci_job_report import en_markdown
+
+    donnees = {
+        "head_sha": "a" * 40,
+        "workflows": [
+            {"workflow": "CI", "run_id": 1, "jobs": {"success": 13, "skipped": 2}, "job_count": 15},
+            {
+                "workflow": "G0 Quality baseline",
+                "run_id": 2,
+                "jobs": {"success": 2},
+                "job_count": 2,
+            },
+        ],
+        "totals": {"skipped": 2, "success": 15},
+        "job_total": 17,
+    }
+    rendu = en_markdown(donnees)
+    assert "CI" in rendu and "G0 Quality baseline" in rendu
+    assert "17 jobs" in rendu
+    assert "15 SUCCESS" in rendu and "2 SKIPPED" in rendu
+
+
+# ── Manifeste et gouvernance ──────────────────────────────────────────────
+
+
+def test_le_manifeste_ne_cite_aucune_ancienne_campagne():
+    """Les têtes des campagnes précédentes n'ont plus rien à y faire."""
+    texte = _lire(DOCS / "QUALITY_BASELINE_CANDIDATE_MANIFEST.md")
+    for perimee in ("a74da03", "9af7c0e", "fa45c84", "4f6cfa7", "6afe098"):
+        # 6afe098 et 4f6cfa7 sont les tetes de la campagne PRECEDENTE : le
+        # manifeste doit designer la nouvelle.
+        assert perimee not in texte, f"le manifeste cite encore la campagne {perimee}"
+
+
+def test_le_manifeste_ne_prononce_aucun_statut_acquis():
+    """Un statut se PRONONCE dans un bloc de statuts, pas dans une phrase.
+
+    Le contrôle porte donc sur les blocs délimités par ```. Interdire ces
+    jetons partout obligerait à ne même pas pouvoir écrire « ceci n'est pas
+    prononcé » : un document ne pourrait plus dire ce qu'il ne dit pas.
+    """
+    texte = _lire(DOCS / "QUALITY_BASELINE_CANDIDATE_MANIFEST.md")
+    # Deux etats d'attente sont legitimes : MEASUREMENT_PENDING quand la
+    # campagne reste a executer (commit de code), REVIEW_PENDING quand elle est
+    # mesuree et attend la revue (commit documentaire). Exiger le second en
+    # permanence obligerait le manifeste a se dire « en attente de revue » alors
+    # qu'aucune mesure n'a encore eu lieu.
+    assert "MEASUREMENT_PENDING" in texte or "REVIEW_PENDING" in texte, (
+        "le manifeste ne declare aucun statut d'attente"
+    )
+    blocs = re.findall(r"```(.*?)```", texte, flags=re.DOTALL)
+    assert blocs, "le manifeste ne declare plus aucun bloc de statuts"
+    prononces: set[str] = set()
+    for bloc in blocs:
+        prononces |= set(re.findall(r"[A-Z][A-Z0-9_]{3,}", bloc))
+    for interdit in ("QUALITY_BASELINE_ACCEPTED", "G0_LOT_C_EVIDENCE_REVIEWED", "G0_LOT_C_MERGED"):
+        assert interdit not in prononces, f"le manifeste prononce {interdit}"
+
+
+@pytest.mark.parametrize(
+    "fichier,attendu",
+    [("CLINICAL_STATUS", "REAL_DATA_NO_GO"), ("DISTRIBUTION_STATUS", "DISTRIBUTION_NO_GO")],
+)
+def test_les_statuts_de_gouvernance_ne_regressent_pas(fichier, attendu):
+    """Une régression silencieuse de ces deux fichiers ouvrirait la porte."""
+    chemin = REPO_ROOT / "docs" / "governance" / fichier
+    assert chemin.read_text(encoding="utf-8").strip() == attendu

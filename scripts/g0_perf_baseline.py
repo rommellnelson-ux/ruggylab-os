@@ -690,7 +690,59 @@ def _etat_postgres(base: str) -> dict[str, Any]:
     }
 
 
+def _image_valkey_declaree() -> dict[str, Any]:
+    """La référence d'image Valkey **déclarée** dans `docker-compose.yml`.
+
+    Elle sert de contradicteur : la version que le serveur annonce doit
+    correspondre au tag épinglé. Sans ce point de comparaison, `valkey_version`
+    ne serait qu'une chaîne que l'on recopie — vraie ou fausse, rien ne
+    pourrait la démentir.
+    """
+    fichier = RACINE / "docker-compose.yml"
+    if not fichier.is_file():
+        return {"available": False, "reason": "docker-compose.yml absent"}
+    try:
+        import yaml
+
+        service = (yaml.safe_load(fichier.read_text(encoding="utf-8")) or {})["services"]["valkey"]
+    except (OSError, KeyError, TypeError, ImportError, yaml.YAMLError):
+        return {"available": False, "reason": "service valkey illisible"}
+    reference = str(service.get("image") or "")
+    if not reference:
+        return {"available": False, "reason": "aucune image declaree"}
+    sans_digest, _, digest = reference.partition("@")
+    _, _, tag = sans_digest.rpartition(":")
+    # `8.1.9-alpine` -> `8.1.9`. Un tag sans version (`latest`, `edge`) ne
+    # permet PAS de contredire la version annoncee : on le dit au lieu de
+    # fabriquer une comparaison qui passerait toujours.
+    attendue = re.match(r"^(\d+\.\d+\.\d+)", tag)
+    return {
+        "available": True,
+        "image_reference": reference,
+        "image_digest": digest or None,
+        "image_tag": tag or None,
+        "version_from_tag": attendue.group(1) if attendue else None,
+    }
+
+
 def _etat_valkey() -> dict[str, Any]:
+    """L'état du serveur Valkey, produit et compatibilité protocolaire SÉPARÉS.
+
+    `INFO server` publie DEUX versions, et les confondre est une erreur de
+    preuve, pas une approximation :
+
+        redis_version:7.2.4      ← compatibilité de PROTOCOLE
+        valkey_version:8.1.9     ← version du PRODUIT
+
+    Les campagnes précédentes lisaient `redis_version` et l'étiquetaient
+    `valkey_version`. Elles publiaient donc « Valkey 7.2.4 » — une version qui
+    n'existe pas chez Valkey, dont la série 7.2.x n'a jamais porté ce numéro de
+    la même façon. Le champ correct était présent dans la même réponse, et il
+    était ignoré.
+
+    Le champ générique `version` a disparu : il ne disait pas de quel produit
+    il parlait, et c'est précisément ce qui a rendu la confusion invisible.
+    """
     brut = _docker("compose", "exec", "-T", "valkey", "valkey-cli", "info")
     if not brut:
         return {"available": False, "reason": "valkey-cli injoignable"}
@@ -700,9 +752,21 @@ def _etat_valkey() -> dict[str, Any]:
             cle, _, valeur = ligne.partition(":")
             valeurs[cle.strip()] = valeur.strip()
     taille = _docker("compose", "exec", "-T", "valkey", "valkey-cli", "dbsize")
+    declaree = _image_valkey_declaree()
     return {
         "available": True,
-        "version": valeurs.get("redis_version"),
+        "valkey_version": valeurs.get("valkey_version"),
+        "protocol_compatibility": {
+            "redis_version": valeurs.get("redis_version"),
+            "note": (
+                "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la "
+                "version du produit : ne jamais la publier comme telle."
+            ),
+        },
+        "image_reference": declaree.get("image_reference"),
+        "image_digest": declaree.get("image_digest"),
+        "expected_version_from_image_tag": declaree.get("version_from_tag"),
+        "server_mode": valeurs.get("server_mode"),
         "used_memory_bytes": int(valeurs.get("used_memory", 0) or 0),
         "used_memory_human": valeurs.get("used_memory_human"),
         "connected_clients": int(valeurs.get("connected_clients", 0) or 0),
@@ -1102,7 +1166,17 @@ def decrire_environnement(
         "image_id": _docker("image", "inspect", image, "--format", "{{.Id}}") or None,
         "image_archive_sha256": image_archive_sha256,
         "postgres_version": version_postgres,
-        "valkey_version": valkey.get("version"),
+        # Produit et compatibilite protocolaire, SEPARES. `valkey.get("version")`
+        # n'existe plus : un champ generique ne disait pas de quel produit il
+        # parlait, et c'est ce qui a rendu la confusion invisible pendant trois
+        # campagnes.
+        "valkey_version": valkey.get("valkey_version"),
+        "redis_protocol_compatibility_version": (
+            (valkey.get("protocol_compatibility") or {}).get("redis_version")
+        ),
+        "valkey_image_reference": valkey.get("image_reference"),
+        "valkey_image_digest": valkey.get("image_digest"),
+        "valkey_expected_version_from_image_tag": valkey.get("expected_version_from_image_tag"),
         "application_configuration": configuration,
         "application_configuration_note": (
             "null = variable non transmise au conteneur ; la valeur effective est "
@@ -1440,10 +1514,56 @@ def valider(corps: Any) -> list[str]:
         "image_id",
         "postgres_version",
         "valkey_version",
+        "redis_protocol_compatibility_version",
+        "valkey_image_reference",
         "application_configuration",
     ):
         if environnement.get(cle) in (None, "", 0, {}):
             motifs.append(f"environnement non decrit : {cle} absent")
+
+    # 4 ter. La version de Valkey est-elle celle du PRODUIT, et est-elle
+    #        contredite par l'image epinglee ?
+    #
+    #        `INFO server` publie deux versions : `valkey_version` (le produit)
+    #        et `redis_version` (la compatibilite de protocole). Les campagnes
+    #        precedentes lisaient la seconde et la publiaient comme la
+    #        premiere — « Valkey 7.2.4 », une version qui n'est pas celle du
+    #        serveur mesure. Le champ correct etait dans la meme reponse.
+    #
+    #        Aucun de ces controles ne porte sur une valeur souhaitee : ils
+    #        portent sur la coherence entre ce que le serveur annonce et ce que
+    #        l'image epinglee impose.
+    produit = str(environnement.get("valkey_version") or "")
+    protocole = str(environnement.get("redis_protocol_compatibility_version") or "")
+    attendue = str(environnement.get("valkey_expected_version_from_image_tag") or "")
+
+    if not produit:
+        motifs.append("valkey_version absent : la version du PRODUIT n'est pas enregistree")
+    if not protocole:
+        motifs.append(
+            "redis_protocol_compatibility_version absent : sans lui, rien ne "
+            "distingue la version du produit de la compatibilite de protocole"
+        )
+    if produit and protocole and produit == protocole:
+        motifs.append(
+            f"valkey_version = redis_protocol_compatibility_version = {produit!r} : "
+            "la compatibilite de protocole a ete recopiee comme version du produit"
+        )
+    if not environnement.get("valkey_image_reference"):
+        motifs.append(
+            "valkey_image_reference absent : la version annoncee par le serveur "
+            "ne peut etre contredite par rien"
+        )
+    if not attendue:
+        motifs.append(
+            "aucune version lisible dans le tag de l'image Valkey : la version "
+            "annoncee par le serveur ne peut pas etre verifiee"
+        )
+    elif produit and produit != attendue:
+        motifs.append(
+            f"version Valkey incoherente : le serveur annonce {produit!r}, "
+            f"l'image epinglee impose {attendue!r}"
+        )
 
     # 4 bis. Aucun systeme externe. Un interrupteur ouvert ferait sortir des
     #        donnees du banc d'essai et melerait la latence d'un tiers a la
@@ -1727,6 +1847,35 @@ def valider_provenance(entete: Any, corps: Any) -> list[str]:
         if not (volatile.get("environment") or {}).get(cle):
             motifs.append(f"provenance : environnement incomplet ({cle} absent)")
 
+    # L'identite embarquee, confrontee au fichier ecrit independamment par la
+    # CI. `baseline_input_commit` n'est PAS le commit mesure : c'est l'ancrage
+    # historique declare du programme G0. Lu seul, il induisait en erreur.
+    from scripts.g0_provenance import ecarts_identite
+
+    voisin = RACINE / "artifacts" / "g0" / "perf-identities.json"
+    sidecar = None
+    if voisin.is_file():
+        try:
+            sidecar = json.loads(voisin.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            motifs.append(f"perf-identities.json illisible : {exc}")
+    motifs.extend(
+        f"provenance : {e}"
+        for e in ecarts_identite(
+            entete.get("measurement_identity") if isinstance(entete, dict) else None, sidecar
+        )
+    )
+
+    # Le commit mesure doit concorder avec ce que le banc a enregistre.
+    identite = (entete.get("measurement_identity") or {}) if isinstance(entete, dict) else {}
+    mesure = str(identite.get("measurement_source_sha") or "")
+    annonce = str(((volatile.get("environment") or {}).get("git_commit")) or "")
+    if mesure and annonce and mesure != annonce:
+        motifs.append(
+            f"provenance : identite mesuree {mesure!r} differente du commit "
+            f"enregistre par le banc {annonce!r}"
+        )
+
     if isinstance(corps, dict):
         execution = corps.get("run") or {}
         for cle in (
@@ -1761,7 +1910,7 @@ def _ecrire(chemin: Path, contenu: dict[str, Any]) -> None:
 
 def construire_provenance(corps: dict[str, Any], commande: str) -> dict[str, Any]:
     """La provenance de la mesure (§20), empreinte du scenario comprise."""
-    from scripts.g0_provenance import provenance
+    from scripts.g0_provenance import identite_de_mesure, provenance
 
     entete = provenance(
         "performance",
@@ -1785,6 +1934,10 @@ def construire_provenance(corps: dict[str, Any], commande: str) -> dict[str, Any
         cle: corps["dataset"][cle]
         for cle in ("synthetic_marker", "identifier_prefix", "identifiers_created", "source")
     }
+    # Hors des blocs compares : ces identites varient a chaque execution, et les
+    # comparer ferait echouer tout controle. Elles sont la pour qu'un lecteur de
+    # CE FICHIER SEUL sache sur quelle tete la mesure a porte.
+    entete["measurement_identity"] = identite_de_mesure("performance-baseline")
     return entete
 
 

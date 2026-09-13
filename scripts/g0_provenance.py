@@ -41,7 +41,11 @@ from __future__ import annotations
 
 import fnmatch
 import hashlib
+import json
+import os
 import platform
+import shutil
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -279,6 +283,129 @@ def empreinte_entrees(ensemble: str) -> tuple[str, int]:
     return accumulateur.hexdigest(), len(fichiers)
 
 
+def _evenement_github() -> dict[str, Any]:
+    """Le corps de l'événement GitHub, ou `{}` hors CI. Aucun appel réseau."""
+    chemin = os.environ.get("GITHUB_EVENT_PATH")
+    if not chemin:
+        return {}
+    try:
+        charge = json.loads(Path(chemin).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return charge if isinstance(charge, dict) else {}
+
+
+def _arbre_courant() -> str | None:
+    """Le SHA de l'arbre de `HEAD`, lu par git. `None` si git ne répond pas."""
+    binaire = shutil.which("git")
+    if binaire is None:
+        return None
+    try:
+        acheve = subprocess.run(  # noqa: S603 - arguments litteraux, jamais de shell
+            [binaire, "-C", str(RACINE), "rev-parse", "HEAD^{tree}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    return acheve.stdout.strip() or None if acheve.returncode == 0 else None
+
+
+def identite_de_mesure(job: str) -> dict[str, Any]:
+    """Ce que l'artefact doit porter pour se suffire à lui-même.
+
+    Un artefact de mesure qui ne dit pas SUR QUOI il a porté oblige son lecteur
+    à retrouver un fichier annexe, ou à faire confiance. `perf-provenance.json`
+    portait bien `baseline_input_commit`, mais ce champ est l'**ancrage
+    historique du programme G0** — un point de départ déclaré, permanent —
+    et non le commit mesuré. Lu seul, il induisait en erreur.
+
+    Les six identités sont donc embarquées dans l'artefact lui-même. Elles sont
+    distinctes, et les confondre a des conséquences : sur un événement
+    `pull_request`, ``GITHUB_SHA`` désigne le commit de fusion **synthétique**
+    que GitHub fabrique pour l'occasion, pas la tête de la branche. Une campagne
+    qui citerait ce SHA renverrait à un commit qui n'existe sur aucune
+    référence.
+
+    ``workflow_job_id`` — l'identifiant NUMÉRIQUE d'un job n'est exposé par
+    aucune variable d'environnement du runner : l'obtenir exige un appel à
+    l'API, donc le droit ``actions: read`` sur un workflow qui n'a aujourd'hui
+    que ``contents: read``, et une campagne qui échouerait sur un incident
+    d'API. Il est donc renseigné **lorsque le workflow le fournit**
+    (``G0_WORKFLOW_JOB_ID``), et l'identification repose sinon sur le triplet
+    ``workflow_run_id`` + ``workflow_run_attempt`` + ``workflow_job``, qui
+    désigne le job sans ambiguïté et se résout en identifiant numérique pour
+    quiconque a accès au dépôt. Le choix est écrit ici plutôt que laissé à
+    deviner devant un champ vide.
+    """
+    evenement = _evenement_github()
+    pr = evenement.get("pull_request") or {}
+    tete_pr = str((pr.get("head") or {}).get("sha") or "")
+    base = str((pr.get("base") or {}).get("sha") or "")
+    github_sha = os.environ.get("GITHUB_SHA", "")
+
+    if tete_pr:
+        # Evenement `pull_request` : GITHUB_SHA est la fusion synthetique.
+        source, fusion = tete_pr, github_sha
+    else:
+        # `push` ou `workflow_dispatch` : GITHUB_SHA EST la tete, et il
+        # n'existe aucune fusion synthetique a enregistrer.
+        source, fusion = github_sha, ""
+
+    return {
+        "_comment": (
+            "Identites de la mesure, embarquees pour que cet artefact se suffise "
+            "a lui-meme. Ne pas confondre avec baseline_input_commit, qui est "
+            "l'ancrage historique DECLARE du programme G0 et non le commit mesure."
+        ),
+        "measurement_source_sha": source or None,
+        "base_sha": base or None,
+        "tested_merge_sha": fusion or None,
+        "tested_tree_sha": _arbre_courant(),
+        "workflow_run_id": os.environ.get("GITHUB_RUN_ID") or None,
+        "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT") or None,
+        "workflow_job": os.environ.get("GITHUB_JOB") or job,
+        "workflow_job_id": os.environ.get("G0_WORKFLOW_JOB_ID") or None,
+        "event_name": os.environ.get("GITHUB_EVENT_NAME") or None,
+    }
+
+
+def ecarts_identite(embarquee: Any, sidecar: Any) -> list[str]:
+    """Compare l'identité embarquée à celle du fichier voisin écrit par la CI.
+
+    Deux écritures indépendantes de la même vérité : l'une par le générateur en
+    Python, l'autre par le job en shell. Si elles divergent, l'une des deux ment
+    — et rien, dans un artefact isolé, ne permettrait de savoir laquelle.
+    """
+    ecarts: list[str] = []
+    if not isinstance(embarquee, dict):
+        return ["identite de mesure absente de l'artefact"]
+    for cle in ("measurement_source_sha", "workflow_run_id", "workflow_job"):
+        if not embarquee.get(cle):
+            ecarts.append(f"identite de mesure incomplete : {cle} absent")
+    source = str(embarquee.get("measurement_source_sha") or "")
+    fusion = str(embarquee.get("tested_merge_sha") or "")
+    if source and fusion and source == fusion:
+        ecarts.append(
+            "measurement_source_sha = tested_merge_sha : la tete de la branche a "
+            "ete confondue avec le commit de fusion synthetique de GitHub"
+        )
+    if not isinstance(sidecar, dict):
+        return ecarts
+    for cle in ("measurement_source_sha", "base_sha", "tested_tree_sha", "workflow_run_id"):
+        attendue, obtenue = sidecar.get(cle), embarquee.get(cle)
+        if attendue in (None, "") or obtenue in (None, ""):
+            continue
+        if str(attendue) != str(obtenue):
+            ecarts.append(
+                f"identite incoherente sur {cle} : artefact {obtenue!r}, "
+                f"fichier de la CI {attendue!r}"
+            )
+    return ecarts
+
+
 def provenance(
     ensemble: str,
     commande: str,
@@ -297,9 +424,12 @@ def provenance(
     return {
         "_comment": (
             "deterministic est compare par --check ; volatile ne l'est pas. "
-            "baseline_input_commit est DECLARE (reference permanente), jamais "
-            "derive de la branche de travail. relevant_input_tree_sha256 est la "
-            "preuve verifiable : l'empreinte des octets reellement lus."
+            "baseline_input_commit est l'ANCRAGE HISTORIQUE DECLARE du programme "
+            "G0 (reference permanente) : ce N'EST PAS le commit mesure, et le "
+            "lire comme tel induit en erreur. Le commit reellement mesure figure "
+            "dans measurement_identity, pour les artefacts qui en portent une. "
+            "relevant_input_tree_sha256 est la preuve verifiable : l'empreinte "
+            "des octets reellement lus."
         ),
         "deterministic": {
             "schema_version": schema_version,
@@ -326,8 +456,6 @@ def controler(chemin: Path, attendue: dict[str, Any]) -> list[str]:
     Renvoie la liste des écarts, vide si tout concorde. La partie `volatile`
     est ignorée : la comparer ferait échouer le contrôle à chaque exécution.
     """
-    import json
-
     if not chemin.is_file():
         return [f"{chemin.name} absent"]
     versionnee = json.loads(chemin.read_text(encoding="utf-8")).get("deterministic")

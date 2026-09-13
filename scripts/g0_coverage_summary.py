@@ -372,7 +372,7 @@ def construire(rapport_json: dict[str, Any], rapport_xml: dict[str, Any]) -> dic
 
     jamais_importes = [m["module"] for m in modules if not m["executed"] and m["statements"] > 0]
 
-    from scripts.g0_provenance import provenance
+    from scripts.g0_provenance import identite_de_mesure, provenance
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -415,6 +415,10 @@ def construire(rapport_json: dict[str, Any], rapport_xml: dict[str, Any]) -> dic
             schema_version=SCHEMA_VERSION,
             generator_version=GENERATOR_VERSION,
         ),
+        # Hors du bloc compare : un lecteur de CE FICHIER SEUL doit savoir sur
+        # quelle tete la mesure a porte, sans avoir a ouvrir un fichier voisin
+        # ni a faire confiance.
+        "measurement_identity": identite_de_mesure("coverage-baseline"),
     }
 
 
@@ -513,6 +517,23 @@ def controler(resume: dict[str, Any]) -> list[str]:
                 f"module clinique critique `{module}` declare mais absent du "
                 "rapport de couverture : il n'est surveille par rien"
             )
+
+    # 4 quinquies. L'artefact se suffit-il a lui-meme, et dit-il la verite ?
+    #              L'identite embarquee est confrontee au fichier ecrit
+    #              independamment par la CI : deux ecritures de la meme verite,
+    #              l'une en Python, l'autre en shell. Si elles divergent, l'une
+    #              des deux ment, et rien dans un artefact isole ne permettrait
+    #              de savoir laquelle.
+    from scripts.g0_provenance import ecarts_identite
+
+    voisin = RACINE / "artifacts" / "g0" / "coverage-identities.json"
+    sidecar = None
+    if voisin.is_file():
+        try:
+            sidecar = json.loads(voisin.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            ecarts.append(f"coverage-identities.json illisible : {exc}")
+    ecarts.extend(ecarts_identite(resume.get("measurement_identity"), sidecar))
 
     # 5. Tous les regroupements exigés sont-ils présents et non vides ?
     paquets = corps.get("by_package", {})
