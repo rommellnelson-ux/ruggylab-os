@@ -13,18 +13,20 @@
 > visibilité du dépôt.
 
 ```
-QUALITY_BASELINE_CANDIDATE = MEASUREMENT_PENDING
+QUALITY_BASELINE_CANDIDATE = REVIEW_PENDING
 ```
 
-> **Ce manifeste est dans son état d'attente.** Le commit qui le porte corrige
-> les générateurs — version Valkey, identités embarquées — et **invalide donc
-> la campagne précédente** : les artefacts qu'elle a produits ne sont plus ceux
-> que ce code produit. Nommer encore cette campagne reviendrait à désigner des
-> fichiers que plus aucune exécution ne reproduit.
->
-> Les identités et les empreintes sont renseignées par le commit
-> **documentaire** qui suit, une fois la nouvelle campagne exécutée et ses deux
-> jobs verts.
+**Ce document ne prononce pas `QUALITY_BASELINE_ACCEPTED`.** Une baseline ne
+devient acceptée qu'après revue indépendante, et c'est cette revue — pas
+l'auteur de la mesure — qui décide.
+
+> **Deuxième campagne candidate.** La première a fait l'objet d'une revue
+> indépendante concluant `CHANGES_REQUIRED` : version de produit Valkey fausse,
+> causalité inférée présentée comme mesurée, décompte de jobs qui ne comptait
+> pas des jobs. Les corrections touchent les **générateurs**, ce qui a invalidé
+> la campagne précédente : ses artefacts ne sont plus ceux que ce code produit.
+> Celle-ci est entièrement nouvelle — aucun hash, aucune identité n'a été
+> reconduit.
 
 **Ce document ne prononce pas `QUALITY_BASELINE_ACCEPTED`.** Une baseline ne
 devient acceptée qu'après revue indépendante, et c'est cette revue — pas
@@ -55,13 +57,13 @@ personne ne retrouverait ensuite.
 
 | Identité | Valeur |
 | --- | --- |
-| `measurement_source_sha` (**tête Q1**) | *à mesurer* |
+| `measurement_source_sha` (**tête Q1**) | `02795a81b801b784572089d6a7860ba889d10a4c` |
 | `base_sha` | `981ef356759bad628898fed0094c0dd40c8a7b57` |
-| `tested_merge_sha` (fusion synthétique GitHub) | *à mesurer* |
-| `tested_tree_sha` | *à mesurer* |
-| `workflow_run_id` | *à mesurer* |
-| Job — couverture | *à mesurer* |
-| Job — performance | *à mesurer* |
+| `tested_merge_sha` (fusion synthétique GitHub) | `cde576af9c3a6386a1d208d8d560b90acb905aad` |
+| `tested_tree_sha` | `2097ecf8208af88253c8d1b596d9cc3ac7b9007d` |
+| `workflow_run_id` | `34786598282` (tentative 1) |
+| Job — couverture | `103803101950` |
+| Job — performance | `103803102185` |
 
 Ces six identités sont désormais **embarquées dans les artefacts eux-mêmes**
 (`coverage-summary.json` et `perf-provenance.json`, champ
@@ -86,18 +88,18 @@ SHA-256 des fichiers tels que la CI les a publiés, sur l'exécution ci-dessus.
 
 | Artefact | Taille | SHA-256 |
 | --- | ---: | --- |
-| `coverage.xml` | *à mesurer* | *à mesurer* |
-| `coverage.json` | *à mesurer* | *à mesurer* |
-| `coverage-summary.json` | *à mesurer* | *à mesurer* |
-| `perf-baseline.json` | *à mesurer* | *à mesurer* |
-| `perf-provenance.json` | *à mesurer* | *à mesurer* |
+| `coverage.xml` | 580 152 o | `6ae1c4adaab833f8672ded6ed48d38f977861f5f7683fc6b32bff955722b41f1` |
+| `coverage.json` | 1 359 014 o | `0783264973b75a50e7d706690fe3027c17aa2def0ccf04460c9d931a7544baed` |
+| `coverage-summary.json` | 115 181 o | `7cb103ae28955692cab9d4809979902f266424e45ae3b7dd833450fcfcc9cf25` |
+| `perf-baseline.json` | 74 781 o | `6ee4b56f96df210105096d36e52d39f4ed775e2d3292457238006b160f7957fb` |
+| `perf-provenance.json` | 4 957 o | `6800d71ae6204fad8428083ebb9988a7a9c68bb1d1ceda86083266b947e3a069` |
 
 ## 4. Image mesurée
 
 | | |
 | --- | --- |
-| `image_id` | *à mesurer* |
-| SHA-256 de l'archive | *à mesurer* |
+| `image_id` | `sha256:1edab0d5f47374eed5bd0464c70e56f7e106d6bbd101d662bd7427b287fd92ee` |
+| SHA-256 de l'archive | `a003354da1cfa00ddcf720bedbc4c64c8592b57f590d4929a1f2b37c7b0adef2` |
 
 L'archive est produite avec `gzip -n` : sans cela, son empreinte changerait à
 chaque exécution à cause du seul horodatage, et ne dirait plus rien de l'image.
@@ -106,8 +108,8 @@ chaque exécution à cause du seul horodatage, et ne dirait plus rien de l'image
 
 | Ensemble | Fichiers | Empreinte |
 | --- | ---: | --- |
-| `coverage` | *à mesurer* | *à mesurer* |
-| `performance` | *à mesurer* | *à mesurer* |
+| `coverage` | 376 | `ec6c08a6a1de44f22c932e13bc007d5210b6784d77d329ec5573dc297257931f` |
+| `performance` | 296 | `9ecec37f7ce09e8e9e62b1056238b49d937b8dafbff81c0f9803a3b9bde04e43` |
 
 Le **plan de mesure** [`scripts/g0_quality_plan.json`](../../scripts/g0_quality_plan.json)
 entre dans les deux empreintes, et son propre SHA-256 est inscrit dans les deux
@@ -115,9 +117,30 @@ artefacts (`measurement_plan_sha256`). Les validateurs **refusent** une campagne
 dont les paramètres s'écarteraient du plan : sans ce refus, le plan ne serait
 qu'une intention, et une campagne réduite continuerait de le citer.
 
-Empreinte du scénario de performance : *à mesurer*
+Empreinte du scénario de performance : `84e8e408aff36448…`
 (`perf-baseline.json`, `run.scenario_sha256`). Elle change dès qu'un pas change
 de route, d'ordre ou de nature — indépendamment de toute reformulation de commentaire.
+
+## 5 bis. Décompte des jobs de CI
+
+Décompte des **jobs** sur `02795a8`, produit par
+[`scripts/g0_ci_job_report.py`](../../scripts/g0_ci_job_report.py) depuis l'API
+GitHub — jamais saisi à la main :
+
+| Workflow | Jobs | Détail |
+| --- | ---: | --- |
+| CI (run `34786598336`) | 15 | 13 `success` · 2 `skipped` |
+| G0 Quality baseline (run `34786598282`) | 2 | 2 `success` |
+
+**Total : 17 jobs.** Les deux `skipped` sont `Build and publish Docker image` et
+`Publish GitHub Release`, sautés faute de tag — condition attendue.
+
+> **Pourquoi ce décompte est généré.** La campagne précédente annonçait
+> « 16 SUCCESS », chiffre pris dans `gh pr view --json statusCheckRollup`. Ce
+> rollup agrège les *check runs* d'une tête, et CodeQL en publie un **en plus**
+> de son job : 13 + 2 + 1 = 16. Le nombre était exact pour ce qu'il comptait, et
+> faux pour ce qu'il prétendait décrire. Un chiffre juste, mal étiqueté — la
+> forme la plus tenace d'erreur de preuve.
 
 ## 6. Ce que la campagne établit, et ce qu'elle n'établit pas
 
@@ -147,7 +170,8 @@ rien ici ne doit être lu comme si elle l'avait été.
 ## 7. Statut
 
 ```
-QUALITY_BASELINE_CANDIDATE     = MEASUREMENT_PENDING
+QUALITY_BASELINE_CANDIDATE_READY
+QUALITY_BASELINE_CANDIDATE     = REVIEW_PENDING
 CLINICAL_STATUS                = REAL_DATA_NO_GO
 DISTRIBUTION_STATUS            = DISTRIBUTION_NO_GO
 ```

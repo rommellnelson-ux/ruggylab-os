@@ -179,10 +179,15 @@ prendrait un conflit de clé pour une régression de performance.
 <!-- RESULTATS_PERFORMANCE_DEBUT -->
 
 > **Campagne canonique candidate.** Exécution de CI
-> [34776027833 / job 103774175500](https://github.com/rommellnelson-ux/ruggylab-os/actions/runs/34776027833/job/103774175500),
-> sur la tête `6afe098` (base `981ef35`, arbre `170ca31`) · identifiant de banc
-> `4597303edb` · plan de mesure `4f651fa8f7a8d30b…` · empreinte du scénario
+> [34786598282 / job 103803102185](https://github.com/rommellnelson-ux/ruggylab-os/actions/runs/34786598282/job/103803102185),
+> sur la tête `02795a8` (base `981ef35`, arbre `2097ecf`) · identifiant de banc
+> `b89ed71dd3` · plan de mesure `4f651fa8f7a8d30b…` · empreinte du scénario
 > `84e8e408aff36448…`.
+>
+> Les six identités sont **embarquées dans `perf-provenance.json`** (champ
+> `measurement_identity`). À ne pas confondre avec `baseline_input_commit`,
+> qui est l'ancrage historique **déclaré** du programme G0 et non le commit
+> mesuré — le document le disait mal, une revue indépendante l'a relevé.
 >
 > Identités, empreintes des cinq artefacts et identité de l'image :
 > [`QUALITY_BASELINE_CANDIDATE_MANIFEST.md`](QUALITY_BASELINE_CANDIDATE_MANIFEST.md).
@@ -204,7 +209,7 @@ PERFORMANCE_PROFILE = CORE_INTRINSIC_WITH_RATE_LIMITS_DISABLED
 | Valkey — **produit** | **8.1.9** |
 | Valkey — compatibilité de protocole | `redis_version` 7.2.4 |
 | Image Valkey épinglée | `valkey/valkey:8.1.9-alpine@sha256:e0eb7c48…` |
-| Image mesurée | `sha256:6490d477…` |
+| Image mesurée | `sha256:1edab0d5…` |
 
 > **Deux versions, et les confondre était une erreur de preuve.** `INFO server`
 > publie `redis_version:7.2.4` — une compatibilité de **protocole** — et
@@ -240,15 +245,20 @@ absente ne dit pas « false », elle ne dit rien.
 
 | Concurrence | p50 | p95 | p99 | moyenne | max | débit | erreurs |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **1** | 12.759 ms | 20.098 ms | 26.082 ms | 13.744 ms | 185.553 ms | 48.477 req/s | 0/210 |
-| **3** | 33.239 ms | 118.668 ms | 161.427 ms | 39.214 ms | 306.003 ms | 52.923 req/s | **5/625** |
-| **5** | 57.037 ms | 405.024 ms | 556.637 ms | 84.787 ms | 652.640 ms | 41.040 req/s | **10/1041** |
-| **10** | 122.733 ms | 1547.293 ms | 2247.785 ms | 251.481 ms | 2541.438 ms | 28.286 req/s | **50/2055** |
+| **1** | 9.341 ms | 14.457 ms | 18.682 ms | 10.208 ms | 166.513 ms | 65.203 req/s | 0/210 |
+| **3** | 24.472 ms | 81.365 ms | 111.189 ms | 28.430 ms | 119.579 ms | 72.624 req/s | **6/624** |
+| **5** | 43.374 ms | 302.333 ms | 418.212 ms | 64.708 ms | 555.075 ms | 54.189 req/s | **13/1037** |
+| **10** | 92.196 ms | 1285.300 ms | 1685.385 ms | 190.262 ms | 1857.323 ms | 37.341 req/s | **45/2058** |
 
-> **Le débit plafonne à trois utilisateurs, puis décroît.** 52,9 req/s à trois,
-> 41,0 à cinq, 28,3 à dix : ajouter des utilisateurs au-delà de trois ne produit
-> plus de travail supplémentaire, il en produit moins. Le p95 est multiplié par
-> **77** entre un et dix utilisateurs. La section 4.4 dit pourquoi.
+> **Le débit plafonne à trois utilisateurs, puis décroît.** 72,6 req/s à trois,
+> 54,2 à cinq, 37,3 à dix : au-delà de trois, ajouter des utilisateurs produit
+> moins de travail, pas plus. Le p95 est multiplié par **89** entre un et dix
+> utilisateurs.
+>
+> Ce runner-ci est sensiblement plus rapide que celui de la campagne précédente
+> (65 req/s contre 48 à concurrence 1). Les chiffres absolus d'une campagne ne
+> se comparent donc pas à ceux d'une autre : c'est la **forme** de la courbe —
+> plateau puis décroissance — qui se reproduit d'une campagne à l'autre.
 
 ### 4.3 Par scénario — concurrence 3 et 10
 
@@ -257,59 +267,58 @@ préleveur, un technicien) :
 
 | Scénario | Échantillons | p50 | p95 | p99 | max | Erreurs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `auth` | 45 | 26.272 | 35.894 | 43.640 | 43.640 | 0 |
-| `patient_create` | 45 | 26.825 | 34.174 | 57.147 | 57.147 | 0 |
-| `patient_search` | 45 | 18.498 | 26.004 | 26.195 | 26.195 | 0 |
-| `order_create` | 45 | 32.473 | 39.675 | 42.072 | 42.072 | 0 |
-| `sample_create` | 45 | 33.910 | 38.159 | 40.482 | 40.482 | 0 |
-| `sample_attach` | 45 | 43.310 | 54.575 | 55.132 | 55.132 | 0 |
-| `worklist` | 45 | 40.017 | 48.021 | 53.184 | 53.184 | 0 |
-| `order_read` | 45 | 20.348 | 25.910 | 27.898 | 27.898 | 0 |
-| `result_create` | 45 | 42.760 | 50.928 | 51.355 | 51.355 | 0 |
-| `result_read` | 45 | 16.441 | 24.140 | 25.090 | 25.090 | 0 |
-| `result_release` | 45 | 40.270 | 49.762 | 51.700 | 51.700 | 0 |
-| `dashboard` | 45 | **128.296** | **172.437** | **306.003** | 306.003 | 0 |
-| `invoice_create` | 45 | 28.719 | 50.410 | 55.050 | 55.050 | **5** (http_500) |
-| `payment_create` | **40** | 33.717 | 65.610 | 183.487 | 183.487 | 0 |
+| `auth` | 45 | 19.031 | 29.439 | 38.671 | 38.671 | 0 |
+| `patient_create` | 45 | 18.987 | 24.706 | 38.300 | 38.300 | 0 |
+| `patient_search` | 45 | 13.318 | 16.677 | 19.454 | 19.454 | 0 |
+| `order_create` | 45 | 24.043 | 32.388 | 50.383 | 50.383 | 0 |
+| `sample_create` | 45 | 24.584 | 31.733 | 37.543 | 37.543 | 0 |
+| `sample_attach` | 45 | 34.824 | 42.735 | 58.305 | 58.305 | 0 |
+| `worklist` | 45 | 29.251 | 38.437 | 40.040 | 40.040 | 0 |
+| `order_read` | 45 | 14.254 | 18.803 | 20.199 | 20.199 | 0 |
+| `result_create` | 45 | 32.060 | 40.589 | 45.085 | 45.085 | 0 |
+| `result_read` | 45 | 12.042 | 16.176 | 19.402 | 19.402 | 0 |
+| `result_release` | 45 | 28.700 | 37.167 | 39.013 | 39.013 | 0 |
+| `dashboard` | 45 | **92.227** | **115.266** | **119.579** | 119.579 | 0 |
+| `invoice_create` | 45 | 20.872 | 40.491 | 45.656 | 45.656 | **6** (http_500) |
+| `payment_create` | **39** | 25.879 | 33.816 | 34.190 | 34.190 | 0 |
 
 Concurrence **10** :
 
 | Scénario | Échantillons | p50 | p95 | p99 | max | Erreurs |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `auth` | 150 | 86.523 | 169.872 | 270.503 | 281.333 | **5** (http_502) |
-| `patient_create` | 150 | 106.718 | 194.714 | 270.233 | 271.429 | 0 |
-| `patient_search` | 150 | 73.528 | 120.374 | 219.079 | 247.494 | 0 |
-| `order_create` | 150 | 117.592 | 170.186 | 263.592 | 267.260 | 0 |
-| `sample_create` | 150 | 135.516 | 193.005 | 308.649 | 323.526 | 0 |
-| `sample_attach` | 150 | 163.818 | 221.465 | 313.510 | 333.792 | 0 |
-| `worklist` | 150 | 125.489 | 177.352 | 282.958 | 284.895 | 0 |
-| `order_read` | 150 | 71.784 | 117.740 | 217.454 | 243.286 | 0 |
-| `result_create` | 150 | 164.739 | 224.653 | 320.794 | 331.257 | 0 |
-| `result_read` | 150 | 60.868 | 91.780 | 134.738 | 238.676 | 0 |
-| `result_release` | 150 | 160.907 | 218.521 | 254.931 | 289.885 | 0 |
-| `dashboard` | 150 | **1970.297** | **2354.884** | **2502.442** | 2541.438 | 0 |
-| `invoice_create` | 150 | 123.067 | 190.569 | 210.503 | 376.116 | **45** (http_500) |
-| `payment_create` | **105** | 127.397 | 224.003 | 336.704 | 338.095 | 0 |
+| `auth` | 150 | 66.078 | 119.297 | 227.876 | 232.916 | **3** (http_502) |
+| `patient_create` | 150 | 77.328 | 127.962 | 236.290 | 265.326 | 0 |
+| `patient_search` | 150 | 50.649 | 76.979 | 89.646 | 94.206 | 0 |
+| `order_create` | 150 | 84.631 | 123.896 | 269.159 | 288.602 | 0 |
+| `sample_create` | 150 | 99.224 | 132.599 | 293.868 | 305.903 | 0 |
+| `sample_attach` | 150 | 119.763 | 169.636 | 314.620 | 332.339 | 0 |
+| `worklist` | 150 | 96.189 | 252.721 | 292.437 | 295.699 | 0 |
+| `order_read` | 150 | 54.663 | 79.224 | 230.488 | 237.423 | 0 |
+| `result_create` | 150 | 121.911 | 157.168 | 326.673 | 331.940 | 0 |
+| `result_read` | 150 | 45.728 | 69.980 | 87.955 | 198.140 | 0 |
+| `result_release` | 150 | 118.733 | 281.053 | 450.963 | 466.570 | 0 |
+| `dashboard` | 150 | **1408.314** | **1790.559** | **1852.006** | 1857.323 | 0 |
+| `invoice_create` | 150 | 92.196 | 183.709 | 222.443 | 257.672 | **42** (http_500) |
+| `payment_create` | **108** | 99.501 | 222.515 | 301.433 | 311.270 | 0 |
 
-> **`payment_create` n'a que 40 échantillons sur 45 à trois utilisateurs, et 105
-> sur 150 à dix.** Un encaissement ne peut avoir lieu que si la facture qui le
-> précède a été émise : les échecs de `invoice_create` privent mécaniquement le
-> pas suivant de son objet. Ce n'est pas une erreur de mesure, c'est la
-> propagation du défaut dans le parcours — et c'est exactement ce qu'un
-> laboratoire observerait.
+> **`payment_create` n'a que 39 échantillons sur 45 à trois utilisateurs, et
+> 108 sur 150 à dix.** Un encaissement suppose une facture émise : les échecs de
+> `invoice_create` privent mécaniquement le pas suivant de son objet. Ce n'est
+> pas une erreur de mesure, c'est la propagation du défaut dans le parcours — et
+> c'est exactement ce qu'un laboratoire observerait.
 >
-> **`dashboard` est le point lent du système, bien avant la charge** : 128 ms de
-> p50 à trois utilisateurs quand aucun autre pas ne dépasse 44 ms, et **1,97 s**
+> **`dashboard` est le point lent du système, bien avant la charge** : 92 ms de
+> p50 à trois utilisateurs quand aucun autre pas ne dépasse 35 ms, et **1,41 s**
 > à dix. La synthèse d'activité est agrégée à chaque appel.
 
 ### 4.4 Ressources pendant la charge
 
 > **Ce tableau remplace un tableau qui mesurait le repos.** Les campagnes
-> précédentes relevaient `docker stats` **avant** et **après** chaque niveau et
+> antérieures relevaient `docker stats` **avant** et **après** chaque niveau et
 > publiaient le résultat comme s'il décrivait l'effort. Deux instantanés qui
-> encadrent une fenêtre ne mesurent pas ce qui s'y passe. Le CPU publié pour
-> l'application était `0.12 %` à **tous** les niveaux de concurrence — le
-> chiffre d'une stack au repos, et rien dans le fichier ne le disait.
+> encadrent une fenêtre ne mesurent pas ce qui s'y passe : le CPU publié pour
+> l'application était `0.12 %` à **tous** les niveaux — le chiffre d'une stack
+> au repos, et rien dans le fichier ne le disait.
 >
 > L'échantillonneur relève désormais **en continu pendant la fenêtre de
 > charge**. Aucun seuil de CPU ni de mémoire n'est introduit : une consommation
@@ -318,44 +327,44 @@ Concurrence **10** :
 
 | Conc. | Fenêtre | Échantillons | Par conteneur | Intervalle observé |
 | ---: | ---: | ---: | ---: | ---: |
-| 1 | 4.334 s | 96 | 16 | 0.233 s |
-| 3 | 11.814 s | 276 | 46 | 0.244 s |
-| 5 | 25.372 s | 600 | 100 | 0.247 s |
-| 10 | 72.664 s | 1728 | 288 | 0.249 s |
+| 1 | 3.223 s | 60 | 10 | 0.222 s |
+| 3 | 8.596 s | 192 | 32 | 0.242 s |
+| 5 | 19.142 s | 444 | 74 | 0.247 s |
+| 10 | 55.123 s | 1308 | 218 | 0.249 s |
 
-Tous les échantillons tombent **dans** la fenêtre de charge (`96/96`, `276/276`,
-`600/600`, `1728/1728`), l'échantillonneur est vivant à l'arrêt aux quatre
+Tous les échantillons tombent **dans** la fenêtre de charge (`60/60`, `192/192`,
+`444/444`, `1308/1308`), l'échantillonneur est vivant à l'arrêt aux quatre
 niveaux, et aucune erreur de lecture n'est survenue.
 
 **CPU (% d'un cœur ; la machine en compte 4) :**
 
 | Conc. | `app` moy | `app` p95 | `app` max | `postgres` moy | `postgres` max | `proxy` moy | `valkey` moy |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | **63.0** | 84.5 | 84.5 | 12.4 | 17.1 | 4.4 | 0.12 |
-| 3 | **114.3** | 128.3 | 128.6 | 24.8 | 38.9 | 5.6 | 0.43 |
-| 5 | **123.7** | 132.7 | 132.8 | 27.8 | 36.9 | 4.6 | 0.39 |
-| 10 | **130.5** | 139.6 | 160.1 | 34.7 | 57.3 | 3.3 | 0.47 |
+| 1 | **49.4** | 81.5 | 81.5 | 10.1 | 17.6 | 3.0 | 0.13 |
+| 3 | **106.7** | 123.9 | 123.9 | 25.6 | 37.0 | 5.4 | 0.48 |
+| 5 | **119.3** | 141.9 | 141.9 | 26.5 | 38.1 | 4.4 | 0.42 |
+| 10 | **128.0** | 137.1 | 152.7 | 35.9 | 59.9 | 3.2 | 0.37 |
 
 **Mémoire (Mio) :**
 
 | Conc. | `app` moy | `app` max | `postgres` moy | `postgres` max | `proxy` max | `valkey` max |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 137.2 | 137.8 | 36.3 | 36.8 | 23.9 | 13.4 |
-| 3 | 143.0 | 145.6 | 46.9 | 47.9 | 26.0 | 13.9 |
-| 5 | 149.0 | 151.2 | 55.7 | 59.2 | 30.3 | 20.6 |
-| 10 | 166.7 | 183.7 | 69.7 | 75.9 | 30.9 | 13.9 |
+| 1 | 137.5 | 137.8 | 36.6 | 36.9 | 22.8 | 13.8 |
+| 3 | 143.7 | 145.4 | 46.2 | 47.9 | 23.2 | 13.4 |
+| 5 | 148.7 | 150.3 | 54.8 | 59.4 | 27.3 | 13.9 |
+| 10 | 165.8 | 174.3 | 68.6 | 75.5 | 29.5 | 13.9 |
 
 > **Ce que cette mesure établit, et que l'ancienne cachait entièrement.**
-> L'application consomme déjà **63 % d'un cœur avec un seul utilisateur**, et
+> L'application consomme déjà **49 % d'un cœur avec un seul utilisateur**, et
 > plafonne autour de **1,3 cœur** dès trois. Au-delà, le CPU ne monte presque
-> plus (114 → 124 → 130 %) alors que la latence explose et que le débit décroît.
+> plus (107 → 119 → 128 %) alors que la latence explose et que le débit décroît.
 >
 > **Ce que cette mesure n'établit pas : la cause.** Une version antérieure de ce
 > document concluait « le système n'est pas en attente d'entrées-sorties, il est
-> borné par le calcul ». C'était une inférence, pas une mesure, et une revue
-> indépendante l'a relevée à juste titre. Un plateau de CPU **concomitant** à
-> une dégradation des latences est compatible avec plusieurs explications, et
-> rien dans cette campagne ne permet de trancher entre elles.
+> borné par le calcul ». C'était une inférence présentée comme une mesure, et
+> une revue indépendante l'a relevée à juste titre. Un plateau de CPU
+> **concomitant** à une dégradation des latences est compatible avec plusieurs
+> explications, et rien dans cette campagne ne permet de trancher.
 >
 > Formulation exacte de ce qui est observé : *le profil est compatible avec une
 > limitation du chemin applicatif ou du processus web, concomitante à un plateau
@@ -363,10 +372,12 @@ niveaux, et aucune erreur de lecture n'est survenue.
 > un verrou, une sérialisation, le pool de connexions, le GIL, une file interne,
 > ni plusieurs de ces causes combinées.*
 >
-> L'absence de lectures physiques PostgreSQL (§4.5) écarte une attente de disque
-> **pendant la partie chaude de cette campagne** — sur une base qui tient
-> entièrement en cache. Elle n'écarte pas une attente d'entrées-sorties en
-> général, ni sur un site dont la base aura grossi.
+> Cette campagne apporte d'ailleurs un élément qui va dans le sens de la
+> prudence : **sept requêtes SQL dépassent 200 ms**, dont un `COMMIT` à 328 ms.
+> La campagne précédente n'en comptait aucune. Un `COMMIT` lent n'est pas du
+> calcul applicatif — il est compatible avec une attente de verrou ou de
+> journalisation. À lui seul il ne démontre rien non plus ; il suffit à montrer
+> qu'une conclusion « c'est le CPU » aurait été prématurée.
 >
 > ```
 > PERFORMANCE_BOTTLENECK_PROFILING_REQUIRED   (P1, investigation)
@@ -374,33 +385,33 @@ niveaux, et aucune erreur de lecture n'est survenue.
 >
 > Un profilage du processus web sous charge est **requis avant toute mise en
 > production sur site**. P1 porte sur l'investigation, pas sur une cause
-> démontrée : affirmer que le CPU est la cause unique reviendrait à refermer la
-> question sans l'avoir instruite, et à orienter le lot D vers une piste qui
-> pourrait n'être qu'un symptôme.
+> démontrée : affirmer que le CPU est la cause unique refermerait la question
+> sans l'avoir instruite, et orienterait le lot D vers une piste qui pourrait
+> n'être qu'un symptôme.
 >
-> La mémoire reste modeste et croît lentement (137 → 167 Mio en moyenne). Rien
-> n'indique de fuite sur la durée de la campagne — mais une campagne de quelques
-> minutes ne dit rien d'une journée de service.
+> La mémoire reste modeste et croît lentement (137 → 166 Mio en moyenne). Rien
+> n'indique de fuite sur la durée de la campagne — mais quelques minutes ne
+> disent rien d'une journée de service.
 >
-> **Prudence sur les p95 à faible effectif.** À concurrence 1, seize
-> échantillons par conteneur : le centile à rang le plus proche y renvoie
-> mécaniquement la valeur maximale. Le p95 et le max coïncident donc, et le p95
-> n'y apporte aucune information propre.
+> **Prudence sur les p95 à faible effectif.** À concurrence 1, dix échantillons
+> par conteneur : le centile à rang le plus proche y renvoie mécaniquement la
+> valeur maximale. Le p95 et le max coïncident donc, et le p95 n'y apporte
+> aucune information propre.
 
 ### 4.5 PostgreSQL et Valkey
 
 | Conc. | Transactions validées | Annulées | Blocs lus disque | Blocs en cache |
 | ---: | ---: | ---: | ---: | ---: |
-| 1 | 199 | 237 | 86 | 12 172 |
-| 3 | 732 | 839 | 26 | 64 552 |
-| 5 | 1 121 | 1 350 | 0 | 147 784 |
-| 10 | 2 339 | 2 653 | 1 | 741 195 |
+| 1 | 215 | 255 | 86 | 12 980 |
+| 3 | 707 | 800 | 26 | 63 469 |
+| 5 | 1 101 | 1 342 | 0 | 152 433 |
+| 10 | 2 354 | 2 684 | 0 | 795 385 |
 
 > **Les transactions annulées dépassent les validées à tous les niveaux.** Le
-> rapport reste stable (≈ 1,15), ce qui écarte une dérive liée à la charge : il
+> rapport reste stable (≈ 1,14), ce qui écarte une dérive liée à la charge : il
 > s'agit d'un comportement du code, pas d'un symptôme de saturation. Un
-> laboratoire n'annule pas plus d'écritures qu'il n'en valide — ce point est
-> transmis au lot D, non instruit ici.
+> laboratoire n'annule pas plus d'écritures qu'il n'en valide — transmis au
+> lot D, non instruit ici.
 >
 > Les blocs lus depuis le disque tombent à **0** dès cinq utilisateurs : le jeu
 > synthétique tient en cache pendant la partie chaude de la campagne. Les
@@ -410,20 +421,24 @@ niveaux, et aucune erreur de lecture n'est survenue.
 >
 > Ce compteur porte sur les **lectures**. Il ne dit rien des écritures, du
 > journal WAL, ni des `fsync` : conclure de ces zéros que la campagne n'a connu
-> aucune entrée-sortie serait aller au-delà de ce qui est mesuré.
+> aucune entrée-sortie irait au-delà de ce qui est mesuré — et le `COMMIT` à
+> 328 ms relevé ci-dessous invite précisément à ne pas le conclure.
 
-Valkey en fin de campagne : 1002,02 Kio utilisés, 2 clients connectés, 0 clé,
-33 commandes traitées. **Requêtes lentes journalisées au-delà de 200 ms : 0** —
-aucune requête SQL prise individuellement ne dépasse ce seuil. Cela n'exclut ni
-une accumulation de requêtes courtes, ni une attente de verrou qui ne serait pas
-comptée comme durée d'exécution.
+Valkey en fin de campagne — **serveur 8.1.9**, mode `standalone` : 1002,27 Kio
+utilisés, 2 clients connectés, 0 clé, 30 commandes traitées.
+
+**Requêtes lentes journalisées au-delà de 200 ms : 7**, dont un `COMMIT` à
+328,652 ms. Aucune requête `SELECT` ou `INSERT` isolée ne domine : la plus
+lourde est une insertion de session, et la plus lente est une validation de
+transaction. La campagne précédente n'en comptait aucune ; ce compteur varie
+donc d'une exécution à l'autre et ne doit pas être lu comme une constante.
 
 ### 4.6 Erreurs applicatives observées
 
 | Type | Occurrences | Où |
 | --- | ---: | --- |
-| `http_500` | **59** | `invoice_create` — 5 à conc. 3, 9 à conc. 5, 45 à conc. 10 |
-| `http_502` | **6** | `auth` — 1 à conc. 5, 5 à conc. 10 |
+| `http_500` | **61** | `invoice_create` — 6 à conc. 3, 13 à conc. 5, 42 à conc. 10 |
+| `http_502` | **3** | `auth` — à concurrence 10 seulement |
 
 Aucun réessai, aucune erreur exclue de l'agrégat, aucune erreur corrigée ici :
 le lot C mesure. Ces constats relèvent du **lot D**.
@@ -433,12 +448,12 @@ sur le fichier écrit, et `--provenance` sur sa provenance.
 
 <!-- RESULTATS_PERFORMANCE_FIN -->
 
-> **Sur quelle révision ces chiffres portent-ils ?** Sur la tête `6afe098`,
+> **Sur quelle révision ces chiffres portent-ils ?** Sur la tête `02795a8`,
 > exactement. Le seul commit postérieur de cette branche est le commit
 > **documentaire** qui porte ce paragraphe : il ne touche que des fichiers
 > Markdown, donc aucun fichier des ensembles d'entrée `coverage` ou
 > `performance`, donc aucune empreinte. Les documents désignent donc légitimement
-> `6afe098` comme campagne canonique.
+> `02795a8` comme campagne canonique.
 
 ## 5. Erreurs applicatives
 
@@ -467,8 +482,9 @@ image fausse de la stabilité du défaut.
 | --- | ---: | ---: | ---: | ---: |
 | `fa45c84` (antérieure au lot B) | 0/15 | 5/45 (11 %) | 13/75 (17 %) | 46/150 (31 %) |
 | `9af7c0e` (cette mission) | 0/15 | 6/45 (13 %) | 12/75 (16 %) | 31/150 (21 %) |
-| `a74da03` (cette mission) | 0/15 | **0/45** | 11/75 (15 %) | 47/150 (31 %) |
-| **`6afe098` (canonique)** | **0/15** | **5/45 (11 %)** | **9/75 (12 %)** | **45/150 (30 %)** |
+| `a74da03` | 0/15 | **0/45** | 11/75 (15 %) | 47/150 (31 %) |
+| `6afe098` | 0/15 | 5/45 (11 %) | 9/75 (12 %) | 45/150 (30 %) |
+| **`02795a8` (canonique)** | **0/15** | **6/45 (13 %)** | **13/75 (17 %)** | **42/150 (28 %)** |
 
 Ce qui est **établi** par les trois : `invoice_create` est le seul pas du
 parcours à échouer, il échoue toujours en `HTTP 500`, jamais à un utilisateur
@@ -476,8 +492,8 @@ seul, et son taux croît avec la concurrence. Le profil oriente vers un conflit
 d'accès concurrent à l'émission d'une facture — numérotation, verrou ou
 transaction.
 
-Ce qui n'est **pas** établi : un palier déterministe. Trois campagnes sur quatre
-montrent des échecs dès trois utilisateurs (11 %, 13 %, 11 %) ; la quatrième
+Ce qui n'est **pas** établi : un palier déterministe. Quatre campagnes sur cinq
+montrent des échecs dès trois utilisateurs (11 %, 13 %, 11 %, 13 %) ; une seule
 n'en montre aucun à ce niveau, sur un code applicatif identique. Le défaut est
 donc **intermittent** — il dépend de l'entrelacement des requêtes.
 
@@ -486,7 +502,7 @@ donc **intermittent** — il dépend de l'entrelacement des requêtes.
 > si elle ne l'avait pas reproduit — comme `a74da03` — la conclusion serait la
 > même : tirer d'une exécution favorable une garantie que les autres exécutions
 > contredisent serait choisir la mesure qui arrange. Un défaut de concurrence
-> observé à trois utilisateurs dans trois campagnes sur quatre est un défaut à
+> observé à trois utilisateurs dans quatre campagnes sur cinq est un défaut à
 > trois utilisateurs, et **trois utilisateurs simultanés est précisément le
 > premier usage envisagé au CSA GR Plateau** (un guichet, un préleveur, un
 > technicien).
@@ -494,15 +510,15 @@ donc **intermittent** — il dépend de l'entrelacement des requêtes.
 > Dans une facturation clinique, un `500` n'est pas une gêne d'affichage :
 > l'acte a-t-il été facturé ou non ? La question se pose pour chaque occurrence,
 > et le parcours suivant s'en trouve amputé — `payment_create` n'a recueilli que
-> 40 encaissements sur 45 tentatives à trois utilisateurs, et 105 sur 150 à
+> 39 encaissements sur 45 tentatives à trois utilisateurs, et 108 sur 150 à
 > dix.
 
 Conservé pour le lot D, sans interprétation ajoutée :
 
-| | Campagne canonique `6afe098` |
+| | Campagne canonique `02795a8` |
 | --- | --- |
 | Code HTTP | `500` |
-| Occurrences / dénominateur | **5/45 à conc. 3** · 9/75 à conc. 5 · 45/150 à conc. 10 · 0/15 à conc. 1 |
+| Occurrences / dénominateur | **6/45 à conc. 3** · 13/75 à conc. 5 · 42/150 à conc. 10 · 0/15 à conc. 1 |
 | Répétitions concernées | les 3 de chaque niveau |
 | Réessais | **aucun** — `run.retries = 0`, contrôlé |
 
@@ -512,34 +528,35 @@ Conservé pour le lot D, sans interprétation ajoutée :
 AUTH_CONCURRENCY_INVESTIGATION_REQUIRED   (P2)
 ```
 
-5 réponses `502` sur 150 à la concurrence 10, et **1 sur 75 à la concurrence
-5** — un niveau où il n'avait jamais été observé jusqu'ici. Un `502` vient du
-**proxy**, pas de l'application : la requête n'a pas abouti jusqu'à elle.
+3 réponses `502` sur 150 à la concurrence 10, et **aucune en dessous**. Un
+`502` vient du **proxy**, pas de l'application : la requête n'a pas abouti
+jusqu'à elle.
 
 | Campagne | conc. 5 | conc. 10 |
 | --- | ---: | ---: |
 | `fa45c84` | 0/75 | 6/150 |
 | `9af7c0e` | 0/75 | **0/150 — non reproduit** |
 | `a74da03` | 0/75 | 7/150 (4,7 %) |
-| **`6afe098` (canonique)** | **1/75 (1,3 %)** | **5/150 (3,3 %)** |
+| `6afe098` | **1/75 (1,3 %)** | 5/150 (3,3 %) |
+| **`02795a8` (canonique)** | **0/75** | **3/150 (2,0 %)** |
 
-Le constat **se reproduit**, mais il avait disparu d'une campagne sur quatre :
-comme `invoice_create`, le phénomène est intermittent. La campagne canonique en
-observe en outre une occurrence à cinq utilisateurs, ce qui abaisse le seuil
-constaté par rapport aux campagnes précédentes.
+Le constat **se reproduit**, mais il avait disparu d'une campagne sur cinq :
+comme `invoice_create`, le phénomène est intermittent. Une seule campagne
+(`6afe098`) en a observé une occurrence à **cinq** utilisateurs ; la campagne
+canonique n'en observe aucune à ce niveau. Le seuil constaté n'est donc pas
+stable non plus.
 
-Il reste classé **P2**, et la mesure ne justifie pas de le monter — mais la
-justification a changé, et il faut le dire. Elle reposait sur « il n'apparaît
-qu'à dix utilisateurs, plus du triple de l'usage envisagé ». La campagne
-canonique en montre **une occurrence à cinq**, donc cet argument ne tient plus
-seul. Ce qui le maintient en P2 : une occurrence unique sur 75 à ce niveau, et
-la coïncidence avec un système déjà saturé en CPU (§4.4) — un symptôme de
-saturation plausible, pas nécessairement un défaut applicatif propre.
+Il reste classé **P2**. Sur la campagne canonique il n'apparaît qu'à dix
+utilisateurs — plus du triple de l'usage envisagé — et coïncide avec un
+plateau de CPU (§4.4) : un symptôme de saturation plausible, pas nécessairement
+un défaut applicatif propre.
 
-Le monter en P1 sur un échantillon de 1/75 serait une conclusion sans mesure,
-au même titre que le descendre. **Le lot D devra observer ce pas à cinq
-utilisateurs sur plusieurs campagnes** avant de trancher ; une occurrence isolée
-ne suffit ni à confirmer ni à écarter.
+Une réserve doit toutefois accompagner ce classement : la campagne `6afe098` en
+a observé une occurrence à **cinq** utilisateurs. Une seule, sur 75 — trop peu
+pour conclure, assez pour ne pas écrire « jamais en dessous de dix ». **Le
+lot D devra observer ce pas à cinq utilisateurs sur plusieurs campagnes** avant
+de trancher ; ni une occurrence isolée ni son absence sur une campagne ne
+suffisent.
 
 ## 6. Provenance
 

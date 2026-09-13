@@ -168,10 +168,15 @@ celui que `coverage` applique par défaut, `# pragma: no cover`, présent
 <!-- RESULTATS_COUVERTURE_DEBUT -->
 
 > **Campagne canonique candidate.** Exécution de CI
-> [34776027833 / job 103774175365](https://github.com/rommellnelson-ux/ruggylab-os/actions/runs/34776027833/job/103774175365),
-> sur la tête `6afe098` (base `981ef35`, arbre `170ca31`) · coverage 7.16.0 ·
+> [34786598282 / job 103803101950](https://github.com/rommellnelson-ux/ruggylab-os/actions/runs/34786598282/job/103803101950),
+> sur la tête `02795a8` (base `981ef35`, arbre `2097ecf`) · coverage 7.16.0 ·
 > branches mesurées : `true` · plan de mesure `4f651fa8f7a8d30b…` · empreinte des
-> entrées `ff1aadec587ad925…` sur **376** fichiers.
+> entrées `ec6c08a6a1de44f2…` sur **376** fichiers.
+>
+> Les six identités de cette campagne sont **embarquées dans l'artefact
+> lui-même** (`coverage-summary.json`, champ `measurement_identity`). Un
+> lecteur du seul fichier canonique sait donc sur quelle tête la mesure a
+> porté, sans ouvrir de fichier annexe ni faire confiance.
 >
 > Identités et empreintes complètes :
 > [`QUALITY_BASELINE_CANDIDATE_MANIFEST.md`](QUALITY_BASELINE_CANDIDATE_MANIFEST.md).
@@ -332,14 +337,14 @@ sur la vérification des valeurs critiques.
 
 <!-- RESULTATS_COUVERTURE_FIN -->
 
-> **Sur quelle révision ces chiffres portent-ils ?** Sur la tête `6afe098`,
+> **Sur quelle révision ces chiffres portent-ils ?** Sur la tête `02795a8`,
 > exactement — c'est elle que le job a mesurée, et le manifeste enregistre
 > séparément la tête, la base, le commit de fusion synthétique de GitHub et
 > l'arbre. Le seul commit postérieur de cette branche est le commit
 > **documentaire** qui ajoute ce paragraphe : il ne touche que des fichiers
 > Markdown, donc aucun fichier des ensembles `coverage` ou `performance`, donc
 > aucune empreinte. Les documents continuent donc légitimement de désigner
-> `6afe098` comme campagne canonique.
+> `02795a8` comme campagne canonique.
 >
 > Chaque nouvelle exécution du workflow produit une autre campagne. C'est la
 > raison pour laquelle ces artefacts ne sont pas versionnés : une mesure
