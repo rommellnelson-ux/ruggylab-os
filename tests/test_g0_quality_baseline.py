@@ -249,6 +249,26 @@ def environnement_ci(monkeypatch, tmp_path):
     monkeypatch.setenv("GITHUB_RUN_ID", "34000000000")
     monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
     monkeypatch.setenv("GITHUB_JOB", "baseline")
+
+    # Le fichier voisin doit CONCORDER avec l'identite que la fixture produit.
+    # Sans lui, le test lirait celui de la vraie execution de CI — le job de
+    # couverture pose `G0_IDENTITIES_FILE` avant de lancer la suite — et le
+    # temoin echouerait sur une divergence entre des SHA fictifs et des SHA
+    # reels. Le test doit etre hermetique a l'environnement qui l'execute.
+    voisin = tmp_path / "identites.json"
+    voisin.write_text(
+        json.dumps(
+            {
+                "measurement_source_sha": TETE_FICTIVE,
+                "base_sha": BASE_FICTIVE,
+                "tested_merge_sha": FUSION_FICTIVE,
+                "workflow_run_id": "34000000000",
+                "workflow_job": "baseline",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("G0_IDENTITIES_FILE", str(voisin))
     return {"measurement_source_sha": TETE_FICTIVE, "base_sha": BASE_FICTIVE}
 
 
@@ -2240,6 +2260,31 @@ def test_le_champ_historique_du_lot_a_est_documente_comme_tel():
     source = _lire(REPO_ROOT / "scripts" / "g0_provenance.py")
     assert "ANCRAGE HISTORIQUE DECLARE" in source
     assert "N'EST PAS le commit mesure" in source
+
+
+def test_les_fichiers_d_identite_ne_sont_pas_ecrits_dans_l_arbre_du_depot():
+    """Ils ne contiennent que des SHA — donc, pour un détecteur d'entropie,
+    autant de chaînes hexadécimales qu'il signale à juste titre.
+
+    Déposés dans `artifacts/g0/`, ils entraient dans le périmètre du scan de
+    secrets, qui parcourt l'arbre de travail : quatre détections non couvertes,
+    et le job de couverture rouge. L'alternative aurait été d'élargir ce que la
+    barrière du lot B ne regarde plus — un mauvais échange pour une question de
+    rangement. Le fichier sort de l'arbre.
+    """
+    import yaml
+
+    workflow = yaml.safe_load(_lire(REPO_ROOT / ".github" / "workflows" / "g0-quality.yml"))
+    for job in ("coverage-baseline", "performance-baseline"):
+        for etape in workflow["jobs"][job]["steps"]:
+            corps = str(etape.get("run", ""))
+            if "identities.json" not in corps:
+                continue
+            assert "artifacts/g0/" not in corps, (
+                f"{job} ecrit ses identites dans l'arbre du depot : le scan de "
+                "secrets les relevera comme chaines de forte entropie"
+            )
+            assert "RUNNER_TEMP" in corps, f"{job} n'ecrit pas hors de l'arbre"
 
 
 def test_les_fichiers_d_identite_sont_ecrits_avant_la_mesure():

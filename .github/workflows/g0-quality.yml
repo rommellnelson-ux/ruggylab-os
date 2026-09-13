@@ -155,8 +155,8 @@ jobs:
       # comparerait rien du tout.
       - name: Write the measured identities before measuring
         run: |
-          mkdir -p artifacts/g0
-          cat > artifacts/g0/coverage-identities.json <<JSON
+          mkdir -p "$RUNNER_TEMP/g0-identites"
+          cat > "$RUNNER_TEMP/g0-identites/coverage-identities.json" <<JSON
           {
             "measurement_source_sha": "${{ steps.identites.outputs.pr_head_sha }}",
             "base_sha": "${{ steps.identites.outputs.base_sha }}",
@@ -168,7 +168,8 @@ jobs:
             "event_name": "${{ github.event_name }}"
           }
           JSON
-          cat artifacts/g0/coverage-identities.json
+          cat "$RUNNER_TEMP/g0-identites/coverage-identities.json"
+          echo "G0_IDENTITIES_FILE=$RUNNER_TEMP/g0-identites/coverage-identities.json" >> "$GITHUB_ENV"
 
       # 1. Suite complète. Les rapports par suite sont écrits dans un
       #    répertoire temporaire : les artefacts définitifs viennent des données
@@ -330,7 +331,7 @@ jobs:
             artifacts/g0/coverage.xml
             artifacts/g0/coverage.json
             artifacts/g0/coverage-summary.json
-            artifacts/g0/coverage-identities.json
+            ${{ runner.temp }}/g0-identites/coverage-identities.json
             ${{ runner.temp }}/coverage-suite.xml
             ${{ runner.temp }}/coverage-suite.json
             ${{ runner.temp }}/coverage-term-missing.txt
@@ -384,10 +385,14 @@ jobs:
 
       # Le CLIENT de mesure seulement. Ce job ne mesure pas la couverture : y
       # installer l'outillage d'instrumentation n'aurait aucun usage.
+      # `pyyaml` sert a LIRE la reference d'image Valkey declaree dans
+      # `docker-compose.yml` : c'est elle qui contredit la version que le
+      # serveur annonce. Sans elle, le banc ne peut plus verifier la version du
+      # produit, et le validateur refuse la campagne — a juste titre.
       - name: Install the measuring client
         run: |
           python -m pip install --upgrade pip
-          pip install httpx==0.28.1 psutil==7.2.2
+          pip install httpx==0.28.1 psutil==7.2.2 pyyaml==6.0.3
 
       - name: Record the measured identities
         id: identites
@@ -411,8 +416,8 @@ jobs:
       # comparerait rien du tout.
       - name: Write the measured identities before measuring
         run: |
-          mkdir -p artifacts/g0
-          cat > artifacts/g0/perf-identities.json <<JSON
+          mkdir -p "$RUNNER_TEMP/g0-identites"
+          cat > "$RUNNER_TEMP/g0-identites/perf-identities.json" <<JSON
           {
             "measurement_source_sha": "${{ steps.identites.outputs.pr_head_sha }}",
             "base_sha": "${{ steps.identites.outputs.base_sha }}",
@@ -424,7 +429,8 @@ jobs:
             "event_name": "${{ github.event_name }}"
           }
           JSON
-          cat artifacts/g0/perf-identities.json
+          cat "$RUNNER_TEMP/g0-identites/perf-identities.json"
+          echo "G0_IDENTITIES_FILE=$RUNNER_TEMP/g0-identites/perf-identities.json" >> "$GITHUB_ENV"
 
       # L'image est construite ICI, et son identité est enregistrée : une
       # baseline qui ne dirait pas quelle image elle a mesurée ne se compare à
@@ -568,7 +574,7 @@ jobs:
           path: |
             artifacts/g0/perf-baseline.json
             artifacts/g0/perf-provenance.json
-            artifacts/g0/perf-identities.json
+            ${{ runner.temp }}/g0-identites/perf-identities.json
             image-id.txt
             image-archive-sha256.txt
           if-no-files-found: error

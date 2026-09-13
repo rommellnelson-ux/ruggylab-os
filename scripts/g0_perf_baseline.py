@@ -701,11 +701,18 @@ def _image_valkey_declaree() -> dict[str, Any]:
     fichier = RACINE / "docker-compose.yml"
     if not fichier.is_file():
         return {"available": False, "reason": "docker-compose.yml absent"}
+    # L'import a SA propre clause. Le mettre dans le `try` suivant rendait son
+    # echec indechiffrable : `yaml` restait non lie, et l'evaluation de
+    # `except (..., yaml.YAMLError)` levait un `UnboundLocalError` a la place de
+    # l'erreur reelle. C'est exactement ce qui s'est produit en CI, ou le job de
+    # performance n'installe ni PyYAML ni le reste du produit.
     try:
         import yaml
-
+    except ImportError:
+        return {"available": False, "reason": "PyYAML absent de l'environnement de mesure"}
+    try:
         service = (yaml.safe_load(fichier.read_text(encoding="utf-8")) or {})["services"]["valkey"]
-    except (OSError, KeyError, TypeError, ImportError, yaml.YAMLError):
+    except (OSError, KeyError, TypeError, yaml.YAMLError):
         return {"available": False, "reason": "service valkey illisible"}
     reference = str(service.get("image") or "")
     if not reference:
@@ -1850,15 +1857,10 @@ def valider_provenance(entete: Any, corps: Any) -> list[str]:
     # L'identite embarquee, confrontee au fichier ecrit independamment par la
     # CI. `baseline_input_commit` n'est PAS le commit mesure : c'est l'ancrage
     # historique declare du programme G0. Lu seul, il induisait en erreur.
-    from scripts.g0_measurement_identity import ecarts_identite
+    from scripts.g0_measurement_identity import charger_identites, ecarts_identite
 
-    voisin = RACINE / "artifacts" / "g0" / "perf-identities.json"
-    sidecar = None
-    if voisin.is_file():
-        try:
-            sidecar = json.loads(voisin.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            motifs.append(f"perf-identities.json illisible : {exc}")
+    sidecar, illisible = charger_identites("perf-identities.json")
+    motifs.extend(illisible)
     motifs.extend(
         f"provenance : {e}"
         for e in ecarts_identite(

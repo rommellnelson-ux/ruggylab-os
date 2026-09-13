@@ -525,15 +525,10 @@ def controler(resume: dict[str, Any]) -> list[str]:
     #              l'une en Python, l'autre en shell. Si elles divergent, l'une
     #              des deux ment, et rien dans un artefact isole ne permettrait
     #              de savoir laquelle.
-    from scripts.g0_measurement_identity import ecarts_identite
+    from scripts.g0_measurement_identity import charger_identites, ecarts_identite
 
-    voisin = RACINE / "artifacts" / "g0" / "coverage-identities.json"
-    sidecar = None
-    if voisin.is_file():
-        try:
-            sidecar = json.loads(voisin.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            ecarts.append(f"coverage-identities.json illisible : {exc}")
+    sidecar, illisible = charger_identites("coverage-identities.json")
+    ecarts.extend(illisible)
     ecarts.extend(ecarts_identite(resume.get("measurement_identity"), sidecar))
 
     # 5. Tous les regroupements exigés sont-ils présents et non vides ?

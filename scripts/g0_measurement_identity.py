@@ -160,3 +160,35 @@ def ecarts_identite(embarquee: Any, sidecar: Any) -> list[str]:
                 f"fichier de la CI {attendue!r}"
             )
     return ecarts
+
+
+def fichier_identites(defaut: str) -> Path | None:
+    """Où lire le fichier d'identités écrit par la CI.
+
+    `G0_IDENTITIES_FILE` prime, et le workflow le pose hors de l'arbre du
+    dépôt. Ce n'est pas un détail de rangement : déposer ce fichier dans
+    `artifacts/g0/` le faisait entrer dans le périmètre du scan de secrets, qui
+    parcourt l'arbre de travail. Il ne contient que des SHA — donc, pour un
+    détecteur d'entropie, quatre chaînes hexadécimales de forte entropie qu'il
+    signale à juste titre, faute de pouvoir savoir qu'elles sont publiques.
+
+    L'alternative aurait été d'ajouter un motif d'exclusion à la barrière du
+    lot B. Élargir ce qu'une barrière de sécurité ne regarde plus, pour ranger
+    un fichier, est un mauvais échange : on déplace le fichier.
+    """
+    impose = os.environ.get("G0_IDENTITIES_FILE")
+    if impose:
+        return Path(impose)
+    voisin = RACINE / "artifacts" / "g0" / defaut
+    return voisin if voisin.is_file() else None
+
+
+def charger_identites(defaut: str) -> tuple[Any, list[str]]:
+    """Le contenu du fichier d'identités, et les motifs de refus de lecture."""
+    chemin = fichier_identites(defaut)
+    if chemin is None or not chemin.is_file():
+        return None, []
+    try:
+        return json.loads(chemin.read_text(encoding="utf-8")), []
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, [f"{chemin.name} illisible : {exc}"]
