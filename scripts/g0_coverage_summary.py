@@ -179,12 +179,21 @@ MODULES_CLINIQUES_CRITIQUES: tuple[str, ...] = (
     "app/services/delta_checker.py",
     "app/services/reference_checker.py",
     "app/services/preanalytic.py",
-    "app/services/result_service.py",
     "app/services/validation/med_logic.py",
     "app/services/validation/precis_expert.py",
     "app/services/validation/poct_reference.py",
     "app/services/exam_order_service.py",
     "app/services/malaria_ai.py",
+    # `app/services/result_service.py` figurait ici et n'a JAMAIS existe —
+    # aucun commit du depot ne le contient. Un nom invente, pas un nom perime. Le resume
+    # publiait donc une ligne « module clinique critique » sans pourcentage, et
+    # aucun controle ne s'en emouvait : la saisie des resultats semblait
+    # surveillee alors qu'elle ne l'etait par rien. Les modules qui portent
+    # reellement l'entree et la liberation d'un resultat les remplacent, et
+    # `controler()` refuse desormais tout module declare mais absent du rapport.
+    "app/api/v1/endpoints/results.py",
+    "app/api/v1/endpoints/results_poct.py",
+    "app/api/v1/endpoints/results_qualitative.py",
 )
 
 
@@ -492,6 +501,18 @@ def controler(resume: dict[str, Any]) -> list[str]:
 
     # 4 ter. L'outillage de mesure est-il hors du runtime, et epingle ?
     ecarts.extend(controler_dependances())
+
+    # 4 quater. Un module clinique critique DECLARE existe-t-il vraiment ?
+    #           Un nom fantome produit une ligne sans pourcentage, et l'oeil y
+    #           lit une surveillance qui n'existe pas. C'est ainsi que
+    #           `app/services/result_service.py` a ete suivi pendant toute une
+    #           campagne sans exister.
+    for module, mesure in (corps.get("clinical_critical_modules") or {}).items():
+        if not isinstance(mesure, dict) or mesure.get("line_percent") is None:
+            ecarts.append(
+                f"module clinique critique `{module}` declare mais absent du "
+                "rapport de couverture : il n'est surveille par rien"
+            )
 
     # 5. Tous les regroupements exigés sont-ils présents et non vides ?
     paquets = corps.get("by_package", {})

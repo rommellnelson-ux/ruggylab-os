@@ -348,6 +348,35 @@ def test_zero_instruction_nest_jamais_cent_pour_cent():
     assert _pourcentage(1, 2) == 50.0
 
 
+def test_tout_module_clinique_critique_declare_existe_vraiment():
+    """Un nom fantôme donne l'apparence d'une surveillance qui n'existe pas.
+
+    `app/services/result_service.py` a été suivi comme « module clinique
+    critique » pendant toute une campagne. Il n'a JAMAIS existé — aucun commit
+    du dépôt ne le contient. Le résumé publiait sa ligne sans pourcentage, et
+    l'œil y lisait que la saisie des résultats était surveillée. Elle ne
+    l'était par rien.
+    """
+    from scripts.g0_coverage_summary import MODULES_CLINIQUES_CRITIQUES, fichiers_application
+
+    presents = set(fichiers_application())
+    fantomes = [m for m in MODULES_CLINIQUES_CRITIQUES if m not in presents]
+    assert not fantomes, f"modules critiques declares mais inexistants : {fantomes}"
+    assert len(MODULES_CLINIQUES_CRITIQUES) >= 12, "la liste critique a fondu"
+
+
+def test_mutation_module_critique_fantome_est_refusee(resume_couverture):
+    """Le contrôle qui aurait dû attraper le défaut, vérifié par mutation."""
+    from scripts.g0_coverage_summary import controler
+
+    resume_couverture["payload"]["clinical_critical_modules"]["app/services/inexistant.py"] = {
+        "line_percent": None,
+        "branch_percent": None,
+    }
+    ecarts = controler(resume_couverture)
+    assert any("declare mais absent du rapport" in e for e in ecarts), ecarts
+
+
 def test_les_regroupements_exiges_sont_tous_declares():
     from scripts.g0_coverage_summary import REGROUPEMENTS
 
