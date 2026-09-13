@@ -39,6 +39,7 @@ Aucun sous-processus, aucun appel réseau, aucun secret, aucune donnée patient.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import platform
 from datetime import UTC, datetime
@@ -76,6 +77,35 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
         "alembic.ini",
         "requirements.txt",
     ),
+    # La baseline de sécurité lit le code applicatif, les artefacts du lot A
+    # dont elle dérive la matrice, le registre de qualification des routes, la
+    # baseline de secrets, et les fichiers qui décrivent les frontières
+    # (Compose, proxy, supervision).
+    #
+    # Les trois artefacts du lot A sont nommés un par un, jamais par un motif
+    # `artifacts/g0/*` : ce répertoire reçoit aussi les artefacts du lot B, et
+    # un motif large rendrait l'empreinte auto-référentielle — elle changerait
+    # à chaque génération, et le contrôle échouerait toujours.
+    "security": (
+        "app/**/*",
+        "artifacts/g0/routes.json",
+        "artifacts/g0/entrypoints.json",
+        "artifacts/g0/schema.json",
+        "docs/g0/ROUTE_EXPOSURE_QUALIFICATION.json",
+        ".secrets.baseline",
+        # Les generateurs eux-memes entrent dans l'empreinte. Le lot C a releve
+        # sur le lot A le defaut inverse : un inventaire qui recense les scripts
+        # sans les couvrir, donc un corps qui change sans que l'empreinte bouge.
+        # Ici, modifier une regle de classification ou la barriere de secrets
+        # DOIT obliger a regenerer.
+        "scripts/g0_security_baseline.py",
+        "scripts/g0_security_rules.py",
+        "scripts/g0_secret_gate.py",
+        "deploy/**/*",
+        "monitoring/**/*",
+        "docker-compose*.yml",
+        "requirements.txt",
+    ),
     # La couverture depend du code mesure, des tests qui l'executent, de la
     # configuration de pytest et des versions epinglees de l'outil. Le
     # generateur du resume en fait partie : c'est lui qui decide des
@@ -107,14 +137,59 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
     ),
 }
 
-#: Répertoires et fichiers produits par l'exécution, jamais par un auteur.
-#: Les inclure ferait varier l'empreinte selon qu'un test a tourné ou non.
-_EXCLUS = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache")
+#: Répertoires produits par une exécution ou par un gestionnaire de paquets,
+#: jamais par un auteur. Les inclure ferait varier l'empreinte selon qu'un test
+#: a tourné ou non sur la machine.
+#:
+#: `artifacts` n'y figure pas : l'ensemble `security` nomme explicitement trois
+#: artefacts du lot A, et les exclure en bloc les lui retirerait.
+_EXCLUS = (
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".tox",
+    "htmlcov",
+)
+
+#: Fichiers produits par une exécution : mesures, rapports bruts, bases
+#: jetables, journaux. Ils sont écartés **par nom**, quel que soit l'ensemble,
+#: parce qu'un motif d'entrée ne peut pas prévoir où une campagne les dépose.
+#: Une empreinte qui les absorberait changerait selon qu'une mesure a tourné,
+#: le contrôle échouerait toujours, et on finirait par l'ignorer.
+_NOMS_EXCLUS = (
+    ".coverage",
+    ".coverage.*",
+    "coverage.xml",
+    "coverage.json",
+    "coverage-summary.json",
+    "perf-baseline.json",
+    "perf-provenance.json",
+    "*.pyc",
+    "*.pyo",
+    "*.db",
+    "*.sqlite",
+    "*.sqlite3",
+    "*.log",
+)
 
 
 def chemin_relatif(chemin: Path) -> str:
     """Le chemin d'un fichier tel qu'il entre dans l'empreinte."""
     return chemin.relative_to(RACINE).as_posix()
+
+
+def est_produit_d_execution(nom: str) -> bool:
+    """Ce nom de fichier désigne-t-il un produit d'exécution ?
+
+    Écarté **par nom** et non par emplacement : un motif d'entrée ne peut pas
+    prévoir où une campagne dépose ses mesures, et `scripts/**/*.json` finirait
+    par absorber un rapport brut déposé à côté du script qui l'a produit.
+    """
+    return any(fnmatch.fnmatch(nom, motif) for motif in _NOMS_EXCLUS)
 
 
 def fichiers_entree(ensemble: str) -> list[Path]:
@@ -137,7 +212,7 @@ def fichiers_entree(ensemble: str) -> list[Path]:
             parties = chemin.relative_to(RACINE).parts
             if any(exclu in parties for exclu in _EXCLUS):
                 continue
-            if chemin.suffix in (".pyc", ".pyo"):
+            if est_produit_d_execution(chemin.name):
                 continue
             trouves.add(chemin)
     return sorted(trouves, key=chemin_relatif)

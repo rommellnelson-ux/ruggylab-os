@@ -85,14 +85,35 @@ jobs:
       - name: Test suite
         run: pytest
 
-      # ── Advisory gates (depend on external state — run and report, never block) ──
+      # ── Advisory gate (depends on external state — runs and reports, never blocks) ──
+      # `pip-audit` interroge une base d'avis qui change sans que le dépôt
+      # change : un job rouge du jour au lendemain, sur un commit qui n'a pas
+      # bougé, finirait par être ignoré. Il informe.
       - name: Dependency audit (advisory)
         continue-on-error: true
         run: pip-audit -r requirements.txt
 
-      - name: Secret scan (advisory)
-        continue-on-error: true
-        run: python -m detect_secrets.pre_commit_hook --baseline .secrets.baseline $(git ls-files)
+      # ── Barrière de secrets — BLOQUANTE (lot B du gate G0) ─────────────────
+      # Elle était `continue-on-error: true`, donc décorative : le scan
+      # échouait déjà sur l'arbre courant, et personne n'en était averti.
+      #
+      # Deux raisons pour lesquelles la commande `detect-secrets` seule ne
+      # pouvait pas être rendue bloquante telle quelle :
+      #   1. `.secrets.baseline` ne couvre que 14 fichiers, alors que 88
+      #      déclenchent une règle aujourd'hui ;
+      #   2. treize de ses quatorze clés portent des séparateurs Windows, donc
+      #      ne s'appliquent JAMAIS sur ce runner Linux.
+      # `scripts/g0_secret_gate.py` normalise les chemins à la lecture — sans
+      # réécrire le fichier, dont le défaut est un constat du lot B — et
+      # confronte chaque détection au registre d'exceptions relu et versionné.
+      #
+      # La sonde de non-vacuité tourne dans le même appel : un scanner muet est
+      # indiscernable d'un dépôt propre.
+      - name: Secret scan (arbre courant, bloquant)
+        run: |
+          git ls-files > "$RUNNER_TEMP/fichiers-suivis.txt"
+          python scripts/g0_secret_gate.py \
+            --tree --files-from "$RUNNER_TEMP/fichiers-suivis.txt" --probes
 
   # ── Image candidate : construite UNE SEULE FOIS ────────────────────────────
   # Une image auditée par un job et reconstruite par un autre ne sont pas la
@@ -446,7 +467,7 @@ jobs:
 
           # Les identités restaurées sont bien celles qui avaient été semées.
           python - <<'PY'
-          import json, sys
+          import json, os, sys
           items = json.load(open("patients.json"))["items"]
           ipps = {p["ipp_unique_id"] for p in items}
           attendus = {"TEST-IPP-0001", "TEST-IPP-0002", "TEST-IPP-0003"}
@@ -1277,6 +1298,458 @@ jobs:
           path: |
             artifacts/g0/*.json
             ${{ runner.temp }}/g0/*.json
+          if-no-files-found: error
+
+  # ── Baseline de sécurité et scan de secrets (G0, lot B) ────────────────────
+  # Ce job répond à quatre questions, et refuse de passer si l'une d'elles perd
+  # sa réponse.
+  #
+  #   1. La matrice RBAC, la classification des données, les flux et les
+  #      observations de sentinelles décrivent-ils encore le code ? Les
+  #      artefacts sont régénérés puis comparés octet par octet aux fichiers
+  #      versionnés. Ils ne sont JAMAIS mis à jour ici : régénérer en silence
+  #      rendrait le contrôle décoratif.
+  #   2. Les sondes d'autorisation, les routes particulières et les sentinelles
+  #      de journalisation sont-elles réellement exercées ? Le générateur les
+  #      exécute contre l'application, sur une base SQLite jetable semée de
+  #      données strictement synthétiques.
+  #   3. L'arbre courant ET l'historique Git complet sont-ils exempts de secret
+  #      non qualifié ? `fetch-depth: 0` est indispensable : un scan sur un
+  #      clone superficiel ne voit qu'un commit, et un secret retiré de l'arbre
+  #      reste lisible dans l'objet Git qui le portait.
+  #   4. Les scanners détectent-ils encore quelque chose ? Deux sondes de
+  #      non-vacuité le vérifient. Sans elles, un outil cassé et un dépôt propre
+  #      produisent le même vert.
+  #
+  # Aucune valeur détectée n'est affichée, et les rapports bruts de Gitleaks —
+  # qui portent auteur, adresse de courriel et message de commit — ne sont pas
+  # publiés : seul le rapport expurgé de la barrière l'est.
+  #
+  # Ce job ne publie aucune image, ne touche à aucune barrière de publication et
+  # ne prononce aucun statut de gouvernance.
+  g0-security:
+    name: G0 — Security baseline and secret scan
+    runs-on: ubuntu-latest
+
+    env:
+      # Gitleaks 8.30.1, épinglé par version EXACTE. Jamais `latest` : une
+      # version flottante changerait le jeu de règles sans qu'aucun commit ne
+      # l'indique, et le résultat d'hier ne serait plus reproductible.
+      #
+      # SHA-256 de gitleaks_8.30.1_linux_x64.tar.gz, INSCRIT EN DUR ICI.
+      # Un tag de release GitHub est mutable : se contenter du fichier de
+      # checksums publié dans la même release ne prouverait rien, puisqu'un
+      # attaquant capable de remplacer l'archive remplacerait aussi ce fichier.
+      # Cette valeur est ancrée par trois canaux concordants, relevés le
+      # 2026-09-09 : calcul local `sha256sum` sur les 8 230 402 octets
+      # réellement téléchargés, champ `digest` de l'API des releases GitHub, et
+      # `gitleaks_8.30.1_checksums.txt` publié. Toute montée de version doit
+      # refaire les trois.
+      # Variante retenue pour le scan des resolutions de fusion.
+      #
+      # `git log -p` n'emet AUCUN patch pour un commit de fusion sans `-m` ni
+      # `--cc` : un contenu introduit pendant une resolution de conflit, donc
+      # absent des deux parents, echappe alors a tout scan. Mesure sur un depot
+      # jetable, une valeur presente uniquement dans l'arbre d'une fusion :
+      #
+      #     --all                 ABSENT   <- la commande d'origine
+      #     --all --no-merges     ABSENT
+      #     --all --merges        ABSENT   <- fusions sans patch
+      #     --all --merges -m     DETECTE
+      #     --all --merges --cc   DETECTE
+      #
+      # `-m` est prefere a `--cc` : il produit des diffs ORDINAIRES, un par
+      # parent, la que `--cc` produit un diff combine dont l'analyse par le
+      # lecteur de Gitleaks n'est pas garantie. La sonde M2 verifie de toute
+      # facon la variante REELLEMENT utilisee : si elle ne detecte rien, le job
+      # passe au rouge sous MERGE_HISTORY_SCAN_INCOMPLETE.
+      MERGE_LOG_OPTS: "--all --merges -m"
+      ORDINARY_LOG_OPTS: "--all --no-merges"
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+    steps:
+      # `fetch-depth: 0` : sans l'historique complet, le scan d'historique
+      # n'aurait qu'un commit à lire et rendrait un vert sans signification.
+      - name: Checkout repository (historique complet)
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Confirm the full history was fetched
+        run: |
+          if [ "$(git rev-parse --is-shallow-repository)" != "false" ]; then
+            echo "::error::clone superficiel : le scan d'historique serait vide de sens"
+            exit 1
+          fi
+          echo "Commits accessibles : $(git rev-list --count --all)"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit detect-secrets
+
+      # ── 1. Les artefacts décrivent-ils encore le code ? ────────────────────
+      - name: Regenerate the security artifacts into a temporary directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/g0b"
+          python scripts/g0_security_baseline.py \
+            --generate --print-summary --output-dir "$RUNNER_TEMP/g0b"
+          ls -l "$RUNNER_TEMP/g0b"
+
+      - name: Fail if the versioned security baseline diverges from the code
+        run: python scripts/g0_security_baseline.py --check
+
+      # Seconde comparaison, sur les fichiers eux-mêmes : `--check` pourrait
+      # comparer autre chose que ce qui a été écrit.
+      - name: Compare the regenerated payloads byte for byte
+        run: |
+          python - "$RUNNER_TEMP/g0b" <<'PY'
+          import json, pathlib, sys
+
+          regenere = pathlib.Path(sys.argv[1])
+          versionne = pathlib.Path("artifacts/g0")
+          divergents = []
+          artefacts = (
+              "rbac-matrix",
+              "data-classification",
+              "external-flows",
+              "log-sentinel-observations",
+              "secret-scan-summary",
+          )
+          for nom in artefacts:
+              attendu, obtenu = versionne / f"{nom}.json", regenere / f"{nom}.json"
+              if not obtenu.is_file():
+                  divergents.append(f"{nom} : non regenere")
+                  continue
+              a = json.loads(attendu.read_text(encoding="utf-8"))["payload"]
+              b = json.loads(obtenu.read_text(encoding="utf-8"))["payload"]
+              if a != b:
+                  divergents.append(f"{nom} : le corps versionne differe de la regeneration")
+                  print(f"::error file={attendu}::corps divergent")
+
+          attendu = versionne / "security-provenance.json"
+          obtenu = regenere / "security-provenance.json"
+          a = json.loads(attendu.read_text(encoding="utf-8")).get("deterministic")
+          b = json.loads(obtenu.read_text(encoding="utf-8")).get("deterministic")
+          if a != b:
+              divergents.append("security-provenance : provenance deterministe divergente")
+          if a and str(a.get("baseline_input_ref", "")).startswith(("tmp/", "wip/")):
+              divergents.append("security-provenance : reference temporaire inscrite")
+
+          if divergents:
+              print("::error::Les artefacts de securite versionnes ne decrivent plus le code.")
+              for ligne in divergents:
+                  print(f"  - {ligne}")
+              print("Regenerez-les et relisez le diff :")
+              print("  python scripts/g0_security_baseline.py --generate")
+              sys.exit(1)
+
+          print("Artefacts de securite : conformes au code.")
+          PY
+
+      # ── 2. Les sondes sont-elles réellement exercées ? ─────────────────────
+      # `--skip B105` — « possible hardcoded password » — et RIEN d'autre.
+      # Quatre constats LOW, tous mesures, tous inherents a ce que ces scripts
+      # sont :
+      #   - g0_security_baseline.py : la cle de signature synthetique de la base
+      #     jetable, et deux occurrences d'un jeton de rafraichissement
+      #     volontairement inexistant, employe pour sonder le refus ;
+      #   - g0_security_rules.py : la categorie `AUTHENTIFICATION_SECRET`, dont
+      #     la valeur est un niveau de risque, pas un secret.
+      # Un `# nosec` masquerait l'alerte sans la nommer ; l'ecart est donc porte
+      # ici, a la vue de tous, et l'etape echoue toujours sur toute autre regle.
+      - name: Scan the G0 security scripts with bandit
+        run: |
+          bandit -q --skip B105 scripts/g0_security_baseline.py scripts/g0_security_rules.py \
+            scripts/g0_secret_gate.py scripts/g0_provenance.py
+          if grep -rn "nosec" scripts/g0_security_baseline.py scripts/g0_security_rules.py \
+              scripts/g0_secret_gate.py; then
+            echo "::error::un # nosec a ete ajoute : justifier l'alerte, pas la masquer"
+            exit 1
+          fi
+
+      - name: Run the G0 security baseline tests
+        run: python -m pytest -q tests/test_g0_security_baseline.py
+
+      # ── 3. Arbre courant, puis historique Git complet ──────────────────────
+      - name: Install Gitleaks (version et empreinte épinglées)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf gitleaks.tar.gz -C "$RUNNER_TEMP/bin" gitleaks
+          rm -f gitleaks.tar.gz
+          "$RUNNER_TEMP/bin/gitleaks" version
+
+      # Les sondes de non-vacuité tournent AVANT le scan réel, dans un dépôt
+      # jetable créé HORS du dépôt principal. La sentinelle est assemblée à
+      # l'exécution par `scripts/g0_secret_gate.py` : l'écrire en clair dans un
+      # fichier versionné ferait entrer dans le dépôt une valeur ayant la forme
+      # d'un secret actif, ce que la campagne s'interdit.
+      # Quatre sondes, et non deux : une sonde qui n'exerce qu'une categorie
+      # de commits ne dit rien de l'autre.
+      - name: Non-emptiness probes (M1 ordinary, M2 merge, M3 clean merge, M4 tree)
+        run: |
+          sonde_racine="$RUNNER_TEMP/sondes"
+          rm -rf "$sonde_racine" && mkdir -p "$sonde_racine"
+
+          # Les quatre sondes vivent dans des depots jetables HORS du depot principal.
+          # Leurs sentinelles sont assemblees par Python a l'execution : ecrites en
+          # litteral, elles entreraient dans ce depot sous la forme d'une valeur
+          # ressemblant a un secret actif.
+          python - "$sonde_racine" <<'PY'
+          import pathlib
+          import subprocess
+          import sys
+
+          racine = pathlib.Path(sys.argv[1])
+          sys.path.insert(0, ".")
+          from scripts.g0_secret_gate import TEXTE_PROPRE, contenu_porteur
+
+          # Deux sentinelles distinctes : une meme valeur dans les deux sondes ne
+          # permettrait pas de dire laquelle des deux categories l'a fait apparaitre.
+          PORTEUR_ORDINAIRE = contenu_porteur()
+          PORTEUR_FUSION = contenu_porteur().replace("Q7XKJ92MW", "4KMZ8PLT2")
+
+
+          def git(depot, *args):
+              resultat = subprocess.run(
+                  ["git", "-C", str(depot), *args], capture_output=True, text=True
+              )
+              if resultat.returncode != 0 and args[0] not in ("merge",):
+                  raise SystemExit(f"git {' '.join(args)} : {resultat.stderr.strip()[:200]}")
+              return resultat.stdout.strip()
+
+
+          def init(nom):
+              depot = racine / nom
+              depot.mkdir(parents=True)
+              git(depot, "init", "-q", "-b", "principal", ".")
+              git(depot, "config", "user.email", "g0-probe@example.invalid")
+              git(depot, "config", "user.name", "G0 probe")
+              git(depot, "config", "commit.gpgsign", "false")
+              (depot / "fichier.txt").write_text("ligne commune\n", encoding="utf-8")
+              git(depot, "add", "fichier.txt")
+              git(depot, "commit", "-q", "-m", "base")
+              return depot
+
+
+          # ── M1 : secret ordinaire, ajoute puis supprime, hors de toute fusion ───────
+          m1 = init("m1-ordinaire")
+          (m1 / "porteur.txt").write_text(PORTEUR_ORDINAIRE, encoding="utf-8")
+          git(m1, "add", "porteur.txt")
+          git(m1, "commit", "-q", "-m", "ordinaire : porteur")
+          git(m1, "rm", "-q", "porteur.txt")
+          git(m1, "commit", "-q", "-m", "ordinaire : nettoyage")
+
+          # ── M2 : secret present UNIQUEMENT dans l'arbre d'un commit de fusion ───────
+          #
+          # Aucun commit ordinaire ne le touche : ni ajout, ni suppression. Il n'apparait
+          # donc dans AUCUN patch ordinaire. La branche principale ne l'a jamais porte,
+          # donc HEAD reste propre. C'est la seule construction qui isole la lacune : une
+          # suppression par un commit ordinaire reexposerait la valeur dans son diff, et
+          # la sonde passerait au vert sans rien prouver.
+          m2 = init("m2-fusion")
+          base = git(m2, "rev-parse", "HEAD")
+          git(m2, "switch", "-q", "-c", "gauche", base)
+          (m2 / "fichier.txt").write_text("ligne commune\nvariante gauche\n", encoding="utf-8")
+          git(m2, "commit", "-qam", "gauche")
+          git(m2, "switch", "-q", "-c", "droite", base)
+          (m2 / "fichier.txt").write_text("ligne commune\nvariante droite\n", encoding="utf-8")
+          git(m2, "commit", "-qam", "droite")
+          git(m2, "switch", "-q", "gauche")
+          git(m2, "merge", "droite", "-q")  # conflit attendu
+          (m2 / "fichier.txt").write_text(
+              "ligne commune\nresolution\n" + PORTEUR_FUSION, encoding="utf-8"
+          )
+          git(m2, "add", "fichier.txt")
+          git(m2, "commit", "-q", "--no-edit", "-m", "fusion : resolution porteuse")
+          fusion = git(m2, "rev-parse", "HEAD")
+          git(m2, "switch", "-q", "principal")
+
+          # La sonde ne vaut que si sa premisse est vraie : verifions-la ici, pas plus tard.
+          arbre = git(m2, "show", f"{fusion}:fichier.txt")
+          if "4KMZ8PLT2" not in arbre:
+              raise SystemExit("SONDE M2 INVALIDE : la sentinelle n'est pas dans l'arbre de la fusion")
+          parents = git(m2, "rev-list", "--parents", "-n1", fusion).split()[1:]
+          for parent in parents:
+              if "4KMZ8PLT2" in git(m2, "show", f"{parent}:fichier.txt"):
+                  raise SystemExit("SONDE M2 INVALIDE : la sentinelle existe deja dans un parent")
+
+          # ── M3 : une fusion PROPRE ne doit produire aucun faux positif ──────────────
+          m3 = init("m3-fusion-propre")
+          base = git(m3, "rev-parse", "HEAD")
+          git(m3, "switch", "-q", "-c", "a", base)
+          (m3 / "a.txt").write_text("alpha\n", encoding="utf-8")
+          git(m3, "add", "a.txt")
+          git(m3, "commit", "-q", "-m", "a")
+          git(m3, "switch", "-q", "-c", "b", base)
+          (m3 / "b.txt").write_text("beta\n", encoding="utf-8")
+          git(m3, "add", "b.txt")
+          git(m3, "commit", "-q", "-m", "b")
+          git(m3, "switch", "-q", "a")
+          git(m3, "merge", "b", "-q", "--no-edit")
+
+          # ── M4 : l'arbre courant des deux depots porteurs est propre ────────────────
+          for depot, nom in ((m1, "m1"), (m2, "m2")):
+              (depot / "propre.txt").write_text(TEXTE_PROPRE, encoding="utf-8")
+              git(depot, "add", "propre.txt")
+              git(depot, "commit", "-q", "-m", "temoin propre")
+
+          print(f"sondes preparees dans {racine}")
+          PY
+
+          gl="$RUNNER_TEMP/bin/gitleaks"
+
+          # M1 — historique ORDINAIRE : le secret a ete ajoute puis supprime hors fusion.
+          "$gl" git "$sonde_racine/m1-ordinaire" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --log-opts="--all --no-merges" \
+            --report-path "$RUNNER_TEMP/sonde-m1-positive.json"
+          "$gl" dir "$sonde_racine/m1-ordinaire" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --report-path "$RUNNER_TEMP/sonde-m1-negative.json"
+
+          # M2 — RESOLUTION DE FUSION. La variante est celle du scan reel, pas une autre :
+          # une sonde qui exercerait une commande differente de la mesure ne prouverait
+          # rien sur la mesure.
+          "$gl" git "$sonde_racine/m2-fusion" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --log-opts="$MERGE_LOG_OPTS" \
+            --report-path "$RUNNER_TEMP/sonde-m2-positive.json"
+
+          # M3 — fusion propre : aucun faux positif attendu, avec la MEME commande.
+          "$gl" git "$sonde_racine/m3-fusion-propre" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --log-opts="$MERGE_LOG_OPTS" \
+            --report-path "$RUNNER_TEMP/sonde-m2-negative.json"
+
+          # M4 — l'arbre courant des depots porteurs est propre.
+          "$gl" dir "$sonde_racine/m2-fusion" --no-banner --redact=100 --exit-code 0 \
+            --report-format json --report-path "$RUNNER_TEMP/sonde-m4-arbre.json"
+
+          echo "--- verdicts des sondes (rapports expurges, --redact=100) ---"
+          python - <<'PY'
+          import json
+          import pathlib
+          import os
+
+          base = pathlib.Path(os.environ["RUNNER_TEMP"])
+          for nom, chemin, attendu in (
+              ("M1 historique ordinaire — positive", "sonde-m1-positive.json", "detecte"),
+              ("M1 arbre — negative", "sonde-m1-negative.json", "vide"),
+              ("M2 resolution de fusion — positive", "sonde-m2-positive.json", "detecte"),
+              ("M3 fusion propre — negative", "sonde-m2-negative.json", "vide"),
+              ("M4 arbre du depot de fusion", "sonde-m4-arbre.json", "vide"),
+          ):
+              texte = (base / chemin).read_text(encoding="utf-8").strip()
+              findings = json.loads(texte) if texte else []
+              regles = sorted({f.get("RuleID", "") for f in findings})
+              verdict = "detecte" if findings else "vide"
+              marque = "OK  " if verdict == attendu else "ECHEC"
+              print(f"  {marque} {nom:44} {verdict:8} {regles}")
+          PY
+
+      - name: Scan the working tree, then the full Git history
+        run: |
+          "$RUNNER_TEMP/bin/gitleaks" dir . --no-banner --redact=100 \
+            --exit-code 0 --report-format json \
+            --report-path "$RUNNER_TEMP/gitleaks-arbre.json"
+          # Historique ORDINAIRE et RESOLUTIONS DE FUSION : deux commandes,
+          # deux rapports, deux preuves. Une seule addition de commits ne
+          # demontre pas que les deux categories ont ete lues.
+          "$RUNNER_TEMP/bin/gitleaks" git . --no-banner --redact=100 \
+            --exit-code 0 --report-format json --log-opts="$ORDINARY_LOG_OPTS" \
+            --report-path "$RUNNER_TEMP/gitleaks-historique.json"
+          "$RUNNER_TEMP/bin/gitleaks" git . --no-banner --redact=100 \
+            --exit-code 0 --report-format json --log-opts="$MERGE_LOG_OPTS" \
+            --report-path "$RUNNER_TEMP/gitleaks-fusions.json"
+
+          # Comptage des commits, mesure ICI et non dans la barriere : celle-ci
+          # s'interdit tout sous-processus, parce qu'une barriere de securite qui
+          # lance des processus elargit sa propre surface. Sans ces nombres, la
+          # couverture de l'historique resterait une affirmation, et la barriere
+          # emet alors HISTORY_SCAN_COUNT_UNRECONCILED.
+          accessibles=$(git rev-list --all --count)
+          fusions=$(git rev-list --all --merges --count)
+          hors_fusion=$(git rev-list --all --no-merges --count)
+          superficiel=$(git rev-parse --is-shallow-repository)
+          echo "commits : $accessibles accessibles = $fusions fusions + $hors_fusion hors fusion"
+          python - "$accessibles" "$fusions" "$hors_fusion" "$superficiel" > "$RUNNER_TEMP/history-counts.json" <<'PY'
+          import json, os, sys
+
+          accessibles, fusions, hors_fusion, superficiel = sys.argv[1:5]
+          json.dump(
+              {
+                  "reachable_commits": int(accessibles),
+                  "merge_commits": int(fusions),
+                  "non_merge_commits": int(hors_fusion),
+                  "empty_or_non_diff_commits": 0,
+                  "is_shallow_repository": superficiel == "true",
+                  "scan_command": (
+                      "gitleaks git . --log-opts=$ORDINARY_LOG_OPTS ; "
+                      "gitleaks git . --log-opts=$MERGE_LOG_OPTS"
+                  ),
+                  "log_opts": "rev-list --all ; --merges ; --no-merges",
+                  "ordinary_history_scan_executed": True,
+                  "merge_history_scan_executed": True,
+                  "ordinary_scan_log_opts": os.environ["ORDINARY_LOG_OPTS"],
+                  "merge_scan_log_opts": os.environ["MERGE_LOG_OPTS"],
+                  "history_scan_errors": [],
+              },
+              sys.stdout,
+          )
+          PY
+          cat "$RUNNER_TEMP/history-counts.json"
+
+      # ── 4. Le verdict, sondes comprises ────────────────────────────────────
+      - name: Secret gate (arbre, historique et sondes)
+        run: |
+          git ls-files > "$RUNNER_TEMP/fichiers-suivis.txt"
+          python scripts/g0_secret_gate.py \
+            --tree --files-from "$RUNNER_TEMP/fichiers-suivis.txt" \
+            --gitleaks-dir-report "$RUNNER_TEMP/gitleaks-arbre.json" \
+            --gitleaks-git-report "$RUNNER_TEMP/gitleaks-historique.json" \
+            --gitleaks-merge-history-report "$RUNNER_TEMP/gitleaks-fusions.json" \
+            --history-counts "$RUNNER_TEMP/history-counts.json" \
+            --gitleaks-merge-probe-positive "$RUNNER_TEMP/sonde-m2-positive.json" \
+            --gitleaks-merge-probe-negative "$RUNNER_TEMP/sonde-m2-negative.json" \
+            --probes \
+            --gitleaks-probe-positive "$RUNNER_TEMP/sonde-m1-positive.json" \
+            --gitleaks-probe-negative "$RUNNER_TEMP/sonde-m1-negative.json" \
+            --report "$RUNNER_TEMP/g0b/secret-gate-report.json"
+
+      - name: Confirm the governance statuses are unchanged
+        run: |
+          clinique=$(tr -d '[:space:]' < docs/governance/CLINICAL_STATUS)
+          distribution=$(tr -d '[:space:]' < docs/governance/DISTRIBUTION_STATUS)
+          echo "CLINICAL_STATUS=$clinique"
+          echo "DISTRIBUTION_STATUS=$distribution"
+          test "$clinique" = "REAL_DATA_NO_GO" || { echo "::error::CLINICAL_STATUS modifié"; exit 1; }
+          test "$distribution" = "DISTRIBUTION_NO_GO" || { echo "::error::DISTRIBUTION_STATUS modifié"; exit 1; }
+
+      # Publication des seuls documents expurgés. Les rapports bruts de Gitleaks
+      # restent dans le runner : ils portent auteur, adresse de courriel et
+      # message de commit, qui n'ont rien à faire dans un artefact téléchargeable.
+      - name: Publish the redacted security artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: g0-security-baseline
+          path: |
+            artifacts/g0/rbac-matrix.json
+            artifacts/g0/data-classification.json
+            artifacts/g0/external-flows.json
+            artifacts/g0/log-sentinel-observations.json
+            artifacts/g0/secret-scan-summary.json
+            artifacts/g0/security-provenance.json
+            ${{ runner.temp }}/g0b/secret-gate-report.json
           if-no-files-found: error
 
   # ── Garde de tag (avant toute publication) ─────────────────────────────────
