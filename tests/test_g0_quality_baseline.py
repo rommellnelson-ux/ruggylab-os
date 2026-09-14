@@ -2416,3 +2416,404 @@ def test_les_statuts_de_gouvernance_ne_regressent_pas(fichier, attendu):
     """Une régression silencieuse de ces deux fichiers ouvrirait la porte."""
     chemin = REPO_ROOT / "docs" / "governance" / fichier
     assert chemin.read_text(encoding="utf-8").strip() == attendu
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Le snapshot accepté — preuve historique immuable
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Ces contrôles ne vérifient pas que la mesure est bonne : la revue
+# indépendante l'a tranché. Ils vérifient qu'elle est **intacte** — que les
+# fichiers versionnés sont exactement ceux que la campagne a produits, et que
+# le manifeste ne dit rien de plus que ce qu'ils contiennent.
+#
+# Un snapshot dont personne ne vérifie l'intégrité n'est pas une preuve : c'est
+# une copie dont on espère qu'elle n'a pas bougé.
+
+SNAPSHOT_SHA = "02795a81b801b784572089d6a7860ba889d10a4c"
+SNAPSHOT = REPO_ROOT / "artifacts" / "g0" / "accepted" / "quality" / SNAPSHOT_SHA
+FICHIERS_SNAPSHOT = (
+    "coverage.xml.gz",
+    "coverage.json.gz",
+    "coverage-summary.json",
+    "perf-baseline.json",
+    "perf-provenance.json",
+    "EVIDENCE_MANIFEST.json",
+    "README.md",
+)
+
+
+@pytest.fixture
+def manifeste_accepte() -> dict[str, Any]:
+    return json.loads((SNAPSHOT / "EVIDENCE_MANIFEST.json").read_text(encoding="utf-8"))
+
+
+def test_le_snapshot_contient_exactement_les_sept_fichiers_attendus():
+    """Ni moins — la preuve serait incomplète — ni plus, sans que rien le dise."""
+    assert SNAPSHOT.is_dir(), f"snapshot absent : {SNAPSHOT}"
+    presents = {f.name for f in SNAPSHOT.iterdir() if f.is_file()}
+    assert presents == set(FICHIERS_SNAPSHOT), (
+        f"manquants : {sorted(set(FICHIERS_SNAPSHOT) - presents)} · "
+        f"en trop : {sorted(presents - set(FICHIERS_SNAPSHOT))}"
+    )
+
+
+def test_le_repertoire_porte_le_nom_du_commit_mesure(manifeste_accepte):
+    """Nommer d'après le commit qui CONTIENT le snapshot serait circulaire.
+
+    Le manifeste citerait alors un SHA qui n'existe pas encore au moment où on
+    l'écrit. Le répertoire porte donc le commit MESURÉ.
+    """
+    assert SNAPSHOT.name == SNAPSHOT_SHA
+    assert manifeste_accepte["measurement_source_sha"] == SNAPSHOT_SHA
+    assert SNAPSHOT.parent.name == "quality"
+    assert SNAPSHOT.parent.parent.name == "accepted"
+
+
+def test_le_manifeste_declare_une_preuve_acceptee(manifeste_accepte):
+    assert manifeste_accepte["status"] == "ACCEPTED"
+    assert manifeste_accepte["review_result"] == "ACCEPTED"
+    assert manifeste_accepte["evidence_type"] == "G0_QUALITY_BASELINE"
+    assert manifeste_accepte["review_date_utc"] == "2026-09-13"
+
+
+@pytest.mark.parametrize(
+    ("nom", "sha"),
+    [
+        ("coverage.xml", "6ae1c4adaab833f8672ded6ed48d38f977861f5f7683fc6b32bff955722b41f1"),
+        ("coverage.json", "0783264973b75a50e7d706690fe3027c17aa2def0ccf04460c9d931a7544baed"),
+        (
+            "coverage-summary.json",
+            "7cb103ae28955692cab9d4809979902f266424e45ae3b7dd833450fcfcc9cf25",
+        ),
+        ("perf-baseline.json", "6ee4b56f96df210105096d36e52d39f4ed775e2d3292457238006b160f7957fb"),
+        (
+            "perf-provenance.json",
+            "6800d71ae6204fad8428083ebb9988a7a9c68bb1d1ceda86083266b947e3a069",
+        ),
+    ],
+)
+def test_les_cinq_empreintes_originales_sont_celles_de_la_campagne(nom, sha, manifeste_accepte):
+    """Les valeurs attendues sont écrites ICI, pas lues dans le manifeste.
+
+    Un test qui lirait l'empreinte dans le fichier qu'il contrôle validerait
+    n'importe quelle paire cohérente : il suffirait de changer les deux
+    ensemble. Les SHA de la campagne Q1 sont donc figés dans le test.
+    """
+    entree = next(e for e in manifeste_accepte["files"] if e["original_name"] == nom)
+    assert entree["original_sha256"] == sha, f"{nom} : le manifeste annonce une autre empreinte"
+
+
+def test_les_fichiers_stockes_ont_l_empreinte_que_le_manifeste_annonce(manifeste_accepte):
+    """Le manifeste décrit-il les octets réellement présents ?"""
+    import hashlib
+
+    for entree in manifeste_accepte["files"]:
+        octets = (SNAPSHOT / entree["stored_name"]).read_bytes()
+        assert hashlib.sha256(octets).hexdigest() == entree["stored_sha256"], (
+            f"{entree['stored_name']} : le fichier versionne n'est pas celui du manifeste"
+        )
+        assert len(octets) == entree["stored_size"]
+
+
+def test_la_decompression_restitue_exactement_les_fichiers_de_la_campagne(manifeste_accepte):
+    """C'est le contrôle qui compte : l'archive rend-elle l'original ?"""
+    import gzip
+    import hashlib
+
+    decompresses = 0
+    for entree in manifeste_accepte["files"]:
+        octets = (SNAPSHOT / entree["stored_name"]).read_bytes()
+        if entree["compression"] == "gzip":
+            octets = gzip.decompress(octets)
+            decompresses += 1
+        assert hashlib.sha256(octets).hexdigest() == entree["original_sha256"], (
+            f"{entree['original_name']} : la restitution ne redonne pas l'original"
+        )
+        assert len(octets) == entree["original_size"]
+    assert decompresses == 2, "les deux fichiers volumineux doivent etre compresses"
+
+
+def test_les_trois_json_sont_conserves_octet_pour_octet(manifeste_accepte):
+    """Leur SHA versionné doit être celui de l'artefact, sans étape intermédiaire."""
+    for nom in ("coverage-summary.json", "perf-baseline.json", "perf-provenance.json"):
+        entree = next(e for e in manifeste_accepte["files"] if e["original_name"] == nom)
+        assert entree["compression"] == "none"
+        assert entree["stored_sha256"] == entree["original_sha256"], (
+            f"{nom} a ete recompresse ou reformate : verifier la preuve demanderait "
+            "une etape de plus, et chaque etape est une occasion de se tromper"
+        )
+
+
+def test_le_snapshot_est_protege_de_la_conversion_de_fin_de_ligne():
+    """Sans cela, un clone Windows casserait toutes les empreintes du manifeste.
+
+    `core.autocrlf=true` est le réglage par défaut de Git for Windows : les
+    trois JSON y recevraient des CRLF, et leur SHA-256 ne correspondrait plus.
+    La CI tourne sous Linux et n'aurait jamais vu le problème — même classe de
+    défaut que l'ordre de tri dépendant de la plateforme rencontré au lot A.
+    """
+    attributs = _lire(REPO_ROOT / ".gitattributes")
+    assert "artifacts/g0/accepted/** -text" in attributs, (
+        "les preuves acceptees ne sont pas protegees de la conversion de fin de ligne"
+    )
+
+
+def test_les_identites_du_manifeste_sont_celles_de_la_campagne(manifeste_accepte):
+    """Six identités, et les confondre rendrait la campagne introuvable."""
+    assert manifeste_accepte["base_sha"] == "981ef356759bad628898fed0094c0dd40c8a7b57"
+    assert manifeste_accepte["tested_merge_sha"] == "cde576af9c3a6386a1d208d8d560b90acb905aad"
+    assert manifeste_accepte["tested_tree_sha"] == "2097ecf8208af88253c8d1b596d9cc3ac7b9007d"
+    assert manifeste_accepte["workflow_run_id"] == "34786598282"
+    assert manifeste_accepte["workflow_run_attempt"] == "1"
+    assert manifeste_accepte["coverage_job_id"] == "103803101950"
+    assert manifeste_accepte["performance_job_id"] == "103803102185"
+    assert manifeste_accepte["measurement_source_sha"] != manifeste_accepte["tested_merge_sha"], (
+        "la tete mesuree a ete confondue avec la fusion synthetique de GitHub"
+    )
+
+
+def test_les_identites_embarquees_concordent_avec_le_manifeste(manifeste_accepte):
+    """Deux écritures de la même vérité : leur divergence trahirait un montage."""
+    for nom in ("coverage-summary.json", "perf-provenance.json"):
+        artefact = json.loads((SNAPSHOT / nom).read_text(encoding="utf-8"))
+        identite = artefact["measurement_identity"]
+        for cle in (
+            "measurement_source_sha",
+            "base_sha",
+            "tested_merge_sha",
+            "tested_tree_sha",
+            "workflow_run_id",
+        ):
+            assert str(identite[cle]) == str(manifeste_accepte[cle]), (
+                f"{nom} : {cle} diverge du manifeste"
+            )
+
+
+def test_les_empreintes_d_entree_du_manifeste_sont_celles_des_artefacts(manifeste_accepte):
+    """Le manifeste ne doit rien affirmer que les artefacts ne portent."""
+    empreintes = manifeste_accepte["input_fingerprints"]
+    resume = json.loads((SNAPSHOT / "coverage-summary.json").read_text(encoding="utf-8"))
+    provenance = json.loads((SNAPSHOT / "perf-provenance.json").read_text(encoding="utf-8"))
+    banc = json.loads((SNAPSHOT / "perf-baseline.json").read_text(encoding="utf-8"))["payload"]
+
+    assert (
+        empreintes["coverage"]
+        == resume["provenance"]["deterministic"]["relevant_input_tree_sha256"]
+    )
+    assert empreintes["performance"] == provenance["deterministic"]["relevant_input_tree_sha256"]
+    assert empreintes["measurement_plan_sha256"] == banc["run"]["measurement_plan_sha256"]
+    assert empreintes["scenario_sha256"] == banc["run"]["scenario_sha256"]
+
+
+def test_la_version_valkey_archivee_est_celle_du_produit(manifeste_accepte):
+    """8.1.9, jamais la compatibilité de protocole 7.2.4."""
+    environnement = json.loads((SNAPSHOT / "perf-baseline.json").read_text(encoding="utf-8"))[
+        "payload"
+    ]["environment"]
+    assert environnement["valkey_version"] == "8.1.9"
+    assert environnement["redis_protocol_compatibility_version"] == "7.2.4"
+    assert environnement["valkey_version"] != environnement["redis_protocol_compatibility_version"]
+    resume = manifeste_accepte["measurement_summary"]
+    assert resume["valkey_version"] == "8.1.9"
+    assert resume["redis_protocol_compatibility_version"] == "7.2.4"
+
+
+def test_la_mesure_archivee_se_declare_valide_et_sans_echec(manifeste_accepte):
+    banc = json.loads((SNAPSHOT / "perf-baseline.json").read_text(encoding="utf-8"))["payload"]
+    assert banc["validity"]["valid"] is True
+    assert banc["validity"]["failures"] == []
+    assert banc["run"]["retries"] == 0, "un reessai aurait sous-estime le taux d'erreur"
+    assert manifeste_accepte["measurement_summary"]["validity_valid"] is True
+    assert manifeste_accepte["measurement_summary"]["validity_failures"] == []
+
+
+def test_les_chiffres_du_manifeste_sont_ceux_des_artefacts(manifeste_accepte):
+    """Un résumé recopié à la main se périme ; celui-ci doit être vérifiable."""
+    totaux = json.loads((SNAPSHOT / "coverage-summary.json").read_text(encoding="utf-8"))[
+        "payload"
+    ]["totals"]
+    resume = manifeste_accepte["measurement_summary"]
+    assert resume["line_percent"] == totaux["line_percent"] == 51.97
+    assert resume["branch_percent"] == totaux["branch_percent"] == 12.89
+    assert resume["statements"] == totaux["statements"] == 12712
+    assert resume["branches"] == totaux["branches"] == 2530
+
+
+def test_les_erreurs_de_facturation_sont_conservees_telles_quelles():
+    """Une preuve acceptée n'est pas une preuve nettoyée."""
+    niveaux = json.loads((SNAPSHOT / "perf-baseline.json").read_text(encoding="utf-8"))["payload"][
+        "levels"
+    ]
+    assert niveaux["3"]["scenarios"]["invoice_create"]["errors"] == 6
+    assert niveaux["5"]["scenarios"]["invoice_create"]["errors"] == 13
+    assert niveaux["10"]["scenarios"]["invoice_create"]["errors"] == 42
+
+
+def test_les_ressources_pendant_la_charge_sont_conservees():
+    """Le relevé pendant l'effort est ce qui distingue cette campagne."""
+    niveaux = json.loads((SNAPSHOT / "perf-baseline.json").read_text(encoding="utf-8"))["payload"][
+        "levels"
+    ]
+    for nom, niveau in niveaux.items():
+        pendant = niveau["resources"]["during_load"]
+        assert pendant["enabled"] is True
+        assert pendant["samples_within_load_window"] > 0, f"niveau {nom} sans releve"
+        assert pendant["sampler_alive_at_stop"] is True
+        assert pendant["containers"]["app"]["cpu_percent"]["mean"] is not None
+
+
+def test_le_profil_et_les_interrupteurs_externes_sont_conserves(manifeste_accepte):
+    corps = json.loads((SNAPSHOT / "perf-baseline.json").read_text(encoding="utf-8"))["payload"]
+    assert corps["run"]["performance_profile"] == "CORE_INTRINSIC_WITH_RATE_LIMITS_DISABLED"
+    interrupteurs = corps["environment"]["effective_external_switches"]
+    assert interrupteurs["available"] is True
+    for nom in ("CSA_SYNC_ENABLED", "ENABLE_DH36_LISTENER", "ANALYZER_RAW_LISTENER_ENABLED"):
+        assert interrupteurs["settings"][nom] is False
+    gouvernance = manifeste_accepte["governance"]
+    assert gouvernance["clinical_status"] == "REAL_DATA_NO_GO"
+    assert gouvernance["distribution_status"] == "DISTRIBUTION_NO_GO"
+    assert gouvernance["csa_sync_enabled"] is False
+    assert gouvernance["dh36_enabled"] is False
+    assert gouvernance["analyzer_raw_enabled"] is False
+
+
+@pytest.mark.parametrize(
+    "constat",
+    [
+        "CSA_SITE_PRODUCTION_GO_BLOCKER",
+        "INVOICE_CONCURRENCY_REMEDIATION_REQUIRED",
+        "PERFORMANCE_BOTTLENECK_PROFILING_REQUIRED",
+        "SITE_OPERATIONAL_PROFILE_REQUIRED",
+        "AUTH_CONCURRENCY_INVESTIGATION_REQUIRED",
+    ],
+)
+def test_les_blocages_restent_ouverts_dans_la_preuve_acceptee(constat, manifeste_accepte):
+    """Accepter la preuve n'est pas refermer les constats qu'elle porte."""
+    identifiants = {f["id"] for f in manifeste_accepte["open_findings"]}
+    assert constat in identifiants, f"{constat} a disparu du manifeste"
+    entree = next(f for f in manifeste_accepte["open_findings"] if f["id"] == constat)
+    assert entree["evidence"], f"{constat} est declare sans preuve rattachee"
+
+
+def test_le_manifeste_ne_prononce_aucun_verdict_de_gouvernance(manifeste_accepte):
+    """L'acceptation porte sur la PREUVE, jamais sur l'aptitude du produit."""
+    texte = (SNAPSHOT / "EVIDENCE_MANIFEST.json").read_text(encoding="utf-8")
+    prononces = set(re.findall(r"[A-Z][A-Z0-9_]{3,}", texte))
+    for interdit in ("G0_PASS", "REAL_DATA_GO", "SITE_PRODUCTION_GO", "DISTRIBUTION_GO"):
+        assert interdit in manifeste_accepte["not_asserted"], (
+            f"{interdit} n'est pas explicitement ecarte"
+        )
+        # Le jeton peut figurer dans `not_asserted`, jamais comme affirmation.
+        assert interdit not in (prononces - set(manifeste_accepte["not_asserted"]))
+
+
+@pytest.mark.parametrize("document", ["COVERAGE.md", "PERFORMANCE.md"])
+def test_aucun_verdict_de_production_dans_les_documents_du_lot_c(document):
+    """Le garde-fou des jetons entiers, appliqué aux documents de cette PR."""
+    jetons = set(re.findall(r"[A-Z][A-Z0-9_]{3,}", _lire(DOCS / document)))
+    interdits = {"G0_PASS", "REAL_DATA_GO", "SITE_PRODUCTION_GO", "DISTRIBUTION_GO"}
+    assert not (jetons & interdits), f"{document} prononce {sorted(jetons & interdits)}"
+
+
+def test_le_snapshot_n_entre_dans_aucun_ensemble_de_mesure():
+    """Archiver une campagne ne doit pas changer l'empreinte de la suivante.
+
+    Si le snapshot entrait dans `coverage` ou `performance`, la preuve
+    modifierait ce qu'elle est censée décrire — et chaque archivage
+    invaliderait la mesure suivante.
+    """
+    from scripts.g0_provenance import chemin_relatif, fichiers_entree
+
+    for ensemble in ("inventory", "schema", "security", "coverage", "performance"):
+        dedans = [
+            chemin_relatif(p) for p in fichiers_entree(ensemble) if "accepted" in chemin_relatif(p)
+        ]
+        assert not dedans, f"l'ensemble {ensemble} absorbe le snapshot : {dedans[:3]}"
+
+
+def test_ajouter_une_preuve_acceptee_ne_deplace_aucune_empreinte_de_mesure():
+    """La propriété à garantir : archiver n'influence pas ce qu'on archivera.
+
+    Une première version de ce test figeait les empreintes aux valeurs de la
+    campagne archivée. C'était la mauvaise propriété : `tests/**` appartient à
+    l'ensemble `coverage`, donc ajouter le moindre test — y compris celui-ci —
+    déplace légitimement l'empreinte. Le test aurait échoué à sa propre
+    écriture, et il aurait fallu le neutraliser.
+
+    Ce qui doit être vrai, c'est qu'un fichier DE PLUS sous
+    `artifacts/g0/accepted/` ne change **rien**. Le contrôle le vérifie en en
+    déposant un, plutôt qu'en le supposant.
+    """
+    from scripts.g0_provenance import empreinte_entrees
+
+    avant = {e: empreinte_entrees(e) for e in ("inventory", "coverage", "performance")}
+    intrus = SNAPSHOT / "intrus-temporaire.json"
+    assert not intrus.exists()
+    try:
+        intrus.write_text('{"mesure": 1}' + chr(10), encoding="utf-8")
+        apres = {e: empreinte_entrees(e) for e in avant}
+    finally:
+        intrus.unlink(missing_ok=True)
+
+    for ensemble, valeur in avant.items():
+        assert apres[ensemble] == valeur, (
+            f"deposer un fichier sous artifacts/g0/accepted/ a change l'empreinte "
+            f"{ensemble} : la preuve influencerait la mesure suivante"
+        )
+    assert {e: empreinte_entrees(e) for e in avant} == avant, "l'arbre n'a pas ete restaure"
+
+
+@pytest.mark.parametrize(
+    "sortie",
+    [
+        "artifacts/g0/coverage.xml",
+        "artifacts/g0/coverage.json",
+        "artifacts/g0/coverage-summary.json",
+        "artifacts/g0/perf-baseline.json",
+        "artifacts/g0/perf-provenance.json",
+    ],
+)
+def test_les_sorties_courantes_restent_ignorees(sortie):
+    """Une campagne locale ne doit pas pouvoir écraser la preuve acceptée."""
+    import subprocess
+
+    acheve = subprocess.run(
+        ["git", "check-ignore", "-q", sortie],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        check=False,
+    )
+    assert acheve.returncode == 0, (
+        f"{sortie} n'est plus ignore : une mesure locale serait versionnee"
+    )
+
+
+def test_le_snapshot_ne_contient_ni_secret_ni_donnee_reelle(manifeste_accepte):
+    """Les seules chaînes de forte entropie doivent être des empreintes publiques."""
+    assert manifeste_accepte["contains"] == {
+        **manifeste_accepte["contains"],
+        "secrets": False,
+        "patient_data": False,
+        "real_site_addresses": False,
+        "simulated_signature": False,
+    }
+    jeu = json.loads((SNAPSHOT / "perf-baseline.json").read_text(encoding="utf-8"))["payload"][
+        "dataset"
+    ]
+    assert jeu["all_identifiers_prefixed"] is True
+    assert jeu["synthetic_marker"], "la marque synthetique a disparu"
+    for identifiant in jeu["sample_identifiers"]:
+        assert str(identifiant).startswith(jeu["synthetic_marker"])
+
+
+def test_le_readme_dit_ce_que_le_snapshot_n_est_pas():
+    """Sans cet avertissement, quelqu'un finira par comparer des latences."""
+    texte = _aplati(SNAPSHOT / "README.md")
+    for mention in (
+        "n'est pas une valeur attendue",
+        "octet par octet",
+        "expirent",
+        "SITE_PRODUCTION_GO = NON",
+    ):
+        assert mention.lower() in texte.lower(), f"le README ne dit pas : « {mention} »"

@@ -1,0 +1,16 @@
+# Les preuves acceptées du gate G0 sont conservées OCTET POUR OCTET.
+#
+# Sans cette règle, un dépôt cloné sous Windows avec `core.autocrlf=true` —
+# la configuration par défaut de Git for Windows — recevrait les fichiers JSON
+# du snapshot avec des CRLF. Leur SHA-256 ne correspondrait alors plus à celui
+# qu'EVIDENCE_MANIFEST.json déclare, et la vérification échouerait pour une
+# raison qui n'a rien à voir avec l'intégrité de la preuve.
+#
+# Le piège est silencieux : la CI tourne sous Linux et ne l'aurait jamais vu.
+# C'est exactement la classe de défaut que le lot A avait déjà rencontrée sur
+# l'empreinte des entrées, où l'ordre de tri dépendait de la plateforme.
+#
+# `-text` désactive toute conversion de fin de ligne dans les deux sens. Le
+# périmètre est délibérément étroit : cette règle ne concerne que les preuves
+# archivées, et ne change rien au reste du dépôt.
+artifacts/g0/accepted/** -text

@@ -1,0 +1,212 @@
+{
+  "_comment": [
+    "Manifeste d'une preuve ACCEPTEE apres revue independante. Il decrit une",
+    "campagne de mesure precise et immuable, identifiee par son commit source.",
+    "",
+    "Ce manifeste n'est PAS une valeur attendue. Les latences varient d'une",
+    "execution a l'autre et d'un executeur a l'autre : comparer une campagne",
+    "future a celle-ci octet par octet n'aurait aucun sens. La comparaison se",
+    "fait sur la METHODE — meme plan de mesure, meme scenario, memes controles",
+    "de validite — puis sur la forme des courbes, jamais sur les chiffres bruts.",
+    "",
+    "L'acceptation porte sur la VALIDITE DE LA PREUVE, jamais sur l'aptitude du",
+    "produit a la production clinique. Les constats defavorables restent ouverts",
+    "et sont enumeres dans open_findings."
+  ],
+  "schema_version": "1.0.0",
+  "status": "ACCEPTED",
+  "evidence_type": "G0_QUALITY_BASELINE",
+  "review_result": "ACCEPTED",
+  "review_date_utc": "2026-09-13",
+  "review_scope": [
+    "Validite de la baseline G0 de couverture lignes/branches.",
+    "Validite de la baseline G0 de performance et des ressources pendant charge.",
+    "N'emporte NI G0_PASS, NI REAL_DATA_GO, NI SITE_PRODUCTION_GO, NI DISTRIBUTION_GO."
+  ],
+
+  "measurement_source_sha": "02795a81b801b784572089d6a7860ba889d10a4c",
+  "base_sha": "981ef356759bad628898fed0094c0dd40c8a7b57",
+  "tested_merge_sha": "cde576af9c3a6386a1d208d8d560b90acb905aad",
+  "tested_tree_sha": "2097ecf8208af88253c8d1b596d9cc3ac7b9007d",
+  "workflow_run_id": "34786598282",
+  "workflow_run_attempt": "1",
+  "coverage_job_id": "103803101950",
+  "performance_job_id": "103803102185",
+
+  "_comment_identites": [
+    "tested_merge_sha est le commit de fusion SYNTHETIQUE fabrique par GitHub",
+    "pour un evenement pull_request. Ce n'est la tete d'aucune reference, et le",
+    "confondre avec measurement_source_sha rendrait la campagne introuvable.",
+    "",
+    "workflow_job_id NUMERIQUE n'est expose par aucune variable du runner : les",
+    "deux identifiants ci-dessus ont ete releves via l'API apres coup, et le",
+    "triplet run_id + run_attempt + nom de job suffit a les retrouver."
+  ],
+
+  "artifact_sources": {
+    "_comment": "Artefacts GitHub Actions du run canonique. Ils EXPIRENT ; ce snapshot, non.",
+    "coverage_artifact_id": "10326104240",
+    "coverage_artifact_digest": "sha256:541e98fb96e53532a5a6c55ff6ef38728885948de8ab41b8466e975940ba7361",
+    "performance_artifact_id": "10326263415",
+    "performance_artifact_digest": "sha256:d4293a07ed4ebb4e27058f8ca9558806df541cce17a7b55b106ea07e79ac96dc"
+  },
+
+  "measured_image": {
+    "image_id": "sha256:1edab0d5f47374eed5bd0464c70e56f7e106d6bbd101d662bd7427b287fd92ee",
+    "image_archive_sha256": "a003354da1cfa00ddcf720bedbc4c64c8592b57f590d4929a1f2b37c7b0adef2"
+  },
+
+  "input_fingerprints": {
+    "coverage": "ec6c08a6a1de44f22c932e13bc007d5210b6784d77d329ec5573dc297257931f",
+    "performance": "9ecec37f7ce09e8e9e62b1056238b49d937b8dafbff81c0f9803a3b9bde04e43",
+    "measurement_plan_sha256": "4f651fa8f7a8d30bbf7bc86a37e60a5ba0c36e5628f2b0129a2f7d79214e8a9e",
+    "scenario_sha256": "84e8e408aff3644844b1b21bf708e2a5c1b4cf91532b7dfe929b95e9db5fe2e2"
+  },
+
+  "measurement_summary": {
+    "_comment": "Repris des artefacts, jamais ressaisi. Verifiable en les relisant.",
+    "line_percent": 51.97,
+    "branch_percent": 12.89,
+    "statements": 12712,
+    "branches": 2530,
+    "measured_modules": 230,
+    "never_executed_modules": 24,
+    "performance_profile": "CORE_INTRINSIC_WITH_RATE_LIMITS_DISABLED",
+    "retries": 0,
+    "validity_valid": true,
+    "validity_failures": [],
+    "valkey_version": "8.1.9",
+    "redis_protocol_compatibility_version": "7.2.4"
+  },
+
+  "compression": {
+    "_comment": [
+      "gzip deterministe : aucun nom de fichier stocke, mtime force a 0,",
+      "niveau 9. Sans cela l'empreinte du .gz changerait a chaque recompression",
+      "du meme contenu et ne dirait plus rien de ce qu'elle archive.",
+      "Equivalent en ligne de commande : gzip -n -9."
+    ],
+    "method": "gzip",
+    "level": 9,
+    "mtime": 0,
+    "stored_filename": "",
+    "reproducible": true
+  },
+
+  "files": [
+    {
+      "original_name": "coverage.xml",
+      "original_size": 580152,
+      "original_sha256": "6ae1c4adaab833f8672ded6ed48d38f977861f5f7683fc6b32bff955722b41f1",
+      "stored_name": "coverage.xml.gz",
+      "compression": "gzip",
+      "stored_size": 36684,
+      "stored_sha256": "299b69dc22573f9f8d97b21f5a5b232605015d4cb4f191ec90e380f598041504"
+    },
+    {
+      "original_name": "coverage.json",
+      "original_size": 1359014,
+      "original_sha256": "0783264973b75a50e7d706690fe3027c17aa2def0ccf04460c9d931a7544baed",
+      "stored_name": "coverage.json.gz",
+      "compression": "gzip",
+      "stored_size": 80750,
+      "stored_sha256": "f5d625ff5f51397570f6c2078c40951d3e3814e2fa556cf4d14dfb3661982d99"
+    },
+    {
+      "original_name": "coverage-summary.json",
+      "original_size": 115181,
+      "original_sha256": "7cb103ae28955692cab9d4809979902f266424e45ae3b7dd833450fcfcc9cf25",
+      "stored_name": "coverage-summary.json",
+      "compression": "none",
+      "stored_size": 115181,
+      "stored_sha256": "7cb103ae28955692cab9d4809979902f266424e45ae3b7dd833450fcfcc9cf25"
+    },
+    {
+      "original_name": "perf-baseline.json",
+      "original_size": 74781,
+      "original_sha256": "6ee4b56f96df210105096d36e52d39f4ed775e2d3292457238006b160f7957fb",
+      "stored_name": "perf-baseline.json",
+      "compression": "none",
+      "stored_size": 74781,
+      "stored_sha256": "6ee4b56f96df210105096d36e52d39f4ed775e2d3292457238006b160f7957fb"
+    },
+    {
+      "original_name": "perf-provenance.json",
+      "original_size": 4957,
+      "original_sha256": "6800d71ae6204fad8428083ebb9988a7a9c68bb1d1ceda86083266b947e3a069",
+      "stored_name": "perf-provenance.json",
+      "compression": "none",
+      "stored_size": 4957,
+      "stored_sha256": "6800d71ae6204fad8428083ebb9988a7a9c68bb1d1ceda86083266b947e3a069"
+    }
+  ],
+
+  "governance": {
+    "clinical_status": "REAL_DATA_NO_GO",
+    "distribution_status": "DISTRIBUTION_NO_GO",
+    "csa_sync_enabled": false,
+    "dh36_enabled": false,
+    "analyzer_raw_enabled": false,
+    "_comment": [
+      "Valeurs EFFECTIVES lues dans le processus applicatif pendant la mesure,",
+      "et non deduites d'une variable d'environnement absente : une variable",
+      "absente ne dit pas false, elle ne dit rien."
+    ]
+  },
+
+  "open_findings": [
+    {
+      "id": "CSA_SITE_PRODUCTION_GO_BLOCKER",
+      "severity": "P1",
+      "summary": "invoice_create repond HTTP 500 des trois utilisateurs simultanes — le premier usage envisage au CSA GR Plateau.",
+      "evidence": "perf-baseline.json : levels.3.scenarios.invoice_create.errors = 6 sur 45"
+    },
+    {
+      "id": "INVOICE_CONCURRENCY_REMEDIATION_REQUIRED",
+      "severity": "P1",
+      "summary": "Le taux d'echec de l'emission de facture croit avec la concurrence : 13 % a trois, 17 % a cinq, 28 % a dix.",
+      "evidence": "perf-baseline.json : errors_by_type_total.http_500 = 61"
+    },
+    {
+      "id": "PERFORMANCE_BOTTLENECK_PROFILING_REQUIRED",
+      "severity": "P1",
+      "summary": "Plateau de CPU applicatif concomitant a la degradation des latences. La CAUSE n'est pas etablie : contention transactionnelle, verrou, serialisation, pool de connexions, GIL ou file interne ne sont pas exclus.",
+      "evidence": "perf-baseline.json : levels.*.resources.during_load ; 7 requetes SQL au-dela de 200 ms dont un COMMIT a 328 ms"
+    },
+    {
+      "id": "SITE_OPERATIONAL_PROFILE_REQUIRED",
+      "severity": "P1",
+      "summary": "La campagne mesure la capacite intrinseque du coeur, limiteurs de debit DESACTIVES. Le comportement du site reste a mesurer : limiteurs actifs, Caddy, X-Forwarded-For reel, TRUSTED_PROXY_IPS, trois clients representatifs, anti-force-brute.",
+      "evidence": "perf-baseline.json : run.performance_profile = CORE_INTRINSIC_WITH_RATE_LIMITS_DISABLED"
+    },
+    {
+      "id": "AUTH_CONCURRENCY_INVESTIGATION_REQUIRED",
+      "severity": "P2",
+      "summary": "Reponses HTTP 502 sur l'authentification a concurrence 10. Intermittent d'une campagne a l'autre ; une campagne anterieure en a observe une a concurrence 5.",
+      "evidence": "perf-baseline.json : levels.10.scenarios.auth.errors = 3 sur 150"
+    }
+  ],
+
+  "not_asserted": [
+    "G0_PASS",
+    "REAL_DATA_GO",
+    "SITE_PRODUCTION_GO",
+    "DISTRIBUTION_GO"
+  ],
+
+  "contains": {
+    "secrets": false,
+    "patient_data": false,
+    "real_site_addresses": false,
+    "simulated_signature": false,
+    "_comment": [
+      "Les seules chaines de forte entropie de ce manifeste sont des empreintes",
+      "PUBLIQUES : SHA de commits, SHA-256 de fichiers et d'images, empreintes",
+      "d'arbres d'entree. Une empreinte est publiee pour etre comparee : elle",
+      "n'ouvre aucun acces et n'a rien a proteger.",
+      "",
+      "Aucune signature n'est simulee. L'acceptation est consignee comme un fait",
+      "de gouvernance, pas comme un acte signe."
+    ]
+  }
+}
