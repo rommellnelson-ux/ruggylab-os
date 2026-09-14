@@ -1,0 +1,49 @@
+# Surcharge de MESURE — baseline de performance G0 (lot C). JAMAIS un fichier
+# de production, et jamais chargée implicitement : `docker compose up` seul
+# n'en tient aucun compte. Usage explicite, uniquement dans le job
+# « G0 — Performance baseline » :
+#
+#   docker compose -f docker-compose.yml -f scripts/g0_perf_overlay.yml up -d
+#
+# POURQUOI ELLE EXISTE
+# --------------------
+# La stack de production limite le débit par adresse IP :
+# RATE_LIMIT_REQUESTS=100 par tranche de 60 s, LOGIN_RATE_LIMIT_REQUESTS=10 par
+# tranche de 300 s (cf. app/core/config.py). Un banc d'essai lancé depuis une
+# seule machine partage forcément une seule adresse IP : au-delà de la centième
+# requête, l'application répond 429 et l'on ne mesure plus le laboratoire, on
+# mesure le limiteur. Une première exécution l'a confirmé — 77 réponses 429 sur
+# 129 requêtes, et 100 % d'erreurs dès deux utilisateurs simultanés.
+#
+# CE QUE CELA COÛTE, ET QUI DOIT LE SAVOIR
+# ----------------------------------------
+# Les chiffres publiés décrivent donc l'application SANS ce limiteur. Le
+# limiteur, lui, reste actif en production, et il plafonne le débit soutenu à
+# environ 1,7 requête par seconde et par adresse IP — un plafond très inférieur
+# aux débits mesurés ici. Ce n'est pas un détail de configuration : c'est un
+# élément que le lot D doit examiner, notamment parce que tous les postes d'un
+# laboratoire derrière un même proxy peuvent partager cette adresse.
+#
+# L'état réel de ces deux réglages est enregistré dans `perf-baseline.json`
+# (`environment.application_configuration`) : la mesure dit ce qu'elle a
+# désactivé, elle ne le dissimule pas.
+#
+# POURQUOI ELLE N'EST PAS DANS `deploy/`
+# -------------------------------------
+# `deploy/**` appartient à l'ensemble d'entrée `inventory` du lot A : un
+# fichier ajouté là change l'empreinte d'une baseline d'architecture déjà
+# fusionnée, et oblige à la régénérer pour un réglage qui ne décrit aucun
+# déploiement. Cette surcharge n'est pas un déploiement : c'est l'appareil de
+# mesure. Elle vit donc auprès du script qui l'utilise, et elle est déclarée
+# dans l'ensemble d'entrée `performance` — modifier ce fichier change bien
+# l'empreinte de la baseline de performance, celle qu'elle détermine
+# réellement.
+#
+# Aucun autre réglage n'est modifié. CSA et interfaces automates restent
+# désactivés, exactement comme dans la stack de production.
+
+services:
+  app:
+    environment:
+      RATE_LIMIT_ENABLED: "false"
+      LOGIN_RATE_LIMIT_ENABLED: "false"

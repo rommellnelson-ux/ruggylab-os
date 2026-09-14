@@ -1,0 +1,117 @@
+{
+  "_comment": "deterministic est compare par --check ; volatile ne l'est pas. baseline_input_commit est l'ANCRAGE HISTORIQUE DECLARE du programme G0 (reference permanente) : ce N'EST PAS le commit mesure, et le lire comme tel induit en erreur. Le commit reellement mesure figure dans measurement_identity, pour les artefacts qui en portent une. relevant_input_tree_sha256 est la preuve verifiable : l'empreinte des octets reellement lus.",
+  "deterministic": {
+    "baseline_input_commit": "f7abd7e10eb8acc22e3e13775a43172e7a90261e",
+    "baseline_input_ref": "main",
+    "concurrency_levels": [
+      1,
+      3,
+      5,
+      10
+    ],
+    "generation_command": "python scripts/g0_perf_baseline.py --run --base-url https://localhost --concurrency 1,3,5,10 --repetitions 3 --iterations 5 --warmup 2 --seed 20260909",
+    "generator_version": "1.0.0",
+    "iterations_per_worker": 5,
+    "relevant_input_file_count": 296,
+    "relevant_input_patterns": [
+      "scripts/g0_perf_baseline.py",
+      "scripts/g0_perf_overlay.yml",
+      "scripts/g0_quality_plan.json",
+      "app/**/*",
+      "alembic/**/*",
+      "docker-compose.yml",
+      "Dockerfile",
+      "requirements.txt"
+    ],
+    "relevant_input_set": "performance",
+    "relevant_input_tree_sha256": "9ecec37f7ce09e8e9e62b1056238b49d937b8dafbff81c0f9803a3b9bde04e43",
+    "repetitions": 3,
+    "scenario_order": [
+      "auth",
+      "patient_create",
+      "patient_search",
+      "order_create",
+      "sample_create",
+      "sample_attach",
+      "worklist",
+      "order_read",
+      "result_create",
+      "result_read",
+      "result_release",
+      "dashboard",
+      "invoice_create",
+      "payment_create"
+    ],
+    "scenario_sha256": "84e8e408aff3644844b1b21bf708e2a5c1b4cf91532b7dfe929b95e9db5fe2e2",
+    "schema_version": "1.0.0",
+    "seed": 20260909
+  },
+  "measurement_identity": {
+    "_comment": "Identites de la mesure, embarquees pour que cet artefact se suffise a lui-meme. Ne pas confondre avec baseline_input_commit, qui est l'ancrage historique DECLARE du programme G0 et non le commit mesure.",
+    "base_sha": "981ef356759bad628898fed0094c0dd40c8a7b57",
+    "event_name": "pull_request",
+    "measurement_source_sha": "02795a81b801b784572089d6a7860ba889d10a4c",
+    "tested_merge_sha": "cde576af9c3a6386a1d208d8d560b90acb905aad",
+    "tested_tree_sha": "2097ecf8208af88253c8d1b596d9cc3ac7b9007d",
+    "workflow_job": "performance-baseline",
+    "workflow_job_id": null,
+    "workflow_run_attempt": "1",
+    "workflow_run_id": "34786598282"
+  },
+  "volatile": {
+    "dataset": {
+      "identifier_prefix": "G0SYNTH-b89ed71dd3",
+      "identifiers_created": 399,
+      "source": "genere par scripts/g0_perf_baseline.py ; aucune donnee patient reelle",
+      "synthetic_marker": "G0SYNTH"
+    },
+    "duration_seconds": 110.829,
+    "environment": {
+      "application_configuration": {
+        "ANALYZER_RAW_LISTENER_ENABLED": null,
+        "CACHE_BACKEND": "redis",
+        "CSA_SYNC_ENABLED": null,
+        "ENABLE_DH36_LISTENER": null,
+        "LOGIN_RATE_LIMIT_ENABLED": "false",
+        "PROCESS_ROLE": "web",
+        "RATE_LIMIT_ENABLED": "false",
+        "REQUIRE_VALIDATION_FOR_RELEASE": "false",
+        "TRUSTED_PROXY_IPS": "[\"172.28.117.10\"]"
+      },
+      "application_configuration_note": "null = variable non transmise au conteneur ; la valeur effective est alors le defaut du code, publie dans effective_external_switches",
+      "architecture": "x86_64",
+      "compose_project": "ruggylab_g0_quality",
+      "cpu_count": 4,
+      "docker_version": "28.0.4",
+      "effective_external_switches": {
+        "available": true,
+        "settings": {
+          "ANALYZER_RAW_LISTENER_ENABLED": false,
+          "CSA_SYNC_ENABLED": false,
+          "ENABLE_DH36_LISTENER": false
+        }
+      },
+      "external_network_calls": false,
+      "git_commit": "02795a81b801b784572089d6a7860ba889d10a4c",
+      "image_archive_sha256": "a003354da1cfa00ddcf720bedbc4c64c8592b57f590d4929a1f2b37c7b0adef2",
+      "image_id": "sha256:1edab0d5f47374eed5bd0464c70e56f7e106d6bbd101d662bd7427b287fd92ee",
+      "image_reference": "ruggylab-os:g0",
+      "memory_available_bytes": 15044083712,
+      "memory_total_bytes": 16766414848,
+      "os": "Linux 6.17.0-1022-azure",
+      "platform": "linux/x86_64",
+      "postgres_version": "PostgreSQL 16.6",
+      "python_version": "3.13.15",
+      "redis_protocol_compatibility_version": "7.2.4",
+      "runner": "github-actions/ubuntu-latest",
+      "valkey_expected_version_from_image_tag": "8.1.9",
+      "valkey_image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+      "valkey_image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+      "valkey_version": "8.1.9"
+    },
+    "generated_at": "2026-09-13T22:25:47Z",
+    "platform": "linux/x86_64",
+    "python_version": "3.13.15",
+    "run_id": "b89ed71dd3"
+  }
+}

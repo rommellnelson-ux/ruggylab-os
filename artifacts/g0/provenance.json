@@ -1,27 +1,33 @@
 {
-  "_comment": "deterministic est compare par --check ; volatile ne l'est pas. baseline_input_commit est DECLARE (reference permanente), jamais derive de la branche de travail. relevant_input_tree_sha256 est la preuve verifiable : l'empreinte des octets reellement lus.",
+  "_comment": "deterministic est compare par --check ; volatile ne l'est pas. baseline_input_commit est l'ANCRAGE HISTORIQUE DECLARE du programme G0 (reference permanente) : ce N'EST PAS le commit mesure, et le lire comme tel induit en erreur. Le commit reellement mesure figure dans measurement_identity, pour les artefacts qui en portent une. relevant_input_tree_sha256 est la preuve verifiable : l'empreinte des octets reellement lus.",
   "deterministic": {
     "baseline_input_commit": "f7abd7e10eb8acc22e3e13775a43172e7a90261e",
     "baseline_input_ref": "main",
     "generation_command": "python scripts/g0_inventory.py --generate",
     "generator_version": "2.0.0",
-    "relevant_input_file_count": 304,
+    "relevant_input_file_count": 347,
     "relevant_input_patterns": [
       "app/**/*",
       "alembic/**/*",
       "deploy/**/*",
       "monitoring/**/*",
+      "scripts/**/*.py",
+      "scripts/**/*.sh",
+      "scripts/**/*.ps1",
+      "scripts/**/*.yml",
+      "scripts/**/*.yaml",
+      "scripts/**/*.json",
       "docker-compose*.yml",
       "Dockerfile",
       "requirements.txt",
       ".github/workflows/ci.yml"
     ],
     "relevant_input_set": "inventory",
-    "relevant_input_tree_sha256": "834b809519de9de55ae81c4df4647953d40e891b472dd1c3e676971fbfee2429",
+    "relevant_input_tree_sha256": "ae8104a40bb0300e1a1831c3cde8b4599eef72b27eb2f82299615faf5fa06377",
     "schema_version": "2.0.0"
   },
   "volatile": {
-    "generated_at": "2026-09-10T03:21:08Z",
+    "generated_at": "2026-09-14T07:55:31Z",
     "platform": "windows/amd64",
     "python_version": "3.13.13"
   }

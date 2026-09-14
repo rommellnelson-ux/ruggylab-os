@@ -39,6 +39,7 @@ Aucun sous-processus, aucun appel réseau, aucun secret, aucune donnée patient.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import platform
 from datetime import UTC, datetime
@@ -57,13 +58,30 @@ BASELINE_INPUT_REF = "main"
 #: rapport, on finirait par régénérer sans lire le diff, et le contrôle
 #: perdrait son sens.
 ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
-    # L'inventaire lit le code, les migrations, les fichiers d'orchestration et
-    # la définition de la CI.
+    # L'inventaire lit le code, les migrations, les fichiers d'orchestration,
+    # la définition de la CI et **les scripts d'exploitation**.
+    #
+    # Les scripts n'y figuraient pas. L'artefact recensait pourtant 30 scripts
+    # CLI un par un : il décrivait un corps qu'il ne lisait pas. Modifier
+    # `scripts/reset_admin_password.py` laissait donc l'empreinte intacte, et
+    # `--check` déclarait la baseline à jour alors qu'une surface d'entrée
+    # venait de changer. Le défaut a été relevé par le lot C sur le lot A ; il
+    # est corrigé ici.
+    #
+    # Les extensions sont énumérées plutôt qu'un `scripts/**/*` global : ce
+    # répertoire reçoit aussi, à l'exécution, des rapports bruts et des bases
+    # jetables qu'un motif large absorberait.
     "inventory": (
         "app/**/*",
         "alembic/**/*",
         "deploy/**/*",
         "monitoring/**/*",
+        "scripts/**/*.py",
+        "scripts/**/*.sh",
+        "scripts/**/*.ps1",
+        "scripts/**/*.yml",
+        "scripts/**/*.yaml",
+        "scripts/**/*.json",
         "docker-compose*.yml",
         "Dockerfile",
         "requirements.txt",
@@ -105,16 +123,100 @@ ENSEMBLES_ENTREE: dict[str, tuple[str, ...]] = {
         "docker-compose*.yml",
         "requirements.txt",
     ),
+    # La couverture depend du code mesure, des tests qui l'executent, de la
+    # configuration de pytest, des versions epinglees de l'outil de mesure et
+    # du **plan de mesure** — c'est lui qui fixe les commandes, les fichiers
+    # PostgreSQL instrumentes et les paquets requis.
+    #
+    # `.github/**` etait declare volontairement absent au motif que « la CI
+    # orchestre la mesure, elle ne la determine pas ». La declaration etait
+    # fausse : le job portait les concurrences, la graine et la liste des
+    # tests PostgreSQL. Le plan ayant repris ces parametres, elle devient
+    # vraie — et les validateurs refusent une campagne qui s'ecarterait du
+    # plan, faute de quoi elle resterait une intention.
+    "coverage": (
+        "app/**/*",
+        "tests/**/*",
+        "pyproject.toml",
+        "requirements.txt",
+        "requirements-g0-quality.txt",
+        "scripts/g0_coverage_summary.py",
+        "scripts/g0_quality_plan.json",
+    ),
+    # La performance depend du scenario, de l'application mesuree, du schema
+    # qu'elle interroge, de l'image construite et de la stack qui l'heberge.
+    # `scripts/g0_perf_baseline.py` EN FAIT PARTIE : modifier le scenario doit
+    # changer l'empreinte, sans quoi une baseline pourrait decrire un parcours
+    # qui n'est plus celui qu'on execute. La surcharge de mesure y figure pour
+    # la meme raison : elle desactive les limiteurs de debit, et une baseline
+    # qui la modifierait sans changer d'empreinte decrirait un autre systeme.
+    # Le plan de mesure aussi : concurrences, repetitions, warm-up, graine,
+    # intervalle d'echantillonnage des ressources.
+    "performance": (
+        "scripts/g0_perf_baseline.py",
+        "scripts/g0_perf_overlay.yml",
+        "scripts/g0_quality_plan.json",
+        "app/**/*",
+        "alembic/**/*",
+        "docker-compose.yml",
+        "Dockerfile",
+        "requirements.txt",
+    ),
 }
 
-#: Répertoires et fichiers produits par l'exécution, jamais par un auteur.
-#: Les inclure ferait varier l'empreinte selon qu'un test a tourné ou non.
-_EXCLUS = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache")
+#: Répertoires produits par une exécution ou par un gestionnaire de paquets,
+#: jamais par un auteur. Les inclure ferait varier l'empreinte selon qu'un test
+#: a tourné ou non sur la machine.
+#:
+#: `artifacts` n'y figure pas : l'ensemble `security` nomme explicitement trois
+#: artefacts du lot A, et les exclure en bloc les lui retirerait.
+_EXCLUS = (
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "node_modules",
+    ".tox",
+    "htmlcov",
+)
+
+#: Fichiers produits par une exécution : mesures, rapports bruts, bases
+#: jetables, journaux. Ils sont écartés **par nom**, quel que soit l'ensemble,
+#: parce qu'un motif d'entrée ne peut pas prévoir où une campagne les dépose.
+#: Une empreinte qui les absorberait changerait selon qu'une mesure a tourné,
+#: le contrôle échouerait toujours, et on finirait par l'ignorer.
+_NOMS_EXCLUS = (
+    ".coverage",
+    ".coverage.*",
+    "coverage.xml",
+    "coverage.json",
+    "coverage-summary.json",
+    "perf-baseline.json",
+    "perf-provenance.json",
+    "*.pyc",
+    "*.pyo",
+    "*.db",
+    "*.sqlite",
+    "*.sqlite3",
+    "*.log",
+)
 
 
 def chemin_relatif(chemin: Path) -> str:
     """Le chemin d'un fichier tel qu'il entre dans l'empreinte."""
     return chemin.relative_to(RACINE).as_posix()
+
+
+def est_produit_d_execution(nom: str) -> bool:
+    """Ce nom de fichier désigne-t-il un produit d'exécution ?
+
+    Écarté **par nom** et non par emplacement : un motif d'entrée ne peut pas
+    prévoir où une campagne dépose ses mesures, et `scripts/**/*.json` finirait
+    par absorber un rapport brut déposé à côté du script qui l'a produit.
+    """
+    return any(fnmatch.fnmatch(nom, motif) for motif in _NOMS_EXCLUS)
 
 
 def fichiers_entree(ensemble: str) -> list[Path]:
@@ -137,7 +239,7 @@ def fichiers_entree(ensemble: str) -> list[Path]:
             parties = chemin.relative_to(RACINE).parts
             if any(exclu in parties for exclu in _EXCLUS):
                 continue
-            if chemin.suffix in (".pyc", ".pyo"):
+            if est_produit_d_execution(chemin.name):
                 continue
             trouves.add(chemin)
     return sorted(trouves, key=chemin_relatif)
@@ -195,9 +297,12 @@ def provenance(
     return {
         "_comment": (
             "deterministic est compare par --check ; volatile ne l'est pas. "
-            "baseline_input_commit est DECLARE (reference permanente), jamais "
-            "derive de la branche de travail. relevant_input_tree_sha256 est la "
-            "preuve verifiable : l'empreinte des octets reellement lus."
+            "baseline_input_commit est l'ANCRAGE HISTORIQUE DECLARE du programme "
+            "G0 (reference permanente) : ce N'EST PAS le commit mesure, et le "
+            "lire comme tel induit en erreur. Le commit reellement mesure figure "
+            "dans measurement_identity, pour les artefacts qui en portent une. "
+            "relevant_input_tree_sha256 est la preuve verifiable : l'empreinte "
+            "des octets reellement lus."
         ),
         "deterministic": {
             "schema_version": schema_version,

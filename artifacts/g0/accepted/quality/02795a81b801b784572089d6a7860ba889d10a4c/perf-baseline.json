@@ -1,0 +1,2365 @@
+{
+  "payload": {
+    "_comment": "Constat, pas verdict. Une latence elevee est un resultat ; seule une mesure invalide fait echouer ce script. Aucun reessai, aucune erreur exclue de l'agregat.",
+    "application_health": {
+      "after": true,
+      "before": true
+    },
+    "dataset": {
+      "all_identifiers_prefixed": true,
+      "identifier_prefix": "G0SYNTH-b89ed71dd3",
+      "identifiers_created": 399,
+      "name_vocabulary": [
+        "Alpha",
+        "Banc",
+        "Bravo",
+        "Charlie",
+        "Delta",
+        "Echo",
+        "Essai",
+        "Fictif",
+        "Foxtrot",
+        "Synthetique",
+        "Temoin",
+        "Zero"
+      ],
+      "names_used": [
+        "Alpha",
+        "Banc",
+        "Bravo",
+        "Charlie",
+        "Delta",
+        "Echo",
+        "Essai",
+        "Fictif",
+        "Foxtrot",
+        "Synthetique",
+        "Temoin",
+        "Zero"
+      ],
+      "sample_identifiers": [
+        "G0SYNTH-b89ed71dd3-L1-R0-W0-0000",
+        "G0SYNTH-b89ed71dd3-L1-R0-W0-0001",
+        "G0SYNTH-b89ed71dd3-L1-R0-W0-0002",
+        "G0SYNTH-b89ed71dd3-L1-R0-W0-0003",
+        "G0SYNTH-b89ed71dd3-L1-R0-W0-0004",
+        "G0SYNTH-b89ed71dd3-L10-R2-W9-0006",
+        "G0SYNTH-b89ed71dd3-L10-R2-W3-0006",
+        "G0SYNTH-b89ed71dd3-L10-R2-W5-0006",
+        "G0SYNTH-b89ed71dd3-L10-R2-W6-0006",
+        "G0SYNTH-b89ed71dd3-L10-R2-W1-0006"
+      ],
+      "source": "genere par scripts/g0_perf_baseline.py ; aucune donnee patient reelle",
+      "synthetic_marker": "G0SYNTH"
+    },
+    "environment": {
+      "application_configuration": {
+        "ANALYZER_RAW_LISTENER_ENABLED": null,
+        "CACHE_BACKEND": "redis",
+        "CSA_SYNC_ENABLED": null,
+        "ENABLE_DH36_LISTENER": null,
+        "LOGIN_RATE_LIMIT_ENABLED": "false",
+        "PROCESS_ROLE": "web",
+        "RATE_LIMIT_ENABLED": "false",
+        "REQUIRE_VALIDATION_FOR_RELEASE": "false",
+        "TRUSTED_PROXY_IPS": "[\"172.28.117.10\"]"
+      },
+      "application_configuration_note": "null = variable non transmise au conteneur ; la valeur effective est alors le defaut du code, publie dans effective_external_switches",
+      "architecture": "x86_64",
+      "compose_project": "ruggylab_g0_quality",
+      "cpu_count": 4,
+      "docker_version": "28.0.4",
+      "effective_external_switches": {
+        "available": true,
+        "settings": {
+          "ANALYZER_RAW_LISTENER_ENABLED": false,
+          "CSA_SYNC_ENABLED": false,
+          "ENABLE_DH36_LISTENER": false
+        }
+      },
+      "external_network_calls": false,
+      "git_commit": "02795a81b801b784572089d6a7860ba889d10a4c",
+      "image_archive_sha256": "a003354da1cfa00ddcf720bedbc4c64c8592b57f590d4929a1f2b37c7b0adef2",
+      "image_id": "sha256:1edab0d5f47374eed5bd0464c70e56f7e106d6bbd101d662bd7427b287fd92ee",
+      "image_reference": "ruggylab-os:g0",
+      "memory_available_bytes": 15044083712,
+      "memory_total_bytes": 16766414848,
+      "os": "Linux 6.17.0-1022-azure",
+      "platform": "linux/x86_64",
+      "postgres_version": "PostgreSQL 16.6",
+      "python_version": "3.13.15",
+      "redis_protocol_compatibility_version": "7.2.4",
+      "runner": "github-actions/ubuntu-latest",
+      "valkey_expected_version_from_image_tag": "8.1.9",
+      "valkey_image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+      "valkey_image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+      "valkey_version": "8.1.9"
+    },
+    "errors_by_type_total": {
+      "http_500": 61,
+      "http_502": 3
+    },
+    "levels": {
+      "1": {
+        "aggregate": {
+          "completed": true,
+          "error_rate": 0.0,
+          "errors": 0,
+          "errors_by_type": {},
+          "latency_ms": {
+            "max": 166.513,
+            "mean": 10.208,
+            "min": 4.658,
+            "p50": 9.341,
+            "p95": 14.457,
+            "p99": 18.682
+          },
+          "samples": 210,
+          "successes": 210,
+          "throughput_rps": 65.203
+        },
+        "concurrency": 1,
+        "repetitions": [
+          {
+            "errors": 0,
+            "index": 0,
+            "samples": 70,
+            "wall_clock_seconds": 1.222
+          },
+          {
+            "errors": 0,
+            "index": 1,
+            "samples": 70,
+            "wall_clock_seconds": 0.999
+          },
+          {
+            "errors": 0,
+            "index": 2,
+            "samples": 70,
+            "wall_clock_seconds": 0.999
+          }
+        ],
+        "resources": {
+          "after": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.12%",
+                "memory_percent": "13.48%",
+                "memory_usage": "138MiB / 1GiB",
+                "pids": "9"
+              },
+              "postgres": {
+                "cpu_percent": "2.72%",
+                "memory_percent": "3.56%",
+                "memory_usage": "36.42MiB / 1GiB",
+                "pids": "7"
+              },
+              "prometheus": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "3.88%",
+                "memory_usage": "19.89MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "0.14%",
+                "memory_usage": "22.3MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.46%",
+                "memory_usage": "54.95MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "0.14%",
+                "memory_percent": "2.67%",
+                "memory_usage": "13.66MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 83445,
+              "blocks_read": 693,
+              "connections": 2,
+              "xact_commit": 242,
+              "xact_rollback": 260
+            },
+            "sampled_at": "2026-09-13T22:24:02Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 8,
+              "used_memory_bytes": 1026328,
+              "used_memory_human": "1002.27K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "before": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.48%",
+                "memory_percent": "13.03%",
+                "memory_usage": "133.4MiB / 1GiB",
+                "pids": "9"
+              },
+              "postgres": {
+                "cpu_percent": "0.03%",
+                "memory_percent": "3.28%",
+                "memory_usage": "33.62MiB / 1GiB",
+                "pids": "7"
+              },
+              "prometheus": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "3.83%",
+                "memory_usage": "19.6MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "0.09%",
+                "memory_usage": "14.8MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.58%",
+                "memory_usage": "55.25MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "0.13%",
+                "memory_percent": "2.58%",
+                "memory_usage": "13.19MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 70465,
+              "blocks_read": 607,
+              "connections": 2,
+              "xact_commit": 27,
+              "xact_rollback": 5
+            },
+            "sampled_at": "2026-09-13T22:23:56Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 5,
+              "used_memory_bytes": 976952,
+              "used_memory_human": "954.05K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "during_load": {
+            "containers": {
+              "app": {
+                "cpu_percent": {
+                  "max": 81.52,
+                  "mean": 49.35,
+                  "p95": 81.52
+                },
+                "memory_bytes": {
+                  "max": 144493772,
+                  "mean": 144158228,
+                  "p95": 144493772
+                },
+                "samples": 10
+              },
+              "postgres": {
+                "cpu_percent": {
+                  "max": 17.63,
+                  "mean": 10.078,
+                  "p95": 17.63
+                },
+                "memory_bytes": {
+                  "max": 38681968,
+                  "mean": 38400949,
+                  "p95": 38681968
+                },
+                "samples": 10
+              },
+              "prometheus": {
+                "cpu_percent": {
+                  "max": 0.07,
+                  "mean": 0.032,
+                  "p95": 0.07
+                },
+                "memory_bytes": {
+                  "max": 20835205,
+                  "mean": 20690501,
+                  "p95": 20835205
+                },
+                "samples": 10
+              },
+              "proxy": {
+                "cpu_percent": {
+                  "max": 5.84,
+                  "mean": 3.04,
+                  "p95": 5.84
+                },
+                "memory_bytes": {
+                  "max": 23865589,
+                  "mean": 20434648,
+                  "p95": 23865589
+                },
+                "samples": 10
+              },
+              "scheduler": {
+                "cpu_percent": {
+                  "max": 0.85,
+                  "mean": 0.34,
+                  "p95": 0.85
+                },
+                "memory_bytes": {
+                  "max": 57619251,
+                  "mean": 57619251,
+                  "p95": 57619251
+                },
+                "samples": 10
+              },
+              "valkey": {
+                "cpu_percent": {
+                  "max": 0.13,
+                  "mean": 0.13,
+                  "p95": 0.13
+                },
+                "memory_bytes": {
+                  "max": 14512291,
+                  "mean": 14407433,
+                  "p95": 14512291
+                },
+                "samples": 10
+              }
+            },
+            "enabled": true,
+            "interval_seconds_configured": 1.0,
+            "interval_seconds_observed_mean": 0.222,
+            "load_window_seconds": 3.223,
+            "min_samples_per_container_within_window": 10,
+            "sampler_alive_at_stop": true,
+            "sampler_exception": null,
+            "sampler_started_at": "2026-09-13T22:23:59.237034Z",
+            "sampler_stopped_at": "2026-09-13T22:24:02.468243Z",
+            "samples_after_load_window": 0,
+            "samples_before_load_window": 0,
+            "samples_total": 60,
+            "samples_within_load_window": 60,
+            "sampling_errors": []
+          },
+          "postgres_delta": {
+            "available": true,
+            "blocks_hit": 12980,
+            "blocks_read": 86,
+            "xact_commit": 215,
+            "xact_rollback": 255
+          }
+        },
+        "scenarios": {
+          "auth": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 10.111,
+              "mean": 9.508,
+              "min": 9.127,
+              "p50": 9.468,
+              "p95": 10.111,
+              "p99": 10.111
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "dashboard": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 166.513,
+              "mean": 25.854,
+              "min": 11.204,
+              "p50": 16.986,
+              "p95": 166.513,
+              "p99": 166.513
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "invoice_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 9.489,
+              "mean": 8.958,
+              "min": 8.608,
+              "p50": 8.802,
+              "p95": 9.489,
+              "p99": 9.489
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "order_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 9.675,
+              "mean": 9.121,
+              "min": 8.656,
+              "p50": 9.075,
+              "p95": 9.675,
+              "p99": 9.675
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "order_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 8.857,
+              "mean": 5.916,
+              "min": 5.409,
+              "p50": 5.686,
+              "p95": 8.857,
+              "p99": 8.857
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "patient_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 7.608,
+              "mean": 7.412,
+              "min": 7.198,
+              "p50": 7.423,
+              "p95": 7.608,
+              "p99": 7.608
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "patient_search": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 5.86,
+              "mean": 5.609,
+              "min": 5.462,
+              "p50": 5.552,
+              "p95": 5.86,
+              "p99": 5.86
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "payment_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 11.198,
+              "mean": 10.616,
+              "min": 10.151,
+              "p50": 10.477,
+              "p95": 11.198,
+              "p99": 11.198
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "result_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 12.083,
+              "mean": 11.323,
+              "min": 10.766,
+              "p50": 11.237,
+              "p95": 12.083,
+              "p99": 12.083
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "result_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 5.324,
+              "mean": 4.927,
+              "min": 4.658,
+              "p50": 4.894,
+              "p95": 5.324,
+              "p99": 5.324
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "result_release": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 12.804,
+              "mean": 11.592,
+              "min": 11.01,
+              "p50": 11.526,
+              "p95": 12.804,
+              "p99": 12.804
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "sample_attach": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 12.885,
+              "mean": 12.221,
+              "min": 11.295,
+              "p50": 12.343,
+              "p95": 12.885,
+              "p99": 12.885
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "sample_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 8.997,
+              "mean": 8.575,
+              "min": 8.218,
+              "p50": 8.463,
+              "p95": 8.997,
+              "p99": 8.997
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          },
+          "worklist": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 12.101,
+              "mean": 11.278,
+              "min": 10.248,
+              "p50": 11.293,
+              "p95": 12.101,
+              "p99": 12.101
+            },
+            "samples": 15,
+            "successes": 15,
+            "throughput_rps": 4.657
+          }
+        },
+        "wall_clock_seconds": 3.221
+      },
+      "10": {
+        "aggregate": {
+          "completed": true,
+          "error_rate": 0.0219,
+          "errors": 45,
+          "errors_by_type": {
+            "http_500": 42,
+            "http_502": 3
+          },
+          "latency_ms": {
+            "max": 1857.323,
+            "mean": 190.262,
+            "min": 15.134,
+            "p50": 92.196,
+            "p95": 1285.3,
+            "p99": 1685.385
+          },
+          "samples": 2058,
+          "successes": 2013,
+          "throughput_rps": 37.341
+        },
+        "concurrency": 10,
+        "repetitions": [
+          {
+            "errors": 9,
+            "index": 0,
+            "samples": 691,
+            "wall_clock_seconds": 16.361
+          },
+          {
+            "errors": 19,
+            "index": 1,
+            "samples": 682,
+            "wall_clock_seconds": 18.338
+          },
+          {
+            "errors": 17,
+            "index": 2,
+            "samples": 685,
+            "wall_clock_seconds": 20.415
+          }
+        ],
+        "resources": {
+          "after": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.12%",
+                "memory_percent": "16.97%",
+                "memory_usage": "173.8MiB / 1GiB",
+                "pids": "21"
+              },
+              "postgres": {
+                "cpu_percent": "0.01%",
+                "memory_percent": "5.28%",
+                "memory_usage": "54.05MiB / 1GiB",
+                "pids": "11"
+              },
+              "prometheus": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "4.68%",
+                "memory_usage": "23.95MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "0.18%",
+                "memory_usage": "29.16MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.46%",
+                "memory_usage": "54.95MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "0.12%",
+                "memory_percent": "2.59%",
+                "memory_usage": "13.26MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 1095453,
+              "blocks_read": 719,
+              "connections": 6,
+              "xact_commit": 4410,
+              "xact_rollback": 5086
+            },
+            "sampled_at": "2026-09-13T22:25:44Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 30,
+              "used_memory_bytes": 1026328,
+              "used_memory_human": "1002.27K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "before": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.15%",
+                "memory_percent": "14.65%",
+                "memory_usage": "150MiB / 1GiB",
+                "pids": "15"
+              },
+              "postgres": {
+                "cpu_percent": "0.02%",
+                "memory_percent": "5.21%",
+                "memory_usage": "53.3MiB / 1GiB",
+                "pids": "11"
+              },
+              "prometheus": {
+                "cpu_percent": "0.02%",
+                "memory_percent": "4.76%",
+                "memory_usage": "24.36MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.06%",
+                "memory_percent": "0.17%",
+                "memory_usage": "26.8MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.46%",
+                "memory_usage": "54.95MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "0.12%",
+                "memory_percent": "2.60%",
+                "memory_usage": "13.32MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 300068,
+              "blocks_read": 719,
+              "connections": 6,
+              "xact_commit": 2056,
+              "xact_rollback": 2402
+            },
+            "sampled_at": "2026-09-13T22:24:45Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 22,
+              "used_memory_bytes": 1026328,
+              "used_memory_human": "1002.27K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "during_load": {
+            "containers": {
+              "app": {
+                "cpu_percent": {
+                  "max": 152.68,
+                  "mean": 128.007,
+                  "p95": 137.13
+                },
+                "memory_bytes": {
+                  "max": 182766796,
+                  "mean": 173810610,
+                  "p95": 180984217
+                },
+                "samples": 218
+              },
+              "postgres": {
+                "cpu_percent": {
+                  "max": 59.9,
+                  "mean": 35.923,
+                  "p95": 52.89
+                },
+                "memory_bytes": {
+                  "max": 79198945,
+                  "mean": 71903549,
+                  "p95": 78234255
+                },
+                "samples": 218
+              },
+              "prometheus": {
+                "cpu_percent": {
+                  "max": 0.5,
+                  "mean": 0.052,
+                  "p95": 0.43
+                },
+                "memory_bytes": {
+                  "max": 25889341,
+                  "mean": 25137156,
+                  "p95": 25574768
+                },
+                "samples": 218
+              },
+              "proxy": {
+                "cpu_percent": {
+                  "max": 7.26,
+                  "mean": 3.219,
+                  "p95": 5.68
+                },
+                "memory_bytes": {
+                  "max": 30985420,
+                  "mean": 29082110,
+                  "p95": 30849105
+                },
+                "samples": 218
+              },
+              "scheduler": {
+                "cpu_percent": {
+                  "max": 2.52,
+                  "mean": 0.103,
+                  "p95": 0.62
+                },
+                "memory_bytes": {
+                  "max": 57933824,
+                  "mean": 57629832,
+                  "p95": 57619251
+                },
+                "samples": 218
+              },
+              "valkey": {
+                "cpu_percent": {
+                  "max": 2.83,
+                  "mean": 0.367,
+                  "p95": 2.68
+                },
+                "memory_bytes": {
+                  "max": 14617149,
+                  "mean": 14241585,
+                  "p95": 14606663
+                },
+                "samples": 218
+              }
+            },
+            "enabled": true,
+            "interval_seconds_configured": 1.0,
+            "interval_seconds_observed_mean": 0.249,
+            "load_window_seconds": 55.123,
+            "min_samples_per_container_within_window": 218,
+            "sampler_alive_at_stop": true,
+            "sampler_exception": null,
+            "sampler_started_at": "2026-09-13T22:24:48.665747Z",
+            "sampler_stopped_at": "2026-09-13T22:25:43.915443Z",
+            "samples_after_load_window": 0,
+            "samples_before_load_window": 0,
+            "samples_total": 1308,
+            "samples_within_load_window": 1308,
+            "sampling_errors": []
+          },
+          "postgres_delta": {
+            "available": true,
+            "blocks_hit": 795385,
+            "blocks_read": 0,
+            "xact_commit": 2354,
+            "xact_rollback": 2684
+          }
+        },
+        "scenarios": {
+          "auth": {
+            "completed": true,
+            "error_rate": 0.02,
+            "errors": 3,
+            "errors_by_type": {
+              "http_502": 3
+            },
+            "latency_ms": {
+              "max": 232.916,
+              "mean": 72.641,
+              "min": 31.731,
+              "p50": 66.078,
+              "p95": 119.297,
+              "p99": 227.876
+            },
+            "samples": 150,
+            "successes": 147,
+            "throughput_rps": 2.722
+          },
+          "dashboard": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 1857.323,
+              "mean": 1397.212,
+              "min": 439.871,
+              "p50": 1408.314,
+              "p95": 1790.559,
+              "p99": 1852.006
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "invoice_create": {
+            "completed": true,
+            "error_rate": 0.28,
+            "errors": 42,
+            "errors_by_type": {
+              "http_500": 42
+            },
+            "latency_ms": {
+              "max": 257.672,
+              "mean": 97.264,
+              "min": 26.927,
+              "p50": 92.196,
+              "p95": 183.709,
+              "p99": 222.443
+            },
+            "samples": 150,
+            "successes": 108,
+            "throughput_rps": 2.722
+          },
+          "order_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 288.602,
+              "mean": 93.33,
+              "min": 59.271,
+              "p50": 84.631,
+              "p95": 123.896,
+              "p99": 269.159
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "order_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 237.423,
+              "mean": 60.489,
+              "min": 29.451,
+              "p50": 54.663,
+              "p95": 79.224,
+              "p99": 230.488
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "patient_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 265.326,
+              "mean": 83.454,
+              "min": 42.498,
+              "p50": 77.328,
+              "p95": 127.962,
+              "p99": 236.29
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "patient_search": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 94.206,
+              "mean": 52.741,
+              "min": 23.894,
+              "p50": 50.649,
+              "p95": 76.979,
+              "p99": 89.646
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "payment_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 311.27,
+              "mean": 105.874,
+              "min": 15.134,
+              "p50": 99.501,
+              "p95": 222.515,
+              "p99": 301.433
+            },
+            "samples": 108,
+            "successes": 108,
+            "throughput_rps": 1.96
+          },
+          "result_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 331.94,
+              "mean": 127.331,
+              "min": 59.157,
+              "p50": 121.911,
+              "p95": 157.168,
+              "p99": 326.673
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "result_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 198.14,
+              "mean": 47.985,
+              "min": 21.408,
+              "p50": 45.728,
+              "p95": 69.98,
+              "p99": 87.955
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "result_release": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 466.57,
+              "mean": 134.444,
+              "min": 52.795,
+              "p50": 118.733,
+              "p95": 281.053,
+              "p99": 450.963
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "sample_attach": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 332.339,
+              "mean": 128.159,
+              "min": 77.509,
+              "p50": 119.763,
+              "p95": 169.636,
+              "p99": 314.62
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "sample_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 305.903,
+              "mean": 103.915,
+              "min": 61.07,
+              "p50": 99.224,
+              "p95": 132.599,
+              "p99": 293.868
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          },
+          "worklist": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 295.699,
+              "mean": 106.813,
+              "min": 65.216,
+              "p50": 96.189,
+              "p95": 252.721,
+              "p99": 292.437
+            },
+            "samples": 150,
+            "successes": 150,
+            "throughput_rps": 2.722
+          }
+        },
+        "wall_clock_seconds": 55.114
+      },
+      "3": {
+        "aggregate": {
+          "completed": true,
+          "error_rate": 0.0096,
+          "errors": 6,
+          "errors_by_type": {
+            "http_500": 6
+          },
+          "latency_ms": {
+            "max": 119.579,
+            "mean": 28.43,
+            "min": 7.66,
+            "p50": 24.472,
+            "p95": 81.365,
+            "p99": 111.189
+          },
+          "samples": 624,
+          "successes": 618,
+          "throughput_rps": 72.624
+        },
+        "concurrency": 3,
+        "repetitions": [
+          {
+            "errors": 0,
+            "index": 0,
+            "samples": 210,
+            "wall_clock_seconds": 2.729
+          },
+          {
+            "errors": 3,
+            "index": 1,
+            "samples": 207,
+            "wall_clock_seconds": 2.855
+          },
+          {
+            "errors": 3,
+            "index": 2,
+            "samples": 207,
+            "wall_clock_seconds": 3.009
+          }
+        ],
+        "resources": {
+          "after": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.15%",
+                "memory_percent": "14.22%",
+                "memory_usage": "145.6MiB / 1GiB",
+                "pids": "13"
+              },
+              "postgres": {
+                "cpu_percent": "0.02%",
+                "memory_percent": "4.65%",
+                "memory_usage": "47.57MiB / 1GiB",
+                "pids": "10"
+              },
+              "prometheus": {
+                "cpu_percent": "0.02%",
+                "memory_percent": "4.71%",
+                "memory_usage": "24.1MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "0.14%",
+                "memory_usage": "22.89MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.46%",
+                "memory_usage": "54.95MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "0.13%",
+                "memory_percent": "2.64%",
+                "memory_usage": "13.5MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 147157,
+              "blocks_read": 719,
+              "connections": 5,
+              "xact_commit": 951,
+              "xact_rollback": 1060
+            },
+            "sampled_at": "2026-09-13T22:24:17Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 13,
+              "used_memory_bytes": 1026328,
+              "used_memory_human": "1002.27K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "before": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.13%",
+                "memory_percent": "13.48%",
+                "memory_usage": "138.1MiB / 1GiB",
+                "pids": "9"
+              },
+              "postgres": {
+                "cpu_percent": "0.01%",
+                "memory_percent": "3.55%",
+                "memory_usage": "36.34MiB / 1GiB",
+                "pids": "7"
+              },
+              "prometheus": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "3.83%",
+                "memory_usage": "19.63MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.02%",
+                "memory_percent": "0.14%",
+                "memory_usage": "22.53MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.46%",
+                "memory_usage": "54.95MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "0.13%",
+                "memory_percent": "2.65%",
+                "memory_usage": "13.57MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 83688,
+              "blocks_read": 693,
+              "connections": 2,
+              "xact_commit": 244,
+              "xact_rollback": 260
+            },
+            "sampled_at": "2026-09-13T22:24:06Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 10,
+              "used_memory_bytes": 1026328,
+              "used_memory_human": "1002.27K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "during_load": {
+            "containers": {
+              "app": {
+                "cpu_percent": {
+                  "max": 123.94,
+                  "mean": 106.662,
+                  "p95": 123.94
+                },
+                "memory_bytes": {
+                  "max": 152462950,
+                  "mean": 150641049,
+                  "p95": 152462950
+                },
+                "samples": 32
+              },
+              "postgres": {
+                "cpu_percent": {
+                  "max": 36.98,
+                  "mean": 25.56,
+                  "p95": 36.98
+                },
+                "memory_bytes": {
+                  "max": 50279219,
+                  "mean": 48462560,
+                  "p95": 50279219
+                },
+                "samples": 32
+              },
+              "prometheus": {
+                "cpu_percent": {
+                  "max": 0.23,
+                  "mean": 0.043,
+                  "p95": 0.23
+                },
+                "memory_bytes": {
+                  "max": 25050480,
+                  "mean": 25009847,
+                  "p95": 25050480
+                },
+                "samples": 32
+              },
+              "proxy": {
+                "cpu_percent": {
+                  "max": 6.67,
+                  "mean": 5.449,
+                  "p95": 6.67
+                },
+                "memory_bytes": {
+                  "max": 24305991,
+                  "mean": 24017632,
+                  "p95": 24305991
+                },
+                "samples": 32
+              },
+              "scheduler": {
+                "cpu_percent": {
+                  "max": 0.78,
+                  "mean": 0.098,
+                  "p95": 0.78
+                },
+                "memory_bytes": {
+                  "max": 57619251,
+                  "mean": 57619251,
+                  "p95": 57619251
+                },
+                "samples": 32
+              },
+              "valkey": {
+                "cpu_percent": {
+                  "max": 2.82,
+                  "mean": 0.482,
+                  "p95": 2.82
+                },
+                "memory_bytes": {
+                  "max": 14103347,
+                  "mean": 13955235,
+                  "p95": 14103347
+                },
+                "samples": 32
+              }
+            },
+            "enabled": true,
+            "interval_seconds_configured": 1.0,
+            "interval_seconds_observed_mean": 0.242,
+            "load_window_seconds": 8.596,
+            "min_samples_per_container_within_window": 32,
+            "sampler_alive_at_stop": true,
+            "sampler_exception": null,
+            "sampler_started_at": "2026-09-13T22:24:08.799860Z",
+            "sampler_stopped_at": "2026-09-13T22:24:17.554860Z",
+            "samples_after_load_window": 0,
+            "samples_before_load_window": 0,
+            "samples_total": 192,
+            "samples_within_load_window": 192,
+            "sampling_errors": []
+          },
+          "postgres_delta": {
+            "available": true,
+            "blocks_hit": 63469,
+            "blocks_read": 26,
+            "xact_commit": 707,
+            "xact_rollback": 800
+          }
+        },
+        "scenarios": {
+          "auth": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 38.671,
+              "mean": 20.065,
+              "min": 13.376,
+              "p50": 19.031,
+              "p95": 29.439,
+              "p99": 38.671
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "dashboard": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 119.579,
+              "mean": 91.407,
+              "min": 61.551,
+              "p50": 92.227,
+              "p95": 115.266,
+              "p99": 119.579
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "invoice_create": {
+            "completed": true,
+            "error_rate": 0.1333,
+            "errors": 6,
+            "errors_by_type": {
+              "http_500": 6
+            },
+            "latency_ms": {
+              "max": 45.656,
+              "mean": 23.307,
+              "min": 9.136,
+              "p50": 20.872,
+              "p95": 40.491,
+              "p99": 45.656
+            },
+            "samples": 45,
+            "successes": 39,
+            "throughput_rps": 5.237
+          },
+          "order_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 50.383,
+              "mean": 25.03,
+              "min": 17.553,
+              "p50": 24.043,
+              "p95": 32.388,
+              "p99": 50.383
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "order_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 20.199,
+              "mean": 14.278,
+              "min": 9.687,
+              "p50": 14.254,
+              "p95": 18.803,
+              "p99": 20.199
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "patient_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 38.3,
+              "mean": 19.719,
+              "min": 12.211,
+              "p50": 18.987,
+              "p95": 24.706,
+              "p99": 38.3
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "patient_search": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 19.454,
+              "mean": 13.143,
+              "min": 7.66,
+              "p50": 13.318,
+              "p95": 16.677,
+              "p99": 19.454
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "payment_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 34.19,
+              "mean": 25.764,
+              "min": 10.5,
+              "p50": 25.879,
+              "p95": 33.816,
+              "p99": 34.19
+            },
+            "samples": 39,
+            "successes": 39,
+            "throughput_rps": 4.539
+          },
+          "result_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 45.085,
+              "mean": 32.806,
+              "min": 24.359,
+              "p50": 32.06,
+              "p95": 40.589,
+              "p99": 45.085
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "result_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 19.402,
+              "mean": 12.538,
+              "min": 8.942,
+              "p50": 12.042,
+              "p95": 16.176,
+              "p99": 19.402
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "result_release": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 39.013,
+              "mean": 29.441,
+              "min": 21.417,
+              "p50": 28.7,
+              "p95": 37.167,
+              "p99": 39.013
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "sample_attach": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 58.305,
+              "mean": 34.384,
+              "min": 24.786,
+              "p50": 34.824,
+              "p95": 42.735,
+              "p99": 58.305
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "sample_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 37.543,
+              "mean": 25.395,
+              "min": 19.194,
+              "p50": 24.584,
+              "p95": 31.733,
+              "p99": 37.543
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          },
+          "worklist": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 40.04,
+              "mean": 29.699,
+              "min": 22.947,
+              "p50": 29.251,
+              "p95": 38.437,
+              "p99": 40.04
+            },
+            "samples": 45,
+            "successes": 45,
+            "throughput_rps": 5.237
+          }
+        },
+        "wall_clock_seconds": 8.592
+      },
+      "5": {
+        "aggregate": {
+          "completed": true,
+          "error_rate": 0.0125,
+          "errors": 13,
+          "errors_by_type": {
+            "http_500": 13
+          },
+          "latency_ms": {
+            "max": 555.075,
+            "mean": 64.708,
+            "min": 10.021,
+            "p50": 43.374,
+            "p95": 302.333,
+            "p99": 418.212
+          },
+          "samples": 1037,
+          "successes": 1024,
+          "throughput_rps": 54.189
+        },
+        "concurrency": 5,
+        "repetitions": [
+          {
+            "errors": 5,
+            "index": 0,
+            "samples": 345,
+            "wall_clock_seconds": 6.132
+          },
+          {
+            "errors": 4,
+            "index": 1,
+            "samples": 346,
+            "wall_clock_seconds": 6.253
+          },
+          {
+            "errors": 4,
+            "index": 2,
+            "samples": 346,
+            "wall_clock_seconds": 6.752
+          }
+        ],
+        "resources": {
+          "after": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.12%",
+                "memory_percent": "14.65%",
+                "memory_usage": "150MiB / 1GiB",
+                "pids": "15"
+              },
+              "postgres": {
+                "cpu_percent": "2.64%",
+                "memory_percent": "5.23%",
+                "memory_usage": "53.55MiB / 1GiB",
+                "pids": "11"
+              },
+              "prometheus": {
+                "cpu_percent": "0.11%",
+                "memory_percent": "4.76%",
+                "memory_usage": "24.36MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "0.17%",
+                "memory_usage": "26.55MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.46%",
+                "memory_usage": "54.95MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "2.27%",
+                "memory_percent": "2.60%",
+                "memory_usage": "13.29MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 299825,
+              "blocks_read": 719,
+              "connections": 6,
+              "xact_commit": 2054,
+              "xact_rollback": 2402
+            },
+            "sampled_at": "2026-09-13T22:24:42Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 20,
+              "used_memory_bytes": 1026328,
+              "used_memory_human": "1002.27K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "before": {
+            "containers": {
+              "app": {
+                "cpu_percent": "0.11%",
+                "memory_percent": "14.17%",
+                "memory_usage": "145.1MiB / 1GiB",
+                "pids": "13"
+              },
+              "postgres": {
+                "cpu_percent": "0.03%",
+                "memory_percent": "4.65%",
+                "memory_usage": "47.64MiB / 1GiB",
+                "pids": "10"
+              },
+              "prometheus": {
+                "cpu_percent": "0.05%",
+                "memory_percent": "4.71%",
+                "memory_usage": "24.1MiB / 512MiB",
+                "pids": "8"
+              },
+              "proxy": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "0.14%",
+                "memory_usage": "22.87MiB / 15.61GiB",
+                "pids": "10"
+              },
+              "scheduler": {
+                "cpu_percent": "0.00%",
+                "memory_percent": "21.46%",
+                "memory_usage": "54.95MiB / 256MiB",
+                "pids": "1"
+              },
+              "valkey": {
+                "cpu_percent": "0.12%",
+                "memory_percent": "2.68%",
+                "memory_usage": "13.71MiB / 512MiB",
+                "pids": "5"
+              }
+            },
+            "postgres": {
+              "available": true,
+              "blocks_hit": 147392,
+              "blocks_read": 719,
+              "connections": 5,
+              "xact_commit": 953,
+              "xact_rollback": 1060
+            },
+            "sampled_at": "2026-09-13T22:24:20Z",
+            "valkey": {
+              "available": true,
+              "blocked_clients": 0,
+              "connected_clients": 2,
+              "expected_version_from_image_tag": "8.1.9",
+              "image_digest": "sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "image_reference": "valkey/valkey:8.1.9-alpine@sha256:e0eb7c480958d32bdc4357a74bdd70653ae15f2f9b4c93c4a5a9fad1dc471c84",
+              "keyspace_size": 0,
+              "protocol_compatibility": {
+                "note": "Compatibilite de protocole annoncee par Valkey. Ce n'est PAS la version du produit : ne jamais la publier comme telle.",
+                "redis_version": "7.2.4"
+              },
+              "server_mode": "standalone",
+              "total_commands_processed": 15,
+              "used_memory_bytes": 1026328,
+              "used_memory_human": "1002.27K",
+              "valkey_version": "8.1.9"
+            }
+          },
+          "during_load": {
+            "containers": {
+              "app": {
+                "cpu_percent": {
+                  "max": 141.91,
+                  "mean": 119.264,
+                  "p95": 141.91
+                },
+                "memory_bytes": {
+                  "max": 157600972,
+                  "mean": 155906246,
+                  "p95": 157600972
+                },
+                "samples": 74
+              },
+              "postgres": {
+                "cpu_percent": {
+                  "max": 38.05,
+                  "mean": 26.504,
+                  "p95": 38.05
+                },
+                "memory_bytes": {
+                  "max": 62295900,
+                  "mean": 57434191,
+                  "p95": 62295900
+                },
+                "samples": 74
+              },
+              "prometheus": {
+                "cpu_percent": {
+                  "max": 0.39,
+                  "mean": 0.039,
+                  "p95": 0.39
+                },
+                "memory_bytes": {
+                  "max": 25291653,
+                  "mean": 25099225,
+                  "p95": 25291653
+                },
+                "samples": 74
+              },
+              "proxy": {
+                "cpu_percent": {
+                  "max": 5.87,
+                  "mean": 4.412,
+                  "p95": 5.87
+                },
+                "memory_bytes": {
+                  "max": 28657582,
+                  "mean": 27236619,
+                  "p95": 28657582
+                },
+                "samples": 74
+              },
+              "scheduler": {
+                "cpu_percent": {
+                  "max": 2.63,
+                  "mean": 0.181,
+                  "p95": 2.63
+                },
+                "memory_bytes": {
+                  "max": 57619251,
+                  "mean": 57619251,
+                  "p95": 57619251
+                },
+                "samples": 74
+              },
+              "valkey": {
+                "cpu_percent": {
+                  "max": 2.78,
+                  "mean": 0.419,
+                  "p95": 2.78
+                },
+                "memory_bytes": {
+                  "max": 14627635,
+                  "mean": 14177030,
+                  "p95": 14627635
+                },
+                "samples": 74
+              }
+            },
+            "enabled": true,
+            "interval_seconds_configured": 1.0,
+            "interval_seconds_observed_mean": 0.247,
+            "load_window_seconds": 19.142,
+            "min_samples_per_container_within_window": 74,
+            "sampler_alive_at_stop": true,
+            "sampler_exception": null,
+            "sampler_started_at": "2026-09-13T22:24:23.078974Z",
+            "sampler_stopped_at": "2026-09-13T22:24:42.335162Z",
+            "samples_after_load_window": 0,
+            "samples_before_load_window": 0,
+            "samples_total": 444,
+            "samples_within_load_window": 444,
+            "sampling_errors": []
+          },
+          "postgres_delta": {
+            "available": true,
+            "blocks_hit": 152433,
+            "blocks_read": 0,
+            "xact_commit": 1101,
+            "xact_rollback": 1342
+          }
+        },
+        "scenarios": {
+          "auth": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 58.449,
+              "mean": 31.629,
+              "min": 13.06,
+              "p50": 30.657,
+              "p95": 54.313,
+              "p99": 58.449
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "dashboard": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 555.075,
+              "mean": 342.65,
+              "min": 177.488,
+              "p50": 334.351,
+              "p95": 464.218,
+              "p99": 555.075
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "invoice_create": {
+            "completed": true,
+            "error_rate": 0.1733,
+            "errors": 13,
+            "errors_by_type": {
+              "http_500": 13
+            },
+            "latency_ms": {
+              "max": 63.346,
+              "mean": 39.752,
+              "min": 16.337,
+              "p50": 37.825,
+              "p95": 57.128,
+              "p99": 63.346
+            },
+            "samples": 75,
+            "successes": 62,
+            "throughput_rps": 3.919
+          },
+          "order_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 66.839,
+              "mean": 41.852,
+              "min": 28.926,
+              "p50": 41.486,
+              "p95": 51.346,
+              "p99": 66.839
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "order_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 195.443,
+              "mean": 30.065,
+              "min": 14.45,
+              "p50": 25.041,
+              "p95": 39.259,
+              "p99": 195.443
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "patient_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 88.519,
+              "mean": 36.375,
+              "min": 23.584,
+              "p50": 34.289,
+              "p95": 49.294,
+              "p99": 88.519
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "patient_search": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 40.26,
+              "mean": 24.591,
+              "min": 15.805,
+              "p50": 24.183,
+              "p95": 36.451,
+              "p99": 40.26
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "payment_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 99.315,
+              "mean": 46.44,
+              "min": 11.489,
+              "p50": 47.288,
+              "p95": 63.888,
+              "p99": 99.315
+            },
+            "samples": 62,
+            "successes": 62,
+            "throughput_rps": 3.24
+          },
+          "result_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 239.826,
+              "mean": 67.968,
+              "min": 41.93,
+              "p50": 57.732,
+              "p95": 221.978,
+              "p99": 239.826
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "result_read": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 191.766,
+              "mean": 24.203,
+              "min": 10.021,
+              "p50": 21.587,
+              "p95": 32.254,
+              "p99": 191.766
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "result_release": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 90.582,
+              "mean": 55.175,
+              "min": 39.453,
+              "p50": 54.084,
+              "p95": 70.397,
+              "p99": 90.582
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "sample_attach": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 146.18,
+              "mean": 58.831,
+              "min": 43.033,
+              "p50": 57.31,
+              "p95": 68.763,
+              "p99": 146.18
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "sample_create": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 122.273,
+              "mean": 46.077,
+              "min": 29.182,
+              "p50": 42.425,
+              "p95": 71.428,
+              "p99": 122.273
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          },
+          "worklist": {
+            "completed": true,
+            "error_rate": 0.0,
+            "errors": 0,
+            "errors_by_type": {},
+            "latency_ms": {
+              "max": 211.276,
+              "mean": 52.81,
+              "min": 35.393,
+              "p50": 50.213,
+              "p95": 66.308,
+              "p99": 211.276
+            },
+            "samples": 75,
+            "successes": 75,
+            "throughput_rps": 3.919
+          }
+        },
+        "wall_clock_seconds": 19.137
+      }
+    },
+    "run": {
+      "base_url_scheme": "https",
+      "clock_monotonic": true,
+      "clock_source": "time.perf_counter (monotone)",
+      "command": "python scripts/g0_perf_baseline.py --run --base-url https://localhost --concurrency 1,3,5,10 --repetitions 3 --iterations 5 --warmup 2 --seed 20260909",
+      "concurrency_levels": [
+        1,
+        3,
+        5,
+        10
+      ],
+      "duration_seconds": 110.829,
+      "iterations_per_worker": 5,
+      "measurement_plan": "scripts/g0_quality_plan.json",
+      "measurement_plan_sha256": "4f651fa8f7a8d30bbf7bc86a37e60a5ba0c36e5628f2b0129a2f7d79214e8a9e",
+      "percentile_method": "nearest-rank (ceil(p/100*n)) sans interpolation",
+      "performance_profile": "CORE_INTRINSIC_WITH_RATE_LIMITS_DISABLED",
+      "repetitions": 3,
+      "retries": 0,
+      "run_id": "b89ed71dd3",
+      "scenario_order": [
+        "auth",
+        "patient_create",
+        "patient_search",
+        "order_create",
+        "sample_create",
+        "sample_attach",
+        "worklist",
+        "order_read",
+        "result_create",
+        "result_read",
+        "result_release",
+        "dashboard",
+        "invoice_create",
+        "payment_create"
+      ],
+      "scenario_sha256": "84e8e408aff3644844b1b21bf708e2a5c1b4cf91532b7dfe929b95e9db5fe2e2",
+      "seed": 20260909,
+      "started_at": "2026-09-13T22:23:55Z",
+      "warmup_iterations_per_worker": 2
+    },
+    "scenarios": [
+      {
+        "description": "Authentification par mot de passe (une fois par utilisateur virtuel et par repetition)",
+        "kind": "read",
+        "method": "POST",
+        "name": "auth",
+        "path_template": "/api/v1/login/access-token"
+      },
+      {
+        "description": "Creation d'un patient synthetique",
+        "kind": "write",
+        "method": "POST",
+        "name": "patient_create",
+        "path_template": "/api/v1/patients"
+      },
+      {
+        "description": "Recherche patient sur l'espace de noms de l'execution",
+        "kind": "read",
+        "method": "GET",
+        "name": "patient_search",
+        "path_template": "/api/v1/patients?q={terme}&limit=20"
+      },
+      {
+        "description": "Creation d'une prescription a deux examens (NFS, GE)",
+        "kind": "write",
+        "method": "POST",
+        "name": "order_create",
+        "path_template": "/api/v1/exam-orders"
+      },
+      {
+        "description": "Creation d'un echantillon avec code-barres",
+        "kind": "write",
+        "method": "POST",
+        "name": "sample_create",
+        "path_template": "/api/v1/samples"
+      },
+      {
+        "description": "Rattachement de l'echantillon a la prescription",
+        "kind": "write",
+        "method": "POST",
+        "name": "sample_attach",
+        "path_template": "/api/v1/exam-orders/{order_id}/collect"
+      },
+      {
+        "description": "File de travail de l'operateur connecte",
+        "kind": "read",
+        "method": "GET",
+        "name": "worklist",
+        "path_template": "/api/v1/worklist/my"
+      },
+      {
+        "description": "Consultation d'un ordre d'examen",
+        "kind": "read",
+        "method": "GET",
+        "name": "order_read",
+        "path_template": "/api/v1/exam-orders/{order_id}"
+      },
+      {
+        "description": "Saisie d'un resultat NFS",
+        "kind": "write",
+        "method": "POST",
+        "name": "result_create",
+        "path_template": "/api/v1/results"
+      },
+      {
+        "description": "Consultation d'un resultat",
+        "kind": "read",
+        "method": "GET",
+        "name": "result_read",
+        "path_template": "/api/v1/results/{result_id}"
+      },
+      {
+        "description": "Liberation du compte rendu selon la configuration en vigueur",
+        "kind": "write",
+        "method": "POST",
+        "name": "result_release",
+        "path_template": "/api/v1/reports/results/{result_id}/release"
+      },
+      {
+        "description": "Synthese d'activite (tableau de bord)",
+        "kind": "read",
+        "method": "GET",
+        "name": "dashboard",
+        "path_template": "/api/v1/stats/summary"
+      },
+      {
+        "description": "Emission d'une facture fictive (compte comptable dedie)",
+        "kind": "write",
+        "method": "POST",
+        "name": "invoice_create",
+        "path_template": "/api/v1/invoices"
+      },
+      {
+        "description": "Encaissement fictif soldant la facture",
+        "kind": "write",
+        "method": "POST",
+        "name": "payment_create",
+        "path_template": "/api/v1/invoices/{invoice_id}/payments"
+      }
+    ],
+    "slow_queries": {
+      "available": true,
+      "count": 7,
+      "examples": [
+        "postgres-1  | 2026-09-13 22:24:54.368 UTC [217] LOG:  duration: 328.652 ms  statement: COMMIT",
+        "ed_at, revoked_at, revocation_reason) VALUES ($1::INTEGER, $2::INTEGER, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::JSONB, $7::VARCHAR, $8::VARCHAR, $9::VARCHAR, $10::INTEGER, $11::INTEGER, $12::TIMESTAMP WITHOUT TIME ZONE, $13::TIMESTAMP WITHOUT TIME ZONE, $14::VARCHAR) RETURNING report_snapshots.id",
+        "ed_at, revoked_at, revocation_reason) VALUES ($1::INTEGER, $2::INTEGER, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::JSONB, $7::VARCHAR, $8::VARCHAR, $9::VARCHAR, $10::INTEGER, $11::INTEGER, $12::TIMESTAMP WITHOUT TIME ZONE, $13::TIMESTAMP WITHOUT TIME ZONE, $14::VARCHAR) RETURNING report_snapshots.id",
+        "ed_at, revoked_at, revocation_reason) VALUES ($1::INTEGER, $2::INTEGER, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::JSONB, $7::VARCHAR, $8::VARCHAR, $9::VARCHAR, $10::INTEGER, $11::INTEGER, $12::TIMESTAMP WITHOUT TIME ZONE, $13::TIMESTAMP WITHOUT TIME ZONE, $14::VARCHAR) RETURNING report_snapshots.id",
+        "ed_at, revoked_at, revocation_reason) VALUES ($1::INTEGER, $2::INTEGER, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::JSONB, $7::VARCHAR, $8::VARCHAR, $9::VARCHAR, $10::INTEGER, $11::INTEGER, $12::TIMESTAMP WITHOUT TIME ZONE, $13::TIMESTAMP WITHOUT TIME ZONE, $14::VARCHAR) RETURNING report_snapshots.id",
+        "ed_at, revoked_at, revocation_reason) VALUES ($1::INTEGER, $2::INTEGER, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::JSONB, $7::VARCHAR, $8::VARCHAR, $9::VARCHAR, $10::INTEGER, $11::INTEGER, $12::TIMESTAMP WITHOUT TIME ZONE, $13::TIMESTAMP WITHOUT TIME ZONE, $14::VARCHAR) RETURNING report_snapshots.id",
+        "postgres-1  | 2026-09-13 22:25:01.240 UTC [241] LOG:  duration: 205.512 ms  execute <unnamed>: SELECT pg_advisory_xact_lock($1::INTEGER, $2::INTEGER) AS pg_advisory_xact_lock_1"
+      ],
+      "threshold_ms": 200
+    },
+    "validity": {
+      "checked_by": "scripts/g0_perf_baseline.py valider()",
+      "failures": [],
+      "valid": true
+    },
+    "validity_policy": {
+      "min_samples_per_scenario_per_level": 10,
+      "note": "Aucun seuil de latence. Les controles portent sur la validite de la mesure, jamais sur la valeur mesuree."
+    }
+  },
+  "schema_version": "1.0.0"
+}
