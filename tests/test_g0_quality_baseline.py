@@ -2383,29 +2383,57 @@ def test_le_manifeste_ne_cite_aucune_ancienne_campagne():
         assert perimee not in texte, f"le manifeste cite encore la campagne {perimee}"
 
 
-def test_le_manifeste_ne_prononce_aucun_statut_acquis():
-    """Un statut se PRONONCE dans un bloc de statuts, pas dans une phrase.
+def test_le_manifeste_declare_l_acceptation_sans_verdict_de_production():
+    """Ce garde-fou a changé d'objet le jour où la revue a conclu.
 
-    Le contrôle porte donc sur les blocs délimités par ```. Interdire ces
-    jetons partout obligerait à ne même pas pouvoir écrire « ceci n'est pas
-    prononcé » : un document ne pourrait plus dire ce qu'il ne dit pas.
+    Il interdisait `QUALITY_BASELINE_ACCEPTED` tant que la revue n'avait pas
+    tranché — c'était juste, et ça ne l'est plus : la seconde revue
+    indépendante a accepté la preuve, et le manifeste doit pouvoir le dire.
+
+    Ce qui reste interdit, et le restera dans cette PR quoi qu'il arrive, ce
+    sont les verdicts qui portent sur le PRODUIT et non sur la preuve. Accepter
+    une mesure n'a jamais rendu un laboratoire apte à recevoir des patients.
     """
     texte = _lire(DOCS / "QUALITY_BASELINE_CANDIDATE_MANIFEST.md")
-    # Deux etats d'attente sont legitimes : MEASUREMENT_PENDING quand la
-    # campagne reste a executer (commit de code), REVIEW_PENDING quand elle est
-    # mesuree et attend la revue (commit documentaire). Exiger le second en
-    # permanence obligerait le manifeste a se dire « en attente de revue » alors
-    # qu'aucune mesure n'a encore eu lieu.
-    assert "MEASUREMENT_PENDING" in texte or "REVIEW_PENDING" in texte, (
-        "le manifeste ne declare aucun statut d'attente"
-    )
     blocs = re.findall(r"```(.*?)```", texte, flags=re.DOTALL)
     assert blocs, "le manifeste ne declare plus aucun bloc de statuts"
     prononces: set[str] = set()
     for bloc in blocs:
         prononces |= set(re.findall(r"[A-Z][A-Z0-9_]{3,}", bloc))
-    for interdit in ("QUALITY_BASELINE_ACCEPTED", "G0_LOT_C_EVIDENCE_REVIEWED", "G0_LOT_C_MERGED"):
+
+    assert "QUALITY_BASELINE_ACCEPTED" in prononces, (
+        "le manifeste ne consigne pas l'acceptation prononcee par la revue"
+    )
+    for interdit in ("G0_PASS", "REAL_DATA_GO", "SITE_PRODUCTION_GO", "DISTRIBUTION_GO"):
         assert interdit not in prononces, f"le manifeste prononce {interdit}"
+    # Et les statuts de gouvernance doivent rester visibles, non silencieux.
+    assert "REAL_DATA_NO_GO" in prononces
+    assert "DISTRIBUTION_NO_GO" in prononces
+
+
+def test_la_decision_de_revue_separe_la_preuve_et_le_produit():
+    """Le document qui acte l'acceptation doit dire ce qu'elle n'emporte pas."""
+    texte = _aplati(DOCS / "QUALITY_BASELINE_REVIEW_DECISION.md")
+    assert "QUALITY_BASELINE_ACCEPTED" in texte
+    assert "G0_LOT_C_INDEPENDENT_REVIEW = ACCEPTED" in texte
+    for mention in (
+        # `_aplati` ecrase les espaces d'alignement : chercher la forme alignee
+        # dans un texte aplati ne trouverait jamais rien.
+        "G0_PASS = NON",
+        "SITE_PRODUCTION_GO = NON",
+        "REAL_DATA_NO_GO",
+        "DISTRIBUTION_NO_GO",
+        "aucun seuil de couverture",
+    ):
+        assert mention.lower() in texte.lower(), f"la decision ne dit pas : « {mention} »"
+    for constat in (
+        "CSA_SITE_PRODUCTION_GO_BLOCKER",
+        "INVOICE_CONCURRENCY_REMEDIATION_REQUIRED",
+        "PERFORMANCE_BOTTLENECK_PROFILING_REQUIRED",
+        "SITE_OPERATIONAL_PROFILE_REQUIRED",
+    ):
+        assert constat in texte, f"la decision ne conserve pas {constat}"
+    assert "signature" in texte.lower(), "la decision ne dit pas qu'aucune signature n'est apposee"
 
 
 @pytest.mark.parametrize(

@@ -13,12 +13,19 @@
 > visibilité du dépôt.
 
 ```
-QUALITY_BASELINE_CANDIDATE = REVIEW_PENDING
+QUALITY_BASELINE_ACCEPTED
+G0_LOT_C_INDEPENDENT_REVIEW = ACCEPTED
+review_date_utc             = 2026-09-13
 ```
 
-**Ce document ne prononce pas `QUALITY_BASELINE_ACCEPTED`.** Une baseline ne
-devient acceptée qu'après revue indépendante, et c'est cette revue — pas
-l'auteur de la mesure — qui décide.
+La seconde revue indépendante a conclu à l'acceptation. La campagne est
+archivée, immuable, sous
+`artifacts/g0/accepted/quality/02795a81b801b784572089d6a7860ba889d10a4c/`.
+
+> **L'acceptation porte sur la PREUVE, pas sur le produit.** Ni `G0_PASS`, ni
+> `REAL_DATA_GO`, ni `SITE_PRODUCTION_GO`, ni `DISTRIBUTION_GO` ne sont
+> prononcés, et les cinq constats défavorables de la campagne restent ouverts.
+> Voir [`QUALITY_BASELINE_REVIEW_DECISION.md`](QUALITY_BASELINE_REVIEW_DECISION.md).
 
 > **Deuxième campagne candidate.** La première a fait l'objet d'une revue
 > indépendante concluant `CHANGES_REQUIRED` : version de produit Valkey fausse,
@@ -27,11 +34,6 @@ l'auteur de la mesure — qui décide.
 > la campagne précédente : ses artefacts ne sont plus ceux que ce code produit.
 > Celle-ci est entièrement nouvelle — aucun hash, aucune identité n'a été
 > reconduit.
-
-**Ce document ne prononce pas `QUALITY_BASELINE_ACCEPTED`.** Une baseline ne
-devient acceptée qu'après revue indépendante, et c'est cette revue — pas
-l'auteur de la mesure — qui décide. Tant que le statut ci-dessus n'a pas changé
-de main, rien ici n'est acquis.
 
 ## 1. Ce qu'est ce document
 
@@ -44,8 +46,9 @@ Ce manifeste fait l'inverse : il **désigne** une exécution précise, avec de q
 la retrouver et de quoi vérifier que les fichiers qu'on lit sont bien ceux
 qu'elle a produits. Les artefacts eux-mêmes restent des artefacts de CI
 (90 jours de rétention). Leur archivage durable sous
-`artifacts/g0/accepted/quality/<measurement_source_sha>/` est une **étape
-postérieure à la revue**, délibérément non faite ici.
+`artifacts/g0/accepted/quality/02795a81b801b784572089d6a7860ba889d10a4c/`
+**existe désormais** : la revue a eu lieu, et les cinq artefacts y sont figés
+avec leur manifeste d'intégrité.
 
 ## 2. Identités de la campagne
 
@@ -170,11 +173,11 @@ rien ici ne doit être lu comme si elle l'avait été.
 ## 7. Statut
 
 ```
-QUALITY_BASELINE_CANDIDATE_READY
-QUALITY_BASELINE_CANDIDATE     = REVIEW_PENDING
+QUALITY_BASELINE_ACCEPTED
+G0_LOT_C_INDEPENDENT_REVIEW    = ACCEPTED
 CLINICAL_STATUS                = REAL_DATA_NO_GO
 DISTRIBUTION_STATUS            = DISTRIBUTION_NO_GO
 ```
 
-Ni `QUALITY_BASELINE_ACCEPTED`, ni `G0_LOT_C_EVIDENCE_REVIEWED`, ni
-`G0_LOT_C_MERGED` ne sont prononcés. La PR #150 reste ouverte et non fusionnée.
+Restent **non prononcés** : `G0_PASS`, `REAL_DATA_GO`, `SITE_PRODUCTION_GO`,
+`DISTRIBUTION_GO`. Accepter une preuve n'est pas accepter un produit.

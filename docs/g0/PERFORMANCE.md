@@ -21,6 +21,16 @@
 > **G0 — Performance baseline**) au moyen de
 > [`scripts/g0_perf_baseline.py`](../../scripts/g0_perf_baseline.py).
 
+> **Campagne acceptée.** La seconde revue indépendante a conclu
+> `G0_LOT_C_INDEPENDENT_REVIEW = ACCEPTED` le 2026-09-13. Les cinq artefacts
+> sont archivés, immuables, sous
+> [`artifacts/g0/accepted/quality/02795a81b801b784572089d6a7860ba889d10a4c/`](../../artifacts/g0/accepted/quality/02795a81b801b784572089d6a7860ba889d10a4c/).
+>
+> L'acceptation porte sur la **validité de la preuve**, jamais sur l'aptitude du
+> produit à la production clinique. Les constats défavorables restent ouverts —
+> voir [`QUALITY_BASELINE_REVIEW_DECISION.md`](QUALITY_BASELINE_REVIEW_DECISION.md).
+> Aucun seuil de couverture ni de performance n'a été imposé par G0.
+
 ## 1. Pourquoi un banc qui n'échoue pas sur les chiffres
 
 Un banc d'essai qui échoue quand les chiffres déplaisent finit par être réglé
