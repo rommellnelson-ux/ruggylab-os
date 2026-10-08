@@ -143,6 +143,23 @@ Conditions non négociables pour que A soit acceptable (voir §6) :
    log/metric relatif à une donnée métier est préfixé par le tenant.
 6. Aucun fallback vers un tenant par défaut, nulle part.
 
+### 4.1 Synthèse normative de la décision
+
+| Clé | Décision |
+|---|---|
+| **RECOMMENDED_ARCHITECTURE** | Base PostgreSQL partagée, schéma partagé, discriminant `tenant_id UUID NOT NULL` sur toute table TENANT/SITE, **RLS `ENABLE` + `FORCE`** en défense en profondeur. Un tenant peut être déployé dans une instance dédiée (silo) avec le même code et le même schéma ; aucune branche de code par mode. |
+| **WHY** | Seule option offrant une chaîne de migration unique (Alembic, un head), une isolation vérifiable par la base (RLS sur rôle non privilégié + FK composites), l'administration plate-forme auditée et un coût d'exploitation compatible avec l'équipe ; migration depuis l'existant additive (backfill vers un tenant fondateur). |
+| **REJECTED_ALTERNATIVES** | **B** (schéma par tenant) : isolation dépendante du `search_path`, Alembic × N, catalogue qui gonfle — rejetée. **C** (base par tenant) comme modèle général : coût linéaire, audit/administration éclatés, aucune capacité de déploiement existante — rejetée comme défaut, conservée comme mode de déploiement d'exception via D. **A sans RLS** : isolation reposant sur le seul code applicatif — rejetée. |
+| **TENANT_BOUNDARY** | Frontière dure de sécurité, de propriété des données, d'export, de restauration et de facturation. Appliquée par RLS + FK composites + préfixes cache/fichiers/pub-sub. Jamais confondue avec SITE ou UNIT. |
+| **SITE_BOUNDARY** | Frontière d'autorisation **à l'intérieur** d'un tenant (lieu physique : analyseurs, stocks, échantillons). `site_id NOT NULL` sur les tables SITE ; filtre applicatif via `TenantContext.allowed_site_ids` ; pas de RLS site en première intention. |
+| **UNIT_BOUNDARY** | Unité organisationnelle (`org_units`, FK `org_unit_id`) rattachée à un site ; attribut d'autorisation, pas de propriété. Fail-closed (suppression du pool `unit IS NULL`, sous réserve H6). Nom réservé pour éviter la collision avec les unités de mesure. |
+| **TENANT_CONTEXT_SOURCE_OF_TRUTH** | `TenantMembership` active en base pour l'identité authentifiée. En-têtes, claims, paramètres de chemin/requête = sélection candidate uniquement. Manquant / invalide / non autorisé ⇒ DENY ; aucun fallback (§6). |
+| **RLS_STRATEGY** | Politique `tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid` en `USING` et `WITH CHECK` ; `set_config(..., true)` par transaction ; rôle `ruggylab_app` NOSUPERUSER NOBYPASSRLS non propriétaire ; rôle de migration distinct ; activation table par table après NOT NULL (§7). |
+| **PLATFORM_ADMIN_STRATEGY** | `PlatformAdminContext` distinct, jamais dérivé du rôle `admin` de tenant ; motif + référence de ticket + expiration obligatoires ; rôle BD `ruggylab_platform_ops` NOBYPASSRLS avec politiques dédiées ; aucun accès clinique par défaut ; audit dans `platform_audit_events` immuable. |
+| **BACKUP_RESTORE_STRATEGY** | Sauvegarde globale chiffrée par rôle `ruggylab_backup` hors application ; restauration d'un tenant par extraction logique filtrée depuis une base de transit, ordre topologique des FK, contrôles d'orphelins/tenant étranger = 0, double validation ; silo restauré par instance. Outillage exigé avant le second tenant réel ([plan](TENANCY_MIGRATION_PLAN.md)). |
+| **MIGRATION_SEQUENCE** | 0. remédiation registre de métadonnée + séparation des rôles BD + harness A/B → 1. tables `tenants`/`sites`/`org_units`/`tenant_memberships` (additif) → 2. vertical slice `exam_tariffs` → 3+. extension par graphe, du non clinique au clinique, `audit_events` en dernier ; chaque table : expand → backfill → verify → NOT NULL → RLS → contract. |
+| **ROLLBACK_STRATEGY** | Chaque étape réversible sans perte avant contraction : `NO FORCE`/`DISABLE` RLS + `DROP POLICY`, `DROP NOT NULL`, suppression des index composites, `DROP COLUMN tenant_id` (recalculable tant qu'un seul tenant). Les contractions (suppression des UNIQUE globales) sont des migrations séparées, postérieures à la validation ; `downgrade()` testé upgrade → downgrade → upgrade. |
+
 ---
 
 ## 5. Modèle conceptuel

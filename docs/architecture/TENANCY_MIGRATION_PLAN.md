@@ -13,7 +13,7 @@ Principe directeur : **expand → backfill → verify → contract**, table par 
 
 | # | Action | Sortie vérifiable |
 |---|---|---|
-| 0.1 | Corriger l'enregistrement de la métadonnée Alembic (P1-ALEMBIC-METADATA : `aes_incidents`, `epi_notifications`, `reagent_lots` absents de `app.db.base`) | `alembic check` sans diff sur base à jour |
+| 0.1 | Corriger l'enregistrement de la métadonnée Alembic (P0-3 FOUNDATION_SCHEMA_REGISTRATION_GAP : `aes_incidents`, `epi_notifications`, `reagent_lots` absents de `app.db.base`) | `alembic check` sans diff sur base à jour |
 | 0.2 | Séparer les rôles PostgreSQL : `ruggylab_owner` / `ruggylab_migrator` / `ruggylab_app` (NOSUPERUSER NOBYPASSRLS) ; l'application cesse d'utiliser le superutilisateur | Test : `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user` → `f, f` au démarrage de l'API |
 | 0.3 | Harness d'isolation A/B (PostgreSQL réel, deux tenants jetables) | Tests T01–T04, T16–T18 exécutables, rouges tant que rien n'est tenantisé |
 | 0.4 | Décisions humaines H1, H2, H4 de l'ADR | Consignées dans l'ADR → statut ACCEPTED |
